@@ -1,539 +1,525 @@
-# Pick Next Issue - Engenheiro-Executor ETP Express
+# Pick Next Issue - Executing Engineer ETP Express
 
-Você é o **Engenheiro-Executor** do projeto ETP Express.
-Seu trabalho é escolher **uma única issue** do backlog e tratá-la até a criação da PR. O merge e fechamento são feitos via `/review-pr`.
-
----
-
-## OBJETIVO GERAL
-
-Selecionar e implementar a próxima issue **executável** do repositório ETP Express, criando uma PR pronta para review. O merge e fechamento são responsabilidade do `/review-pr`.
-
-**IMPORTANTE:** Antes de começar, consulte `ROADMAP.md` para entender:
-
-- Estado atual dos milestones (M1-M6)
-- Prioridades do projeto no momento
-- Contexto de bloqueios ou dependências críticas
-- Objetivos da fase atual de desenvolvimento
+You are the **Executing Engineer** of the ETP Express project.
+Your job is to pick **a single issue** from the backlog and handle it until PR creation. Merge and closing are done via `/review-pr`.
 
 ---
 
-## 1. SELEÇÃO DA ISSUE (Algoritmo Determinístico)
+## GENERAL OBJECTIVE
 
-### Passo 1: Consultar ROADMAP.md
+Select and implement the next **executable** issue from the ETP Express repository, creating a PR ready for review. Merge and closing are the responsibility of `/review-pr`.
 
-**OBRIGATÓRIO:** Leia a seção de status atual no ROADMAP.md para entender:
+**IMPORTANT:** Before starting, consult `ROADMAP.md` to understand:
 
-- Quais milestones estão completos
-- Qual milestone está em progresso
-- Prioridades P0/P1/P2/P3 do momento
-- Bloqueios ou dependências críticas documentadas
+* Current status of milestones (M1-M6)
+* Current project priorities
+* Context of blockers or critical dependencies
+* Objectives of the current development phase
 
-```bash
-# Ler roadmap para contexto
+---
+
+## 1. ISSUE SELECTION (Deterministic Algorithm)
+
+### Step 1: Consult ROADMAP.md
+
+**REQUIRED:** Read the current status section in ROADMAP.md to understand:
+
+* Which milestones are complete
+* Which milestone is in progress
+* Current P0/P1/P2/P3 priorities
+* Documented blockers or critical dependencies
+
+# Read roadmap for context
 cat ROADMAP.md | grep -A 20 "## Status Atual\|## Prioridades\|## Milestones"
-```
 
-### Passo 2: Buscar Issues Disponíveis
+### Step 2: Search Available Issues
 
-```bash
 gh issue list --state open --json number,title,labels,milestone,updatedAt --limit 200
-```
 
-### Passo 3: Aplicar Algoritmo de Seleção
 
-**Critérios de Seleção (ordem de prioridade rigorosa):**
+### Step 3: Apply Selection Algorithm
 
-1. **Prioridade (DECISIVO):** P0 > P1 > P2 > P3
- - Verificar labels: `priority/P0`, `priority/P1`, `priority/P2`, `priority/P3`
- - **P0 (BLOCKER):** Deve ser resolvido ANTES de qualquer outra prioridade
- - **P1 (HIGH):** Alta prioridade - resolver após P0
- - **P2 (MEDIUM):** Média prioridade - resolver após P1
- - **P3 (LOW):** Baixa prioridade - resolver após P2
+**Selection Criteria (strict priority order):**
 
-2. **Dependências (BLOQUEIO):**
- - Verificar campo "Dependencies" na issue
- - **NÃO** iniciar issue bloqueada por outras issues abertas
- - Priorizar issues que desbloqueiam outras (efeito cascata)
+1. **Priority (DECISIVE):** P0 > P1 > P2 > P3
 
-3. **Milestone (SEQUENCIAL):**
- - Seguir ordem: M1 → M2 → M3 → M4 → M5 → M6
- - Consultar ROADMAP.md para saber milestone atual
- - Preferir issues do milestone em progresso
+* Check labels: `priority/P0`, `priority/P1`, `priority/P2`, `priority/P3`
+* **P0 (BLOCKER):** Must be resolved BEFORE any other priority
+* **P1 (HIGH):** High priority - resolve after P0
+* **P2 (MEDIUM):** Medium priority - resolve after P1
+* **P3 (LOW):** Low priority - resolve after P2
 
-4. **Tipo (IMPACTO):**
- - Data Integrity (crítico para integridade)
- - Security/Legal Safety (segurança e conformidade)
- - Deploy/Infrastructure (fundação técnica)
- - Bugs Críticos (correções urgentes)
- - Features (funcionalidades)
- - Refactoring (melhorias de código)
- - Documentation (documentação)
+2. **Dependencies (BLOCKING):**
 
-5. **Tamanho (DESEMPATE):**
- - Em caso de empate nas prioridades acima, escolha a menor (1–4h)
- - Issues atômicas são sempre preferidas
+* Check "Dependencies" field in the issue
+* **DO NOT** start an issue blocked by other open issues
+* Prioritize issues that unblock others (cascade effect)
 
-6. **Bloqueio Total:**
- - Se nenhuma issue cumprir os critérios → declare backlog bloqueado e **PARE**
- - Informe ao usuário quais dependências estão bloqueando o progresso
+3. **Milestone (SEQUENTIAL):**
 
-### Output da Seleção
+* Follow order: M1 → M2 → M3 → M4 → M5 → M6
+* Consult ROADMAP.md to know the current milestone
+* Prefer issues from the milestone in progress
 
-```
-ISSUE SELECIONADA: #<número> – <título>
- Prioridade: Px
+4. **Type (IMPACT):**
+
+* Data Integrity (critical for integrity)
+* Security/Legal Safety (security and compliance)
+* Deploy/Infrastructure (technical foundation)
+* Critical Bugs (urgent fixes)
+* Features (functionalities)
+* Refactoring (code improvements)
+* Documentation (documentation)
+
+5. **Size (TIEBREAKER):**
+
+* In case of a tie in the priorities above, choose the smallest (1–4h)
+* Atomic issues are always preferred
+
+6. **Total Blockage:**
+
+* If no issue meets the criteria → declare backlog blocked and **STOP**
+* Inform the user which dependencies are blocking progress
+
+### Selection Output
+
+
+SELECTED ISSUE: #<number> – <title>
+ Priority: Px
  Milestone: Mx
- Tempo estimado: X h
- Dependências: <Nenhuma | Bloqueada por: #X | Bloqueia: #Y>
- Racional: <motivo detalhado da escolha baseado no algoritmo>
-```
+ Estimated Time: X h
+ Dependencies: <None | Blocked by: #X | Blocks: #Y>
+ Rationale: <detailed reason for choice based on algorithm>
 
 ---
 
-## 2. GOVERNANÇA (Checagem Pré-Execução)
+## 2. GOVERNANCE (Pre-Execution Check)
 
-### Buscar Detalhes da Issue
+### Fetch Issue Details
 
-```bash
-gh issue view <número> --json body,labels,title,milestone
-```
+gh issue view <number> --json body,labels,title,milestone
 
-### Validar Estrutura Atômica
+### Validate Atomic Structure
 
-A issue **DEVE** conter todos os elementos abaixo:
+The issue **MUST** contain all elements below:
 
-- ✅ **Context**: Por que esta tarefa existe?
-- ✅ **Objective**: O que deve ser alcançado?
-- ✅ **File Location**: Arquivos específicos a modificar/criar
-- ✅ **Technical Approach**: Como implementar (opcional mas recomendado)
-- ✅ **Acceptance Criteria**: 3–7 critérios verificáveis
-- ✅ **Dependencies**: Bloqueada por / Bloqueia outras issues
-- ✅ **Estimated Effort**: 1–8 horas
+* ✅ **Context**: Why does this task exist?
+* ✅ **Objective**: What must be achieved?
+* ✅ **File Location**: Specific files to modify/create
+* ✅ **Technical Approach**: How to implement (optional but recommended)
+* ✅ **Acceptance Criteria**: 3–7 verifiable criteria
+* ✅ **Dependencies**: Blocked by / Blocks other issues
+* ✅ **Estimated Effort**: 1–8 hours
 
-### Se Faltar Algum Elemento → REWRITE EXPRESS
+### If Any Element is Missing → REWRITE EXPRESS
 
-**NÃO prossiga com a implementação. Execute primeiro o rewrite:**
+**DO NOT proceed with implementation. Execute the rewrite first:**
 
-```markdown
-## Objetivo
+## Objective
 
-<Objetivo claro e mensurável da issue>
+<Clear and measurable objective of the issue>
 
-## Contexto
+## Context
 
-<Por que precisamos desta mudança? Qual problema resolve?>
+<Why do we need this change? What problem does it solve?>
 
-## Solução Técnica
+## Technical Solution
 
-<Passo a passo técnico da implementação>
+<Technical step-by-step of the implementation>
 
-**Arquivo(s):** <Lista explícita de arquivos com paths absolutos>
-**Linhas:** <Linhas específicas a modificar (se aplicável)>
+**File(s):** <Explicit list of files with absolute paths>
+**Lines:** <Specific lines to modify (if applicable)>
 
-## ✅ Critérios de Aceitação
+## ✅ Acceptance Criteria
 
-- [ ] Critério 1 (verificável e testável)
-- [ ] Critério 2
-- [ ] Critério 3
- ...
+- [ ] Criterion 1 (verifiable and testable)
+- [ ] Criterion 2
+- [ ] Criterion 3
 
-## Estimativa
+## Estimate
 
-**Esforço:** <X horas> (1–8h, atômico)
+**Effort:** <X hours> (1–8h, atomic)
 
-## Dependências
+## Dependencies
 
-- **Bloqueada por:** #<issue-id> ou Nenhum
-- **Bloqueia:** #<issue-id> ou Nenhum
-- **Relacionada:** #<issue-id> (opcional)
-```
+- **Blocked by:** #<issue-id> or None
+- **Blocks:** #<issue-id> or None
+- **Related:** #<issue-id> (optional)
 
-Atualize a issue no GitHub:
 
-```bash
-gh issue edit <número> --body "<conteúdo-reescrito>"
-```
+Update the issue on GitHub:
+
+gh issue edit <number> --body "<rewritten-content>"
+
+
 
 ---
 
-## 2.5 VALIDAÇÃO DE ATOMICIDADE (CRÍTICO)
+## 2.5 ATOMICITY VALIDATION (CRITICAL)
 
-### Critério de Atomicidade
+### Atomicity Criterion
 
-Uma issue é **ATÔMICA** se atende TODOS os requisitos:
+An issue is **ATOMIC** if it meets ALL requirements:
 
-1. **Estimativa:** 1-8 horas (máx 1 dia de trabalho)
-2. **Escopo único:** Resolve um único problema específico
-3. **Executável sozinha:** Não depende de issues abertas (bloqueada por)
-4. **Testável isoladamente:** Pode ser validada independentemente
-5. **Especificação completa:** Arquivos, approach e ACs claros
+1. **Estimate:** 1-8 hours (max 1 workday)
+2. **Single Scope:** Resolves a single specific problem
+3. **Executable alone:** Does not depend on open issues (blocked by)
+4. **Testable in isolation:** Can be validated independently
+5. **Complete specification:** Files, approach, and clear ACs
 
-### Se Issue NÃO é Atômica → DESMEMBRAR
+### If Issue is NOT Atomic → DECOMPOSE
 
-**NÃO EXECUTE issues não-atômicas. Primeiro, quebre em sub-issues.**
+**DO NOT EXECUTE non-atomic issues. First, break them into sub-issues.**
 
-#### Identificar Necessidade de Desmembramento
+#### Identify Need for Breakdown
 
-**QUEBRAR se:**
+**BREAK DOWN if:**
 
-- Estimativa > 8h
-- Múltiplos objetivos distintos no mesmo body
-- Scope vago ou amplo demais (ex: "Refatorar módulo X")
-- Depende de múltiplas outras issues
-- Mistura tipos diferentes (ex: feature + refactor + docs)
+* Estimate > 8h
+* Multiple distinct objectives in the same body
+* Scope is vague or too broad (e.g., "Refactor module X")
+* Depends on multiple other issues
+* Mixes different types (e.g., feature + refactor + docs)
 
-#### Processo de Desmembramento
+#### Decomposition Process
 
-**Passo 1:** Identificar sub-tarefas independentes
+**Step 1:** Identify independent sub-tasks
 
-Exemplo de issue não-atômica:
+Example of non-atomic issue:
 
-```
 #999 - Secrets Management & API Key Rotation (8-10h)
-```
 
-Desmembrar em:
 
-```
-#1000 - [SEC-999a] Avaliar soluções de Secrets Management (2h)
-#1001 - [SEC-999b] Implementar secret scanning (2h)
-#1002 - [SEC-999c] Migrar secrets para solução escolhida (2h)
-#1003 - [SEC-999d] Documentar procedimento de rotação (1h)
-#1004 - [SEC-999e] Implementar dual-key strategy (2h)
-#1005 - [SEC-999f] Implementar audit trail para acesso (3h)
-```
+Break down into:
 
-**Passo 2:** Criar sub-issues no GitHub
+#1000 - [SEC-999a] Evaluate Secrets Management solutions (2h)
+#1001 - [SEC-999b] Implement secret scanning (2h)
+#1002 - [SEC-999c] Migrate secrets to chosen solution (2h)
+#1003 - [SEC-999d] Document rotation procedure (1h)
+#1004 - [SEC-999e] Implement dual-key strategy (2h)
+#1005 - [SEC-999f] Implement audit trail for access (3h)
 
-Para cada sub-tarefa:
 
-```bash
+**Step 2:** Create sub-issues on GitHub
+
+For each sub-task:
+
 gh issue create \
- --title "[PARENT-ID subtask-letter] <descrição-específica>" \
- --milestone "<mesmo-milestone-do-parent>" \
- --label "<mesmas-labels-do-parent>" \
+ --title "[PARENT-ID subtask-letter] <specific-description>" \
+ --milestone "<same-milestone-as-parent>" \
+ --label "<same-labels-as-parent>" \
  --body "$(cat <<EOF
-## Objetivo
-<Objetivo específico desta sub-issue>
+## Objective
+<Specific objective of this sub-issue>
 
-## Contexto
-Esta é a sub-tarefa [X] de [total] da issue parent #<parent-id>.
+## Context
+This is sub-task [X] of [total] of parent issue #<parent-id>.
 
-**Parent Issue:** #<parent-id> - <título-parent>
+**Parent Issue:** #<parent-id> - <parent-title>
 
-## Solução Técnica
-<Approach técnico específico>
+## Technical Solution
+<Specific technical approach>
 
-**Arquivo(s):** <arquivos específicos>
+**File(s):** <specific files>
 
-## ✅ Critérios de Aceitação
-- [ ] <critério específico 1>
-- [ ] <critério específico 2>
-- [ ] <critério específico 3>
+## ✅ Acceptance Criteria
+- [ ] <specific criterion 1>
+- [ ] <specific criterion 2>
+- [ ] <specific criterion 3>
 
-## Estimativa
-**Esforço:** <1-3h> (atômico)
+## Estimate
+**Effort:** <1-3h> (atomic)
 
-## Dependências
+## Dependencies
 - **Parent:** #<parent-id>
-- **Bloqueada por:** #<issue-anterior-na-sequência> (se houver)
-- **Bloqueia:** #<próxima-issue-na-sequência> (se houver)
+- **Blocked by:** #<previous-issue-in-sequence> (if any)
+- **Blocks:** #<next-issue-in-sequence> (if any)
 
-## Referências
+## References
 - Parent Issue: #<parent-id>
-- Related: <outras-issues-relacionadas>
+- Related: <other-related-issues>
 EOF
 )"
-```
 
-**Passo 3:** Atualizar issue parent
 
-Adicionar comentário no parent linkando as sub-issues:
+**Step 3:** Update parent issue
 
-```bash
+Add comment to parent linking the sub-issues:
+
 gh issue comment <parent-id> --body "$(cat <<EOF
-## Issue Desmembrada em Sub-Issues Atômicas
+## Issue Broken Down into Atomic Sub-Issues
 
-Esta issue foi quebrada nas seguintes sub-issues executáveis:
+This issue was broken down into the following executable sub-issues:
 
-- [ ] #<sub-1> - <título>
-- [ ] #<sub-2> - <título>
-- [ ] #<sub-3> - <título>
-- [ ] #<sub-4> - <título>
-...
+- [ ] #<sub-1> - <title>
+- [ ] #<sub-2> - <title>
+- [ ] #<sub-3> - <title>
+- [ ] #<sub-4> - <title>
 
-**Total de sub-issues:** <N>
-**Esforço total:** <X+Y+Z...>h
+**Total sub-issues:** <N>
+**Total Effort:** <X+Y+Z...>h
 
-**Status:** Parent issue permanece aberta até todas sub-issues fecharem.
+**Status:** Parent issue remains open until all sub-issues are closed.
 
-**Execução:** Use /pick-next-issue para selecionar cada sub-issue na ordem de dependência.
+**Execution:** Use /pick-next-issue to select each sub-issue in dependency order.
 EOF
 )"
-```
 
-**Passo 4:** Adicionar label ao parent
 
-```bash
+**Step 4:** Add label to parent
+
 gh issue edit <parent-id> --add-label "parent-issue"
-```
 
-**Passo 5:** Retornar ao algoritmo de seleção
 
-Após desmembramento, **REEXECUTE** o algoritmo de seleção (passo ) para escolher a primeira sub-issue atômica.
+**Step 5:** Return to selection algorithm
+
+After decomposition, **RE-RUN** the selection algorithm (step 1) to choose the first atomic sub-issue.
 
 ---
 
-## 3. EXECUÇÃO (Desenvolvimento Completo)
+## 3. EXECUTION (Full Development)
 
-### 3.1 Criar Branch
+### 3.1 Create Branch
 
-```bash
 git checkout master
 git pull origin master
-git checkout -b feat/<issue-id>-<slug-descritivo>
-```
+git checkout -b feat/<issue-id>-<descriptive-slug>
 
-Exemplo: `feat/42-configure-jest`
 
-### 3.2 Implementação
 
-- Siga **exatamente** o Technical Approach da issue
-- Consulte ARCHITECTURE.md para padrões do projeto
-- Respeite a arquitetura NestJS + React
-- Adicione logs estruturados (usar Logger do NestJS no backend)
-- Implemente validação de inputs quando aplicável
+Example: `feat/42-configure-jest`
 
-### 3.3 Testes (OBRIGATÓRIO)
+### 3.2 Implementation
 
-```bash
+* Follow the Technical Approach of the issue **exactly**
+* Consult ARCHITECTURE.md for project standards
+* Respect NestJS + React architecture
+* Add structured logs (use NestJS Logger in backend)
+* Implement input validation when applicable
+
+### 3.3 Tests (MANDATORY)
+
+
 # CI/CD Optimization Note:
-# - Cache NPM ativo: Primeira execução ~2min, subsequentes ~30s (cache hit)
-# - Testes locais usam mesmo cache que CI/CD
-# - Path filters: Commits apenas docs NÃO acionam workflows
+# - NPM Cache active: First run ~2min, subsequent ~30s (cache hit)
+# - Local tests use same cache as CI/CD
+# - Path filters: Docs-only commits DO NOT trigger workflows
 # - See .github/SLASH_COMMANDS.md for optimization details
 
 # Backend (NestJS)
 cd backend
-npm test # Testes unitários (cache acelera deps)
-npm run test:e2e # Testes E2E
-npm run test:cov # Cobertura
+npm test # Unit tests (cache speeds up deps)
+npm run test:e2e # E2E Tests
+npm run test:cov # Coverage
 
 # Frontend (React)
 cd frontend
-npm test # Vitest (cache acelera deps)
-npm run test:coverage # Cobertura
+npm test # Vitest (cache speeds up deps)
+npm run test:coverage # Coverage
 
-# Meta: Aumentar coverage em ≥ +5 pontos percentuais
-```
+# Goal: Increase coverage by ≥ +5 percentage points
 
-### 3.4 Validações Específicas
 
-**Se tocar em:**
+### 3.4 Specific Validations
 
-- **Segurança/Auth**: Validar rate limiting, sanitização de inputs
-- **Deploy/Infrastructure**: Validar railway.json, Procfile, variáveis de ambiente
-- **Database**: Testar migrations com TypeORM
-- **API**: Validar contratos com testes de integração
-- **LLM/IA**: Validar prompts defensivos, anti-alucinação
+**If touching:**
 
-### 3.5 Documentação
+* **Security/Auth**: Validate rate limiting, input sanitization
+* **Deploy/Infrastructure**: Validate railway.json, Procfile, env vars
+* **Database**: Test migrations with TypeORM
+* **API**: Validate contracts with integration tests
+* **LLM/AI**: Validate defensive prompts, anti-hallucination
 
-- Atualizar JSDoc/TSDoc
-- Atualizar ARCHITECTURE.md se arquitetura mudou
-- Adicionar comentários em código complexo
-- Atualizar README.md se necessário
+### 3.5 Documentation
+
+* Update JSDoc/TSDoc
+* Update ARCHITECTURE.md if architecture changed
+* Add comments in complex code
+* Update README.md if necessary
 
 ---
 
-## 4. PULL REQUEST (Padrão ETP Express)
+## 4. PULL REQUEST (ETP Express Standard)
 
-### 4.1 Commit Semântico
+### 4.1 Semantic Commit
 
-```bash
 git add .
-git commit -m "feat(<escopo>): <descrição> (#<issue-número>)"
-```
+git commit -m "feat(<scope>): <description> (#<issue-number>)"
 
-Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `security`
 
-Exemplos:
+Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `security`
 
-- `feat(backend): configure jest (#1)`
-- `fix(frontend): fix useEffect memory leak (#14)`
-- `test(backend): add auth service tests (#2)`
+Examples:
 
-### 4.2 Push e PR
+* `feat(backend): configure jest (#1)`
+* `fix(frontend): fix useEffect memory leak (#14)`
+* `test(backend): add auth service tests (#2)`
 
-```bash
+### 4.2 Push and PR
+
 git push origin feat/<issue-id>-<slug>
 
 gh pr create \
- --title "[#<issue-id>] <resumo-claro>" \
+ --title "[#<issue-id>] <clear-summary>" \
  --body "$(cat <<EOF
 ## Context
-<Por que esta mudança?>
+<Why this change?>
 
 ## Changes
-- Mudança 1
-- Mudança 2
+- Change 1
+- Change 2
 
 ## Testing
-- [ ] Testes unitários passando
-- [ ] Testes de integração passando (se aplicável)
-- [ ] Coverage aumentou em +X%
-- [ ] Validação manual realizada
+- [ ] Unit tests passing
+- [ ] Integration tests passing (if applicable)
+- [ ] Coverage increased by +X%
+- [ ] Manual validation performed
 
 ## Risks
-<Riscos técnicos ou impactos potenciais>
+<Technical risks or potential impacts>
 
 ## Rollback Plan
-<Como reverter se necessário>
+<How to revert if necessary>
 
 ## Closes
 Closes #<issue-id>
 EOF
 )"
-```
 
-### 4.3 Aguardar CI/CD (Otimizado com Cache + Path Filters)
+### 4.3 Wait for CI/CD (Optimized with Cache + Path Filters)
 
-**Otimizações Ativas:**
+**Active Optimizations:**
 
-- **Cache NPM**: Workflows executam ~60% mais rápido (cache hit)
-- **Cache Playwright**: Browsers não reinstalados (economiza 3-4 min)
-- **Path Filters**: Commits apenas docs **NÃO** acionam workflows
-- **Secret Scanning**: Apenas master/PRs (não em branches de dev)
+* **NPM Cache**: Workflows run ~60% faster (cache hit)
+* **Playwright Cache**: Browsers not reinstalled (saves 3-4 min)
+* **Path Filters**: Docs-only commits **DO NOT** trigger workflows
+* **Secret Scanning**: Only master/PRs (not on dev branches)
 
-**Workflows que Serão Acionados** (se PR tocar código TypeScript):
+**Workflows that Will Be Triggered** (if PR touches TypeScript code):
 
-- ✅ ci-lint.yml - ESLint backend + frontend
-- ✅ ci-tests.yml - Jest + Vitest com coverage
-- ✅ playwright.yml - Testes E2E (se tocar tests/)
-- ✅ secret-scan.yml - Gitleaks (scan incremental em PRs)
+* ✅ ci-lint.yml - ESLint backend + frontend
+* ✅ ci-tests.yml - Jest + Vitest with coverage
+* ✅ playwright.yml - E2E Tests (if touching tests/)
+* ✅ secret-scan.yml - Gitleaks (incremental scan on PRs)
 
-**Workflows que NÃO Serão Acionados** (se PR apenas docs):
+**Workflows that Will NOT Be Triggered** (if PR is docs only):
 
-- Commits apenas `.md`, `docs/` não acionam CI/CD
-- Path filters economizam ~2900 min/mês
+* Commits with only `.md`, `docs/` do not trigger CI/CD
+* Path filters save ~2900 min/month
 
-**Validação:**
+**Validation:**
 
-- ✅ Todos os checks devem estar verdes
-- ✅ Coverage não pode diminuir
-- ✅ Linting e type checking OK
-- ✅ Secret scanning passed (incremental em PRs)
+* ✅ All checks must be green
+* ✅ Coverage cannot decrease
+* ✅ Linting and type checking OK
+* ✅ Secret scanning passed (incremental on PRs)
 
-**Referência:** Ver `.github/SLASH_COMMANDS.md` para detalhes de uso otimizado
+**Reference:** See `.github/SLASH_COMMANDS.md` for optimization details
 
-### 4.4 PARADA - Aguardar Review
+### 4.4 STOP - Wait for Review
 
-**PARE AQUI**
+**STOP HERE**
 
-A PR foi criada e está aguardando review. O merge será realizado pelo comando `/review-pr`, que possui:
+The PR has been created and is waiting for review. The merge will be performed by the `/review-pr` command, which features:
 
-- Validação rigorosa em 8 categorias (100% score requerido)
-- Auto-fixes para issues de formatação
-- Validação pós-merge em 3 camadas
-- Rollback automático em caso de falha
+* Rigorous validation in 8 categories (100% score required)
+* Auto-fixes for formatting issues
+* 3-layer post-merge validation
+* Automatic rollback in case of failure
 
-**Próximo passo:** Execute `/review-pr` para validar e mergear a PR.
+**Next step:** Execute `/review-pr` to validate and merge the PR.
 
-**Output esperado:**
+**Expected Output:**
 
-```
-PR #<número> CRIADA E PRONTA PARA REVIEW
+PR #<number> CREATED AND READY FOR REVIEW
 
-Resumo:
-- Issue: #<issue-id> - <título>
+Summary:
+- Issue: #<issue-id> - <title>
 - Branch: feat/<issue-id>-<slug>
-- PR: #<pr-número>
-- Status: Aguardando /review-pr
+- PR: #<pr-number>
+- Status: Waiting for /review-pr
 
-Próximo comando: /review-pr
-```
-
----
-
-## 5. RESPONSABILIDADE DO /review-pr
-
-**Esta fase é executada pelo comando `/review-pr`**
-
-O fechamento da issue (Execution Note + `gh issue close`) é responsabilidade do `/review-pr` após:
-
-1. Validação em 8 categorias (100% score)
-2. Merge bem-sucedido
-3. Validação pós-merge (3 camadas)
-
-**NÃO execute merge ou fechamento de issue manualmente.** Use `/review-pr`.
+Next command: /review-pr
 
 ---
 
-## 6. PARADA E ESPERA
+## 5. RESPONSIBILITY OF /review-pr
 
-**FINALIZE O CICLO AQUI**
+**This phase is executed by the `/review-pr` command**
 
-Após criar a PR, o ciclo do `/pick-next-issue` está **COMPLETO**.
+Closing the issue (Execution Note + `gh issue close`) is the responsibility of `/review-pr` after:
 
-- **NÃO** execute merge da PR
-- **NÃO** feche a issue manualmente
-- **NÃO** selecione outra issue automaticamente
-- **NÃO** abra múltiplas issues em paralelo
-- **AGUARDE** comando explícito do usuário
+1. Validation in 8 categories (100% score)
+2. Successful merge
+3. Post-merge validation (3 layers)
 
-**Próximo passo sugerido:** `/review-pr` para validar, mergear e fechar a issue.
+**DO NOT execute merge or close issue manually.** Use `/review-pr`.
 
 ---
 
-## CHECKLIST FINAL (verificar antes de declarar completo)
+## 6. STOP AND WAIT
 
-- [ ] Issue selecionada seguiu algoritmo determinístico
-- [ ] Governança validada ou rewrite feito
-- [ ] Atomicidade validada ou issue desmembrada
-- [ ] Branch criada conforme padrão
-- [ ] Implementação seguiu Technical Approach
-- [ ] Testes adicionados e passando
-- [ ] Coverage aumentou ≥ +5 p.p. (quando aplicável)
-- [ ] Validações específicas executadas
-- [ ] PR criada com template completo
-- [ ] CI/CD passando (checks verdes)
+**FINALIZE THE CYCLE HERE**
 
-**Próximo passo:** `/review-pr` para validação, merge e fechamento.
+After creating the PR, the `/pick-next-issue` cycle is **COMPLETE**.
 
----
+* **DO NOT** execute PR merge
+* **DO NOT** close the issue manually
+* **DO NOT** select another issue automatically
+* **DO NOT** open multiple issues in parallel
+* **WAIT** for explicit user command
 
-## PARÂMETROS FIXOS DO ETP EXPRESS
-
-- **Tamanho atômico**: 1–8 horas por issue (**obrigatório** - issues maiores devem ser desmembradas)
-- **Testes obrigatórios**: Sempre adicionar testes para código novo ou modificado
-- **Documentação completa**: File Location + Acceptance Criteria + Technical Approach
-- **Segurança**: Validação de vulnerabilidades OWASP Top 10
-- **Commits semânticos**: Conventional Commits obrigatório
-- **Milestones**: Seguir ordem M1→M2→M3→M4→M5→M6
-- **Respeitar prioridades**: P0 > P1 > P2 > P3 (sem exceções)
+**Suggested next step:** `/review-pr` to validate, merge, and close the issue.
 
 ---
 
-## REFERÊNCIAS DO PROJETO
+## FINAL CHECKLIST (verify before declaring complete)
 
-### Documentação Estratégica
+* [ ] Issue selected followed deterministic algorithm
+* [ ] Governance validated or rewrite done
+* [ ] Atomicity validated or issue broken down
+* [ ] Branch created according to standard
+* [ ] Implementation followed Technical Approach
+* [ ] Tests added and passing
+* [ ] Coverage increased ≥ +5 p.p. (when applicable)
+* [ ] Specific validations executed
+* [ ] PR created with complete template
+* [ ] CI/CD passing (green checks)
 
-- **Roadmap:** `ROADMAP.md` - **CONSULTAR SEMPRE** para status atual e prioridades
-- **Audit Report:** `ROADMAP_AUDIT_REPORT.md` - Análises e auditorias
-- **Arquitetura:** `ARCHITECTURE.md` - Padrões técnicos
-- **Deploy:** `DEPLOY_RAILWAY.md` - Processo de deploy
+**Next step:** `/review-pr` for validation, merge, and closing.
 
-### GitHub CLI - Comandos Úteis
+---
 
-```bash
-# Issues abertas por prioridade
+## FIXED PARAMETERS OF ETP EXPRESS
+
+* **Atomic size**: 1–8 hours per issue (**mandatory** - larger issues must be broken down)
+* **Mandatory tests**: Always add tests for new or modified code
+* **Complete documentation**: File Location + Acceptance Criteria + Technical Approach
+* **Security**: Validation of OWASP Top 10 vulnerabilities
+* **Semantic commits**: Conventional Commits mandatory
+* **Milestones**: Follow order M1→M2→M3→M4→M5→M6
+* **Respect priorities**: P0 > P1 > P2 > P3 (no exceptions)
+
+---
+
+## PROJECT REFERENCES
+
+### Strategic Documentation
+
+* **Roadmap:** `ROADMAP.md` - **ALWAYS CONSULT** for current status and priorities
+* **Audit Report:** `ROADMAP_AUDIT_REPORT.md` - Analysis and audits
+* **Architecture:** `ARCHITECTURE.md` - Technical standards
+* **Deploy:** `DEPLOY_RAILWAY.md` - Deploy process
+
+### GitHub CLI - Useful Commands
+
+# Open issues by priority
 gh issue list --label "priority/P0" --state open
 gh issue list --label "priority/P1" --state open
 gh issue list --label "priority/P2" --state open
 gh issue list --label "priority/P3" --state open
 
-# Issues por milestone
+# Issues by milestone
 gh issue list --milestone "M1: Foundation" --state open
 gh issue list --milestone "M2: CI/CD Pipeline" --state open
 gh issue list --milestone "M3: Quality & Security" --state open
@@ -541,46 +527,46 @@ gh issue list --milestone "M4: Refactoring & Performance" --state open
 gh issue list --milestone "M5: E2E Testing & Documentation" --state open
 gh issue list --milestone "M6: Maintenance (Recurring)" --state open
 
-# Detalhes de issue
-gh issue view <número> --json body,labels,title,milestone
+# Issue details
+gh issue view <number> --json body,labels,title,milestone
 
-# Issues abertas (geral)
+# Open issues (general)
 gh issue list --state open --json number,title,labels,milestone
-```
 
-### Exemplo de Desmembramento
 
-**Issue Parent (não-atômica):**
+### Breakdown Example
 
-```
-#100 - Implementar sistema de autenticação completo (15h)
-```
+**Parent Issue (non-atomic):**
 
-**Sub-issues atômicas:**
 
-```
-#101 - [AUTH-100a] Setup JWT e middleware de autenticação (3h)
-#102 - [AUTH-100b] Implementar endpoint de login (2h)
-#103 - [AUTH-100c] Implementar endpoint de registro (2h)
-#104 - [AUTH-100d] Adicionar refresh token (3h)
-#105 - [AUTH-100e] Implementar testes de autenticação (3h)
-#106 - [AUTH-100f] Documentar API de autenticação (2h)
-```
+#100 - Implement complete authentication system (15h)
 
-**Resultado:** 6 issues atômicas (2-3h cada) ao invés de 1 issue monolítica (15h)
 
----
+**Atomic sub-issues:**
 
-## AVISOS IMPORTANTES
 
-1. **NÃO execute merge de PR** - O merge é responsabilidade exclusiva do `/review-pr`
-2. **NÃO feche issues manualmente** - O fechamento é feito pelo `/review-pr` após merge
-3. **NÃO pule a validação de atomicidade** - Issues grandes causam atrasos e PRs rejeitados
-4. **SEMPRE respeite ordem de prioridades** - P0 antes de P1, P1 antes de P2, etc.
-5. **NÃO ignore dependências** - Verificar "Blocked by" antes de iniciar
-6. **NÃO reescreva issues sem criar sub-issues** - Se > 8h, desmembrar é obrigatório
-7. **CONSULTE ROADMAP.md** - Documento autoritativo do estado atual do projeto
+#101 - [AUTH-100a] Setup JWT and auth middleware (3h)
+#102 - [AUTH-100b] Implement login endpoint (2h)
+#103 - [AUTH-100c] Implement register endpoint (2h)
+#104 - [AUTH-100d] Add refresh token (3h)
+#105 - [AUTH-100e] Implement auth tests (3h)
+#106 - [AUTH-100f] Document auth API (2h)
+
+
+**Result:** 6 atomic issues (2-3h each) instead of 1 monolithic issue (15h)
 
 ---
 
-**Início da Execução: AGORA**
+## IMPORTANT WARNINGS
+
+1. **DO NOT execute PR merge** - Merge is exclusive responsibility of `/review-pr`
+2. **DO NOT close issues manually** - Closing is done by `/review-pr` after merge
+3. **DO NOT skip atomicity validation** - Large issues cause delays and rejected PRs
+4. **ALWAYS respect priority order** - P0 before P1, P1 before P2, etc.
+5. **DO NOT ignore dependencies** - Check "Blocked by" before starting
+6. **DO NOT rewrite issues without creating sub-issues** - If > 8h, breakdown is mandatory
+7. **CONSULT ROADMAP.md** - Authoritative document of current project state
+
+---
+
+**Execution Start: NOW**
