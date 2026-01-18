@@ -1,113 +1,89 @@
-# 🤖 Tiago Sasaki — AI Systems Architect & Automation Strategist
+# 🏗️ Tiago Sasaki — Domain-Native AI Engineer & High-Velocity Architect
 
-> **Civil Engineer turned AI Infrastructure Specialist**  
-> Building production-ready agentic workflows that replace entire business processes
+> **Civil Engineer turned Software Architect.** > Bridging the gap between complex industry constraints (GovTech/ConTech/Supply Chain) and scalable, rigorous software systems.
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://www.linkedin.com/in/tiagosasaki/)
 [![GitHub followers](https://img.shields.io/github/followers/tjsasakifln?style=social)](https://github.com/tjsasakifln)
 
 ---
 
-## 🎯 Who I Am
+## 🎯 Executive Summary
 
-**I'm not a software developer. I'm a systems architect who builds with AI.**
+I am a **Product Engineer** with a background in Civil Engineering and Public Infrastructure. I don't just write code; I build **compliant systems** for highly regulated industries.
 
-Civil Engineering background shaped by operational reality of public infrastructure and unforgiving deadlines. I bring a unique perspective to automation: **I ignore trends and build only what's transformational**.
+Unlike traditional developers who focus solely on syntax, I bring **structural rigor** to software architecture. I leverage LLMs and Agentic Workflows not to replace engineering, but to achieve **10x velocity on boilerplate**, allowing me to focus on what matters: **race conditions, transactional integrity, and business logic.**
 
-I prototype complex systems from zero, directly in CLI environments, using natural language orchestration, domain-specific prompting, and deep research into real user pain points.
-
-**I focus on "applied prompt engineering for systemic leverage"** — because when your stack has constraints, **LLMs aren't toys, they're multipliers**.
-
----
-
-## 🔧 What I Build
-
-### 🏗️ **AI Infrastructure for Real Industries**
-- Automated real estate appraisals (Valion) 
-- Compliance-driven technical reports (ETP Express)
-- I use AI not to prototype ideas, but to **reconstruct industry standards**
-
-### 🎭 **Vibe Coding as Architecture**
-I operate as a "vibe coder" in Karpathy's definition: **focusing on the *what*, not the *how***.
-
-All projects driven by: pain-point immersion → prompt systematization → CLI-first orchestration using Gemini CLI, Aider, Claude Code, Make.com.
-
-### 🤖 **Agentic Workflows with Measurable ROI**
-My bots don't chat. **They replace entire workflows**.
-
-**Example**: WhatsApp message → full technical report → delivered to client → tracked on dashboard.
-
-All orchestrated efficiently. **Pure systemic leverage**.
+**My Core Value Proposition:**
+* **Autonomy:** Solo-shipped a production-grade GovTech SaaS (ETP Express) with **760+ features in 90 days**.
+* **Governance:** I don't rely on "hero mode". I rely on automated engineering protocols that enforce quality standards before code ever hits `master`.
+* **Domain Expertise:** I understand that in sectors like Supply Chain and Construction, "moving fast" cannot mean breaking things.
 
 ---
 
-## 🚀 Systems I Develop
+## 🛠️ Engineering Governance Protocols
 
-### 🏗️ **Industry-Specific AI Infrastructure**
-**Real Estate & Construction**: Automated valuation systems, technical compliance reports, and regulatory documentation that meet industry standards. Each system replaces manual processes with intelligent workflows.
+To maintain high velocity without accruing technical debt, I developed a suite of **Automated Governance Agents**. These scripts enforce the rigorous standards I learned in Civil Engineering within the software lifecycle.
 
-### 📊 **Business Process Automation**
-**End-to-End Workflows**: From lead capture to client delivery, I build systems that handle entire business processes. WhatsApp integration, automated reporting, CRM synchronization, and client communication — all orchestrated seamlessly.
+### 1. [The "Zero-Tolerance" Automated Reviewer](./review-pr.md)
+* **What it is:** A deterministic PR auditing system.
+* **Function:** Enforces a **100/100 score** across 8 categories (Security, OWASP, Testing, Docs) before a human ever reviews the code.
+* **Impact:** Eliminates bikeshedding on formatting/style, allowing human review to focus purely on architecture and logic. Includes automatic rollback layers for post-merge failures.
 
-### 🤖 **Agentic Decision Systems**
-**Intelligent Agents**: Not chatbots, but specialized agents that make decisions, process complex information, and execute multi-step business logic. These systems operate independently while maintaining full auditability.
+### 2. [Deterministic Task Prioritization](./pick-next-issue.md)
+* **What it is:** An algorithmic decision matrix for backlog management.
+* **Function:** Removes decision fatigue by selecting the next task based on ROI, Critical Path (P0>P1), and Dependency Blocking.
+* **Impact:** Ensures I am always working on the highest-value feature, preventing "cherry-picking" of easy tasks over necessary ones.
 
-### 🔧 **CLI-First Architecture**
-**Developer-Centric Tools**: Systems built for technical teams who prefer command-line interfaces. Direct integration with existing development workflows, version control, and deployment pipelines.
-
----
-
-## 🛠️ Technical Arsenal
-
-### **CLI-First Approach**
-- Gemini CLI, Aider, Claude Code
-- Terminal workflows as primary interface
-- Command-line orchestration
-
-### **Low/No-Code Integration**
-- Make.com, Bubble, Retool, Supabase, Appsmith
-- API-first architecture
-- Rapid prototyping to production
-
-### **Prompt Engineering Methodologies**
-- ReAct, Tree-of-Thought, Chain-of-Thought
-- Self-Consistency patterns
-- Domain-specific prompt optimization
+### 3. [Drift Detection Audit](./audit-roadmap.md)
+* **What it is:** A synchronization engine between Documentation (Roadmap) and Reality (Git State).
+* **Function:** Automatically detects "Phantom Issues" (documented but not coded) and "Orphan Code" (coded but not documented).
+* **Impact:** Guarantees that the project Roadmap is always a source of truth, crucial for stakeholder transparency in complex supply chains.
 
 ---
 
-## 📊 GitHub Stats
+## ⚡ Technical Stack (The "Heavy Lifting")
 
-<div align="center">
-  
-![GitHub Stats](https://github-readme-stats.vercel.app/api?username=tjsasakifln&show_icons=true&theme=dark)
+I build robust, scalable systems using industry-standard tools for enterprise environments.
 
-![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=tjsasakifln&layout=compact&theme=dark)
+### **Backend & Architecture**
+* **Core:** TypeScript, Node.js, **NestJS** (Strict Typing & Modular Architecture)
+* **Async Processing:** **BullMQ**, Redis (For complex job queues and reliable message brokering)
+* **Persistence:** PostgreSQL (Focus on complex schema design and transactional integrity)
+* **Infrastructure:** Docker, Railway, GitHub Actions (CI/CD)
 
-</div>
+### **AI & Agentic Orchestration**
+* **Frameworks:** LangChain, Vercel AI SDK
+* **Techniques:** RAG (Retrieval-Augmented Generation) for regulatory compliance, Structured Output parsing.
+* **Philosophy:** AI as a deterministic function caller, not a probabilistic chatter.
 
 ---
 
-## 🌍 The Vision
+## 🚀 Featured Project: ETP Express (GovTech)
 
-> *"The future isn't about writing code — it's about writing systems of intent."*
+**The Challenge:** Brazilian public procurement is a bureaucracy-heavy process governed by strict laws (Law 14.133/2021), typically requiring 40+ hours of manual documentation per bid.
 
-My goal is to be **visible to the ecosystem building the next wave of automation**. Whether you're a VC, CTO, or recruiter, you'll find in my work:
+**The Solution:** A monolithic SaaS platform that automates the generation of compliant technical documents.
 
-- 🎯 **Business-level clarity**  
-- 🤖 **Agentic technical fluency**  
-- 🛠️ **Independent execution**  
-- 🧭 **Strategic perspective**  
+* **Architecture:** React Frontend + NestJS Backend.
+* **Key Feature:** An Agentic Workflow that ingests raw project data and "drafts" legal documents, which are then validated by a deterministic rule engine.
+* **Result:** Reduced documentation time from **40 hours to <2 hours** per bid.
+* **Scale:** 760+ features shipped solo in 3 months using the governance protocols listed above.
+
+---
+
+## 🌍 The Vision: "Domain-Native" Engineering
+
+> *"The most valuable engineer in 2026 is not the one who knows the most algorithms, but the one who understands the friction of the physical world."*
+
+I am positioning myself at the intersection of **Software Engineering** and **Industrial Reality** (Supply Chain, Construction, Government).
+
+I am looking to join a high-performance team where I can apply my **velocity, discipline, and domain empathy** to solve real-world problems.
 
 ---
 
 ## ☎️ Let's Connect
 
-Building agentic AI infrastructure that **prototypes efficiently and scales with purpose**.
-
-**Open to international opportunities and remote collaboration.**
-
-> 💡 *Follow the repos to see the future in action.*
+**Open to Senior Backend / Full-Stack opportunities (Remote / International).**
 
 <div align="center">
   
@@ -120,7 +96,6 @@ Building agentic AI infrastructure that **prototypes efficiently and scales with
 
 <div align="center">
   
-**Keywords**: `AI Systems Architecture` • `Prompt Engineering` • `Agentic Workflows` • `CLI Automation` • `Make.com Integration` • `Real Estate AI` • `Construction Tech` • `Business Process Automation` • `Python AI Development` • `No‑Code Solutions` • `BIM Automation` • `openBIM` • `IFC Parsing` • `IFC‑JS` • `Autodesk Forge Integration` • `Autodesk Platform Services` • `Digital Twin Workflows` • `BIM Clash Detection` • `BIM Coordination` • `AEC Data Pipelines`
-
+**Keywords**: `TypeScript` • `NestJS` • `System Architecture` • `CI/CD` • `GovTech` • `ConTech` • `Supply Chain` • `Agentic Workflows` • `Engineering Governance` • `RAG` • `PostgreSQL` • `BullMQ`
 
 </div>
