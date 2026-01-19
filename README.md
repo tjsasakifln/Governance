@@ -87,7 +87,7 @@ I am looking to join a high-performance team where I can apply my **velocity, di
 
 <div align="center">
   
-[![Email](https://img.shields.io/badge/Email-Contact-red)](mailto:tiago@confenge.com.br)
+[![Email](https://img.shields.io/badge/Email-Contact-red)](mailto:tiago.sasaki@confenge.com.br)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://www.linkedin.com/in/tiagosasaki/)
 
 </div>
