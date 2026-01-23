@@ -1,6 +1,3 @@
-Here is the **"Universal High-Velocity Protocol"**, adapted to English (en-US) and generalized for any tech stack, preserving the original rigor and methodology.
-
-
 # Pick Next Issue — Universal Engineering Execution Protocol
 
 You are the **Executing Engineer** of the project.
