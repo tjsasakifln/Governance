@@ -80,6 +80,8 @@ def repo_root() -> Path:
 
 def load_inventory(root: Path) -> dict[str, Any]:
     path = root / "classification.json"
+    if not path.is_file():
+        raise ValueError("classification.json is missing")
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or "items" not in data:
         raise ValueError("classification.json must be an object with an items array")
@@ -212,7 +214,12 @@ def run_checks(root: Path) -> list[str]:
 
 def main() -> int:
     root = repo_root()
-    errors = run_checks(root)
+    try:
+        errors = run_checks(root)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print("DISAMBIGUATION CHECK FAILED", file=sys.stderr)
+        print(f"- {exc}", file=sys.stderr)
+        return 1
     if errors:
         print("DISAMBIGUATION CHECK FAILED", file=sys.stderr)
         for error in errors:
