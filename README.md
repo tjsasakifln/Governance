@@ -1,3 +1,14 @@
+<!-- AUTHORITY: PERSONAL_PORTFOLIO -->
+> **AUTHORITY / AUTORIDADE — read this first.**
+>
+> This repository is a **personal portfolio and legacy draft** of Tiago Sasaki.
+> It is **not** CONFENGE operational governance, **not** a CONFENGE source of truth, and **not** the Extra Consultoria / `extra-cli` operating system.
+> Repositório de **portfólio pessoal / legado**. **Não** é a governança operacional canônica da CONFENGE e **não** é source of truth de nenhum sistema CONFENGE.
+>
+> Extra Consultoria development policy already lives in [`tjsasakifln/extra-cli`](https://github.com/tjsasakifln/extra-cli) (`DOD.md`, `docs/DEVELOPMENT.md`). This repo does not override it.
+> The three protocol files below are reusable **personal samples**. They are not live CONFENGE runbooks.
+<!-- /AUTHORITY -->
+
 # 🏗️ Tiago Sasaki — Domain-Native AI Engineer & High-Velocity Architect
 
 > **Civil Engineer turned Software Architect.** > Bridging the gap between complex industry constraints (GovTech/ConTech/Supply Chain) and scalable, rigorous software systems.
@@ -20,9 +31,9 @@ Unlike traditional developers who focus solely on syntax, I bring **structural r
 
 ---
 
-## 🛠️ Engineering Governance Protocols
+## 🛠️ Personal engineering-protocol samples
 
-To maintain high velocity without accruing technical debt, I developed a suite of **Automated Governance Agents**. These scripts enforce the rigorous standards I learned in Civil Engineering within the software lifecycle.
+These are **portfolio drafts**, not an operating CONFENGE control plane. To keep high velocity without accruing technical debt I drafted a suite of reusable review/backlog protocols. They are samples of how I work; they are not CONFENGE policy.
 
 ### 1. [The "Zero-Tolerance" Automated Reviewer](./review-pr.md)
 * **What it is:** A deterministic PR auditing system.

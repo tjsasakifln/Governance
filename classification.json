@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "repo": "tjsasakifln/Governance",
+  "audited_origin_main_sha": "49d9c3e84bf51466047d4c096cadd3104adfad74",
+  "allowed_classes": [
+    "KEEP_PERSONAL_PORTFOLIO",
+    "MOVE_TO_CANONICAL_DOC",
+    "DEAD",
+    "ARCHIVE"
+  ],
+  "notes": [
+    "No MOVE_TO_CANONICAL_DOC items: extra-cli already holds byte-identical copies of the three protocol files under .claude/commands/; transferring them would duplicate a capability that already exists there.",
+    "Canonical Extra Consultoria development policy already lives in tjsasakifln/extra-cli (DOD.md, docs/DEVELOPMENT.md). This inventory does not invent a CONFENGE governance URL.",
+    "github.repo_lifecycle is ARCHIVE-ready. Archive is documented, not executed."
+  ],
+  "items": [
+    {
+      "id": "README.md",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Personal positioning README. Keep as portfolio after adding an explicit non-authority banner."
+    },
+    {
+      "id": "review-pr.md",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Reusable personal PR-review protocol draft. Operational Extra copy already exists at tjsasakifln/extra-cli:.claude/commands/review-pr.md (byte-identical on 2026-08-16). Not transferred."
+    },
+    {
+      "id": "pick-next-issue.md",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Reusable personal backlog-selection protocol draft. Operational Extra copy already exists at tjsasakifln/extra-cli:.claude/commands/pick-next-issue.md (byte-identical on 2026-08-16). Not transferred."
+    },
+    {
+      "id": "audit-roadmap.md",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Reusable personal roadmap-drift protocol draft. Operational Extra copy already exists at tjsasakifln/extra-cli:.claude/commands/audit-roadmap.md (byte-identical on 2026-08-16). Not transferred."
+    },
+    {
+      "id": "classification.json",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Shipped inventory that makes the KEEP/MOVE/DEAD/ARCHIVE decision auditable."
+    },
+    {
+      "id": "check_disambiguation.py",
+      "kind": "path",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Fail-closed checker over shipped README + inventory. Not operational CONFENGE governance."
+    },
+    {
+      "id": "ARCHIVE_READINESS.md",
+      "kind": "path",
+      "class": "ARCHIVE",
+      "owner": null,
+      "rationale": "Archive-readiness record. Documents that GitHub archive was not executed."
+    },
+    {
+      "id": "github.description",
+      "kind": "metadata",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Live GitHub description. Rewrite to deny CONFENGE operational authority while keeping personal-portfolio wording."
+    },
+    {
+      "id": "github.topics",
+      "kind": "metadata",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Live topics. Drop engineering-governance; keep skill tags; add personal-portfolio and legacy."
+    },
+    {
+      "id": "github.homepageUrl",
+      "kind": "metadata",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "LinkedIn profile. Personal, not an operational CONFENGE console."
+    },
+    {
+      "id": "github.pages",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "GitHub Pages is not configured (API 404, has_pages=false). Leave off."
+    },
+    {
+      "id": "github.deployments",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "Zero deployments. No live operational surface."
+    },
+    {
+      "id": "github.environments",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "Zero environments. No live operational surface."
+    },
+    {
+      "id": "github.actions.workflows",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "Zero Actions workflows. No CI operating as CONFENGE governance."
+    },
+    {
+      "id": "github.wiki",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "Wiki flag is on but unused. Not a documentation plane. Do not treat as active governance."
+    },
+    {
+      "id": "github.projects",
+      "kind": "metadata",
+      "class": "DEAD",
+      "owner": null,
+      "rationale": "Projects flag is on but unused. Not a CONFENGE operating board."
+    },
+    {
+      "id": "github.archived",
+      "kind": "metadata",
+      "class": "ARCHIVE",
+      "owner": null,
+      "rationale": "archived=false today. Archive is recommended after this disambiguation lands; not executed by this change."
+    },
+    {
+      "id": "github.repo_name",
+      "kind": "metadata",
+      "class": "ARCHIVE",
+      "owner": null,
+      "rationale": "The name Governance stays ambiguous. Rename is a human identity mutation, not done here."
+    },
+    {
+      "id": "link.linkedin",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "https://www.linkedin.com/in/tiagosasaki/ — personal profile."
+    },
+    {
+      "id": "link.github_profile",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "https://github.com/tjsasakifln — personal GitHub account."
+    },
+    {
+      "id": "link.mailto_confenge",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "mailto:tiago.sasaki@confenge.com.br is a personal contact address, not an operational CONFENGE channel and not a governance inbox."
+    },
+    {
+      "id": "link.internal.review-pr",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Relative link ./review-pr.md inside the personal portfolio."
+    },
+    {
+      "id": "link.internal.pick-next-issue",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Relative link ./pick-next-issue.md inside the personal portfolio."
+    },
+    {
+      "id": "link.internal.audit-roadmap",
+      "kind": "cross_link",
+      "class": "KEEP_PERSONAL_PORTFOLIO",
+      "owner": null,
+      "rationale": "Relative link ./audit-roadmap.md inside the personal portfolio."
+    }
+  ]
+}

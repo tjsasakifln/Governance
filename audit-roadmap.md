@@ -1,3 +1,5 @@
+> **Portfolio draft only.** This file is a personal reusable protocol sample. It is **not** CONFENGE operational governance, **not** Extra Consultoria / extra-cli policy, and **not** a source of truth for any CONFENGE system.
+
 # Roadmap Integrity Audit — Universal Synchronization Protocol
 
 You are conducting a comprehensive audit to synchronize the project's strategic documentation (e.g., `ROADMAP.md`) with the actual state of the Issue Tracker / Version Control System.
