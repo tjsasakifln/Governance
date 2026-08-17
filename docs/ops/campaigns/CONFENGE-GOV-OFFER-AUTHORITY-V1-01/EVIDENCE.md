@@ -25,8 +25,8 @@ Both commands were executed twice from the worktree root. Validator stdout was i
 | Fail-closed flags (checkout/webhook/money/publication false; sandbox/manual true) | CODE_PROVEN | `authority-manifest.v1.json` + `production-gates.v1.json` |
 | `ACTIVE` rejected while required gates are `UNKNOWN` | CODE_PROVEN | validator + adversarial test |
 | Hash reproducible across two runs; no build clock in `content_hash` | CODE_PROVEN | identical `AUTHORITY_HASH` lines |
-| CI green on GitHub Actions | UNKNOWN until the workflow actually runs on the PR | workflow added at `.github/workflows/commercial-authority.yml`; absence of a run is not pass |
-| Merged to `main` | UNKNOWN until a green CI + review-clean merge happens | this file is written pre-merge |
+| CI green on GitHub Actions | CI_PROVEN | push run 32053336990 and PR run 32053358442 both `success` (validate + adversarial tests). Not skipped. |
+| Merged to `main` | MERGED | PR https://github.com/tjsasakifln/Governance/pull/2 merged at `bd40aa7dd2d875ae8a5c4688e713acba87aa964f`. GitHub auto-closed #1 on the phrase “Do not close #1”; issue was reopened and remains OPEN. |
 | Deployed / live / real external payment | NO_GO | no Asaas mutation, no checkout, no NFS-e, no publication |
 | Counsel, accountant, staffed capacity, brand publication, finance operator | UNKNOWN | gates remain `UNKNOWN`; not fabricated |
 | Extra contract change | NO_GO | private registry only; no addendum |
