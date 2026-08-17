@@ -1,0 +1,86 @@
+{
+  "schema_version": "production-gates.v1",
+  "catalog_authority": "APPROVED",
+  "production_checkout_enabled": false,
+  "production_webhook_enabled": false,
+  "real_money_mutation_approved": false,
+  "public_activation_approved": false,
+  "sandbox_preparation_approved": true,
+  "manual_preparation_approved": true,
+  "unknown_is_not_approval": true,
+  "intended_webhook_host": "https://api.confenge.com.br",
+  "intended_webhook_path": "/webhooks/asaas",
+  "effective_at": "2026-08-17T00:00:00Z",
+  "gates": [
+    {
+      "gate_id": "legal_terms_forum",
+      "title": "Legal terms, early-exit formula and forum",
+      "state": "UNKNOWN",
+      "approver": "named_legal_counsel + executive",
+      "required_evidence": "Reviewed CFG-TERMS-B2B-2026-08-17-v1, written counsel opinion on enforceability, entity data and elected forum, plus invoice/settlement wording for the three-cap early-exit formula.",
+      "approve_consequence": "Approve this terms version for contracting.",
+      "reject_consequence": "Keep every offer gated; do not activate or publish.",
+      "blocks": ["ACTIVE", "public_activation", "production_checkout"]
+    },
+    {
+      "gate_id": "tax_nfse",
+      "title": "Accountant, NFS-e and effective tax treatment",
+      "state": "UNKNOWN",
+      "approver": "accountant + finance + executive",
+      "required_evidence": "Tax classification (CNAE, Annex/factor R, RBT12, municipal item), invoice test and margin impact. The 6% pricing premise is not a confirmed tax regime.",
+      "approve_consequence": "Enable approved NFS-e issuance under the validated classification.",
+      "reject_consequence": "Keep production NFS-e blocked; manual finance hold.",
+      "blocks": ["nfse_issuance", "public_activation"]
+    },
+    {
+      "gate_id": "capacity_inventory",
+      "title": "Staffed recurring capacity inventory and delivery owner",
+      "state": "UNKNOWN",
+      "approver": "service_delivery_owner + executive",
+      "required_evidence": "Published staffed inventory of 50 active Full slots, collision policy, hold/release/overbooking controls and named delivery owner.",
+      "approve_consequence": "Release recurring quantity for holds after other gates allow checkout.",
+      "reject_consequence": "No recurring checkout; waitlist, Diagnóstico or fit conversation only.",
+      "blocks": ["recurring_checkout", "production_checkout", "ACTIVE"]
+    },
+    {
+      "gate_id": "security_environments",
+      "title": "Security, environment segregation, secrets, rotation, rollback and Sandbox E2E",
+      "state": "UNKNOWN",
+      "approver": "security_technical_owner + executive",
+      "required_evidence": "Separated Sandbox/production, least privilege, secret rotation, Sandbox E2E, monitoring, runbook and rollback. Production API key and production webhook remain unapproved.",
+      "approve_consequence": "Permit controlled production configuration after a separate finance/operator action.",
+      "reject_consequence": "Sandbox-only; no production checkout or webhook.",
+      "blocks": ["production_checkout", "production_webhook", "real_money_mutation"]
+    },
+    {
+      "gate_id": "publication_brand",
+      "title": "Brand, commercial and legal final publication",
+      "state": "UNKNOWN",
+      "approver": "brand + commercial + legal + executive",
+      "required_evidence": "Approved registry, public copy, scope, FAQ, terms, accessibility and SEO. Catalog presence is not publication.",
+      "approve_consequence": "Activate the public offer surface.",
+      "reject_consequence": "Keep catalog NOT_PUBLISHED / PUBLIC_CANDIDATE.",
+      "blocks": ["public_activation", "ACTIVE"]
+    },
+    {
+      "gate_id": "finance_operator_mutation",
+      "title": "Finance/operator approval for each real money mutation",
+      "state": "UNKNOWN",
+      "approver": "authorized_finance_operator + contract_owner",
+      "required_evidence": "Customer, contract, capacity, terms and payment evidence for a single charge, refund or cancellation.",
+      "approve_consequence": "Perform one approved provider action with audit evidence.",
+      "reject_consequence": "No provider mutation.",
+      "blocks": ["real_money_mutation"]
+    },
+    {
+      "gate_id": "extra_exception_change",
+      "title": "Change to the Extra historical exception",
+      "state": "UNKNOWN",
+      "approver": "executive + legal + client_authority",
+      "required_evidence": "Explicit addendum and non-MFC review. The historical R$ 10.000/month x 6 condition is not a public offer, coupon or equalization baseline.",
+      "approve_consequence": "Apply a documented private exception change.",
+      "reject_consequence": "Preserve the current private contract; do not publish or equalize.",
+      "blocks": ["extra_contract_change"]
+    }
+  ]
+}

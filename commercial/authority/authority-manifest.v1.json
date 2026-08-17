@@ -1,0 +1,100 @@
+{
+  "schema_version": "authority-manifest.v1",
+  "authority_id": "CFG-OFFER-AUTHORITY-v1",
+  "catalog_authority": "APPROVED",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "production_checkout_enabled": false,
+  "production_webhook_enabled": false,
+  "real_money_mutation_approved": false,
+  "public_activation_approved": false,
+  "sandbox_preparation_approved": true,
+  "manual_preparation_approved": true,
+  "effective_at": "2026-08-17T00:00:00Z",
+  "source_issue": "https://github.com/tjsasakifln/Governance/issues/1",
+  "consumers": [
+    {
+      "id": "web-cfg#88",
+      "role": "delivery_parent",
+      "pin": "authority_hash"
+    },
+    {
+      "id": "Warmbly#47",
+      "role": "reconciliation_consumer",
+      "pin": "authority_hash"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "commercial/offers/catalog.v1.json",
+      "schema_version": "offer-catalog.v1",
+      "content_hash": "sha256:a451ad3c7cc74a25ebde536664fb25e459073add5e8fc850a33ace1b859736e9",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/offers/catalog.public.v1.json",
+      "schema_version": "offer-catalog.v1",
+      "content_hash": "sha256:52b70ab3646548ec41b0650d4a2d29c509594f969dfa4bc3117e06368019ed34",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/exceptions/extra-historical.v1.json",
+      "schema_version": "commercial-exception.v1",
+      "content_hash": "sha256:d48478c060e9f32552e14bcdf92adfd3030786232346bf32ed4e855d2018f9a4",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/terms/CFG-TERMS-B2B-2026-08-17-v1.md",
+      "schema_version": "CFG-TERMS-B2B-2026-08-17-v1",
+      "content_hash": "sha256:0711f56af9e462f77239196d923080863510669de698eb3e39bf031751557092",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/terms/CFG-TERMS-B2B-2026-08-17-v1.manifest.json",
+      "schema_version": "terms-manifest.v1",
+      "content_hash": "sha256:00e292364b3826227d1b420b12293023f2cf771391af84685d1fac1d4b2a554b",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/gates/production-gates.v1.json",
+      "schema_version": "production-gates.v1",
+      "content_hash": "sha256:69b008a60563acc7201529efeae9c46f3ad1a8936cf8af2d7ef10337a1cae7e8",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/capacity/capacity-policy.v1.json",
+      "schema_version": "capacity-policy.v1",
+      "content_hash": "sha256:f79f5bcf0ca18715c129ec797edf9abd1b839b3770a8bf10c40f3e86a3b1d4f7",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "decisions/ADR-CFG-OFFER-CATALOG-001.md",
+      "schema_version": "ADR-CFG-OFFER-CATALOG-001",
+      "content_hash": "sha256:473ab3537a97e44fc3ea3ea8ad55160e997826eb8beb80edadb416a87f15834c",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/offer-catalog.v1.schema.json",
+      "schema_version": "offer-catalog.v1.schema",
+      "content_hash": "sha256:b2bb2bbbe60bbe58b7bfd4b7dedf9f18a7a6f0e66e6dac25a21c6d01fa424a0a",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/production-gates.v1.schema.json",
+      "schema_version": "production-gates.v1.schema",
+      "content_hash": "sha256:c5f645db88404356e36125d36deda9e084d83499f01bcb28ed7cc95ef606a42e",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/authority-manifest.v1.schema.json",
+      "schema_version": "authority-manifest.v1.schema",
+      "content_hash": "sha256:3629efb1aee213361862d7bf21fc88a1c8b2c77a031dadfff1d1c6ce824fac92",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/CONSUMER-HANDOFF.md",
+      "schema_version": "consumer-handoff.v1",
+      "content_hash": "sha256:66c6e2a29bff566b61b0a72992d43e1b3588c287db7a9c50d371a48fb8f2f5b7",
+      "effective_at": "2026-08-17T00:00:00Z"
+    }
+  ]
+}
