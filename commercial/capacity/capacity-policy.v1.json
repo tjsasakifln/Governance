@@ -1,0 +1,53 @@
+{
+  "schema_version": "capacity-policy.v1",
+  "policy_id": "CFG-CAPACITY-v1",
+  "effective_at": "2026-08-17T00:00:00Z",
+  "recurring": {
+    "global_active_slots": 50,
+    "standard_contract_slots": 1,
+    "hold_hours": 72,
+    "hold_bound_to": ["cnpj", "offer_code", "start_window"],
+    "final_reservation_requires": "confirmed_first_payment",
+    "expired_or_failed_checkout_releases_hold": true,
+    "no_capacity_actions": [
+      "waitlist",
+      "CFG-DIAG-EXP-v1",
+      "fit_conversation"
+    ],
+    "checkout_requires": [
+      "offer_status_approved_or_active",
+      "valid_hold_or_available_slot",
+      "production_checkout_enabled"
+    ]
+  },
+  "one_off": {
+    "fixed_commercial_cap": null,
+    "acceptance_gates": [
+      "legality",
+      "completeness",
+      "conflict",
+      "viability"
+    ],
+    "standard_clock_business_hours": 48,
+    "clock_exceptions": {
+      "CFG-DIAG-EXP-v1": {
+        "delivery_business_days_min": 10,
+        "delivery_business_days_max": 15
+      }
+    }
+  },
+  "onboarding": {
+    "requires_confirmed_first_payment": true,
+    "requires_accepted_terms": true,
+    "requires_final_capacity_reservation_when_recurring": true
+  },
+  "revenue": {
+    "created_customer_is_received_revenue": false,
+    "created_checkout_is_received_revenue": false,
+    "created_subscription_is_received_revenue": false,
+    "created_payment_is_received_revenue": false,
+    "received_revenue_requires": "confirmed_payment"
+  },
+  "inventory_owner_gate": "capacity_inventory",
+  "staffed_inventory_published": false
+}

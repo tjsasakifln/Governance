@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/production-gates.v1.schema.json",
+  "title": "CONFENGE production gates v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_authority",
+    "production_checkout_enabled",
+    "production_webhook_enabled",
+    "real_money_mutation_approved",
+    "public_activation_approved",
+    "sandbox_preparation_approved",
+    "manual_preparation_approved",
+    "unknown_is_not_approval",
+    "gates"
+  ],
+  "properties": {
+    "schema_version": { "const": "production-gates.v1" },
+    "catalog_authority": {
+      "type": "string",
+      "enum": ["DRAFT", "APPROVED", "ACTIVE", "PAUSED", "RETIRED"]
+    },
+    "production_checkout_enabled": { "type": "boolean" },
+    "production_webhook_enabled": { "type": "boolean" },
+    "real_money_mutation_approved": { "type": "boolean" },
+    "public_activation_approved": { "type": "boolean" },
+    "sandbox_preparation_approved": { "type": "boolean" },
+    "manual_preparation_approved": { "type": "boolean" },
+    "unknown_is_not_approval": { "const": true },
+    "intended_webhook_host": { "type": "string" },
+    "intended_webhook_path": { "type": "string" },
+    "effective_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 7,
+      "items": { "$ref": "#/$defs/gate" }
+    }
+  },
+  "$defs": {
+    "gate_state": {
+      "type": "string",
+      "enum": ["UNKNOWN", "PENDING", "APPROVED", "REJECTED", "WAIVED"]
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "state",
+        "approver",
+        "required_evidence",
+        "approve_consequence",
+        "reject_consequence",
+        "blocks"
+      ],
+      "properties": {
+        "gate_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "state": { "$ref": "#/$defs/gate_state" },
+        "approver": { "type": "string", "minLength": 1 },
+        "required_evidence": { "type": "string", "minLength": 1 },
+        "approve_consequence": { "type": "string" },
+        "reject_consequence": { "type": "string" },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "public_activation",
+              "production_checkout",
+              "production_webhook",
+              "real_money_mutation",
+              "nfse_issuance",
+              "extra_contract_change",
+              "recurring_checkout"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

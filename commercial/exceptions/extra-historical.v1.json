@@ -1,0 +1,31 @@
+{
+  "schema_version": "commercial-exception.v1",
+  "registry_id": "CFG-EXCEPTION-REGISTRY-v1",
+  "visibility": "PRIVATE",
+  "public_serialization_allowed": false,
+  "effective_at": "2026-08-17T00:00:00Z",
+  "exceptions": [
+    {
+      "exception_id": "CFG-EXC-EXTRA-HISTORICAL-v1",
+      "kind": "HISTORICAL_PRIVATE_CONTRACT",
+      "visibility": "PRIVATE",
+      "public_serialization_allowed": false,
+      "publishable": false,
+      "is_coupon": false,
+      "is_mfc": false,
+      "auto_equalization": false,
+      "is_public_offer": false,
+      "client_ref": "HISTORICAL_LIGHTHOUSE",
+      "currency": "BRL",
+      "amount_cents": 1000000,
+      "billing_mode": "RECURRING",
+      "cycle": "MONTHLY",
+      "commitment_months": 6,
+      "change_requires_addendum": true,
+      "change_requires_explicit_authority": true,
+      "status": "PRIVATE_ACTIVE_CONTRACT",
+      "authority_note": "Private historical condition for the founder/lighthouse client only. Do not publish, catalog, couponize, create MFC, or auto-equalize. Any change requires an addendum and explicit authority. This record is not an offer.",
+      "effective_at": "2026-08-17T00:00:00Z"
+    }
+  ]
+}

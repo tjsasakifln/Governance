@@ -1,0 +1,44 @@
+{
+  "schema_version": "terms-manifest.v1",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "status": "COMMERCIAL_BASELINE_APPROVED",
+  "counsel_validated": false,
+  "publication_approved": false,
+  "obligation_kind": "MEANS",
+  "never_promises": ["victory", "revenue", "savings", "approval"],
+  "first_confirmed_charge_before_kickoff": true,
+  "late_penalty_percent_once": 2,
+  "interest_percent_per_month_simple": 1,
+  "interest_method": "PRO_RATA_DIE",
+  "index": "IPCA",
+  "compound_contractual_interest": false,
+  "suspension_after_calendar_days": 10,
+  "suspension_written_notice_business_days_min": 2,
+  "termination_for_cause_after_calendar_days": 30,
+  "flex_notice_days": 30,
+  "flex_notice_billable": true,
+  "recomposition": {
+    "CFG-DIRB2G-180-v1": {
+      "base_cents_per_started_month": 500000,
+      "caps": [
+        "calculated_accrued_discount",
+        "20_percent_original_commitment",
+        "unpaid_nominal_balance"
+      ]
+    },
+    "CFG-DIRB2G-365-v1": {
+      "base_cents_per_started_month": 750000,
+      "caps": [
+        "calculated_accrued_discount",
+        "20_percent_original_commitment",
+        "unpaid_nominal_balance"
+      ]
+    }
+  },
+  "silent_renewal_after_max_payments": false,
+  "tax_premise_percent": 6,
+  "tax_premise_is_confirmed_regime": false,
+  "nfse_production_blocked": true,
+  "source_path": "commercial/terms/CFG-TERMS-B2B-2026-08-17-v1.md",
+  "effective_at": "2026-08-17T00:00:00Z"
+}

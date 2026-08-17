@@ -1,0 +1,44 @@
+{
+  "campaign": "CONFENGE-GOV-OFFER-AUTHORITY-V1-01",
+  "repository": "tjsasakifln/Governance",
+  "baseline_main_sha": "49d9c3e84bf51466047d4c096cadd3104adfad74",
+  "branch": "campaign/CONFENGE-GOV-OFFER-AUTHORITY-V1-01",
+  "authority_hash": "sha256:bc5aa6b30b48768bae98906d820a44188fa095b8a80f3f84643a974fcf40a0fc",
+  "catalog_authority": "APPROVED",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "production_checkout_enabled": false,
+  "production_webhook_enabled": false,
+  "real_money_mutation_approved": false,
+  "public_activation_approved": false,
+  "sandbox_preparation_approved": true,
+  "manual_preparation_approved": true,
+  "offers": [
+    "CFG-DIAG-EXP-v1",
+    "CFG-DIRB2G-FLEX-v1",
+    "CFG-DIRB2G-180-v1",
+    "CFG-DIRB2G-365-v1"
+  ],
+  "consumers": ["web-cfg#88", "Warmbly#47"],
+  "governance_issue": 1,
+  "governance_issue_must_remain_open": true,
+  "pending_gates": [
+    "legal_terms_forum",
+    "tax_nfse",
+    "capacity_inventory",
+    "security_environments",
+    "publication_brand",
+    "finance_operator_mutation",
+    "extra_exception_change"
+  ],
+  "evidence_class": {
+    "package_in_worktree": "CODE_PROVEN",
+    "hashes_reproducible": "CODE_PROVEN",
+    "tests_twice": "CODE_PROVEN",
+    "ci": "UNKNOWN",
+    "merged": "UNKNOWN",
+    "deployed": "NO_GO",
+    "live_proven": "NO_GO",
+    "real_external": "NO_GO",
+    "asaas_mutation": "NO_GO"
+  }
+}

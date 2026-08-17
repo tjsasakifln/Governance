@@ -1,0 +1,21 @@
+name: commercial-authority
+
+on:
+  push:
+    branches: [main, "campaign/**"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install --upgrade pip pytest
+      - name: Validate commercial authority
+        run: python scripts/validate_commercial_authority.py
+      - name: Adversarial tests
+        run: python -m pytest tests/test_commercial_authority.py -q
