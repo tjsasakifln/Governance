@@ -13,7 +13,7 @@ Still blocked or unknown after this package exists. None of these were invented 
 | `extra_exception_change` | NO_GO | Historical Extra condition stays private; no addendum |
 | Production checkout / webhook / real money | NO_GO | flags are `false` |
 | Closing Governance #1 | NO_GO | authority is materialized; go-live is not |
-| CI_PROVEN / MERGED | UNKNOWN | depends on GitHub Actions actually running green and a review-clean merge |
+| CI_PROVEN / MERGED | MERGED | PR #2 merged after both Actions runs succeeded; #1 reopened and left OPEN |
 | web-cfg / Warmbly pin | UNKNOWN | those repos are mirrors only; this campaign does not wait on them |
 
 Do not treat residual `UNKNOWN` as approval.
