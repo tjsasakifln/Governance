@@ -1,0 +1,232 @@
+{
+  "schema_version": "commercial-legal-provisional.v1",
+  "artifact": "legal_risk_register",
+  "status": "PROVISIONAL_AI_DRAFT",
+  "professional_legal_review": "NOT_YET_PERFORMED",
+  "operational_use": "HUMAN_DECISION_REQUIRED",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "risks": [
+    {
+      "risk_id": "R01",
+      "risk": "Cliente entende o diagnóstico como promessa de resultado",
+      "impacto": "HIGH",
+      "probabilidade": "HIGH",
+      "mitigacao": "Cláusula de ausência de garantia de resultado; aviso de limitações em preview; obrigação de meio no objeto",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Antes de qualquer superfície pública ou OS assinada com cliente real"
+    },
+    {
+      "risk_id": "R02",
+      "risk": "Cliente envia dados incompletos",
+      "impacto": "MEDIUM",
+      "probabilidade": "HIGH",
+      "mitigacao": "Relógio só inicia com insumos obrigatórios; suspensão por falta de informação; OS com checklist",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Se o cliente contestar mora após ter omitido insumo"
+    },
+    {
+      "risk_id": "R03",
+      "risk": "Atraso causado pelo cliente imputado ao prestador",
+      "impacto": "MEDIUM",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Marcos separados (confirmação financeira vs. insumos vs. relógio); registro no canal",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Primeira disputa de prazo"
+    },
+    {
+      "risk_id": "R04",
+      "risk": "Descoberta de fato novo após kickoff",
+      "impacto": "MEDIUM",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Fato novo é ajuste de escopo, não retrabalho; mudança material exige nova proposta",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Pedido de refazer o diagnóstico por mudança de tese"
+    },
+    {
+      "risk_id": "R05",
+      "risk": "Pedido de trabalho fora do escopo",
+      "impacto": "HIGH",
+      "probabilidade": "HIGH",
+      "mitigacao": "Lista fechada de entregáveis; exemplos de fora de escopo; OS prevalece no recorte",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Pressão para incluir recurso, protocolo ou segundo recorte sem nova proposta"
+    },
+    {
+      "risk_id": "R06",
+      "risk": "Uso do relatório como revisão jurídica profissional",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Ausência de representação jurídica; não substitui advogado; licença veda esse uso; aviso de limitações",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Cliente anexar o PDF a processo ou a órgão como peça profissional"
+    },
+    {
+      "risk_id": "R07",
+      "risk": "Cancelamento antes ou depois do início",
+      "impacto": "MEDIUM",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Política por marcos A-F; início definido; sem mutação financeira automática",
+      "owner": "founder",
+      "gate": "finance_operator_mutation",
+      "professional_review_trigger": "Qualquer pedido de estorno em provedor"
+    },
+    {
+      "risk_id": "R08",
+      "risk": "Pedido de reembolso integral após trabalho executado",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Política conservadora recusa reembolso integral pós-execução; tratamento exato HUMAN_DECISION_REQUIRED",
+      "owner": "founder",
+      "gate": "finance_operator_mutation",
+      "professional_review_trigger": "Ameaça de chargeback ou notificação extrajudicial de devolução total"
+    },
+    {
+      "risk_id": "R09",
+      "risk": "Vazamento de informação do cliente",
+      "impacto": "HIGH",
+      "probabilidade": "LOW",
+      "mitigacao": "Confidencialidade; minimização; proibição de publicar caso; sem dado em URL",
+      "owner": "founder",
+      "gate": "security_environments",
+      "professional_review_trigger": "Qualquer incidente com dado de cliente ou lead"
+    },
+    {
+      "risk_id": "R10",
+      "risk": "Fonte pública incorreta no relatório",
+      "impacto": "MEDIUM",
+      "probabilidade": "HIGH",
+      "mitigacao": "Premissa de falibilidade da base pública; correção factual na rodada; sem certidão",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Erro público que o cliente use em proposta ou impugnação"
+    },
+    {
+      "risk_id": "R11",
+      "risk": "Erro material e correção",
+      "impacto": "MEDIUM",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Uma rodada consolidada; dever de validação do cliente; correção pontual de fato",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Erro que altere decisão de preço ou de órgão citado"
+    },
+    {
+      "risk_id": "R12",
+      "risk": "Disputa de autoria / PI",
+      "impacto": "MEDIUM",
+      "probabilidade": "LOW",
+      "mitigacao": "Métodos genéricos permanecem no prestador; licença não exclusiva dos entregáveis específicos",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Cliente reivindicar método, template ou planilha-mãe"
+    },
+    {
+      "risk_id": "R13",
+      "risk": "Inadimplência",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Início só após confirmação financeira; suspensão do não executado; sem multa inventada",
+      "owner": "founder",
+      "gate": "finance_operator_mutation",
+      "professional_review_trigger": "Atraso de pagamento após início ou chargeback"
+    },
+    {
+      "risk_id": "R14",
+      "risk": "Retenção fiscal / NFS-e incorreta",
+      "impacto": "HIGH",
+      "probabilidade": "HIGH",
+      "mitigacao": "Handoff ao contador sem respostas inventadas; NFS-e de produção bloqueada; premissa 6% não confirmada",
+      "owner": "accountant",
+      "gate": "tax_nfse",
+      "professional_review_trigger": "Antes da primeira nota; qualquer tomador público com retenção"
+    },
+    {
+      "risk_id": "R15",
+      "risk": "Conflito com proposta específica",
+      "impacto": "MEDIUM",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Prevalência OS/proposta aceita sobre termos provisórios; catálogo manda em preço e entregáveis",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Proposta com prazo, desconto ou entregável divergente do catálogo"
+    },
+    {
+      "risk_id": "R16",
+      "risk": "Cláusula abusiva ou ambígua",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Sem multa inventada; teto e foro em token; ressalva de regras cogentes se houver consumo; linguagem conservadora",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Revisão profissional obrigatória antes de publicação; qualquer alegação de abusividade"
+    },
+    {
+      "risk_id": "R17",
+      "risk": "Placeholder indevidamente publicado",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Tokens visíveis; handoff bloqueia publicação; validador rejeita valor inventado no lugar do token",
+      "owner": "web-cfg#88",
+      "gate": "publication_brand",
+      "professional_review_trigger": "Qualquer tentativa de ligar superfície pública com token ainda aberto"
+    },
+    {
+      "risk_id": "R18",
+      "risk": "Pacote se apresentar como validado ou ocultar ausência de revisão",
+      "impacto": "HIGH",
+      "probabilidade": "LOW",
+      "mitigacao": "Metadata obrigatória; frases proibidas varridas pelo validador; status LEGAL_APPROVED recusado",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Qualquer comunicação interna ou externa chamando este texto de aprovado"
+    },
+    {
+      "risk_id": "R19",
+      "risk": "Autorização indevida de cobrança ou checkout",
+      "impacto": "HIGH",
+      "probabilidade": "LOW",
+      "mitigacao": "Flags fail-closed no manifesto; consumers não alterados; checkout disabled até gates",
+      "owner": "web-cfg#88",
+      "gate": "finance_operator_mutation",
+      "professional_review_trigger": "Qualquer PR de consumidor que ligue checkout lendo este pacote"
+    },
+    {
+      "risk_id": "R20",
+      "risk": "Vazamento de condição comercial privada histórica alheia ao catálogo público",
+      "impacto": "HIGH",
+      "probabilidade": "LOW",
+      "mitigacao": "Pacote legal não cita a exceção privada; validador recusa marcadores dessa condição; catálogo público permanece sem ela",
+      "owner": "founder",
+      "gate": "extra_exception_change",
+      "professional_review_trigger": "Qualquer menção da condição privada em preview, termos ou proposta"
+    },
+    {
+      "risk_id": "R21",
+      "risk": "Base legal inventada ou interpretação controvertida afirmada como fato",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Citações só de fonte oficial com data; texto declara que citação não interpreta; testes rejeitam base inventada",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Antes de usar artigo de lei para defender foro, teto ou multa"
+    },
+    {
+      "risk_id": "R22",
+      "risk": "Decisão humana preenchida com valor inventado (CNPJ, foro, teto)",
+      "impacto": "HIGH",
+      "probabilidade": "MEDIUM",
+      "mitigacao": "Tokens obrigatórios; HUMAN_DECISIONS_REQUIRED.md; validador exige tokens irresolvidos",
+      "owner": "founder",
+      "gate": "legal_terms_forum",
+      "professional_review_trigger": "Qualquer preenchimento desses campos, inclusive o da linha de base comercial anterior"
+    }
+  ]
+}
