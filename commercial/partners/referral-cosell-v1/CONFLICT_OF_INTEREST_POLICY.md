@@ -42,6 +42,7 @@ A CONFENGE comunica conflito simétrico quando souber.
 | `APPARENT` | `LEGAL_REVIEW_REQUIRED` ou `APPROVED_WITH_LIMITATIONS` somente após mitigação escrita; nunca autoaprovação |
 | `REAL` | `REJECTED` ou `SUSPENDED`; não há comissão |
 | `UNKNOWN` | fail-closed: não aprova até evidência |
+| ausente / não informado | fail-closed: equivalente a `UNKNOWN`; não aprova |
 
 Mitigações possíveis (não automáticas): recusa do lead; recusa do parceiro; limitação de modalidade; recusa de marca; firewall de informação. Mitigação **não** legitima influência.
 

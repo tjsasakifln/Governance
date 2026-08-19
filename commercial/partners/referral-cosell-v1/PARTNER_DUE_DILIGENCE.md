@@ -34,7 +34,7 @@ Estados:
 - `[[FAIL_CLOSED:PARTNER_LEGAL_NAME]]`, `[[FAIL_CLOSED:PARTNER_CNPJ]]`, foro de parceiro ou `[[FAIL_CLOSED:PARTNER_PROFESSIONAL_REGISTRY]]` permanecem vazios/placeholder;
 - `modality = NOT_ELIGIBLE`;
 - `professional_flag = PROFESSIONAL_RULE_REVIEW_REQUIRED` sem revisão específica posterior (neste caso o estado máximo automático é `LEGAL_REVIEW_REQUIRED`);
-- conflito de integridade `REAL`, `APPARENT` ou `UNRESOLVED`;
+- conflito de integridade `REAL`, `APPARENT`, `UNRESOLVED`, `UNKNOWN`, ausente ou não informado (unassessed); somente `NONE` evidenciado permite autoaprovação;
 - o pacote tenta marcar `real_partner_created = true`.
 
 ---

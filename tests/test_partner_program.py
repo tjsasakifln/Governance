@@ -208,6 +208,35 @@ def test_placeholders_cannot_become_approved():
         v.assert_due_diligence_state_allowed(conflict, "APPROVED")
 
 
+def test_unknown_and_missing_integrity_conflict_cannot_be_approved():
+    base = {
+        "legal_name": "Consultoria Exemplo LTDA",
+        "cnpj": "preenchido-apos-diligencia",
+        "professional_registry": "NAO_APLICAVEL",
+        "modality": "REFERRAL_QUALIFIED",
+        "professional_flag": None,
+    }
+    blocked_values = ("UNKNOWN", "REAL", "APPARENT", "UNRESOLVED", "", "UNASSESSED")
+    for conflict in blocked_values:
+        record = dict(base, integrity_conflict=conflict)
+        assert v.integrity_conflict_blocks_approval(conflict) is True
+        assert v.partner_record_may_be_approved(record) is False
+        with pytest.raises(v.ValidationError, match="integrity"):
+            v.assert_due_diligence_state_allowed(record, "APPROVED")
+        with pytest.raises(v.ValidationError, match="integrity"):
+            v.assert_due_diligence_state_allowed(record, "APPROVED_WITH_LIMITATIONS")
+    missing = dict(base)
+    assert "integrity_conflict" not in missing
+    assert v.integrity_conflict_blocks_approval(missing.get("integrity_conflict")) is True
+    assert v.partner_record_may_be_approved(missing) is False
+    with pytest.raises(v.ValidationError, match="integrity"):
+        v.assert_due_diligence_state_allowed(missing, "APPROVED")
+    cleared = dict(base, integrity_conflict="NONE")
+    assert v.integrity_conflict_blocks_approval("NONE") is False
+    assert v.partner_record_may_be_approved(cleared) is True
+    v.assert_due_diligence_policy(v.load_text(PKG / "PARTNER_DUE_DILIGENCE.md"))
+
+
 def test_partner_event_is_never_received_revenue_without_evidence():
     accrual = {"type": "partner_commission_accrual_candidate", "eligible_receipt_cents": 800000}
     assert v.partner_event_is_received_revenue(accrual) is False

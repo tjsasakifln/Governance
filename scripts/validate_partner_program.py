@@ -61,6 +61,8 @@ DD_STATES = (
     "SUSPENDED",
 )
 APPROVED_DD_STATES = frozenset({"APPROVED", "APPROVED_WITH_LIMITATIONS"})
+INTEGRITY_CONFLICT_ALLOWED_FOR_APPROVAL = "NONE"
+INTEGRITY_CONFLICT_BLOCKED = frozenset({"REAL", "APPARENT", "UNRESOLVED", "UNKNOWN", True})
 INELIGIBLE_BASES = frozenset(
     {
         "edital",
@@ -396,6 +398,16 @@ def identity_is_placeholder(value: Any) -> bool:
     return False
 
 
+def integrity_conflict_blocks_approval(value: Any) -> bool:
+    """UNKNOWN, missing, empty and any value other than NONE cannot auto-approve."""
+    if value is None or value is True:
+        return True
+    text = str(value).strip()
+    if not text:
+        return True
+    return text.upper() != INTEGRITY_CONFLICT_ALLOWED_FOR_APPROVAL
+
+
 def partner_record_may_be_approved(record: Mapping[str, Any]) -> bool:
     try:
         assert_due_diligence_state_allowed(record, "APPROVED")
@@ -418,8 +430,7 @@ def assert_due_diligence_state_allowed(record: Mapping[str, Any], proposed_state
         raise ValidationError("NOT_ELIGIBLE cannot be approved")
     if record.get("modality") == "DISTRIBUTION_INTEGRATION" and not record.get("separate_addendum"):
         raise ValidationError("DISTRIBUTION_INTEGRATION cannot auto-approve without separate addendum")
-    conflict = record.get("integrity_conflict")
-    if conflict in {"REAL", "APPARENT", "UNRESOLVED", True}:
+    if integrity_conflict_blocks_approval(record.get("integrity_conflict")):
         raise ValidationError("integrity conflict cannot auto-approve")
     if record.get("real_partner_created") is True:
         raise ValidationError("canonical package cannot mark a real partner created")
@@ -771,6 +782,17 @@ def assert_agreement(agreement: str, pkg: Path) -> None:
             raise ValidationError(f"package missing modality {modality}")
 
 
+def assert_due_diligence_policy(text: str) -> None:
+    for token in ("REAL", "APPARENT", "UNRESOLVED", "UNKNOWN"):
+        if token not in text:
+            raise ValidationError(f"due diligence policy missing prohibited conflict token {token}")
+    lowered = text.lower()
+    if "ausente" not in lowered and "não informado" not in lowered and "nao informado" not in lowered:
+        raise ValidationError("due diligence policy must prohibit missing/unassessed integrity conflict")
+    if "`NONE`" not in text and "NONE" not in text:
+        raise ValidationError("due diligence policy must state NONE is the only auto-approval conflict value")
+
+
 def assert_p0(register: Mapping[str, Any]) -> None:
     if int(register.get("p0_count") or 0) != 0 or int(register.get("p0_unmitigated") or 0) != 0:
         raise ValidationError("unmitigated P0 risks are not allowed")
@@ -971,6 +993,7 @@ def validate_partner_dir(pkg: Path, *, root: Path | None = None) -> dict[str, An
     assert_events(load_json(pkg / "PARTNER_EVENT_CONTRACT.json"))
     assert_clause_matrix(load_json(pkg / "CLAUSE_MATRIX.json"), joined)
     assert_p0(load_json(pkg / "LEGAL_RISK_REGISTER.json"))
+    assert_due_diligence_policy(load_text(pkg / "PARTNER_DUE_DILIGENCE.md"))
     manifest = load_json(pkg / "manifest.json")
     assert_manifest_flags(manifest)
     hashed = assert_sha256sums_match(pkg)
