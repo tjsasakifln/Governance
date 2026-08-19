@@ -1,0 +1,79 @@
+{
+  "schema_version": "commercial-legal-founder-approved.v1",
+  "artifact": "retention_schedule",
+  "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "legal_hold_suspends_deletion_for_necessary_set_only": true,
+  "deletion_routine": "scripts/validate_legal_founder_approved.py:due_for_deletion",
+  "items": [
+    {
+      "class_id": "lead_not_converted",
+      "description": "lead não convertido",
+      "retention": "24 months after last significant commercial interaction",
+      "retention_days": 730,
+      "action": "delete_or_anonymize"
+    },
+    {
+      "class_id": "eligibility_rejected_or_abandoned",
+      "description": "elegibilidade rejeitada ou abandonada",
+      "retention": "12 months",
+      "retention_days": 365,
+      "action": "delete_or_anonymize"
+    },
+    {
+      "class_id": "acceptance_not_paid",
+      "description": "aceite não convertido em pagamento",
+      "retention": "24 months",
+      "retention_days": 730,
+      "action": "delete_or_anonymize"
+    },
+    {
+      "class_id": "contract_financial_evidence",
+      "description": "contrato, aceite, hashes, comprovantes, conciliação, NFS-e e evidência financeira",
+      "retention": "10 years after closure",
+      "retention_days": 3650,
+      "action": "retain_then_archive"
+    },
+    {
+      "class_id": "webhook_raw_payload",
+      "description": "payload bruto de webhook",
+      "retention": "5 years, restricted access, redaction in observability",
+      "retention_days": 1825,
+      "action": "restrict_then_delete",
+      "observability_redaction": true
+    },
+    {
+      "class_id": "security_logs_ip_ua",
+      "description": "logs de segurança/IP/user-agent",
+      "retention": "12 months",
+      "retention_days": 365,
+      "action": "delete_or_anonymize"
+    },
+    {
+      "class_id": "client_raw_inputs",
+      "description": "insumos técnicos brutos do cliente",
+      "retention": "180 days after final acceptance unless contractual duty, legal hold or documented request",
+      "retention_days": 180,
+      "action": "delete_or_anonymize",
+      "exceptions": ["contractual_duty", "legal_hold", "documented_request"]
+    },
+    {
+      "class_id": "final_deliverables_correction_trail",
+      "description": "entregáveis finais e trilha de correção",
+      "retention": "5 years",
+      "retention_days": 1825,
+      "action": "retain_then_archive"
+    },
+    {
+      "class_id": "incidents",
+      "description": "incidentes",
+      "retention": "per playbook and legal hold",
+      "retention_days": null,
+      "action": "playbook_and_legal_hold"
+    }
+  ]
+}

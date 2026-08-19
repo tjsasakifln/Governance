@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/commercial/legal/founder-approved-v1/commercial-legal-founder-approved.schema.json",
+  "title": "CONFENGE founder-approved limited-production legal package",
+  "x-package-metadata": {
+    "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+    "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+    "founder_risk_acceptance": "APPROVED",
+    "supersedable": true,
+    "jurisdiction": "Brazil",
+    "business_context": "B2B_ENGINEERING_CONSULTING"
+  },
+  "$defs": {
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "clauseId": {
+      "type": "string",
+      "enum": [
+        "partes_elegibilidade_b2b",
+        "objeto",
+        "entregaveis",
+        "dados_documentos_cliente",
+        "premissas",
+        "prazo_marcos",
+        "preco_condicao_inicio",
+        "tributos_nfse",
+        "aceite",
+        "ajustes_escopo",
+        "confidencialidade",
+        "propriedade_intelectual",
+        "licenca_uso_entregaveis",
+        "fontes_publicas_dados_terceiros",
+        "limitacoes_responsabilidade",
+        "ausencia_garantia_resultado",
+        "ausencia_representacao_juridica",
+        "ausencia_substituicao_advogado_contador",
+        "dever_validacao_cliente",
+        "suspensao_falta_informacao",
+        "cancelamento",
+        "inadimplencia",
+        "forca_maior",
+        "protecao_dados_minimizacao",
+        "comunicacao",
+        "resolucao_conflitos",
+        "foro_provisorio",
+        "versionamento",
+        "prevalencia_proposta_os"
+      ]
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "package_id",
+        "package_version",
+        "status",
+        "professional_legal_review",
+        "founder_risk_acceptance",
+        "decision_token",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "offer_code",
+        "approved_offer",
+        "approved_amount_cents",
+        "approved_billing_mode",
+        "public_activation_approved",
+        "production_checkout_approved",
+        "recurring_checkout_approved",
+        "automated_refund_approved",
+        "automated_nfse_approved",
+        "counsel_review_trigger",
+        "counsel_review_target_business_days",
+        "dpa_lite_applicable",
+        "dpa_lite_path",
+        "campaign_status",
+        "prior_package_id",
+        "prior_package_hash",
+        "decider_name",
+        "decided_at",
+        "timezone",
+        "artifacts"
+      ],
+      "properties": {
+        "schema_version": { "const": "commercial-legal-founder-approved.v1" },
+        "package_id": { "const": "CFG-LEGAL-DIAG-EXP-FOUNDER-v1" },
+        "package_version": { "const": "founder-approved-v1" },
+        "status": { "const": "FOUNDER_APPROVED_LIMITED_PRODUCTION" },
+        "professional_legal_review": { "const": "DEFERRED_UNTIL_FIRST_REVENUE" },
+        "founder_risk_acceptance": { "const": "APPROVED" },
+        "decision_token": { "const": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW_2026_08_18" },
+        "supersedable": { "const": true },
+        "jurisdiction": { "const": "Brazil" },
+        "business_context": { "const": "B2B_ENGINEERING_CONSULTING" },
+        "offer_code": { "const": "CFG-DIAG-EXP-v1" },
+        "approved_offer": { "const": "CFG-DIAG-EXP-v1" },
+        "approved_amount_cents": { "const": 800000 },
+        "approved_billing_mode": { "const": "ONE_TIME" },
+        "public_activation_approved": { "const": true },
+        "production_checkout_approved": { "const": true },
+        "recurring_checkout_approved": { "const": false },
+        "automated_refund_approved": { "const": false },
+        "automated_nfse_approved": { "const": false },
+        "counsel_review_trigger": { "const": "FIRST_PAYMENT_RECEIVED" },
+        "counsel_review_target_business_days": { "const": 10 },
+        "dpa_lite_applicable": { "const": false },
+        "dpa_lite_path": { "type": "null" },
+        "campaign_status": { "const": "FOUNDER_APPROVED_LIMITED_PRODUCTION" },
+        "prior_package_id": { "const": "CFG-LEGAL-PROVISIONAL-DIAG-v1" },
+        "prior_package_hash": { "$ref": "#/$defs/contentHash" },
+        "decider_name": { "const": "Tiago Jun Sasaki" },
+        "decided_at": { "const": "2026-08-18" },
+        "timezone": { "const": "America/Sao_Paulo" },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["path", "content_hash"],
+            "properties": {
+              "path": { "type": "string" },
+              "content_hash": { "$ref": "#/$defs/contentHash" }
+            }
+          }
+        }
+      }
+    },
+    "clauseMatrix": {
+      "type": "object",
+      "required": ["artifact", "status", "clauses"],
+      "properties": {
+        "artifact": { "const": "clause_matrix" },
+        "status": { "const": "FOUNDER_APPROVED_LIMITED_PRODUCTION" },
+        "clauses": {
+          "type": "array",
+          "minItems": 29,
+          "items": {
+            "type": "object",
+            "required": ["clause_id", "risk_covered", "source_or_premissa", "state", "consumer"],
+            "properties": {
+              "clause_id": { "$ref": "#/$defs/clauseId" },
+              "title": { "type": "string" },
+              "document": { "type": "string" },
+              "risk_covered": { "type": "string", "minLength": 1 },
+              "source_or_premissa": { "type": "string", "minLength": 1 },
+              "state": { "const": "FOUNDER_APPROVED_LIMITED_PRODUCTION" },
+              "consumer": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "riskRegister": {
+      "type": "object",
+      "required": ["artifact", "p0_unmitigated", "risks"],
+      "properties": {
+        "artifact": { "const": "legal_risk_register" },
+        "p0_count": { "const": 0 },
+        "p0_unmitigated": { "const": 0 },
+        "risks": {
+          "type": "array",
+          "minItems": 16,
+          "items": {
+            "type": "object",
+            "required": ["risk_id", "risk", "impacto", "probabilidade", "mitigacao", "owner", "gate", "professional_review_trigger"],
+            "properties": {
+              "risk_id": { "type": "string" },
+              "risk": { "type": "string" },
+              "impacto": { "enum": ["LOW", "MEDIUM", "HIGH"] },
+              "probabilidade": { "enum": ["LOW", "MEDIUM", "HIGH"] },
+              "severidade": { "type": "string" },
+              "mitigacao": { "type": "string" },
+              "risco_residual": { "type": "string" },
+              "owner": { "type": "string" },
+              "gate": { "type": "string" },
+              "priority": { "enum": ["P0", "P1", "P2"] },
+              "decision": { "enum": ["ACCEPT", "REWRITE", "SPLIT", "REMOVE", "HOLD"] },
+              "professional_review_trigger": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

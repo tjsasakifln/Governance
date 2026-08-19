@@ -1,0 +1,41 @@
+{
+  "schema_version": "commercial-legal-founder-approved.v1",
+  "artifact": "founder_risk_acceptance",
+  "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "decision_token": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW_2026_08_18",
+  "decider_name": "Tiago Jun Sasaki",
+  "decided_at": "2026-08-18",
+  "timezone": "America/Sao_Paulo",
+  "approved_offer": "CFG-DIAG-EXP-v1",
+  "approved_amount_cents": 800000,
+  "approved_billing_mode": "ONE_TIME",
+  "public_activation_approved": true,
+  "production_checkout_approved": true,
+  "recurring_checkout_approved": false,
+  "automated_refund_approved": false,
+  "automated_nfse_approved": false,
+  "counsel_review_trigger": "FIRST_PAYMENT_RECEIVED",
+  "counsel_review_target_business_days": 10,
+  "counsel_review_is_kill_switch": false,
+  "forbidden_claims": [
+    "LEGAL_APPROVED",
+    "COUNSEL_REVIEWED",
+    "LAWYER_APPROVED",
+    "conformidade jurídica garantida",
+    "ausência de risco",
+    "inaplicabilidade absoluta do CDC"
+  ],
+  "accepted_residuals": [
+    "deferred_counsel_review",
+    "possible_cdc_incidence_despite_cnpj",
+    "forum_election_challenge",
+    "liability_cap_partial_ineffectiveness",
+    "electronic_acceptance_without_icp_brasil",
+    "internal_authority_of_automated_publication",
+    "tax_classification_not_claimed",
+    "hosted_checkout_without_boleto"
+  ],
+  "p0_unmitigated": 0
+}

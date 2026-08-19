@@ -19,5 +19,7 @@ jobs:
         run: python scripts/validate_commercial_authority.py
       - name: Validate legal packages
         run: python scripts/validate_legal_provisional.py
+      - name: Validate founder-approved legal package
+        run: python scripts/validate_legal_founder_approved.py
       - name: Adversarial tests
-        run: python -m pytest tests/test_commercial_authority.py tests/test_legal_provisional.py -q
+        run: python -m pytest tests/test_commercial_authority.py tests/test_legal_provisional.py tests/test_legal_founder_approved.py -q
