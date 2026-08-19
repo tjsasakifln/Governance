@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import sys
@@ -765,6 +766,18 @@ def authority_hash(manifest: Mapping[str, Any]) -> str:
     return content_hash_json(manifest)
 
 
+def load_legal_validator(root: Path):
+    path = root / "scripts" / "validate_legal_provisional.py"
+    if not path.is_file():
+        raise ValidationError("missing scripts/validate_legal_provisional.py")
+    spec = importlib.util.spec_from_file_location("validate_legal_provisional", path)
+    if spec is None or spec.loader is None:
+        raise ValidationError("cannot load legal provisional validator")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def validate_package(root: Path | None = None) -> dict[str, Any]:
     root = repo_root(root)
     catalog_schema = load_json(root / "schemas" / "offer-catalog.v1.schema.json")
@@ -802,9 +815,11 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
         raise ValidationError("terms text must declare version and obligation of means")
 
     digest = authority_hash(manifest)
+    legal = load_legal_validator(root).validate_legal_package(root)
     return {
         "root": str(root),
         "authority_hash": digest,
+        "legal_package_hash": legal["authority_hash"],
         "catalog_authority": manifest["catalog_authority"],
         "offers": [offer["offer_code"] for offer in catalog["offers"]],
         "pending_gates": gates_pending_for_active(gates),
@@ -833,6 +848,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(f"VALIDATION_ERROR {exc}", file=sys.stderr)
         return 1
     print(f"AUTHORITY_HASH {result['authority_hash']}")
+    print(f"LEGAL_PACKAGE_HASH {result['legal_package_hash']}")
     print(f"CATALOG_AUTHORITY {result['catalog_authority']}")
     print("OFFERS " + ",".join(result["offers"]))
     print("PENDING_GATES " + ",".join(result["pending_gates"]))
