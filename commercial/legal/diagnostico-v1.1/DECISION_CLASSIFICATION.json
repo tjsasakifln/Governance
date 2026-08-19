@@ -1,0 +1,119 @@
+{
+  "schema_version": "commercial-legal-diagnostico.v1.1",
+  "artifact": "decision_classification",
+  "status": "FOUNDER_DECIDED_DRAFT",
+  "professional_legal_review": "NOT_YET_PERFORMED",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "package_id": "CFG-LEGAL-DIAG-EXP-v1.1",
+  "package_version": "diagnostico-v1.1",
+  "offer_code": "CFG-DIAG-EXP-v1",
+  "prior_package_id": "CFG-LEGAL-PROVISIONAL-DIAG-v1",
+  "prior_package_version": "provisional-v1",
+  "decided_by": "founder",
+  "decided_at": "2026-08-18",
+  "invalidation_rule": "Any material edit of this package requires a new package_version and a new hash. An already-accepted prior contract pinned to provisional-v1 is not rewritten. LEGAL_APPROVED, TAX_APPROVED, PRODUCTION_AUTHORIZED and CHECKOUT_AUTHORIZED are never implied by a founder baseline.",
+  "legal_approved": false,
+  "tax_approved": false,
+  "checkout_authorized": false,
+  "decisions": [
+    {
+      "id": "razao_social_cnpj_contratante",
+      "status": "PENDING_ENTITY_DOCUMENT",
+      "owner": "founder",
+      "professional_owner": "named_counsel_after_document",
+      "required_evidence": "Contrato social, cartão CNPJ or other authorized societal/Asaas official-account document stating exact legal name and CNPJ of the contracting provider. Trade name CONFENGE, public website, personal memory and marketing copy are not sources.",
+      "token": "[[HUMAN_DECISION_REQUIRED: razao_social_cnpj_contratante]]",
+      "blocks": ["publication", "nfse", "signable_os", "checkout"]
+    },
+    {
+      "id": "foro",
+      "status": "PENDING_ENTITY_DOCUMENT",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Registered headquarters address from the same authorized societal document, then a proposed forum derived from that sede. Counsel validates efficacy. No comarca may be invented.",
+      "token": "[[HUMAN_DECISION_REQUIRED: foro]]",
+      "blocks": ["publication", "legal_terms_forum"]
+    },
+    {
+      "id": "limite_responsabilidade",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Counsel review of ceiling efficacy and carve-outs. Founder baseline is commercial only.",
+      "token": "[[FOUNDER_BASELINE: limite_responsabilidade]]",
+      "baseline": "One-off ceiling limited to the amount actually paid on the affected OS, preserving non-limitable exceptions, dolo/fraude, confidencialidade/LGPD, IP and integrity. Not LEGAL_APPROVED.",
+      "blocks": ["legal_terms_forum"]
+    },
+    {
+      "id": "politica_reembolso",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Counsel review of refund/cancellation wording. Founder baseline is commercial only.",
+      "token": "[[FOUNDER_BASELINE: politica_reembolso]]",
+      "baseline": "Undue/duplicate charge: reconcile and return. CONFENGE refuses before start: full return. After start: settle demonstrably executed work and return any positive balance. No automatic full refund.",
+      "blocks": ["finance_operator_mutation"]
+    },
+    {
+      "id": "prazo_entrega",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "None for the commercial window already in the catalog. Counsel may still review contractual wording.",
+      "token": "[[FOUNDER_BASELINE: prazo_entrega]]",
+      "baseline": "10 to 15 business days after alignment, complete brief/data and acceptance. Obligation of means. Not a guaranteed result.",
+      "blocks": []
+    },
+    {
+      "id": "dados_pessoais_tratados",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Counsel review of LGPD inventory vs actual collection. Founder baseline lists typical B2B data only.",
+      "token": "[[FOUNDER_BASELINE: dados_pessoais_tratados]]",
+      "baseline": "Corporate name and contact, role, company/CNPJ, contractual/fiscal data, supplied brief/files, communications and acceptance metadata. Do not request sensitive data by default.",
+      "blocks": ["publication"]
+    },
+    {
+      "id": "retencao",
+      "status": "PENDING_NAMED_COUNSEL",
+      "owner": "named_counsel",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Named Brazilian counsel written retention periods for lead and one-off dossier, coordinated with accountant on fiscal-document retention. Do not invent a number.",
+      "token": "[[HUMAN_DECISION_REQUIRED: retencao]]",
+      "blocks": ["publication"]
+    },
+    {
+      "id": "responsavel_fiscal",
+      "status": "PENDING_NAMED_ACCOUNTANT",
+      "owner": "named_accountant",
+      "professional_owner": "named_accountant",
+      "required_evidence": "Named accountant/responsável fiscal, CRC or equivalent identification, and dated answers to ACCOUNTANT_HANDOFF.md. Do not invent a name.",
+      "token": "[[HUMAN_DECISION_REQUIRED: responsavel_fiscal]]",
+      "blocks": ["nfse", "tax_nfse"]
+    },
+    {
+      "id": "aceite_eletronico",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "Counsel review of electronic-acceptance efficacy. Founder baseline is commercial only.",
+      "token": "[[FOUNDER_BASELINE: aceite_eletronico]]",
+      "baseline": "Acceptance = OS/proposal + terms_version + scope_version + hashes + authorized representative/CNPJ + timestamp + durable copy. Checkout/callback alone is not acceptance.",
+      "blocks": ["checkout", "publication"]
+    },
+    {
+      "id": "canal_suporte",
+      "status": "RESOLVED_BY_FOUNDER_BASELINE",
+      "owner": "founder",
+      "professional_owner": "named_counsel",
+      "required_evidence": "None unless a different canonical channel already exists in commercial authority. Governance README lists the same address; no conflicting canonical was found.",
+      "token": "[[FOUNDER_BASELINE: canal_suporte]]",
+      "baseline": "tiago.sasaki@confenge.com.br",
+      "blocks": []
+    }
+  ]
+}

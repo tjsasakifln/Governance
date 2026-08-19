@@ -1,0 +1,356 @@
+{
+  "schema_version": "commercial-legal-diagnostico.v1.1",
+  "artifact": "clause_matrix",
+  "status": "FOUNDER_DECIDED_DRAFT",
+  "professional_legal_review": "NOT_YET_PERFORMED",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "clauses": [
+    {
+      "clause_id": "partes_elegibilidade_b2b",
+      "title": "Partes e elegibilidade B2B",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Contratação com consumidor pessoa física ou polo prestador inventado",
+      "source_or_premissa": "Default founder: somente PJ/empresário B2B; identidade do prestador HUMAN_DECISION_REQUIRED",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "objeto",
+      "title": "Objeto",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Escopo implícito, recorrência ativada ou obrigação de resultado",
+      "source_or_premissa": "Catálogo CFG-DIAG-EXP-v1 ONE_TIME; default founder consultivo/técnico",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "entregaveis",
+      "title": "Entregáveis",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Promessa de item fora do catálogo ou crédito lido como plano recorrente",
+      "source_or_premissa": "catalog.v1.json deliverables + commercial_credit sem ativar recorrência",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "dados_documentos_cliente",
+      "title": "Dados e documentos do cliente",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Insumos incompletos, dado ilícito ou falta de autorização",
+      "source_or_premissa": "Default founder: cliente responde por veracidade e autorização",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "premissas",
+      "title": "Premissas",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Expectativa de diligência de campo, ART/RRT ou certidão de base pública",
+      "source_or_premissa": "Exclusões padrão do catálogo + default founder fontes públicas + dados do cliente",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "prazo_marcos",
+      "title": "Prazo e marcos",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Relógio iniciado sem insumo; prazo de catálogo tratado como confirmado",
+      "source_or_premissa": "Catálogo e founder baseline 10-15 dias úteis após alinhamento, brief completo e aceite; sem garantia de resultado",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "preco_condicao_inicio",
+      "title": "Preço, condição e início após confirmação financeira",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Trabalho sem pagamento confirmado; objeto de provedor lido como receita",
+      "source_or_premissa": "amount_cents 800000; first confirmed charge before kickoff",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "tributos_nfse",
+      "title": "Tributos e NFS-e",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Regime fiscal inventado; NFS-e de produção sem contador",
+      "source_or_premissa": "Premissa 6% não confirmada; gate tax_nfse UNKNOWN; responsável PENDING_NAMED_ACCOUNTANT",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "accountant"
+      ]
+    },
+    {
+      "clause_id": "aceite",
+      "title": "Aceite",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Checkout ou callback usados como prova de aceite",
+      "source_or_premissa": "FOUNDER_BASELINE aceite_eletronico: OS/proposta + terms_version + scope_version + hashes + representante/CNPJ + timestamp + cópia durável; checkout/callback sozinho não prova aceite",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "ajustes_escopo",
+      "title": "Ajustes de escopo",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Pedido fora do escopo executado sem nova proposta",
+      "source_or_premissa": "Default founder: mudança material exige nova proposta",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "confidencialidade",
+      "title": "Confidencialidade",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Publicação de dado ou caso do cliente sem autorização",
+      "source_or_premissa": "Default founder: nenhuma publicação de confidencial do cliente sem autorização",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "propriedade_intelectual",
+      "title": "Propriedade intelectual",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Disputa de autoria sobre método genérico ou dado público bruto",
+      "source_or_premissa": "Linha de base comercial de métodos preexistentes; não reaprovada",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "licenca_uso_entregaveis",
+      "title": "Licença de uso dos entregáveis",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Uso do relatório como revisão jurídica profissional ou revenda",
+      "source_or_premissa": "Licença interna após pagamento integral; sem transferência de código",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "fontes_publicas_dados_terceiros",
+      "title": "Fontes públicas e dados de terceiros",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Fonte pública incorreta tratada como certidão; dado de terceiro sem autorização",
+      "source_or_premissa": "Default founder: fontes públicas + dados do cliente permitidos; cliente autoriza",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "limitacoes_responsabilidade",
+      "title": "Limitações de responsabilidade",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Teto inventado, ineficaz ou copiado da linha de base como se aprovado",
+      "source_or_premissa": "FOUNDER_BASELINE: teto = valor efetivamente pago na OS afetada; carve-outs dolo/fraude, LGPD, PI, integridade; eficácia PENDING_NAMED_COUNSEL",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_garantia_resultado",
+      "title": "Ausência de garantia de resultado",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Cliente lê o diagnóstico como promessa de vitória, economia ou receita",
+      "source_or_premissa": "Default founder: nenhuma garantia de economia, adjudicação, vitória, reajuste ou receita",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_representacao_juridica",
+      "title": "Ausência de representação jurídica",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Relatório usado como mandato ou peça processual",
+      "source_or_premissa": "Default founder: serviço não é advocacia; exclusões do catálogo",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_substituicao_advogado_contador",
+      "title": "Ausência de substituição de advogado ou contador",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Cliente omite assessoria própria e atribui omissão ao prestador",
+      "source_or_premissa": "Default founder: não substitui advogado/contador",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "accountant"
+      ]
+    },
+    {
+      "clause_id": "dever_validacao_cliente",
+      "title": "Dever de validação pelo cliente",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Uso irrefletido do relatório; erro material sem via de correção",
+      "source_or_premissa": "Uma rodada consolidada de correção factual; validação do cliente",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "suspensao_falta_informacao",
+      "title": "Suspensão por falta de informação",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Atraso do cliente imputado ao prestador",
+      "source_or_premissa": "Default founder: prazo só corre com insumos obrigatórios",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "cancelamento",
+      "title": "Cancelamento",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Reembolso integral após trabalho executado; mutação financeira sem gate",
+      "source_or_premissa": "FOUNDER_BASELINE politica_reembolso; sem reembolso automático integral; mutação financeira bloqueada",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "inadimplencia",
+      "title": "Inadimplência",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Multa/juros inventados; chargeback apagando débito",
+      "source_or_premissa": "Sem percentual inventado neste rascunho; valores incontroversos permanecem devidos",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "forca_maior",
+      "title": "Força maior",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Impossibilidade temporária lida como inadimplemento",
+      "source_or_premissa": "Suspensão documentada; pagamento do já entregue permanece devido",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "protecao_dados_minimizacao",
+      "title": "Proteção de dados e minimização",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Sobrecoleta; DPA/subprocessador inventado; vazamento",
+      "source_or_premissa": "FOUNDER_BASELINE dados_pessoais_tratados; retenção PENDING_NAMED_COUNSEL; DPA lite não aplicável",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "comunicacao",
+      "title": "Comunicação",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Canal de suporte inventado ou aviso informal de cancelamento",
+      "source_or_premissa": "FOUNDER_BASELINE canal_suporte tiago.sasaki@confenge.com.br; atos relevantes exigem registro escrito",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "resolucao_conflitos",
+      "title": "Resolução de conflitos",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Arbitragem ou rito inventado",
+      "source_or_premissa": "Tentativa direta registrada; sem arbitragem neste rascunho",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "foro_provisorio",
+      "title": "Foro provisório",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Foro inventado ou linha de base comercial publicada como aprovada",
+      "source_or_premissa": "jurisdiction Brazil; foro PENDING_ENTITY_DOCUMENT; legal_terms_forum UNKNOWN",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "founder",
+        "web-cfg#88"
+      ]
+    },
+    {
+      "clause_id": "versionamento",
+      "title": "Versionamento",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Aceite de hash antigo após mudança; status LEGAL_APPROVED",
+      "source_or_premissa": "diagnostico-v1.1 aponta para provisional-v1 imutável; supersedable true; status LEGAL_APPROVED recusado",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47"
+      ]
+    },
+    {
+      "clause_id": "prevalencia_proposta_os",
+      "title": "Prevalência da proposta ou Ordem de Serviço",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Conflito OS vs termos vs catálogo; overwrite silencioso da linha de base comercial",
+      "source_or_premissa": "Default founder: proposta/OS prevalece quando aplicável; catálogo manda em preço/entregáveis",
+      "state": "FOUNDER_DECIDED_DRAFT",
+      "consumer": [
+        "web-cfg#88",
+        "founder"
+      ]
+    }
+  ]
+}
