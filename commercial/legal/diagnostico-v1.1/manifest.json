@@ -1,0 +1,133 @@
+{
+  "schema_version": "commercial-legal-diagnostico.v1.1",
+  "package_id": "CFG-LEGAL-DIAG-EXP-v1.1",
+  "package_version": "diagnostico-v1.1",
+  "status": "FOUNDER_DECIDED_DRAFT",
+  "professional_legal_review": "NOT_YET_PERFORMED",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "offer_code": "CFG-DIAG-EXP-v1",
+  "offer_amount_cents": 800000,
+  "billing_mode": "ONE_TIME",
+  "catalog_terms_version_referenced": "CFG-TERMS-B2B-2026-08-17-v1",
+  "does_not_reapprove_catalog_terms": true,
+  "dpa_lite_applicable": false,
+  "dpa_lite_path": null,
+  "dpa_lite_reason": "Diagnosis one-off treats B2B contact and client-supplied inputs as an independent controller activity. No processing-on-behalf relationship is established and no subprocessors are contracted or listed.",
+  "campaign_status": "READY_FOR_PRIVATE_NEGOTIATION",
+  "production_checkout_enabled": false,
+  "public_activation_approved": false,
+  "real_money_mutation_approved": false,
+  "legal_terms_forum_gate": "UNKNOWN",
+  "checkout_authorized": false,
+  "publication_authorized": false,
+  "cobranca_authorized": false,
+  "effective_at": "2026-08-18T00:00:00Z",
+  "prior_package_id": "CFG-LEGAL-PROVISIONAL-DIAG-v1",
+  "prior_package_version": "provisional-v1",
+  "prior_package_hash": "sha256:53cb908af9eeaaa1d7097c322394440cff329ff9bd7fb9522ab922801f0cd150",
+  "founder_decided_by": "founder",
+  "founder_decided_at": "2026-08-18",
+  "invalidation_rule": "Any material edit of diagnostico-v1.1 requires a new package_version and a new hash. An already-accepted prior contract pinned to provisional-v1 is not rewritten. LEGAL_APPROVED, TAX_APPROVED, PRODUCTION_AUTHORIZED and CHECKOUT_AUTHORIZED are never implied by a founder baseline.",
+  "consumers": [
+    {
+      "id": "web-cfg#88",
+      "role": "delivery_parent",
+      "pin": "founder_decided_hash"
+    },
+    {
+      "id": "Warmbly#47",
+      "role": "reconciliation_consumer",
+      "pin": "founder_decided_hash"
+    }
+  ],
+  "unresolved_human_decisions": [
+    "razao_social_cnpj_contratante",
+    "foro",
+    "retencao",
+    "responsavel_fiscal"
+  ],
+  "remaining_pending_decisions": [
+    "razao_social_cnpj_contratante",
+    "foro",
+    "retencao",
+    "responsavel_fiscal"
+  ],
+  "forbidden_statuses": [
+    "CHECKOUT_AUTHORIZED",
+    "LEGAL_APPROVED",
+    "PRODUCTION_AUTHORIZED"
+  ],
+  "artifacts": [
+    {
+      "path": "TERMOS_B2B_DIAGNOSTICO.md",
+      "content_hash": "sha256:3dcf75c45c9cfde06bb30834a8e194e1610eb3a8770e05d9ce8936e4c1ade233"
+    },
+    {
+      "path": "ORDEM_DE_SERVICO_DIAGNOSTICO.md",
+      "content_hash": "sha256:d80946edd577288c6ad71b6ca29b6f60b7a510eaa856cffaed013d11551eb72a"
+    },
+    {
+      "path": "POLITICA_CANCELAMENTO_REEMBOLSO.md",
+      "content_hash": "sha256:2b37f1e94bb28e45aedc399ceea70a0764d34c5b1feb480c86e5324b0ea4c6bc"
+    },
+    {
+      "path": "AVISO_LIMITACOES_TECNICAS.md",
+      "content_hash": "sha256:2168e97a08d940705ddf4c40437018e4645a70d092b83c7b31e1a6b8c89ea262"
+    },
+    {
+      "path": "AVISO_PRIVACIDADE_LEADS.md",
+      "content_hash": "sha256:da6b6e442881f9aaec207596ccfedf7b7c73e396174a24e0dac857daf1c2193b"
+    },
+    {
+      "path": "LEGAL_RISK_REGISTER.json",
+      "content_hash": "sha256:05783432a0540299805bbc7314fbcf1eece4a0a8cafe97f0fbcbb700f7d36a6f"
+    },
+    {
+      "path": "HUMAN_DECISIONS_REQUIRED.md",
+      "content_hash": "sha256:f1c1dc1d7d488d405d5ca72dfafad64bae85eb302304ab78ec3e9dd4c24a194b"
+    },
+    {
+      "path": "FOUNDER_DECISIONS.md",
+      "content_hash": "sha256:f5d955814867a2b706d6c4820dac84ad24f4cea2312faf45d4c0b95e4401c44d"
+    },
+    {
+      "path": "PROFESSIONAL_GATES.md",
+      "content_hash": "sha256:7a23259026a4fd629934b7cd52c15384b0d6a549fef2178853e81a8e429da9e4"
+    },
+    {
+      "path": "LEGAL_COUNSEL_HANDOFF.md",
+      "content_hash": "sha256:22e4f9a1c067dfb81a7bf5bd74d66a9e629500516b7f799d1f7d4492dedef38f"
+    },
+    {
+      "path": "ACCOUNTANT_HANDOFF.md",
+      "content_hash": "sha256:3b885c8d16f21502bf0742c7e2d8c981f36d47f21c1d31ad6422b292cd599bc5"
+    },
+    {
+      "path": "DECISION_CLASSIFICATION.json",
+      "content_hash": "sha256:45d7310306740c4a405bfdfd40e7b731aaf855839a68b368f65d08d9c3f70806"
+    },
+    {
+      "path": "STATUS_FINAL.md",
+      "content_hash": "sha256:2d699415d61ddde3e379b6becf71ea27e5d4a5c58191500977c7945bc3289cd9"
+    },
+    {
+      "path": "CLAUSE_MATRIX.json",
+      "content_hash": "sha256:7b16f03069aa9f5cf703e54d1f62a3ba3e3489c5f3f3131db845fcca07d8d15c"
+    },
+    {
+      "path": "commercial-legal-diagnostico.schema.json",
+      "content_hash": "sha256:c39a6a66a569d1076ebf1b780f8d38f13d85df8c9020691f2c2cfb87eddfaf49"
+    },
+    {
+      "path": "README.md",
+      "content_hash": "sha256:1139d2365a41fb762938297f03814dbeee210e6e3627f847aff9b88b9ff00e01"
+    },
+    {
+      "path": "CONSUMER_HANDOFF.md",
+      "content_hash": "sha256:60609d965b7604c4f83214f19ad3a1956d454534c05aebe898d874c203fa905e"
+    }
+  ]
+}

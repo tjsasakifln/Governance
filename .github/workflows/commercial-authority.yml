@@ -17,5 +17,7 @@ jobs:
         run: python -m pip install --upgrade pip pytest
       - name: Validate commercial authority
         run: python scripts/validate_commercial_authority.py
+      - name: Validate legal packages
+        run: python scripts/validate_legal_provisional.py
       - name: Adversarial tests
-        run: python -m pytest tests/test_commercial_authority.py -q
+        run: python -m pytest tests/test_commercial_authority.py tests/test_legal_provisional.py -q

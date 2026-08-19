@@ -1,0 +1,660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/commercial/legal/diagnostico-v1.1/commercial-legal-diagnostico.schema.json",
+  "title": "CONFENGE founder-decided commercial-legal package diagnostico-v1.1",
+  "x-package-metadata": {
+    "status": "FOUNDER_DECIDED_DRAFT",
+    "professional_legal_review": "NOT_YET_PERFORMED",
+    "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+    "supersedable": true,
+    "jurisdiction": "Brazil",
+    "business_context": "B2B_ENGINEERING_CONSULTING"
+  },
+  "$defs": {
+    "metadataFields": {
+      "type": "object",
+      "required": [
+        "status",
+        "professional_legal_review",
+        "operational_use",
+        "supersedable",
+        "jurisdiction",
+        "business_context"
+      ],
+      "properties": {
+        "status": {
+          "const": "FOUNDER_DECIDED_DRAFT"
+        },
+        "professional_legal_review": {
+          "const": "NOT_YET_PERFORMED"
+        },
+        "operational_use": {
+          "const": "PRIVATE_NEGOTIATION_ONLY"
+        },
+        "supersedable": {
+          "const": true
+        },
+        "jurisdiction": {
+          "const": "Brazil"
+        },
+        "business_context": {
+          "const": "B2B_ENGINEERING_CONSULTING"
+        }
+      }
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "humanDecisionId": {
+      "type": "string",
+      "enum": [
+        "razao_social_cnpj_contratante",
+        "foro",
+        "limite_responsabilidade",
+        "politica_reembolso",
+        "prazo_entrega",
+        "dados_pessoais_tratados",
+        "retencao",
+        "responsavel_fiscal",
+        "aceite_eletronico",
+        "canal_suporte"
+      ]
+    },
+    "clauseId": {
+      "type": "string",
+      "enum": [
+        "partes_elegibilidade_b2b",
+        "objeto",
+        "entregaveis",
+        "dados_documentos_cliente",
+        "premissas",
+        "prazo_marcos",
+        "preco_condicao_inicio",
+        "tributos_nfse",
+        "aceite",
+        "ajustes_escopo",
+        "confidencialidade",
+        "propriedade_intelectual",
+        "licenca_uso_entregaveis",
+        "fontes_publicas_dados_terceiros",
+        "limitacoes_responsabilidade",
+        "ausencia_garantia_resultado",
+        "ausencia_representacao_juridica",
+        "ausencia_substituicao_advogado_contador",
+        "dever_validacao_cliente",
+        "suspensao_falta_informacao",
+        "cancelamento",
+        "inadimplencia",
+        "forca_maior",
+        "protecao_dados_minimizacao",
+        "comunicacao",
+        "resolucao_conflitos",
+        "foro_provisorio",
+        "versionamento",
+        "prevalencia_proposta_os"
+      ]
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "package_id",
+        "package_version",
+        "status",
+        "professional_legal_review",
+        "operational_use",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "offer_code",
+        "offer_amount_cents",
+        "billing_mode",
+        "catalog_terms_version_referenced",
+        "does_not_reapprove_catalog_terms",
+        "dpa_lite_applicable",
+        "dpa_lite_path",
+        "dpa_lite_reason",
+        "campaign_status",
+        "production_checkout_enabled",
+        "public_activation_approved",
+        "real_money_mutation_approved",
+        "legal_terms_forum_gate",
+        "checkout_authorized",
+        "publication_authorized",
+        "cobranca_authorized",
+        "effective_at",
+        "consumers",
+        "unresolved_human_decisions",
+        "forbidden_statuses",
+        "artifacts",
+        "prior_package_id",
+        "prior_package_version",
+        "prior_package_hash",
+        "founder_decided_by",
+        "founder_decided_at",
+        "invalidation_rule",
+        "remaining_pending_decisions"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "commercial-legal-diagnostico.v1.1"
+        },
+        "package_id": {
+          "const": "CFG-LEGAL-DIAG-EXP-v1.1"
+        },
+        "package_version": {
+          "const": "diagnostico-v1.1"
+        },
+        "status": {
+          "const": "FOUNDER_DECIDED_DRAFT"
+        },
+        "professional_legal_review": {
+          "const": "NOT_YET_PERFORMED"
+        },
+        "operational_use": {
+          "const": "PRIVATE_NEGOTIATION_ONLY"
+        },
+        "supersedable": {
+          "const": true
+        },
+        "jurisdiction": {
+          "const": "Brazil"
+        },
+        "business_context": {
+          "const": "B2B_ENGINEERING_CONSULTING"
+        },
+        "offer_code": {
+          "const": "CFG-DIAG-EXP-v1"
+        },
+        "offer_amount_cents": {
+          "const": 800000
+        },
+        "billing_mode": {
+          "const": "ONE_TIME"
+        },
+        "catalog_terms_version_referenced": {
+          "const": "CFG-TERMS-B2B-2026-08-17-v1"
+        },
+        "does_not_reapprove_catalog_terms": {
+          "const": true
+        },
+        "dpa_lite_applicable": {
+          "const": false
+        },
+        "dpa_lite_path": {
+          "type": "null"
+        },
+        "dpa_lite_reason": {
+          "type": "string",
+          "minLength": 20
+        },
+        "campaign_status": {
+          "type": "string",
+          "enum": [
+            "READY_FOR_PRIVATE_NEGOTIATION",
+            "BLOCKED_MISSING_COMMERCIAL_AUTHORITY",
+            "BLOCKED_CI",
+            "BLOCKED_PROFESSIONAL_GATES"
+          ]
+        },
+        "production_checkout_enabled": {
+          "const": false
+        },
+        "public_activation_approved": {
+          "const": false
+        },
+        "real_money_mutation_approved": {
+          "const": false
+        },
+        "legal_terms_forum_gate": {
+          "const": "UNKNOWN"
+        },
+        "checkout_authorized": {
+          "const": false
+        },
+        "publication_authorized": {
+          "const": false
+        },
+        "cobranca_authorized": {
+          "const": false
+        },
+        "effective_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "consumers": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "role",
+              "pin"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "pin": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "unresolved_human_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/humanDecisionId"
+          }
+        },
+        "forbidden_statuses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "LEGAL_APPROVED",
+              "PRODUCTION_AUTHORIZED",
+              "CHECKOUT_AUTHORIZED"
+            ]
+          },
+          "minItems": 3
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "content_hash"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_hash": {
+                "$ref": "#/$defs/contentHash"
+              }
+            }
+          }
+        },
+        "prior_package_id": {
+          "const": "CFG-LEGAL-PROVISIONAL-DIAG-v1"
+        },
+        "prior_package_version": {
+          "const": "provisional-v1"
+        },
+        "prior_package_hash": {
+          "$ref": "#/$defs/contentHash"
+        },
+        "founder_decided_by": {
+          "const": "founder"
+        },
+        "founder_decided_at": {
+          "type": "string",
+          "minLength": 10
+        },
+        "invalidation_rule": {
+          "type": "string",
+          "minLength": 20
+        },
+        "remaining_pending_decisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/humanDecisionId"
+          }
+        }
+      }
+    },
+    "clauseMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "artifact",
+        "status",
+        "professional_legal_review",
+        "operational_use",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "clauses"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "commercial-legal-diagnostico.v1.1"
+        },
+        "artifact": {
+          "const": "clause_matrix"
+        },
+        "status": {
+          "const": "FOUNDER_DECIDED_DRAFT"
+        },
+        "professional_legal_review": {
+          "const": "NOT_YET_PERFORMED"
+        },
+        "operational_use": {
+          "const": "PRIVATE_NEGOTIATION_ONLY"
+        },
+        "supersedable": {
+          "const": true
+        },
+        "jurisdiction": {
+          "const": "Brazil"
+        },
+        "business_context": {
+          "const": "B2B_ENGINEERING_CONSULTING"
+        },
+        "clauses": {
+          "type": "array",
+          "minItems": 29,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "clause_id",
+              "title",
+              "document",
+              "risk_covered",
+              "source_or_premissa",
+              "state",
+              "consumer"
+            ],
+            "properties": {
+              "clause_id": {
+                "$ref": "#/$defs/clauseId"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "document": {
+                "type": "string",
+                "minLength": 1
+              },
+              "risk_covered": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_or_premissa": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "const": "FOUNDER_DECIDED_DRAFT"
+              },
+              "consumer": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "riskRegister": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "artifact",
+        "status",
+        "professional_legal_review",
+        "operational_use",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "risks"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "commercial-legal-diagnostico.v1.1"
+        },
+        "artifact": {
+          "const": "legal_risk_register"
+        },
+        "status": {
+          "const": "FOUNDER_DECIDED_DRAFT"
+        },
+        "professional_legal_review": {
+          "const": "NOT_YET_PERFORMED"
+        },
+        "operational_use": {
+          "const": "PRIVATE_NEGOTIATION_ONLY"
+        },
+        "supersedable": {
+          "const": true
+        },
+        "jurisdiction": {
+          "const": "Brazil"
+        },
+        "business_context": {
+          "const": "B2B_ENGINEERING_CONSULTING"
+        },
+        "risks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "risk_id",
+              "risk",
+              "impacto",
+              "probabilidade",
+              "mitigacao",
+              "owner",
+              "gate",
+              "professional_review_trigger"
+            ],
+            "properties": {
+              "risk_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "risk": {
+                "type": "string",
+                "minLength": 1
+              },
+              "impacto": {
+                "type": "string",
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH"
+                ]
+              },
+              "probabilidade": {
+                "type": "string",
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH"
+                ]
+              },
+              "mitigacao": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "gate": {
+                "type": "string",
+                "minLength": 1
+              },
+              "professional_review_trigger": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "decisionStatus": {
+      "type": "string",
+      "enum": [
+        "RESOLVED_BY_FOUNDER_BASELINE",
+        "RESOLVED_BY_AUTHORITATIVE_ENTITY_DATA",
+        "PENDING_NAMED_COUNSEL",
+        "PENDING_NAMED_ACCOUNTANT",
+        "PENDING_ENTITY_DOCUMENT",
+        "PENDING_OPERATIONAL_INVENTORY"
+      ]
+    },
+    "decisionClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "artifact",
+        "status",
+        "professional_legal_review",
+        "operational_use",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "package_id",
+        "package_version",
+        "offer_code",
+        "prior_package_id",
+        "prior_package_version",
+        "decided_by",
+        "decided_at",
+        "invalidation_rule",
+        "legal_approved",
+        "tax_approved",
+        "checkout_authorized",
+        "decisions"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "commercial-legal-diagnostico.v1.1"
+        },
+        "artifact": {
+          "const": "decision_classification"
+        },
+        "status": {
+          "const": "FOUNDER_DECIDED_DRAFT"
+        },
+        "professional_legal_review": {
+          "const": "NOT_YET_PERFORMED"
+        },
+        "operational_use": {
+          "const": "PRIVATE_NEGOTIATION_ONLY"
+        },
+        "supersedable": {
+          "const": true
+        },
+        "jurisdiction": {
+          "const": "Brazil"
+        },
+        "business_context": {
+          "const": "B2B_ENGINEERING_CONSULTING"
+        },
+        "package_id": {
+          "const": "CFG-LEGAL-DIAG-EXP-v1.1"
+        },
+        "package_version": {
+          "const": "diagnostico-v1.1"
+        },
+        "offer_code": {
+          "const": "CFG-DIAG-EXP-v1"
+        },
+        "prior_package_id": {
+          "const": "CFG-LEGAL-PROVISIONAL-DIAG-v1"
+        },
+        "prior_package_version": {
+          "const": "provisional-v1"
+        },
+        "decided_by": {
+          "const": "founder"
+        },
+        "decided_at": {
+          "type": "string",
+          "minLength": 10
+        },
+        "invalidation_rule": {
+          "type": "string",
+          "minLength": 20
+        },
+        "legal_approved": {
+          "const": false
+        },
+        "tax_approved": {
+          "const": false
+        },
+        "checkout_authorized": {
+          "const": false
+        },
+        "decisions": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "status",
+              "owner",
+              "professional_owner",
+              "required_evidence",
+              "token",
+              "blocks"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/humanDecisionId"
+              },
+              "status": {
+                "$ref": "#/$defs/decisionStatus"
+              },
+              "owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "professional_owner": {
+                "type": "string",
+                "minLength": 1
+              },
+              "required_evidence": {
+                "type": "string",
+                "minLength": 1
+              },
+              "token": {
+                "type": "string",
+                "minLength": 1
+              },
+              "baseline": {
+                "type": "string"
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

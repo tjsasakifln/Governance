@@ -815,11 +815,13 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
         raise ValidationError("terms text must declare version and obligation of means")
 
     digest = authority_hash(manifest)
-    legal = load_legal_validator(root).validate_legal_package(root)
+    legal_mod = load_legal_validator(root)
+    legal = legal_mod.validate_all_legal_packages(root)
     return {
         "root": str(root),
         "authority_hash": digest,
-        "legal_package_hash": legal["authority_hash"],
+        "legal_package_hash": legal["prior_package_hash"],
+        "founder_decided_hash": legal["founder_decided_hash"],
         "catalog_authority": manifest["catalog_authority"],
         "offers": [offer["offer_code"] for offer in catalog["offers"]],
         "pending_gates": gates_pending_for_active(gates),
@@ -849,6 +851,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         return 1
     print(f"AUTHORITY_HASH {result['authority_hash']}")
     print(f"LEGAL_PACKAGE_HASH {result['legal_package_hash']}")
+    print(f"FOUNDER_DECIDED_HASH {result['founder_decided_hash']}")
     print(f"CATALOG_AUTHORITY {result['catalog_authority']}")
     print("OFFERS " + ",".join(result["offers"]))
     print("PENDING_GATES " + ",".join(result["pending_gates"]))

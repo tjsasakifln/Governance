@@ -272,3 +272,163 @@ def test_schema_rejects_illegal_campaign_status():
     bad_forum["legal_terms_forum_gate"] = "APPROVED"
     with pytest.raises(v.ValidationError, match="APPROVED"):
         v.assert_fail_closed_flags(bad_forum)
+
+
+SUCCESSOR = ROOT / "commercial" / "legal" / "diagnostico-v1.1"
+
+
+def test_successor_package_exists_and_points_at_frozen_prior():
+    assert SUCCESSOR.is_dir()
+    assert (SUCCESSOR / "FOUNDER_DECISIONS.md").is_file()
+    assert (SUCCESSOR / "PROFESSIONAL_GATES.md").is_file()
+    assert (SUCCESSOR / "LEGAL_COUNSEL_HANDOFF.md").is_file()
+    assert (SUCCESSOR / "ACCOUNTANT_HANDOFF.md").is_file()
+    assert (SUCCESSOR / "STATUS_FINAL.md").is_file()
+    assert (SUCCESSOR / "DECISION_CLASSIFICATION.json").is_file()
+    assert not (SUCCESSOR / "DPA_LITE_B2B.md").is_file()
+    result = v.validate_all_legal_packages(ROOT)
+    prior = v.validate_legal_package(ROOT)
+    assert result["prior_package_hash"] == prior["authority_hash"]
+    assert result["founder_decided_hash"] != result["prior_package_hash"]
+    assert result["offer_code"] == "CFG-DIAG-EXP-v1"
+    assert result["offer_amount_cents"] == 800000
+    manifest = v.load_json(SUCCESSOR / "manifest.json")
+    assert manifest["prior_package_hash"] == prior["authority_hash"]
+    assert manifest["prior_package_version"] == "provisional-v1"
+    assert manifest["campaign_status"] == "READY_FOR_PRIVATE_NEGOTIATION"
+
+
+def test_ten_ids_classified_founder_baseline_not_legal_approved():
+    classification = v.load_json(SUCCESSOR / "DECISION_CLASSIFICATION.json")
+    v.assert_classification(classification)
+    statuses = {item["id"]: item["status"] for item in classification["decisions"]}
+    assert statuses == dict(v.EXPECTED_FOUNDER_STATUSES)
+    for item in classification["decisions"]:
+        assert item["status"] in v.ALLOWED_CLASSIFICATION_STATUSES
+        assert item["status"] != "LEGAL_APPROVED"
+        assert item.get("legal_approved") is not True
+    assert classification["legal_approved"] is False
+    assert classification["tax_approved"] is False
+    assert classification["checkout_authorized"] is False
+    for decision_id in v.FOUNDER_COMMERCIAL_IDS:
+        assert statuses[decision_id] == "RESOLVED_BY_FOUNDER_BASELINE"
+    pending = v.pending_decision_ids(classification)
+    assert sorted(pending) == sorted(
+        ["razao_social_cnpj_contratante", "foro", "retencao", "responsavel_fiscal"]
+    )
+
+
+def test_status_final_ready_for_private_negotiation_not_approved():
+    text = v.load_text(SUCCESSOR / "STATUS_FINAL.md")
+    v.assert_status_final(text)
+    assert "READY_FOR_PRIVATE_NEGOTIATION" in text
+    assert "NOT_LEGAL_APPROVED" in text
+    assert "NOT_TAX_APPROVED" in text
+    assert "NOT_CHECKOUT_AUTHORIZED" in text
+
+
+def test_write_hashes_does_not_mutate_prior_package():
+    prior_manifest = v.load_json(PKG / "manifest.json")
+    prior_hash = v.legal_package_hash(prior_manifest)
+    prior_files = {name: v.hash_legal_file(PKG / name) for name in v.HASHED_FILES}
+    prior_sums = v.load_text(PKG / "SHA256SUMS.txt")
+    result = v.write_hashes(ROOT)
+    after_files = {name: v.hash_legal_file(PKG / name) for name in v.HASHED_FILES}
+    after_manifest = v.load_json(PKG / "manifest.json")
+    assert prior_files == after_files
+    assert v.legal_package_hash(after_manifest) == prior_hash
+    assert v.load_text(PKG / "SHA256SUMS.txt") == prior_sums
+    assert result["prior_package_hash"] == prior_hash
+    assert result["founder_decided_hash"].startswith("sha256:")
+
+
+def test_pending_professional_gate_blocks_checkout_and_publication():
+    classification = v.load_json(SUCCESSOR / "DECISION_CLASSIFICATION.json")
+    manifest = v.load_json(SUCCESSOR / "manifest.json")
+    v.assert_pending_gates_block_activation(manifest, classification)
+    assert v.checkout_or_publication_permitted(manifest, classification) is False
+    bad = deepcopy(manifest)
+    bad["checkout_authorized"] = True
+    with pytest.raises(v.ValidationError, match="checkout_authorized"):
+        v.assert_pending_gates_block_activation(bad, classification)
+    bad_pub = deepcopy(manifest)
+    bad_pub["publication_authorized"] = True
+    with pytest.raises(v.ValidationError, match="publication_authorized"):
+        v.assert_pending_gates_block_activation(bad_pub, classification)
+
+
+def test_pending_gate_in_successor_dir_rejects_checkout_flag(tmp_path):
+    dest = v.mutate_package(SUCCESSOR, tmp_path / "adv-checkout-pending")
+    manifest = v.load_json(dest / "manifest.json")
+    manifest["checkout_authorized"] = True
+    (dest / "manifest.json").write_text(
+        __import__("json").dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(v.ValidationError, match="checkout_authorized"):
+        v.validate_founder_decided_dir(dest, root=ROOT)
+
+
+def test_invented_cnpj_razao_and_foro_fail(tmp_path):
+    dest = v.mutate_package(SUCCESSOR, tmp_path / "adv-cnpj")
+    terms = v.load_text(dest / "TERMOS_B2B_DIAGNOSTICO.md")
+    invented_cnpj = f"{12:02d}.{345:03d}.{678:03d}/{1:04d}-{90:02d}"
+    filled = terms.replace(
+        v.human_decision_token("razao_social_cnpj_contratante"),
+        f"CONFENGE SERVICOS LTDA CNPJ {invented_cnpj}",
+    )
+    (dest / "TERMOS_B2B_DIAGNOSTICO.md").write_text(filled, encoding="utf-8")
+    with pytest.raises(v.ValidationError, match="invented"):
+        v.reject_adversarial_text(filled, kind="invented_entity")
+    with pytest.raises(v.ValidationError):
+        v.validate_founder_decided_dir(dest, root=ROOT)
+
+    dest_foro = v.mutate_package(SUCCESSOR, tmp_path / "adv-foro-v11")
+    foro_text = v.load_text(dest_foro / "TERMOS_B2B_DIAGNOSTICO.md").replace(
+        v.human_decision_token("foro"),
+        "Foro da Comarca de Recife",
+    )
+    (dest_foro / "TERMOS_B2B_DIAGNOSTICO.md").write_text(foro_text, encoding="utf-8")
+    with pytest.raises(v.ValidationError, match="invented"):
+        v.reject_adversarial_text(foro_text, kind="invented_entity")
+    with pytest.raises(v.ValidationError):
+        v.validate_founder_decided_dir(dest_foro, root=ROOT)
+
+
+def test_checkout_callback_is_not_aceite(tmp_path):
+    terms = v.load_text(SUCCESSOR / "TERMOS_B2B_DIAGNOSTICO.md")
+    v.assert_checkout_is_not_acceptance(terms, source="terms")
+    bad = terms + "\nO checkout constitui aceite.\n"
+    with pytest.raises(v.ValidationError, match="aceite"):
+        v.reject_adversarial_text(bad, kind="checkout_as_aceite")
+    dest = v.mutate_package(SUCCESSOR, tmp_path / "adv-aceite")
+    (dest / "TERMOS_B2B_DIAGNOSTICO.md").write_text(bad, encoding="utf-8")
+    with pytest.raises(v.ValidationError, match="aceite"):
+        v.validate_founder_decided_dir(dest, root=ROOT)
+
+
+def test_successor_terms_do_not_promise_result(tmp_path):
+    terms = v.load_text(SUCCESSOR / "TERMOS_B2B_DIAGNOSTICO.md")
+    v.assert_no_resultado_promise(terms, source="successor-terms")
+    bad = terms + "\nEste diagnóstico garante vitória em licitação.\n"
+    with pytest.raises(v.ValidationError, match="result promise"):
+        v.reject_adversarial_text(bad, kind="resultado")
+    dest = v.mutate_package(SUCCESSOR, tmp_path / "adv-result-v11")
+    (dest / "TERMOS_B2B_DIAGNOSTICO.md").write_text(bad, encoding="utf-8")
+    with pytest.raises(v.ValidationError, match="result promise"):
+        v.validate_founder_decided_dir(dest, root=ROOT)
+
+
+def test_mislabeling_founder_baseline_as_legal_approved_fails():
+    classification = v.load_json(SUCCESSOR / "DECISION_CLASSIFICATION.json")
+    bad = deepcopy(classification)
+    for item in bad["decisions"]:
+        if item["id"] == "limite_responsabilidade":
+            item["status"] = "LEGAL_APPROVED"
+    with pytest.raises(v.ValidationError, match="illegal classification status"):
+        v.assert_classification(bad)
+    invented_entity = deepcopy(classification)
+    for item in invented_entity["decisions"]:
+        if item["id"] == "razao_social_cnpj_contratante":
+            item["status"] = "RESOLVED_BY_AUTHORITATIVE_ENTITY_DATA"
+    with pytest.raises(v.ValidationError, match="PENDING_ENTITY_DOCUMENT"):
+        v.assert_classification(invented_entity)
