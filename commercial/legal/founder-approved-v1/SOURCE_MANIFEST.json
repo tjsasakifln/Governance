@@ -1,0 +1,88 @@
+{
+  "schema_version": "commercial-legal-founder-approved.v1",
+  "artifact": "source_manifest",
+  "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "revalidated_on": "2026-08-18",
+  "timezone": "America/Sao_Paulo",
+  "rule": "Primary sources only for normative conclusions. Secondary sources are navigation, never final authority.",
+  "primary_sources": [
+    {
+      "id": "cc",
+      "title": "Código Civil (Lei 10.406/2002)",
+      "url": "https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm",
+      "class": "primary"
+    },
+    {
+      "id": "lgpd",
+      "title": "LGPD (Lei 13.709/2018)",
+      "url": "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709compilado.htm",
+      "class": "primary"
+    },
+    {
+      "id": "mp2200",
+      "title": "MP 2.200-2/2001",
+      "url": "https://www.planalto.gov.br/ccivil_03/mpv/antigas_2001/2200-2.htm",
+      "class": "primary"
+    },
+    {
+      "id": "lei14063",
+      "title": "Lei 14.063/2020",
+      "url": "https://www.planalto.gov.br/ccivil_03/_ato2019-2022/2020/lei/l14063.htm",
+      "class": "primary"
+    },
+    {
+      "id": "cpc",
+      "title": "CPC (Lei 13.105/2015), especialmente art. 63",
+      "url": "https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm",
+      "class": "primary"
+    },
+    {
+      "id": "cdc",
+      "title": "CDC (Lei 8.078/1990) — ressalva de regras cogentes",
+      "url": "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm",
+      "class": "primary"
+    },
+    {
+      "id": "anpd_portal",
+      "title": "ANPD — portal",
+      "url": "https://www.gov.br/anpd/",
+      "class": "primary"
+    },
+    {
+      "id": "anpd_incident",
+      "title": "ANPD — comunicação de incidente de segurança",
+      "url": "https://www.gov.br/anpd/pt-br/assuntos/comunicacao-de-incidentes-de-seguranca-cis",
+      "class": "primary"
+    },
+    {
+      "id": "stj",
+      "title": "STJ",
+      "url": "https://www.stj.jus.br/",
+      "class": "primary"
+    },
+    {
+      "id": "asaas_checkout_intro",
+      "title": "Asaas Checkout introduction",
+      "url": "https://docs.asaas.com/docs/introduction-1",
+      "class": "primary"
+    },
+    {
+      "id": "asaas_create_checkout",
+      "title": "Asaas create new checkout",
+      "url": "https://docs.asaas.com/reference/create-new-checkout",
+      "class": "primary"
+    }
+  ],
+  "identity_verification": {
+    "source_class": "PUBLIC_CNPJ_REGISTRY_LOOKUP",
+    "provider": "brasilapi.com.br/api/cnpj/v1/52407089000109",
+    "verified_at": "2026-08-18",
+    "canonical_hash": "sha256:91bc707d8135e6599379e9f0ef5624a2089ea2cd315801d9a9607a5323d94ca9",
+    "not_versioned": ["contrato_social", "documento_pessoal", "procuracao"],
+    "does_not_prove_internal_signing_powers": true
+  },
+  "asaas_checkout_billing_types_on_revalidation": ["PIX", "CREDIT_CARD"],
+  "asaas_checkout_boleto_documented": false
+}

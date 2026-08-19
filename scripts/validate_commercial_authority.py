@@ -278,12 +278,17 @@ def reject_float_money(obj: Any, path: str = "$") -> None:
             reject_float_money(value, f"{path}[{i}]")
 
 
+# Public CNPJ of the contracting legal entity, verified 2026-08-18.
+# It is identity, not a secret. Any other CNPJ/CPF in-tree remains forbidden.
+ALLOWED_PUBLIC_IDENTITY_TOKENS = frozenset({"52.407.089/0001-09"})
+
+
 def scan_forbidden_secrets(text: str) -> list[str]:
     hits: list[str] = []
     for pattern in SECRET_PATTERNS:
         found = pattern.findall(text)
         hits.extend(str(item) for item in found)
-    return hits
+    return [hit for hit in hits if hit not in ALLOWED_PUBLIC_IDENTITY_TOKENS]
 
 
 def exception_may_serialize_public(exception: Mapping[str, Any]) -> bool:

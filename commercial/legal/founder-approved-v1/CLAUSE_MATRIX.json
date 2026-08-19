@@ -1,0 +1,389 @@
+{
+  "schema_version": "commercial-legal-founder-approved.v1",
+  "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "artifact": "clause_matrix",
+  "clauses": [
+    {
+      "clause_id": "partes_elegibilidade_b2b",
+      "title": "Partes e elegibilidade B2B",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Cliente consumidor, menor, ou representante sem poderes; polo prestador inventado",
+      "source_or_premissa": "Consulta CNPJ + declaração de poderes + bloqueio PF/menor",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "objeto",
+      "title": "Objeto",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Obrigação de resultado ou recorrência implícita",
+      "source_or_premissa": "Obrigação de meio; recorrência OFF",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "entregaveis",
+      "title": "Entregáveis",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Item fora do catálogo ou crédito lido como plano",
+      "source_or_premissa": "Lista fechada; crédito não ativa recorrência",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "dados_documentos_cliente",
+      "title": "Dados do cliente",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Insumo ilícito ou incompleto",
+      "source_or_premissa": "Cliente responde; relógio suspenso",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "premissas",
+      "title": "Premissas",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Expectativa de ART/certidão/campo",
+      "source_or_premissa": "Exclusões explícitas",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "prazo_marcos",
+      "title": "Prazo e marcos",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Relógio sem as quatro condições",
+      "source_or_premissa": "15 dias úteis após quatro condições cumulativas",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "preco_condicao_inicio",
+      "title": "Preço e início",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Preço do cliente; checkout como aceite",
+      "source_or_premissa": "800000 server-side; aceite antes do checkout",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "tributos_nfse",
+      "title": "Tributos e NFS-e",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Classificação tributária inventada",
+      "source_or_premissa": "NOT_CLAIMED; fila manual",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "aceite",
+      "title": "Aceite",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Callback/checkout como prova",
+      "source_or_premissa": "OTP/magic link + record append-only",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ajustes_escopo",
+      "title": "Ajustes",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Expansão tácita",
+      "source_or_premissa": "Aditivo obrigatório",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "confidencialidade",
+      "title": "Confidencialidade",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Publicação de caso",
+      "source_or_premissa": "Não publica sem autorização",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "propriedade_intelectual",
+      "title": "PI",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Transferência de método genérico",
+      "source_or_premissa": "Titularidade prévia preservada",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "licenca_uso_entregaveis",
+      "title": "Licença",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Revenda do relatório como jurídico",
+      "source_or_premissa": "Licença veta esse uso",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "fontes_publicas_dados_terceiros",
+      "title": "Fontes públicas",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Relatório como certidão",
+      "source_or_premissa": "Sem garantia de base pública",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "limitacoes_responsabilidade",
+      "title": "Limite de responsabilidade",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Teto abusivo / renúncia total",
+      "source_or_premissa": "Teto = pago ≤ 8000; carve-outs; sem renúncia total",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_garantia_resultado",
+      "title": "Sem garantia",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Promessa de vitória",
+      "source_or_premissa": "Cláusula + aviso público",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_representacao_juridica",
+      "title": "Sem representação",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Uso como peça processual",
+      "source_or_premissa": "Vedação expressa",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "ausencia_substituicao_advogado_contador",
+      "title": "Não substitui profissionais",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Relatório como conclusão jurídica",
+      "source_or_premissa": "Vedação expressa",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "dever_validacao_cliente",
+      "title": "Validação do cliente",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Uso sem crítica",
+      "source_or_premissa": "Dever de validar",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "suspensao_falta_informacao",
+      "title": "Suspensão",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Mora imputada ao prestador",
+      "source_or_premissa": "Registro escrito",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "cancelamento",
+      "title": "Cancelamento",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Multa disfarçada / refund automático",
+      "source_or_premissa": "M0–M5 + fórmula; sem auto-mutação",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "inadimplencia",
+      "title": "Inadimplência",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Multa/juros inventados",
+      "source_or_premissa": "Sem encargo automático",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "forca_maior",
+      "title": "Força maior",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Impossibilidade sem acerto",
+      "source_or_premissa": "Acerto proporcional",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "protecao_dados_minimizacao",
+      "title": "LGPD",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Consentimento curinga / retenção inventada",
+      "source_or_premissa": "Bases por finalidade + agenda",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "comunicacao",
+      "title": "Comunicação",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Canal inventado ou cargo formal de privacidade inexistente",
+      "source_or_premissa": "Somente canal de privacidade nomeado",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "resolucao_conflitos",
+      "title": "Conflitos",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Arbitragem forçada",
+      "source_or_premissa": "Sem arbitragem",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "foro_provisorio",
+      "title": "Foro",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Foro abusivo / impede tutela urgente",
+      "source_or_premissa": "Florianópolis/SC + cogência + tutela urgente",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "versionamento",
+      "title": "Versionamento",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Aceite antigo reescrito / LEGAL_APPROVED",
+      "source_or_premissa": "Hash pinado; token founder",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    },
+    {
+      "clause_id": "prevalencia_proposta_os",
+      "title": "Prevalência",
+      "document": "TERMOS_B2B_DIAGNOSTICO.md",
+      "risk_covered": "Conflito silencioso com catálogo",
+      "source_or_premissa": "Hierarquia explícita",
+      "state": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+      "consumer": [
+        "web-cfg#88",
+        "Warmbly#47",
+        "founder"
+      ]
+    }
+  ]
+}

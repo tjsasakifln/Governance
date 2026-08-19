@@ -1,0 +1,109 @@
+{
+  "schema_version": "commercial-legal-founder-approved.v1",
+  "package_id": "CFG-LEGAL-DIAG-EXP-FOUNDER-v1",
+  "package_version": "founder-approved-v1",
+  "status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "decision_token": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW_2026_08_18",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "offer_code": "CFG-DIAG-EXP-v1",
+  "approved_offer": "CFG-DIAG-EXP-v1",
+  "approved_amount_cents": 800000,
+  "approved_billing_mode": "ONE_TIME",
+  "public_activation_approved": true,
+  "production_checkout_approved": true,
+  "recurring_checkout_approved": false,
+  "automated_refund_approved": false,
+  "automated_nfse_approved": false,
+  "counsel_review_trigger": "FIRST_PAYMENT_RECEIVED",
+  "counsel_review_target_business_days": 10,
+  "dpa_lite_applicable": false,
+  "dpa_lite_path": null,
+  "campaign_status": "FOUNDER_APPROVED_LIMITED_PRODUCTION",
+  "prior_package_id": "CFG-LEGAL-PROVISIONAL-DIAG-v1",
+  "prior_package_hash": "sha256:53cb908af9eeaaa1d7097c322394440cff329ff9bd7fb9522ab922801f0cd150",
+  "decider_name": "Tiago Jun Sasaki",
+  "decided_at": "2026-08-18",
+  "timezone": "America/Sao_Paulo",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "content_hash": "sha256:83ea8fa4df8b265663ed6e75fab5901bc626e79736d8093878f125944f311001"
+    },
+    {
+      "path": "TERMOS_B2B_DIAGNOSTICO.md",
+      "content_hash": "sha256:10e0d43a43197b4757ba416c1e92b0a94bec7373f7363fd28d67cc604f80559c"
+    },
+    {
+      "path": "ORDEM_DE_SERVICO_DIAGNOSTICO.md",
+      "content_hash": "sha256:a5f7e993287a819d9f58d787bf9d9abecda279080ea052cfb5283f3af68bcb14"
+    },
+    {
+      "path": "POLITICA_CANCELAMENTO_REEMBOLSO.md",
+      "content_hash": "sha256:f988b999a41e328f248dd33e821b82b63e06cda5b9c1b5c689ccf30309f522aa"
+    },
+    {
+      "path": "AVISO_LIMITACOES_TECNICAS.md",
+      "content_hash": "sha256:9ac90315d4c94f94fa45d4442ed758a8f91600a5af47c53b34bec6babf0f6894"
+    },
+    {
+      "path": "AVISO_PRIVACIDADE_LEADS.md",
+      "content_hash": "sha256:59eeed9fabf1a062789a89e4345221515236bc567424610d72344f91f7257d3d"
+    },
+    {
+      "path": "RETENTION_SCHEDULE.json",
+      "content_hash": "sha256:bc43a6a488fa2e4abb955119c3d4f2b4e16cfea03292eb25049fca4c9ed9ced6"
+    },
+    {
+      "path": "ELECTRONIC_ACCEPTANCE_SPEC.json",
+      "content_hash": "sha256:5538537447208615049baffe725ded993eabd6337a7fbf1c9ae74408e3cb06f0"
+    },
+    {
+      "path": "INCIDENT_RESPONSE_MINIMUM.md",
+      "content_hash": "sha256:e55d12ca28df5da4d7db042547afff19f82b7584cf1af855b20d2e52e2951b34"
+    },
+    {
+      "path": "ADVERSARIAL_REVIEW.md",
+      "content_hash": "sha256:d7509e238c953e75852c0d322413d79262a0ea0a8c52c23ed5df0689e0c6740a"
+    },
+    {
+      "path": "ADVERSARIAL_FINDINGS.json",
+      "content_hash": "sha256:6e4790edd018ca456bdc6a30c9cc4f7de3f063e17d00480d278f07912b7c82e0"
+    },
+    {
+      "path": "LEGAL_RISK_REGISTER.json",
+      "content_hash": "sha256:5f6d207bc496165c3a00b888fb111f06731314f934a80c1576855a297f2698cb"
+    },
+    {
+      "path": "CLAUSE_MATRIX.json",
+      "content_hash": "sha256:ececed00777fcf4e348d1c06b999e33a6ca6052eb9a0b134a024bc5fb45863fa"
+    },
+    {
+      "path": "FOUNDER_RISK_ACCEPTANCE.md",
+      "content_hash": "sha256:8f62b7b69edaef8b802bdd294c7b105bd91c02bea5b78c269dc4e4c3d3c1d36a"
+    },
+    {
+      "path": "FOUNDER_RISK_ACCEPTANCE.json",
+      "content_hash": "sha256:26ac7391b9e2441b294efd1eceb6608c03ce3e55013b3e844057abf94b394d76"
+    },
+    {
+      "path": "CONSUMER_HANDOFF.md",
+      "content_hash": "sha256:233531a094266be5166b3349d81eafe5d379fed52d65adf91745b21d8ae39f1a"
+    },
+    {
+      "path": "PUBLICATION_SUMMARY.md",
+      "content_hash": "sha256:ae7323c952664fdd1c37f6959aaf0ddb102b5b33c7308d8ead906b4e849afa50"
+    },
+    {
+      "path": "SOURCE_MANIFEST.json",
+      "content_hash": "sha256:489953d083ef99ac35af48bdb8b35c987f2f60d3a130108d96183c146921a01c"
+    },
+    {
+      "path": "commercial-legal-founder-approved.schema.json",
+      "content_hash": "sha256:ead97da2f3739504dc682ef91fa2b05e0abfd77daba564916b347b7585ba6859"
+    }
+  ]
+}
