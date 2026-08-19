@@ -1,0 +1,263 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/commercial/partners/referral-cosell-v1/partner-program.schema.json",
+  "title": "CONFENGE partner referral/co-sell program v1",
+  "x-package-metadata": {
+    "status": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW",
+    "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+    "founder_risk_acceptance": "APPROVED",
+    "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+    "supersedable": true,
+    "jurisdiction": "Brazil",
+    "business_context": "B2B_ENGINEERING_CONSULTING"
+  },
+  "$defs": {
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "const": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW"
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "package_id",
+        "package_version",
+        "status",
+        "professional_legal_review",
+        "founder_risk_acceptance",
+        "decision_token",
+        "supersedable",
+        "jurisdiction",
+        "business_context",
+        "operational_use",
+        "legal_approved",
+        "private_negotiation_enabled",
+        "publication_enabled",
+        "real_partner_created",
+        "real_money_mutation_approved",
+        "automatic_financial_provider_mutation",
+        "counsel_review_trigger",
+        "counsel_review_trigger_reuse",
+        "counsel_review_target_business_days",
+        "integrity_oab_conflict_auto_accept",
+        "canonical_issue",
+        "decider_name",
+        "decided_at",
+        "timezone",
+        "confenge_legal_name",
+        "confenge_cnpj",
+        "forum",
+        "artifacts"
+      ],
+      "properties": {
+        "schema_version": { "const": "partner-program.v1" },
+        "package_id": { "const": "CFG-PARTNER-REFERRAL-COSELL-v1" },
+        "package_version": { "const": "referral-cosell-v1" },
+        "status": { "$ref": "#/$defs/status" },
+        "professional_legal_review": { "const": "DEFERRED_UNTIL_FIRST_REVENUE" },
+        "founder_risk_acceptance": { "const": "APPROVED" },
+        "decision_token": { "const": "FOUNDER_APPROVED_PARTNER_PROGRAM_DEFERRED_COUNSEL_2026_08_19" },
+        "supersedable": { "const": true },
+        "jurisdiction": { "const": "Brazil" },
+        "business_context": { "const": "B2B_ENGINEERING_CONSULTING" },
+        "operational_use": { "const": "PRIVATE_NEGOTIATION_ONLY" },
+        "legal_approved": { "const": false },
+        "private_negotiation_enabled": { "const": true },
+        "publication_enabled": { "const": false },
+        "real_partner_created": { "const": false },
+        "real_money_mutation_approved": { "const": false },
+        "automatic_financial_provider_mutation": { "const": false },
+        "counsel_review_trigger": { "const": "FIRST_PARTNER_ATTRIBUTED_REVENUE" },
+        "counsel_review_trigger_reuse": { "const": "FIRST_PAYMENT_RECEIVED" },
+        "counsel_review_target_business_days": { "const": 10 },
+        "integrity_oab_conflict_auto_accept": { "const": false },
+        "canonical_issue": { "const": "https://github.com/tjsasakifln/Governance/issues/7" },
+        "decider_name": { "const": "Tiago Jun Sasaki" },
+        "decided_at": { "const": "2026-08-19" },
+        "timezone": { "const": "America/Sao_Paulo" },
+        "confenge_legal_name": { "const": "CONFENGE SERVICOS DE DESENHOS TECNICOS LTDA" },
+        "confenge_cnpj": { "const": "52.407.089/0001-09" },
+        "forum": { "const": "Foro da Comarca de Florianópolis, Estado de Santa Catarina" },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "content_hash"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "content_hash": { "$ref": "#/$defs/contentHash" }
+            }
+          }
+        }
+      }
+    },
+    "commissionSchedule": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "status",
+        "currency",
+        "base",
+        "advance_allowed",
+        "guaranteed_minimum_cents",
+        "human_approval_required",
+        "automatic_financial_provider_mutation",
+        "real_money_mutation_approved",
+        "ineligible_bases",
+        "attribution",
+        "modalities",
+        "professional_rule"
+      ],
+      "properties": {
+        "schema_version": { "const": "partner-commission-schedule.v1" },
+        "status": { "$ref": "#/$defs/status" },
+        "currency": { "const": "BRL" },
+        "base": { "const": "eligible_net_fees_actually_received" },
+        "advance_allowed": { "const": false },
+        "guaranteed_minimum_cents": { "const": 0 },
+        "human_approval_required": { "const": true },
+        "automatic_financial_provider_mutation": { "const": false },
+        "real_money_mutation_approved": { "const": false },
+        "ineligible_bases": { "type": "array", "minItems": 8 },
+        "attribution": {
+          "type": "object",
+          "required": ["decision_business_days", "protection_days_from_acceptance", "protection_is_permanent_account_ownership", "preexisting_excluded", "retroactive_silent_attribution"],
+          "properties": {
+            "decision_business_days": { "const": 2 },
+            "protection_days_from_acceptance": { "const": 90 },
+            "protection_is_permanent_account_ownership": { "const": false },
+            "preexisting_excluded": { "const": true },
+            "retroactive_silent_attribution": { "const": false }
+          }
+        },
+        "modalities": {
+          "type": "object",
+          "required": ["REFERRAL_QUALIFIED", "COSELL_SPECIALIZED", "DISTRIBUTION_INTEGRATION", "NOT_ELIGIBLE"],
+          "properties": {
+            "REFERRAL_QUALIFIED": {
+              "type": "object",
+              "required": ["rate_bps", "period_months", "cap_cents_total_per_referred_client", "cap_kind"],
+              "properties": {
+                "rate_bps": { "const": 1000 },
+                "period_months": { "const": 6 },
+                "cap_cents_total_per_referred_client": { "const": 1000000 },
+                "cap_kind": { "const": "TOTAL_PER_REFERRED_CLIENT_NOT_MONTHLY" }
+              }
+            },
+            "COSELL_SPECIALIZED": {
+              "type": "object",
+              "required": ["max_rate_bps", "period_months", "cap_cents_total_per_client", "cap_kind", "requires_addendum"],
+              "properties": {
+                "max_rate_bps": { "const": 1500 },
+                "period_months": { "const": 6 },
+                "cap_cents_total_per_client": { "const": 1500000 },
+                "cap_kind": { "const": "TOTAL_PER_CLIENT_NOT_MONTHLY" },
+                "requires_addendum": { "const": true }
+              }
+            },
+            "DISTRIBUTION_INTEGRATION": {
+              "type": "object",
+              "required": ["auto_included", "requires_separate_addendum"],
+              "properties": {
+                "auto_included": { "const": false },
+                "requires_separate_addendum": { "const": true }
+              }
+            },
+            "NOT_ELIGIBLE": {
+              "type": "object",
+              "required": ["contracts", "commission"],
+              "properties": {
+                "contracts": { "const": false },
+                "commission": { "const": false }
+              }
+            }
+          }
+        },
+        "professional_rule": {
+          "type": "object",
+          "required": ["flag", "standard_referral_commission_automatically_available", "attorney_fees_commission_without_specific_authority"],
+          "properties": {
+            "flag": { "const": "PROFESSIONAL_RULE_REVIEW_REQUIRED" },
+            "standard_referral_commission_automatically_available": { "const": false },
+            "attorney_fees_commission_without_specific_authority": { "const": false }
+          }
+        }
+      }
+    },
+    "eventContract": {
+      "type": "object",
+      "required": ["schema_version", "operational_ledger", "creates_second_ledger", "consumer", "events"],
+      "properties": {
+        "schema_version": { "const": "partner-event-contract.v1" },
+        "operational_ledger": { "const": false },
+        "creates_second_ledger": { "const": false },
+        "consumer": { "const": "Warmbly#47" },
+        "events": { "type": "array", "minItems": 16 }
+      }
+    },
+    "clauseMatrix": {
+      "type": "object",
+      "required": ["schema_version", "status", "clauses"],
+      "properties": {
+        "schema_version": { "const": "partner-program.v1" },
+        "status": { "$ref": "#/$defs/status" },
+        "p0_unmitigated": { "type": "integer" },
+        "clauses": {
+          "type": "array",
+          "minItems": 37,
+          "items": {
+            "type": "object",
+            "required": ["clause_id", "title", "document", "risk_covered", "state"],
+            "properties": {
+              "clause_id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string" },
+              "document": { "type": "string" },
+              "risk_covered": { "type": "string" },
+              "source_or_premissa": { "type": "string" },
+              "state": { "$ref": "#/$defs/status" },
+              "consumer": { "type": "array" }
+            }
+          }
+        }
+      }
+    },
+    "riskRegister": {
+      "type": "object",
+      "required": ["schema_version", "status", "p0_count", "p0_unmitigated", "risks"],
+      "properties": {
+        "schema_version": { "const": "partner-program.v1" },
+        "status": { "$ref": "#/$defs/status" },
+        "p0_count": { "const": 0 },
+        "p0_unmitigated": { "const": 0 },
+        "risks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["risk_id", "risk", "priority", "decision"],
+            "properties": {
+              "risk_id": { "type": "string" },
+              "risk": { "type": "string" },
+              "impacto": { "type": "string" },
+              "probabilidade": { "type": "string" },
+              "severidade": { "type": "string" },
+              "mitigacao": { "type": "string" },
+              "risco_residual": { "type": "string" },
+              "owner": { "type": "string" },
+              "gate": { "type": "string" },
+              "priority": { "type": "string" },
+              "decision": { "type": "string" },
+              "professional_review_trigger": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

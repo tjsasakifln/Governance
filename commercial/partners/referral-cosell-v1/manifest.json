@@ -1,0 +1,128 @@
+{
+  "schema_version": "partner-program.v1",
+  "package_id": "CFG-PARTNER-REFERRAL-COSELL-v1",
+  "package_version": "referral-cosell-v1",
+  "status": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "decision_token": "FOUNDER_APPROVED_PARTNER_PROGRAM_DEFERRED_COUNSEL_2026_08_19",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "legal_approved": false,
+  "private_negotiation_enabled": true,
+  "publication_enabled": false,
+  "real_partner_created": false,
+  "real_money_mutation_approved": false,
+  "automatic_financial_provider_mutation": false,
+  "counsel_review_trigger": "FIRST_PARTNER_ATTRIBUTED_REVENUE",
+  "counsel_review_trigger_reuse": "FIRST_PAYMENT_RECEIVED",
+  "counsel_review_target_business_days": 10,
+  "integrity_oab_conflict_auto_accept": false,
+  "canonical_issue": "https://github.com/tjsasakifln/Governance/issues/7",
+  "decider_name": "Tiago Jun Sasaki",
+  "decided_at": "2026-08-19",
+  "timezone": "America/Sao_Paulo",
+  "confenge_legal_name": "CONFENGE SERVICOS DE DESENHOS TECNICOS LTDA",
+  "confenge_cnpj": "52.407.089/0001-09",
+  "forum": "Foro da Comarca de Florianópolis, Estado de Santa Catarina",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "content_hash": "sha256:271f3ab614610600e1036a87665e6c094e6106ca88e50da71c55930f3cb319de"
+    },
+    {
+      "path": "PARTNER_PROGRAM_POLICY.md",
+      "content_hash": "sha256:b4cb53f584305b701fc41cec3633455ad3a2030612724d4837d0dc826d15371b"
+    },
+    {
+      "path": "PARTNER_AGREEMENT_B2B.md",
+      "content_hash": "sha256:1aa4b62fc015ce96cfc0bf5f28439b5ef375bbfc451e626ca520b87e4821aec5"
+    },
+    {
+      "path": "COSELLING_ADDENDUM.md",
+      "content_hash": "sha256:a78d2de82a5df7f71a2a09534810e62f8f98a45e99ba17bf9a9df4fdcf8a71c6"
+    },
+    {
+      "path": "LEAD_REGISTRATION_AND_ATTRIBUTION.md",
+      "content_hash": "sha256:540bca5cc382868c1f1ed07ed6f9670f5c67adf38403c3a208a0681e4ceaf647"
+    },
+    {
+      "path": "COMMISSION_POLICY.md",
+      "content_hash": "sha256:666a04ec42079e4643b45aa0f9d9b0d23a4d89e9d268d0d06ffc82cfa44fca99"
+    },
+    {
+      "path": "COMMISSION_SCHEDULE.json",
+      "content_hash": "sha256:743aaeb981683b0de5155fb5cda0fa4986cb76f68441909c5a51eb4fbbd27de1"
+    },
+    {
+      "path": "PARTNER_DUE_DILIGENCE.md",
+      "content_hash": "sha256:b9b64ea6fc5b631f3ebe2bc6ac5d85c289e8e9c2c6be332dedb64fe0ab0d1f17"
+    },
+    {
+      "path": "PARTNER_CODE_OF_CONDUCT.md",
+      "content_hash": "sha256:64c5b02252f85ee9ca9282038a24166a8b907587294ac43430e1f1adb8106afe"
+    },
+    {
+      "path": "PUBLIC_SECTOR_INTEGRITY.md",
+      "content_hash": "sha256:5dcfabc2679c98c3abf6d4eda73b1d4a3cda0b37a343938fc1643971c6f62aaf"
+    },
+    {
+      "path": "CONFLICT_OF_INTEREST_POLICY.md",
+      "content_hash": "sha256:8beced2958e02c23f57559a796574c021a6ef502f2f4c10f3635304dfef028f2"
+    },
+    {
+      "path": "LGPD_PARTNER_LEAD_NOTICE.md",
+      "content_hash": "sha256:4c9e0f9f2ebcbd548fe042ccee78f5be13c0f733c90e2d39ec5ddefd49163033"
+    },
+    {
+      "path": "PROFESSIONAL_RESTRICTIONS.md",
+      "content_hash": "sha256:3962f0e5faacf7cc500a8d702d98850f79fa1223a43ff66451157c60378d7538"
+    },
+    {
+      "path": "OAB_REVIEW_GATE.md",
+      "content_hash": "sha256:61ee2ecbd284bd4896ad6688db00811a58513bc30bb03cc17dae1bb379f6378b"
+    },
+    {
+      "path": "ANTI_CIRCUMVENTION_AND_ACCOUNT_PROTECTION.md",
+      "content_hash": "sha256:0c5c878dda0739fad5cd97537f3994fd7185ba2f3810cc035a1de4f17e5e3c3f"
+    },
+    {
+      "path": "TERMINATION_AND_SUSPENSION.md",
+      "content_hash": "sha256:074e3e0feb757a57ddfa10dd9ab248cc5c5e9c460b14e28c682f1a9c9edf3362"
+    },
+    {
+      "path": "PARTNER_EVENT_CONTRACT.json",
+      "content_hash": "sha256:7ae64d780984c013d144041642758f41f602ce811c88efa0730cc50f08513d3a"
+    },
+    {
+      "path": "CONSUMER_HANDOFF.md",
+      "content_hash": "sha256:5757e1528b891e44b53867e25658248304fa251193fb60fc25c7831537dba8b5"
+    },
+    {
+      "path": "FOUNDER_RISK_ACCEPTANCE.md",
+      "content_hash": "sha256:2118226b89ff843f3e31bc4a4185d4135e470f48aa012e6e770ff7e7f230eb0b"
+    },
+    {
+      "path": "FOUNDER_RISK_ACCEPTANCE.json",
+      "content_hash": "sha256:25d2acbcb9f95431c74cccc950492cdc69c226e59c60bd04b7091bda75677829"
+    },
+    {
+      "path": "COUNSEL_HANDOFF.md",
+      "content_hash": "sha256:304274da1389243df7ef570ced2945748adb571d280d9f5af5789a007f0bd900"
+    },
+    {
+      "path": "LEGAL_RISK_REGISTER.json",
+      "content_hash": "sha256:2abd0280e1c49c18b2d0514a773df40f4a5a3c9dfa268c85fa0d483d4a674377"
+    },
+    {
+      "path": "CLAUSE_MATRIX.json",
+      "content_hash": "sha256:7dbdd3f51b7f28078f1bcda22a963b1bb08c17c59d3fc55973f5a79f7ede8aa6"
+    },
+    {
+      "path": "partner-program.schema.json",
+      "content_hash": "sha256:6789859c9ca1e2185886387af585664893295108782f2a0beee3f3f7cf0e2eaa"
+    }
+  ]
+}
