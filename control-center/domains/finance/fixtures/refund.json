@@ -1,0 +1,78 @@
+{
+  "id": "refund",
+  "as_of": "2026-08-20T12:00:00Z",
+  "cash_in_window": {
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-08-31T23:59:59Z"
+  },
+  "events": [
+    {
+      "id": "cc:finance-event:rf-contract",
+      "idempotency_key": "fixture:refund:contract",
+      "kind": "contract_signed",
+      "occurred_at": "2026-08-02T09:00:00Z",
+      "amount_cents": 100000,
+      "currency": "BRL",
+      "client_id": "client:beta",
+      "obligation_id": "ob:rf-beta",
+      "billing_mode": "ONE_TIME",
+      "billing_cycle": "NONE",
+      "settlement_proven": false,
+      "offer_code": "CFG-DIAG-EXP-v1",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_rf" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "id": "cc:finance-event:rf-invoice",
+      "idempotency_key": "fixture:refund:invoice",
+      "kind": "invoice_issued",
+      "occurred_at": "2026-08-03T09:00:00Z",
+      "amount_cents": 100000,
+      "currency": "BRL",
+      "client_id": "client:beta",
+      "obligation_id": "ob:rf-beta",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "invoice_id": "inv:rf-beta",
+      "due_at": "2026-08-10T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_rf" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "id": "cc:finance-event:rf-received",
+      "idempotency_key": "fixture:refund:received",
+      "kind": "settlement_received",
+      "occurred_at": "2026-08-06T09:00:00Z",
+      "amount_cents": 100000,
+      "currency": "BRL",
+      "client_id": "client:beta",
+      "obligation_id": "ob:rf-beta",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": true,
+      "source": { "system": "asaas", "kind": "receivable", "locator": "pay_rf" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "id": "cc:finance-event:rf-refund",
+      "idempotency_key": "fixture:refund:refund",
+      "kind": "refund",
+      "occurred_at": "2026-08-14T09:00:00Z",
+      "amount_cents": 100000,
+      "currency": "BRL",
+      "client_id": "client:beta",
+      "obligation_id": "ob:rf-beta",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_rf" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    }
+  ]
+}
