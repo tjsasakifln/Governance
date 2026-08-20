@@ -1,0 +1,49 @@
+{
+  "id": "unpaid-invoiced",
+  "as_of": "2026-08-20T12:00:00Z",
+  "cash_in_window": {
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-08-31T23:59:59Z"
+  },
+  "events": [
+    {
+      "id": "cc:finance-event:unpaid-contract",
+      "idempotency_key": "fixture:unpaid-invoiced:contract",
+      "kind": "contract_signed",
+      "occurred_at": "2026-08-02T10:00:00Z",
+      "amount_cents": 800000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:diag-acme",
+      "billing_mode": "ONE_TIME",
+      "billing_cycle": "NONE",
+      "settlement_proven": false,
+      "offer_code": "CFG-DIAG-EXP-v1",
+      "contract_id": "ct:diag-acme",
+      "source": { "system": "asaas", "kind": "subscription", "locator": "sub_unpaid_diag" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.95
+    },
+    {
+      "id": "cc:finance-event:unpaid-invoice",
+      "idempotency_key": "fixture:unpaid-invoiced:invoice",
+      "kind": "invoice_issued",
+      "occurred_at": "2026-08-03T10:00:00Z",
+      "amount_cents": 800000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:diag-acme",
+      "billing_mode": "ONE_TIME",
+      "billing_cycle": "NONE",
+      "settlement_proven": false,
+      "offer_code": "CFG-DIAG-EXP-v1",
+      "invoice_id": "inv:diag-acme",
+      "due_at": "2026-09-01T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_unpaid_diag" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.95
+    }
+  ]
+}

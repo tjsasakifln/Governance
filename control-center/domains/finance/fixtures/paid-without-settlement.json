@@ -1,0 +1,60 @@
+{
+  "id": "paid-without-settlement",
+  "as_of": "2026-08-20T12:00:00Z",
+  "cash_in_window": {
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-08-31T23:59:59Z"
+  },
+  "events": [
+    {
+      "id": "cc:finance-event:pws-contract",
+      "idempotency_key": "fixture:pws:contract",
+      "kind": "contract_signed",
+      "occurred_at": "2026-08-02T10:00:00Z",
+      "amount_cents": 200000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:pws",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_pws" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.8
+    },
+    {
+      "id": "cc:finance-event:pws-invoice",
+      "idempotency_key": "fixture:pws:invoice",
+      "kind": "invoice_issued",
+      "occurred_at": "2026-08-03T10:00:00Z",
+      "amount_cents": 200000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:pws",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "invoice_id": "inv:pws",
+      "due_at": "2026-08-20T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_pws" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.8
+    },
+    {
+      "id": "cc:finance-event:pws-paid",
+      "idempotency_key": "fixture:pws:paid",
+      "kind": "payment_confirmed",
+      "occurred_at": "2026-08-08T10:00:00Z",
+      "amount_cents": 200000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:pws",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_pws" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.8
+    }
+  ]
+}
