@@ -3,9 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import {
+  ACTOR_KINDS,
   allowedMcpToolNames,
   catalogFixturePath,
   catalogType,
+  DIRECTIVE_STATUSES,
   FRESHNESS_STATUSES,
   forbiddenHttpPaths,
   forbiddenMcpOperationNames,
@@ -39,28 +41,23 @@ const catalog = loadCatalog();
 const types = listResourceTypes();
 
 describe("Control Center catalog", () => {
-  it("lists exactly the 13 named types", () => {
-    assert.deepEqual([...RESOURCE_TYPE_NAMES], [
-      "Directive",
-      "OperationalSnapshot",
-      "SourceObservation",
-      "AttentionItem",
-      "PriorityRecommendation",
-      "AgentSession",
-      "ClientStatus",
-      "CommercialSnapshot",
-      "FinanceSnapshot",
-      "EngineeringSnapshot",
-      "ServiceHealth",
-      "CollectorRun",
-      "AuditEvent",
-    ]);
-    assert.equal(catalog.types.length, 13);
+  it("stays in lockstep with RESOURCE_TYPE_NAMES and catalogs AgentActivity apart from AgentSession", () => {
     assert.deepEqual(
       catalog.types.map((t) => t.name),
       [...RESOURCE_TYPE_NAMES],
     );
     assert.deepEqual(types, [...RESOURCE_TYPE_NAMES]);
+    assert.equal(catalog.types.length, RESOURCE_TYPE_NAMES.length);
+    assert.ok(RESOURCE_TYPE_NAMES.includes("AgentActivity"));
+    assert.ok(RESOURCE_TYPE_NAMES.includes("AgentSession"));
+    const activity = catalogType("AgentActivity");
+    const session = catalogType("AgentSession");
+    assert.notEqual(activity.schema_version, session.schema_version);
+    assert.notEqual(activity.id_type, session.id_type);
+    assert.equal(activity.schema_version, "control-center.agent-activity.v1");
+    assert.equal(activity.id_type, "agent-activity");
+    assert.equal(session.schema_version, "control-center.agent-session.v1");
+    assert.equal(session.id_type, "agent-session");
   });
 });
 
@@ -80,6 +77,20 @@ describe("primitives lockstep with JSON Schema", () => {
   it("encodes UTC Z timestamps and resource IDs", () => {
     assert.equal(primitives.$defs.utc_datetime?.pattern, UTC_DATETIME_PATTERN);
     assert.equal(primitives.$defs.resource_id?.pattern, RESOURCE_ID_PATTERN);
+  });
+
+  it("encodes Directive status draft|active|superseded|revoked|expired and typed ActorRef", () => {
+    const directive = readJson("schemas/directive.v1.schema.json") as {
+      properties: { status: { enum: string[] }; supersedes: { type: string[] | string } };
+    };
+    assert.deepEqual(directive.properties.status.enum, [...DIRECTIVE_STATUSES]);
+    assert.ok(
+      Array.isArray(directive.properties.supersedes.type)
+        ? directive.properties.supersedes.type.includes("array")
+        : directive.properties.supersedes.type === "array",
+    );
+    const actor = primitives.$defs.actor_ref as { properties?: { kind?: { enum?: string[] } } };
+    assert.deepEqual(actor.properties?.kind?.enum, [...ACTOR_KINDS]);
   });
 
   it("requires provenance fields source, observed_at, freshness_status, confidence", () => {
@@ -281,12 +292,31 @@ describe("OperationalSnapshot homepage limit", () => {
 });
 
 describe("FinanceSnapshot money and mutations", () => {
+  it("accepts the named aggregates on the valid fixture", () => {
+    const valid = readJson("fixtures/valid/finance-snapshot.json") as Record<string, unknown>;
+    for (const field of [
+      "contracted",
+      "billed",
+      "paid",
+      "effectively_received",
+      "overdue",
+      "receivable",
+      "refunds",
+      "chargebacks",
+    ]) {
+      assert.ok(field in valid, `missing ${field}`);
+    }
+    assert.equal(valid.provider_mutations, "forbidden");
+    const result = validate("FinanceSnapshot", valid);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+  });
+
   it("rejects non-integer cents", () => {
     const valid = readJson("fixtures/valid/finance-snapshot.json") as {
-      receivables_open: { amount_cents: number; currency: string };
+      receivable: { amount_cents: number; currency: string };
     };
     const doc = clone(valid);
-    doc.receivables_open.amount_cents = 10.5;
+    doc.receivable.amount_cents = 10.5;
     assert.equal(validate("FinanceSnapshot", doc).ok, false);
   });
 
@@ -295,6 +325,71 @@ describe("FinanceSnapshot money and mutations", () => {
     const doc = clone(valid);
     doc.provider_mutations = "allowed";
     assert.equal(validate("FinanceSnapshot", doc).ok, false);
+  });
+
+  it("rejects missing provider_mutations", () => {
+    const valid = readJson("fixtures/valid/finance-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    delete doc.provider_mutations;
+    assert.equal(validate("FinanceSnapshot", doc).ok, false);
+  });
+
+  it("rejects cash_in without evidence", () => {
+    const valid = readJson("fixtures/valid/finance-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    doc.cash_in = { amount_cents: 100, currency: "BRL" };
+    assert.equal(validate("FinanceSnapshot", doc).ok, false);
+  });
+
+  it("rejects mrr without applicability", () => {
+    const valid = readJson("fixtures/valid/finance-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    doc.mrr = { amount_cents: 100, currency: "BRL" };
+    assert.equal(validate("FinanceSnapshot", doc).ok, false);
+  });
+
+  it("rejects runway without reliable cash and expense", () => {
+    const valid = readJson("fixtures/valid/finance-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    doc.runway = {
+      months: 3,
+      cash_balance: { amount_cents: 1, currency: "BRL" },
+      monthly_expense: { amount_cents: 1, currency: "BRL" },
+    };
+    assert.equal(validate("FinanceSnapshot", doc).ok, false);
+  });
+});
+
+describe("CommercialSnapshot funnel and catalog pin", () => {
+  it("accepts funnel, nominal pipeline, gated weighted pipeline, and attention refs", () => {
+    const valid = readJson("fixtures/valid/commercial-snapshot.json") as {
+      funnel: Record<string, number>;
+      offer_pin: Record<string, unknown>;
+      attention_item_ids: string[];
+    };
+    for (const key of ["new_leads", "qualified", "opportunities", "proposals", "clients"]) {
+      assert.ok(key in valid.funnel, `missing funnel.${key}`);
+    }
+    assert.equal(valid.offer_pin.catalog_authority, "governance");
+    assert.ok(valid.attention_item_ids.length > 0);
+    const result = validate("CommercialSnapshot", valid);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+  });
+
+  it("rejects pipeline_weighted without reliable probability", () => {
+    const valid = readJson("fixtures/valid/commercial-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    doc.pipeline_weighted = { amount_cents: 1000, currency: "BRL" };
+    assert.equal(validate("CommercialSnapshot", doc).ok, false);
+  });
+
+  it("rejects a copied offer catalog inside CommercialSnapshot", () => {
+    const valid = readJson("fixtures/valid/commercial-snapshot.json") as Record<string, unknown>;
+    const doc = clone(valid);
+    doc.offers = [{ name: "Diagnóstico", price_cents: 100000, terms: "net 15" }];
+    const result = validate("CommercialSnapshot", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "catalog_copy" || e.keyword === "additionalProperties"));
   });
 });
 
@@ -361,7 +456,7 @@ describe("MCP principal agent interface", () => {
 describe("internal HTTP contract", () => {
   const spec = loadOpenApi();
 
-  it("requires scopes on the context endpoint and names all 13 resources", () => {
+  it("requires scopes on the context endpoint and names all cataloged resources", () => {
     const context = spec.paths["/v1/context"] as {
       get: { parameters: Array<{ name: string; required?: boolean }> };
     };

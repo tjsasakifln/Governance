@@ -11,8 +11,9 @@
     "cc-contracts-validate": "./src/cli.ts"
   },
   "scripts": {
-    "test": "tsx --test tests/contract.test.ts",
+    "test": "tsx --test tests/*.test.ts",
     "validate": "tsx src/cli.ts",
+    "fingerprint": "tsx src/cli.ts --fingerprint",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

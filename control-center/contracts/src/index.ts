@@ -15,6 +15,22 @@ export {
   type ValidationResult,
 } from "./validate.js";
 export {
+  loadCompatibilityTable,
+  classifyCompatibility,
+  compatibilityShape,
+  type CompatibilityTable,
+  type CompatibilityShape,
+  type CompatibilityFinding,
+  type CompatibilityResult,
+  type CompatibilityVerdict,
+} from "./compatibility.js";
+export {
+  contractFingerprint,
+  fingerprintArtifacts,
+  publicOntologyArtifacts,
+  type PublicArtifact,
+} from "./fingerprint.js";
+export {
   isResourceId,
   isScope,
   isClientSlug,

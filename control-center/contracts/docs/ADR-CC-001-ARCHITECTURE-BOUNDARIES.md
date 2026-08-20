@@ -50,7 +50,7 @@ Finance snapshots set `read_model_only: true` and `provider_mutations: "forbidde
 
 ### 4. Control Center is an aggregation + memory plane, not chat and not ERP
 
-It stores operational snapshots, exceptions (`AttentionItem`), at most three current priorities for the homepage, human directives with audit, and scoped agent sessions. It is not a chatbot log and not a general ledger.
+It stores operational snapshots, exceptions (`AttentionItem`), at most three current priorities for the homepage, human directives with audit, scoped agent sessions (`AgentSession`), and agent execution records (`AgentActivity`). `AgentActivity` is not `AgentSession`. It is not a chatbot log and not a general ledger.
 
 ### 5. Agents consume by scope
 

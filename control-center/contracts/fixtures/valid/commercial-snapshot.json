@@ -18,7 +18,29 @@
     "commercial_runtime": "warmbly",
     "this_document": "read_model"
   },
+  "offer_pin": {
+    "catalog_authority": "governance",
+    "catalog_id": "CFG-OFFER-CATALOG-v1",
+    "known_offer_ids": ["CFG-DIAG-EXP-v1", "CFG-DIRB2G-FLEX-v1"]
+  },
+  "funnel": {
+    "new_leads": 6,
+    "qualified": 4,
+    "opportunities": 3,
+    "proposals": 2,
+    "clients": 1
+  },
+  "pipeline_nominal": { "amount_cents": 4800000, "currency": "BRL" },
+  "pipeline_weighted": {
+    "amount_cents": 2100000,
+    "currency": "BRL",
+    "probability_reliable": true
+  },
+  "aging_count": 1,
+  "stalled_count": 1,
+  "missing_next_action_count": 2,
   "pipeline_open_count": 4,
   "inbound_unread_count": 3,
-  "at_risk_client_count": 1
+  "at_risk_client_count": 1,
+  "attention_item_ids": ["cc:attention-item:01K3CC-STALLED-DEAL"]
 }

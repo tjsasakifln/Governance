@@ -110,6 +110,19 @@ export type PriorityHorizon = (typeof PRIORITY_HORIZONS)[number];
 export const AGENT_SESSION_STATUSES = ["open", "closed", "denied"] as const;
 export type AgentSessionStatus = (typeof AGENT_SESSION_STATUSES)[number];
 
+/**
+ * Execution-ledger statuses for AgentActivity. Distinct from AgentSession
+ * (`open|closed|denied`), which is a scoped context-consult grant.
+ */
+export const AGENT_ACTIVITY_STATUSES = [
+  "running",
+  "done",
+  "partial",
+  "blocked",
+  "failed",
+] as const;
+export type AgentActivityStatus = (typeof AGENT_ACTIVITY_STATUSES)[number];
+
 export const CLIENT_LIFECYCLES = [
   "lead",
   "active",
@@ -144,6 +157,7 @@ export const RESOURCE_TYPE_NAMES = [
   "AttentionItem",
   "PriorityRecommendation",
   "AgentSession",
+  "AgentActivity",
   "ClientStatus",
   "CommercialSnapshot",
   "FinanceSnapshot",
@@ -161,6 +175,7 @@ export const SCHEMA_VERSIONS = {
   AttentionItem: "control-center.attention-item.v1",
   PriorityRecommendation: "control-center.priority-recommendation.v1",
   AgentSession: "control-center.agent-session.v1",
+  AgentActivity: "control-center.agent-activity.v1",
   ClientStatus: "control-center.client-status.v1",
   CommercialSnapshot: "control-center.commercial-snapshot.v1",
   FinanceSnapshot: "control-center.finance-snapshot.v1",
@@ -178,6 +193,7 @@ export const ID_TYPE_BY_RESOURCE: Record<ResourceTypeName, string> = {
   AttentionItem: "attention-item",
   PriorityRecommendation: "priority-recommendation",
   AgentSession: "agent-session",
+  AgentActivity: "agent-activity",
   ClientStatus: "client-status",
   CommercialSnapshot: "commercial-snapshot",
   FinanceSnapshot: "finance-snapshot",

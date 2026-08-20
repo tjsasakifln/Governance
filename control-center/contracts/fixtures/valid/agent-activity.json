@@ -1,0 +1,25 @@
+{
+  "schema_version": "control-center.agent-activity.v1",
+  "id": "cc:agent-activity:01K3CC-LEDGER-PARTIAL",
+  "agent_id": "agent:cc-context",
+  "session_id": "cc:agent-session:01K3CC-CTX-FINANCE",
+  "scope": "finance",
+  "status": "partial",
+  "started_at": "2026-08-20T17:50:00Z",
+  "finished_at": "2026-08-20T18:10:00Z",
+  "goal": "Prepare a scoped finance briefing for overdue receivables.",
+  "summary": "Read finance snapshot; leftover: confirm settlement evidence for one invoice.",
+  "provenance": {
+    "source": {
+      "system": "collector",
+      "kind": "report",
+      "locator": "agent-activity/01K3CC-LEDGER-PARTIAL"
+    },
+    "observed_at": "2026-08-20T18:10:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.9
+  },
+  "actor": { "kind": "agent", "id": "agent:cc-context" },
+  "evidence_refs": ["cc:finance-snapshot:01K3CC-RO-RECEIVABLES"],
+  "residual_work": ["Confirm settlement evidence for invoice overdue more than 30 days"]
+}

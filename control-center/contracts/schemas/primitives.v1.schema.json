@@ -144,6 +144,79 @@
         }
       }
     },
+    "time_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "$ref": "#/$defs/utc_datetime" },
+        "to": { "$ref": "#/$defs/utc_datetime" }
+      }
+    },
+    "evidenced_cash_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cash-in aggregate. MUST be omitted unless settlement/cash movement is evidenced. Silent invention of caixa is forbidden.",
+      "required": ["amount_cents", "currency", "evidenced", "source"],
+      "properties": {
+        "amount_cents": { "type": "integer", "minimum": 0 },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "evidenced": { "const": true },
+        "source": { "$ref": "#/$defs/source_ref" },
+        "window": { "$ref": "#/$defs/time_window" }
+      }
+    },
+    "applicable_mrr": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "MRR aggregate. MUST be omitted unless recurring monthly billing is applicable. One-off revenue is not MRR.",
+      "required": ["amount_cents", "currency", "applicable", "basis"],
+      "properties": {
+        "amount_cents": { "type": "integer", "minimum": 0 },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "applicable": { "const": true },
+        "basis": { "const": "recurring_monthly" }
+      }
+    },
+    "reliable_runway": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Runway in months. MUST be omitted unless both cash balance and expense/burn are reliable.",
+      "required": [
+        "months",
+        "cash_balance",
+        "monthly_expense",
+        "cash_reliable",
+        "expense_reliable"
+      ],
+      "properties": {
+        "months": { "type": "number", "minimum": 0 },
+        "cash_balance": { "$ref": "#/$defs/unsigned_money" },
+        "monthly_expense": { "$ref": "#/$defs/unsigned_money" },
+        "cash_reliable": { "const": true },
+        "expense_reliable": { "const": true }
+      }
+    },
+    "weighted_pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Probability-weighted pipeline. MUST be omitted unless win probability is reliable. Do not invent weights.",
+      "required": ["amount_cents", "currency", "probability_reliable"],
+      "properties": {
+        "amount_cents": { "type": "integer", "minimum": 0 },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "probability_reliable": { "const": true }
+      }
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": false,

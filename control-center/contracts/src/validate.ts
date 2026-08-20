@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Ajv2020, type ErrorObject as AjvError } from "ajv/dist/2020.js";
 import { catalogType, loadCatalog, schemaVersionToType } from "./catalog.js";
+import { classifyCompatibility } from "./compatibility.js";
 import { parseResourceId } from "./ids.js";
 import { packageRoot } from "./paths.js";
 import {
@@ -31,6 +32,7 @@ const SCHEMA_FILES = [
   "schemas/attention-item.v1.schema.json",
   "schemas/priority-recommendation.v1.schema.json",
   "schemas/agent-session.v1.schema.json",
+  "schemas/agent-activity.v1.schema.json",
   "schemas/client-status.v1.schema.json",
   "schemas/commercial-snapshot.v1.schema.json",
   "schemas/finance-snapshot.v1.schema.json",
@@ -182,6 +184,113 @@ function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[
     }
   }
 
+  if (type === "AgentActivity") {
+    const sessionId = stringField(rec, "session_id");
+    if (sessionId !== undefined) {
+      const parsed = parseResourceId(sessionId);
+      if (parsed === null || parsed.type !== "agent-session") {
+        errors.push(
+          issue(
+            "/session_id",
+            "session_id must be a cc:agent-session:... id; AgentActivity is not AgentSession",
+            "session_link",
+          ),
+        );
+      }
+    }
+    const activityId = stringField(rec, "id");
+    if (activityId !== undefined) {
+      const parsed = parseResourceId(activityId);
+      if (parsed !== null && parsed.type === "agent-session") {
+        errors.push(
+          issue("/id", "AgentActivity id type must be agent-activity, not agent-session", "id_type"),
+        );
+      }
+    }
+  }
+
+  if (type === "FinanceSnapshot") {
+    if (rec.provider_mutations !== "forbidden") {
+      errors.push(
+        issue(
+          "/provider_mutations",
+          "provider_mutations must be forbidden; financial provider writes are not in this ontology",
+          "provider_mutations",
+        ),
+      );
+    }
+    collectNonIntegerCents(rec, "", errors);
+    const cashIn = asRecord(rec.cash_in);
+    if (cashIn !== null && cashIn.evidenced !== true) {
+      errors.push(
+        issue("/cash_in", "cash_in may appear only when settlement is evidenced", "cash_in_evidence"),
+      );
+    }
+    const mrr = asRecord(rec.mrr);
+    if (mrr !== null && (mrr.applicable !== true || mrr.basis !== "recurring_monthly")) {
+      errors.push(
+        issue("/mrr", "mrr may appear only when recurring monthly billing is applicable", "mrr_applicable"),
+      );
+    }
+    const runway = asRecord(rec.runway);
+    if (runway !== null && (runway.cash_reliable !== true || runway.expense_reliable !== true)) {
+      errors.push(
+        issue(
+          "/runway",
+          "runway may appear only when cash balance and expense are reliable",
+          "runway_reliable",
+        ),
+      );
+    }
+  }
+
+  if (type === "CommercialSnapshot") {
+    for (const key of Object.keys(rec)) {
+      if (CATALOG_COPY_KEYS.has(key)) {
+        errors.push(
+          issue(
+            `/${key}`,
+            "CommercialSnapshot must pin Governance catalog identity and MUST NOT copy the offer catalog",
+            "catalog_copy",
+          ),
+        );
+      }
+    }
+    const pin = asRecord(rec.offer_pin);
+    if (pin !== null) {
+      for (const key of CATALOG_COPY_KEYS) {
+        if (key in pin) {
+          errors.push(
+            issue(
+              `/offer_pin/${key}`,
+              "offer_pin is identity-only; names, prices, terms, and copied offers are forbidden",
+              "catalog_copy",
+            ),
+          );
+        }
+      }
+      if ("known_offers" in pin) {
+        errors.push(
+          issue(
+            "/offer_pin/known_offers",
+            "pin known_offer_ids (strings) only; do not copy offer objects",
+            "catalog_copy",
+          ),
+        );
+      }
+    }
+    const weighted = asRecord(rec.pipeline_weighted);
+    if (weighted !== null && weighted.probability_reliable !== true) {
+      errors.push(
+        issue(
+          "/pipeline_weighted",
+          "pipeline_weighted may appear only with reliable probability",
+          "probability_reliable",
+        ),
+      );
+    }
+  }
+
   if (type === "AgentSession") {
     const requested = rec.requested_scopes;
     const granted = rec.granted_scopes;
@@ -268,12 +377,55 @@ const PROVENANCE_TYPES = new Set<ResourceTypeName>([
   "SourceObservation",
   "AttentionItem",
   "PriorityRecommendation",
+  "AgentActivity",
   "ClientStatus",
   "CommercialSnapshot",
   "FinanceSnapshot",
   "EngineeringSnapshot",
   "ServiceHealth",
 ]);
+
+const CATALOG_COPY_KEYS = new Set([
+  "catalog",
+  "offers",
+  "products",
+  "prices",
+  "terms",
+  "offer_catalog",
+  "price_list",
+  "copy",
+  "skus",
+]);
+
+function collectNonIntegerCents(
+  value: unknown,
+  pathExpr: string,
+  acc: ValidationIssue[],
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => collectNonIntegerCents(item, `${pathExpr}/${i}`, acc));
+    return;
+  }
+  const rec = asRecord(value);
+  if (rec === null) {
+    return;
+  }
+  if ("amount_cents" in rec) {
+    const cents = rec.amount_cents;
+    if (typeof cents !== "number" || !Number.isInteger(cents)) {
+      acc.push(
+        issue(
+          `${pathExpr}/amount_cents`,
+          "money amount_cents must be an integer (centavos); floats are invalid",
+          "integer_cents",
+        ),
+      );
+    }
+  }
+  for (const [key, child] of Object.entries(rec)) {
+    collectNonIntegerCents(child, `${pathExpr}/${key}`, acc);
+  }
+}
 
 function typeHasProvenance(type: ResourceTypeName): boolean {
   return PROVENANCE_TYPES.has(type);
@@ -301,6 +453,18 @@ export function validate(type: ResourceTypeName, data: unknown): ValidationResul
   }
   const schemaOk = validateFn(data) === true;
   const errors = [...ajvIssues(validateFn.errors), ...semanticChecks(type, data)];
+  const compat = classifyCompatibility(data);
+  if (compat.verdict !== "canonical") {
+    for (const finding of compat.findings) {
+      errors.push(
+        issue(
+          finding.path,
+          `${finding.verdict}: ${finding.message}`,
+          "compatibility",
+        ),
+      );
+    }
+  }
   const rec = asRecord(data);
   const schema_version = rec !== null ? stringField(rec, "schema_version") : undefined;
   const unique = dedupeIssues(errors);
@@ -323,19 +487,35 @@ export function validateUnknown(data: unknown): ValidationResult {
   }
   const version = stringField(rec, "schema_version");
   if (version === undefined) {
+    const compat = classifyCompatibility(data);
+    const errors = [issue("/schema_version", "schema_version is required to infer type", "required")];
+    if (compat.verdict !== "canonical") {
+      for (const finding of compat.findings) {
+        errors.push(issue(finding.path, `${finding.verdict}: ${finding.message}`, "compatibility"));
+      }
+    }
     return {
       ok: false,
       type: "unknown",
-      errors: [issue("/schema_version", "schema_version is required to infer type", "required")],
+      errors: dedupeIssues(errors),
     };
   }
   const type = schemaVersionToType(version);
   if (type === undefined) {
+    const compat = classifyCompatibility(data);
+    const errors = [
+      issue("/schema_version", `unsupported schema_version '${version}'`, "schema_version"),
+    ];
+    if (compat.verdict !== "canonical") {
+      for (const finding of compat.findings) {
+        errors.push(issue(finding.path, `${finding.verdict}: ${finding.message}`, "compatibility"));
+      }
+    }
     return {
       ok: false,
       type: "unknown",
       schema_version: version,
-      errors: [issue("/schema_version", `unsupported schema_version '${version}'`, "schema_version")],
+      errors: dedupeIssues(errors),
     };
   }
   return validate(type, data);

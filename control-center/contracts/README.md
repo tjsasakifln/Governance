@@ -40,7 +40,9 @@ Parameterized:
 
 Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix) that are **not** the reserved literals or `repo`/`client`. `company:foo` and `client:Acme` are invalid. Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
 
-## The 13 resource types
+## Public resource types
+
+The catalog (`catalog.json`) is the index. Do not freeze a type count in consumers; additively cataloged types are listed there.
 
 | Type | `schema_version` | ID type |
 |---|---|---|
@@ -50,6 +52,7 @@ Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix)
 | AttentionItem | `control-center.attention-item.v1` | `attention-item` |
 | PriorityRecommendation | `control-center.priority-recommendation.v1` | `priority-recommendation` |
 | AgentSession | `control-center.agent-session.v1` | `agent-session` |
+| AgentActivity | `control-center.agent-activity.v1` | `agent-activity` |
 | ClientStatus | `control-center.client-status.v1` | `client-status` |
 | CommercialSnapshot | `control-center.commercial-snapshot.v1` | `commercial-snapshot` |
 | FinanceSnapshot | `control-center.finance-snapshot.v1` | `finance-snapshot` |
@@ -58,21 +61,30 @@ Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix)
 | CollectorRun | `control-center.collector-run.v1` | `collector-run` |
 | AuditEvent | `control-center.audit-event.v1` | `audit-event` |
 
-`AgentContext` (`control-center.agent-context.v1`) is the HTTP/MCP envelope, not a stored core resource.
+`AgentContext` (`control-center.agent-context.v1`) is the HTTP/MCP envelope, not a stored core resource. Directive `draft` plus OperationalSnapshot / AgentContext compose proposal and today envelopes; those are not separate cataloged types.
+
+`AgentActivity` is the execution ledger (what an agent ran). `AgentSession` is the scoped context-consult grant (`open\|closed\|denied`). They are not aliases.
+
+FinanceSnapshot is a read-only aggregate (`provider_mutations: "forbidden"`) with integer-cents money: contracted, billed, paid, effectively_received, overdue, receivable, refunds, chargebacks. `cash_in`, `mrr`, and `runway` are omitted unless evidenced / applicable / cash+expense reliable.
+
+CommercialSnapshot is a Warmbly read model that pins Governance catalog identity (`offer_pin`) and MUST NOT copy names, prices, terms, or offer copy. Funnel: new_leads, qualified, opportunities, proposals, clients. `pipeline_weighted` is omitted unless probability is reliable. Attention refs cover aging / stalled / missing-next-action.
 
 ## Layout
 
 ```
-catalog.json                 # machine index of the 13 types
+catalog.json                 # machine index of public types
 schemas/                     # JSON Schema 2020-12
 src/types.ts                 # TypeScript types in lockstep
 src/validate.ts              # shipped validator (Ajv + semantic checks)
+src/compatibility.ts         # compatibility table classifier
+src/fingerprint.ts           # deterministic CONTRACT_FINGERPRINT
 src/cli.ts                   # shipped CLI entry
 fixtures/valid|invalid/      # at least one each per type
 docs/http.openapi.json
 docs/mcp.v1.json
+docs/compatibility.v1.json
 docs/ADR-CC-001-ARCHITECTURE-BOUNDARIES.md
-tests/contract.test.ts
+tests/
 ```
 
 ## Run validation and tests
@@ -85,8 +97,10 @@ npm install
 npm test
 npm run typecheck
 npx tsx src/cli.ts --list-types
+npx tsx src/cli.ts --fingerprint
 npx tsx src/cli.ts --type Directive fixtures/valid/directive.json
 npx tsx src/cli.ts --type Directive fixtures/invalid/directive.json
+npx tsx src/cli.ts --type AgentActivity fixtures/valid/agent-activity.json
 ```
 
 The CLI prints JSON with `"ok": true` or `"ok": false` plus `errors`. Exit 0 only when valid.

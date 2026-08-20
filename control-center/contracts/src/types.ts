@@ -1,5 +1,6 @@
 import type {
   ActorKind,
+  AgentActivityStatus,
   AgentSessionStatus,
   AttentionSeverity,
   AttentionStatus,
@@ -147,6 +148,28 @@ export interface AgentSession {
   include_attention: boolean;
 }
 
+/**
+ * Execution ledger record. Distinct from AgentSession (context-consult grant).
+ * Optional session_id, when present, MUST be a `cc:agent-session:...` id.
+ */
+export interface AgentActivity {
+  schema_version: "control-center.agent-activity.v1";
+  id: ResourceId;
+  agent_id: string;
+  session_id?: ResourceId;
+  scope: Scope;
+  status: AgentActivityStatus;
+  started_at: UtcDateTime;
+  finished_at: UtcDateTime | null;
+  goal: string;
+  summary: string;
+  provenance: Provenance;
+  actor: ActorRef;
+  evidence_refs?: string[];
+  residual_work?: string[];
+  related_ids?: ResourceId[];
+}
+
 export interface ClientStatus {
   schema_version: "control-center.client-status.v1";
   id: ResourceId;
@@ -166,6 +189,27 @@ export interface CommercialAuthorityStamp {
   this_document: "read_model";
 }
 
+/** Identity pin only. MUST NOT carry names, prices, terms, or offer copy. */
+export interface GovernanceOfferPin {
+  catalog_authority: "governance";
+  catalog_id: string;
+  known_offer_ids?: string[];
+}
+
+export interface CommercialFunnelCounts {
+  new_leads: number;
+  qualified: number;
+  opportunities: number;
+  proposals: number;
+  clients: number;
+}
+
+export interface WeightedPipeline {
+  amount_cents: number;
+  currency: string;
+  probability_reliable: true;
+}
+
 export interface CommercialSnapshot {
   schema_version: "control-center.commercial-snapshot.v1";
   id: ResourceId;
@@ -173,10 +217,40 @@ export interface CommercialSnapshot {
   generated_at: UtcDateTime;
   provenance: Provenance;
   authority: CommercialAuthorityStamp;
+  offer_pin: GovernanceOfferPin;
+  funnel: CommercialFunnelCounts;
+  pipeline_nominal: Money;
+  pipeline_weighted?: WeightedPipeline;
+  aging_count: number;
+  stalled_count: number;
+  missing_next_action_count: number;
   pipeline_open_count: number;
   inbound_unread_count: number;
   at_risk_client_count: number;
   attention_item_ids?: ResourceId[];
+}
+
+export interface EvidencedCashIn {
+  amount_cents: number;
+  currency: string;
+  evidenced: true;
+  source: SourceRef;
+  window?: { from: UtcDateTime; to: UtcDateTime };
+}
+
+export interface ApplicableMrr {
+  amount_cents: number;
+  currency: string;
+  applicable: true;
+  basis: "recurring_monthly";
+}
+
+export interface ReliableRunway {
+  months: number;
+  cash_balance: Money;
+  monthly_expense: Money;
+  cash_reliable: true;
+  expense_reliable: true;
 }
 
 export interface FinanceSnapshot {
@@ -187,8 +261,17 @@ export interface FinanceSnapshot {
   provenance: Provenance;
   read_model_only: true;
   provider_mutations: "forbidden";
-  receivables_open: Money;
-  receivables_overdue: Money;
+  contracted: Money;
+  billed: Money;
+  paid: Money;
+  effectively_received: Money;
+  overdue: Money;
+  receivable: Money;
+  refunds: Money;
+  chargebacks: Money;
+  cash_in?: EvidencedCashIn;
+  mrr?: ApplicableMrr;
+  runway?: ReliableRunway;
   attention_item_ids?: ResourceId[];
 }
 
@@ -270,7 +353,7 @@ export interface OperationalSnapshot {
 }
 
 /**
- * HTTP/MCP envelope. Not one of the 13 core resources. Agents receive this
+ * HTTP/MCP envelope. Not a stored core resource. Agents receive this
  * only for the scopes they requested and were granted.
  */
 export interface AgentContext {
@@ -298,6 +381,7 @@ export type ControlCenterResource =
   | AttentionItem
   | PriorityRecommendation
   | AgentSession
+  | AgentActivity
   | ClientStatus
   | CommercialSnapshot
   | FinanceSnapshot

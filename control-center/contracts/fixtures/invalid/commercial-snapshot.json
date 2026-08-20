@@ -18,6 +18,21 @@
     "commercial_runtime": "warmbly",
     "this_document": "read_model"
   },
+  "offer_pin": {
+    "catalog_authority": "governance",
+    "catalog_id": "CFG-OFFER-CATALOG-v1"
+  },
+  "funnel": {
+    "new_leads": 6,
+    "qualified": 4,
+    "opportunities": 3,
+    "proposals": 2,
+    "clients": 1
+  },
+  "pipeline_nominal": { "amount_cents": 4800000, "currency": "BRL" },
+  "aging_count": 0,
+  "stalled_count": 0,
+  "missing_next_action_count": 0,
   "pipeline_open_count": 4,
   "inbound_unread_count": 3,
   "at_risk_client_count": 1

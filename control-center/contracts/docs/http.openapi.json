@@ -409,6 +409,40 @@
         }
       }
     },
+    "/v1/agent-activities": {
+      "get": {
+        "tags": ["context"],
+        "operationId": "listAgentActivities",
+        "summary": "List AgentActivity execution records for requested scopes. Distinct from AgentSession.",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Scope" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AgentActivity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/agent-activity.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/audit": {
       "get": {
         "tags": ["memory"],

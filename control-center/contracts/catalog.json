@@ -55,6 +55,14 @@
       "invalid_fixture": "fixtures/invalid/agent-session.json"
     },
     {
+      "name": "AgentActivity",
+      "schema_version": "control-center.agent-activity.v1",
+      "id_type": "agent-activity",
+      "schema": "schemas/agent-activity.v1.schema.json",
+      "valid_fixture": "fixtures/valid/agent-activity.json",
+      "invalid_fixture": "fixtures/invalid/agent-activity.json"
+    },
+    {
       "name": "ClientStatus",
       "schema_version": "control-center.client-status.v1",
       "id_type": "client-status",
