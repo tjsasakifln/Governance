@@ -1,0 +1,97 @@
+{
+  "schema": "confenge.control_center.engineering_snapshot.v1",
+  "snapshot_id": "github:engineering_snapshot:confenge/billing-api",
+  "collected_at": "2026-08-20T12:00:00.000Z",
+  "allowlist": ["confenge/billing-api"],
+  "source": "github",
+  "observed_at": "2026-08-20T12:00:00.000Z",
+  "freshness_status": "fresh",
+  "confidence": 1,
+  "token": "ghp_THIS_MUST_NOT_LEAK_IN_OUTPUT_1234567890",
+  "errors": [],
+  "repos": [
+    {
+      "repo": {
+        "source": "github",
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "fresh",
+        "confidence": 1,
+        "observation_id": "github:repo:confenge%2Fbilling-api",
+        "owner": "confenge",
+        "name": "billing-api",
+        "full_name": "confenge/billing-api",
+        "default_branch": "main",
+        "html_url": "https://github.com/confenge/billing-api",
+        "pushed_at": "2026-08-19T09:00:00.000Z",
+        "updated_at": "2026-08-19T09:00:00.000Z",
+        "last_activity_at": "2026-08-19T09:00:00.000Z"
+      },
+      "repo_collection": {
+        "ok": true,
+        "freshness_status": "fresh"
+      },
+      "issues_collection": {
+        "ok": true,
+        "freshness_status": "fresh"
+      },
+      "recent_commits": [
+        {
+          "source": "github",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "freshness_status": "fresh",
+          "confidence": 1,
+          "observation_id": "github:commit:confenge%2Fbilling-api:aaa111",
+          "repo": "confenge/billing-api",
+          "sha": "aaa111bbbbccccddddeeeeffff000011112222",
+          "message": "chore: bump invoice template",
+          "committed_at": "2026-08-19T09:00:00.000Z",
+          "author_login": "bot"
+        }
+      ],
+      "open_issues": [],
+      "open_pull_requests": [
+        {
+          "source": "github",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "freshness_status": "fresh",
+          "confidence": 1,
+          "observation_id": "github:pull_request:confenge%2Fbilling-api:42",
+          "repo": "confenge/billing-api",
+          "number": 42,
+          "title": "Add invoice export",
+          "draft": false,
+          "created_at": "2026-08-08T12:00:00.000Z",
+          "age_seconds": 1036800,
+          "review_status": "REVIEW_REQUIRED",
+          "check_status": "success",
+          "html_url": "https://github.com/confenge/billing-api/pull/42",
+          "updated_at": "2026-08-10T12:00:00.000Z",
+          "head_sha": "abc123",
+          "head_ref": "feat/invoice-export",
+          "base_ref": "main",
+          "diff": "DIFF_BODY_MUST_NOT_LEAK\n@@ -1,200 +1,240 @@\n-huge patch omitted on purpose",
+          "patch": "DIFF_BODY_MUST_NOT_LEAK",
+          "body": "DIFF_BODY_MUST_NOT_LEAK long PR description that must never be copied into the executive read model"
+        }
+      ],
+      "check_failures": [],
+      "workflow_failures": [],
+      "divergence": {
+        "source": "github",
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "unsupported",
+        "confidence": 0.5,
+        "observation_id": "github:compare:confenge%2Fbilling-api:none",
+        "repo": "confenge/billing-api",
+        "base": null,
+        "head": null,
+        "support": "unsupported",
+        "ahead_by": null,
+        "behind_by": null,
+        "status": "unsupported",
+        "reason": "no_compare_target"
+      },
+      "errors": []
+    }
+  ]
+}
