@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+backups/
+*.dump
+*.dump.sql
+!fixtures/postgres.dump.sql
+*.enc
+*.enc.meta.json
+coverage/
