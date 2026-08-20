@@ -1,0 +1,57 @@
+# Confenge Control Center — Caddy reverse-proxy example.
+# TLS terminates here. Identity is Authelia ForwardAuth.
+# {$VAR} are Caddy env substitutions. Never commit live secrets or hostnames of record.
+# example.invalid is a documentation name; this wave does not publish DNS.
+
+{
+	admin off
+}
+
+(secure_headers) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		-Server
+	}
+}
+
+(cors_deny) {
+	@cors_preflight method OPTIONS
+	handle @cors_preflight {
+		respond "CORS denied by default" 403
+	}
+}
+
+{$CC_PUBLIC_DOMAIN} {
+	tls {$CC_TLS_CERT_FILE} {$CC_TLS_KEY_FILE}
+
+	encode gzip
+	import secure_headers
+	import cors_deny
+
+	# Public unauthenticated allowlist for the app: liveness only.
+	@health path /healthz /livez
+	handle @health {
+		reverse_proxy {$CC_APP_UPSTREAM}
+	}
+
+	handle {
+		forward_auth {$AUTHELIA_URL} {
+			uri /api/authz/forward-auth
+			copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+		}
+		reverse_proxy {$CC_APP_UPSTREAM}
+	}
+}
+
+{$CC_AUTH_DOMAIN} {
+	tls {$CC_TLS_CERT_FILE} {$CC_TLS_KEY_FILE}
+	import secure_headers
+	reverse_proxy {$AUTHELIA_URL}
+}

@@ -1,0 +1,1 @@
+{"status":"ok","user":"operator","dsn":"postgres://authelia:hunter2@postgres:5432/authelia","redis":"up"}

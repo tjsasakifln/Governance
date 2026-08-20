@@ -1,0 +1,12 @@
+{
+  "schema_version": "control-center.forward-auth.v1",
+  "idp": "authelia",
+  "proxy": "caddy",
+  "uri": "/api/authz/forward-auth",
+  "copy_headers": ["Remote-User", "Remote-Groups", "Remote-Name", "Remote-Email"],
+  "trust": "immediate TCP peer in CC_TRUSTED_PROXY_CIDRS only; never X-Forwarded-For",
+  "fail_closed": ["missing", "empty", "spoofed", "untrusted_hop", "malformed"],
+  "public_unauthenticated_paths": ["/healthz", "/livez"],
+  "health_body": { "status": "ok" },
+  "actor_mapping": "Remote-User becomes later ActorRef.id; never a password"
+}
