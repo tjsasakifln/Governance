@@ -1,0 +1,15 @@
+{
+  "schema_version": "control-center.hoje-payload.v1",
+  "fixture_name": "zero-atividade",
+  "generated_at": "2026-08-20T18:00:00Z",
+  "headline": "Zero atividade. Não inventar trabalho.",
+  "recommended_actions": [],
+  "incidents": [],
+  "clients": [],
+  "commercial": null,
+  "finance": null,
+  "engineering": null,
+  "infra": [],
+  "agent_activity": [],
+  "founder_override": null
+}

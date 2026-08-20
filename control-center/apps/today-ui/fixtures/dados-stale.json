@@ -1,0 +1,202 @@
+{
+  "schema_version": "control-center.hoje-payload.v1",
+  "fixture_name": "dados-stale",
+  "generated_at": "2026-08-20T18:00:00Z",
+  "headline": "Dados presentes, mas não confiáveis. Não tratar como fresco.",
+  "recommended_actions": [
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-STALE-REFRESH",
+      "scope": "company",
+      "rank": 1,
+      "title": "Reexecutar coletores antes de decidir",
+      "rationale": "Recortes comercial/financeiro/engenharia não estão FRESH.",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "snapshot-composer",
+          "locator": "snapshots/company"
+        },
+        "observed_at": "2026-08-19T12:00:00Z",
+        "freshness_status": "STALE",
+        "confidence": 0.4
+      },
+      "generated_at": "2026-08-20T18:00:00Z",
+      "horizon": "now"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-STALE-ASAAS",
+      "scope": "finance",
+      "rank": 2,
+      "title": "Não agir sobre recebíveis até o recorte Asaas voltar",
+      "rationale": "Coleta financeira em ERROR. Proibido mutar Asaas.",
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-read",
+          "locator": "finance/receivables"
+        },
+        "observed_at": "2026-08-18T09:00:00Z",
+        "freshness_status": "ERROR",
+        "confidence": 0.15
+      },
+      "generated_at": "2026-08-20T18:00:00Z",
+      "horizon": "now"
+    }
+  ],
+  "incidents": [
+    {
+      "schema_version": "control-center.attention-item.v1",
+      "id": "cc:attention-item:01K3CC-STALE-COLLECTOR",
+      "scope": "infrastructure",
+      "severity": "high",
+      "status": "open",
+      "title": "Coletor GitHub sem heartbeat",
+      "summary": "Última observação há mais de 24h. Status de freshness STALE.",
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "collector-health",
+          "locator": "collectors/github"
+        },
+        "observed_at": "2026-08-19T11:00:00Z",
+        "freshness_status": "STALE",
+        "confidence": 0.35
+      },
+      "detected_at": "2026-08-19T11:00:00Z",
+      "homepage_eligible": true,
+      "incident_kind": "incident"
+    }
+  ],
+  "clients": [
+    {
+      "schema_version": "control-center.client-status.v1",
+      "id": "cc:client-status:acme-industria",
+      "scope": "client:acme-industria",
+      "client_slug": "acme-industria",
+      "display_name": "Acme Indústria",
+      "lifecycle": "unknown",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "client-record",
+          "locator": "clients/acme-industria"
+        },
+        "observed_at": "2026-08-17T08:00:00Z",
+        "freshness_status": "UNKNOWN",
+        "confidence": 0.2
+      },
+      "notes": "lifecycle unknown — recorte Warmbly sem freshness"
+    }
+  ],
+  "commercial": {
+    "schema_version": "control-center.commercial-snapshot.v1",
+    "id": "cc:commercial-snapshot:01K3CC-STALE",
+    "scope": "commercial",
+    "generated_at": "2026-08-19T10:00:00Z",
+    "provenance": {
+      "source": {
+        "system": "warmbly",
+        "kind": "crm-read-model",
+        "locator": "commercial/pipeline"
+      },
+      "observed_at": "2026-08-19T10:00:00Z",
+      "freshness_status": "STALE",
+      "confidence": 0.3
+    },
+    "authority": {
+      "catalog_authority": "governance",
+      "commercial_runtime": "warmbly",
+      "this_document": "read_model"
+    },
+    "pipeline_open_count": 4,
+    "inbound_unread_count": 1,
+    "at_risk_client_count": 0
+  },
+  "finance": {
+    "schema_version": "control-center.finance-snapshot.v1",
+    "id": "cc:finance-snapshot:01K3CC-STALE",
+    "scope": "finance",
+    "generated_at": "2026-08-18T09:00:00Z",
+    "provenance": {
+      "source": {
+        "system": "asaas",
+        "kind": "receivable-read",
+        "locator": "finance/receivables"
+      },
+      "observed_at": "2026-08-18T09:00:00Z",
+      "freshness_status": "ERROR",
+      "confidence": 0.15
+    },
+    "read_model_only": true,
+    "provider_mutations": "forbidden",
+    "receivables_open": { "amount_cents": 2500000, "currency": "BRL" },
+    "receivables_overdue": { "amount_cents": 0, "currency": "BRL" }
+  },
+  "engineering": {
+    "schema_version": "control-center.engineering-snapshot.v1",
+    "id": "cc:engineering-snapshot:01K3CC-STALE",
+    "scope": "repo:tjsasakifln/Governance",
+    "generated_at": "2026-08-19T11:00:00Z",
+    "provenance": {
+      "source": {
+        "system": "github",
+        "kind": "repo-read",
+        "locator": "repos/tjsasakifln/Governance"
+      },
+      "observed_at": "2026-08-19T11:00:00Z",
+      "freshness_status": "UNKNOWN",
+      "confidence": 0.25
+    },
+    "open_pr_count": 1,
+    "failing_check_count": 0,
+    "open_incident_count": 0,
+    "repo_scopes": ["repo:tjsasakifln/Governance"]
+  },
+  "infra": [
+    {
+      "schema_version": "control-center.service-health.v1",
+      "id": "cc:service-health:01K3CC-STALE-CONTEXT",
+      "scope": "infrastructure",
+      "service_name": "context-service",
+      "status": "unknown",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "health-probe",
+          "locator": "health/context-service"
+        },
+        "observed_at": "2026-08-19T11:00:00Z",
+        "freshness_status": "UNKNOWN",
+        "confidence": 0.1
+      },
+      "checked_at": "2026-08-19T11:00:00Z",
+      "message": "sem probe recente"
+    }
+  ],
+  "agent_activity": [
+    {
+      "correlation_id": "sess.cc-18-stale-running",
+      "agent": { "id": "agent:collector", "provider": "system" },
+      "repo": "tjsasakifln/Governance",
+      "goal": "Heartbeat do coletor",
+      "campaign": null,
+      "started_at": "2026-08-19T10:00:00Z",
+      "finished_at": null,
+      "status": "RUNNING",
+      "summary": "Sessão ainda marcada RUNNING com observação stale.",
+      "blockers": [],
+      "residual_work": ["Reconciliar heartbeat"],
+      "source": {
+        "system": "agent",
+        "kind": "heartbeat",
+        "locator": "sess.cc-18-stale-running"
+      },
+      "observed_at": "2026-08-19T10:00:00Z",
+      "freshness_status": "STALE",
+      "confidence": 0.2
+    }
+  ],
+  "founder_override": null
+}
