@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#121418" />
+  <meta name="description" content="Confenge Control Center — HOJE. Cockpit de exceções. Sem chat. Sem mutações financeiras." />
+  <title>HOJE — Control Center</title>
+  <link rel="stylesheet" href="./hoje.css" />
+</head>
+<body>
+  <div id="root">
+
+    <header class="top">
+      <p class="brand">Control Center</p>
+      <h1>HOJE</h1>
+      <p class="headline">Incêndio operacional. Três ações agora; o resto pode esperar.</p>
+      <p class="as-of"><time datetime="2026-08-20T18:15:00Z">2026-08-20T18:15:00Z</time></p>
+    </header>
+    <main id="hoje" data-fixture="incendio-operacional" data-charts-emitted="false">
+
+    <section class="band" data-band-id="top3" data-band-label="Top 3 ações recomendadas" data-compressed="false">
+      <h2>Top 3 ações recomendadas</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:priority-recommendation:01K3CC-FIRE-RECEIVABLE" data-tone="green" data-founder-override-visible="true">
+      <header>
+        <p class="kicker"><span class="pill">rank-1</span></p>
+        <h3>Revisar recebível vencido da Acme Indústria (somente leitura)</h3>
+      </header>
+      <p>R$ 15.000 vencidos. Não executar cobrança, checkout, refund ou mutação Asaas neste cockpit.</p>
+
+      <p class="override" data-founder-override="pin">Prioridade do founder: pin</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="asaas">
+      <span class="src">asaas · receivable-read</span>
+      <time datetime="2026-08-20T18:10:00Z">20/08/2026, 15:10 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:10:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,86</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:priority-recommendation:01K3CC-FIRE-INBOUND" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">rank-2</span></p>
+        <h3>Destravar inbound Warmbly (8 sem leitura)</h3>
+      </header>
+      <p>Fila comercial em exceção. Runtime operacional continua Warmbly.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · inbound-queue</span>
+      <time datetime="2026-08-20T18:12:00Z">20/08/2026, 15:12 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:12:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,84</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:priority-recommendation:01K3CC-FIRE-CI" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">rank-3</span></p>
+        <h3>Desbloquear CI vermelha em Governance</h3>
+      </header>
+      <p>3 checks falhando e 1 incidente de engenharia aberto. Agente BLOCKED.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="github">
+      <span class="src">github · repo-read</span>
+      <time datetime="2026-08-20T18:14:00Z">20/08/2026, 15:14 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:14:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,95</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="incidents" data-band-label="Incidentes/blockers/riscos" data-compressed="false">
+      <h2>Incidentes/blockers/riscos</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:attention-item:01K3CC-FIRE-BLOCKER-CI" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">critical</span><span class="pill">blocker</span></p>
+        <h3>Blocker: CI vermelha impede merge</h3>
+      </header>
+      <p>Checks de autoridade comercial falhando no branch de campanha.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="github">
+      <span class="src">github · check-run</span>
+      <time datetime="2026-08-20T18:14:00Z">20/08/2026, 15:14 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:14:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,95</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:attention-item:01K3CC-FIRE-RISK-CHURN" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">high</span><span class="pill">risk</span></p>
+        <h3>Risco: Acme Indústria em churn com recebível vencido</h3>
+      </header>
+      <p>Cliente at-risk no recorte Warmbly e fatura vencida no recorte Asaas.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · client-record</span>
+      <time datetime="2026-08-20T18:05:00Z">20/08/2026, 15:05 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:05:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,80</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="clients" data-band-label="Clientes que exigem atenção" data-compressed="false">
+      <h2>Clientes que exigem atenção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:client-status:acme-industria" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">churn_risk</span></p>
+        <h3>Acme Indústria</h3>
+      </header>
+      <p>churn_risk + recebível vencido</p>
+      <p class="money" data-amount-cents="1500000" data-currency="BRL">BRL 15.000,00</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · client-record</span>
+      <time datetime="2026-08-20T18:05:00Z">20/08/2026, 15:05 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:05:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,80</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:client-status:delta-logistica" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">paused</span></p>
+        <h3>Delta Logística</h3>
+      </header>
+      <p>contrato pausado — exige atenção comercial</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · client-record</span>
+      <time datetime="2026-08-20T17:00:00Z">20/08/2026, 14:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T17:00:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,77</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="commercial" data-band-label="Comercial em exceção" data-compressed="false">
+      <h2>Comercial em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:commercial-snapshot:01K3CC-FIRE:inbound" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">inbound</span></p>
+        <h3>Inbound sem leitura</h3>
+      </header>
+      <p>8 item(ns) no inbound Warmbly (somente leitura)</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · crm-read-model</span>
+      <time datetime="2026-08-20T18:12:00Z">20/08/2026, 15:12 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:12:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,84</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:commercial-snapshot:01K3CC-FIRE:at-risk" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">at-risk</span></p>
+        <h3>Clientes em risco no recorte comercial</h3>
+      </header>
+      <p>2 cliente(s) at-risk (autoridade operacional: Warmbly)</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="warmbly">
+      <span class="src">warmbly · crm-read-model</span>
+      <time datetime="2026-08-20T18:12:00Z">20/08/2026, 15:12 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:12:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,84</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="finance" data-band-label="Financeiro em exceção" data-compressed="false">
+      <h2>Financeiro em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:finance-snapshot:01K3CC-FIRE:overdue" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">overdue</span></p>
+        <h3>Recebíveis vencidos</h3>
+      </header>
+      <p>Somente leitura. Cobrança, checkout, refund e mutação Asaas são proibidos neste cockpit.</p>
+      <p class="money" data-amount-cents="1500000" data-currency="BRL">BRL 15.000,00</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="asaas">
+      <span class="src">asaas · receivable-read</span>
+      <time datetime="2026-08-20T18:10:00Z">20/08/2026, 15:10 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:10:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,86</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="engineering" data-band-label="Engenharia/infra em exceção" data-compressed="false">
+      <h2>Engenharia/infra em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:engineering-snapshot:01K3CC-FIRE:checks" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">high</span><span class="pill">failing-check</span></p>
+        <h3>Checks falhando</h3>
+      </header>
+      <p>3 check(s) falhando</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="github">
+      <span class="src">github · repo-read</span>
+      <time datetime="2026-08-20T18:14:00Z">20/08/2026, 15:14 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:14:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,95</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:engineering-snapshot:01K3CC-FIRE:incidents" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">critical</span><span class="pill">eng-incident</span></p>
+        <h3>Incidentes de engenharia abertos</h3>
+      </header>
+      <p>1 incidente(s) aberto(s)</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="github">
+      <span class="src">github · repo-read</span>
+      <time datetime="2026-08-20T18:14:00Z">20/08/2026, 15:14 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:14:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,95</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:service-health:01K3CC-FIRE-CONTEXT" data-tone="red" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">infra</span></p>
+        <h3>context-service</h3>
+      </header>
+      <p>probe recusou conexão</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="red" data-source="collector">
+      <span class="src">collector · health-probe</span>
+      <time datetime="2026-08-20T18:14:00Z">20/08/2026, 15:14 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:14:00Z</span>
+      <span class="pill tone-red" data-tone="red">FRESH · fresco</span>
+      <span class="conf">confiança 0,99</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="agents" data-band-label="atividade recente de agentes" data-compressed="false">
+      <h2>atividade recente de agentes</h2>
+
+      <div class="rows">
+    <article class="row" data-id="sess.cc-18-fire-blocked" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">BLOCKED</span></p>
+        <h3>agent:grok-4.6 · BLOCKED</h3>
+      </header>
+      <p>Agente bloqueado: check vermelho e context-service down.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="agent">
+      <span class="src">agent · report</span>
+      <time datetime="2026-08-20T18:13:00Z">20/08/2026, 15:13 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:13:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,90</span>
+    </p>
+    </article>
+    <article class="row" data-id="sess.cc-18-fire-failed" data-tone="green" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">FAILED</span></p>
+        <h3>agent:collector · FAILED</h3>
+      </header>
+      <p>Probe falhou.</p>
+
+    <p class="meta" data-freshness="FRESH" data-tone="green" data-source="collector">
+      <span class="src">collector · health-probe</span>
+      <time datetime="2026-08-20T18:11:00Z">20/08/2026, 15:11 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-20T18:11:00Z</span>
+      <span class="pill tone-green" data-tone="green">FRESH · fresco</span>
+      <span class="conf">confiança 0,99</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="shortcuts" data-band-label="shortcuts para registrar decisão/nota" data-compressed="false">
+      <h2>shortcuts para registrar decisão/nota</h2>
+
+      <div class="shortcuts">
+        <button type="button" class="shortcut" data-shortcut="decision" data-label="Registrar decisão">
+          Registrar decisão
+        </button>
+        <p class="hint">Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda.</p>
+        <button type="button" class="shortcut" data-shortcut="nota" data-label="Registrar nota">
+          Registrar nota
+        </button>
+        <p class="hint">Nota local. Sem POST externo nesta onda.</p>
+        <p id="registrar-feedback" class="feedback" hidden></p>
+      </div>
+    </section>
+    </main>
+  </div>
+  <script type="application/json" id="hoje-view">{"schema_version":"control-center.hoje-view.v1","fixture_name":"incendio-operacional","generated_at":"2026-08-20T18:15:00Z","headline":"Incêndio operacional. Três ações agora; o resto pode esperar.","bands":[{"id":"top3","label":"Top 3 ações recomendadas","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:priority-recommendation:01K3CC-FIRE-RECEIVABLE","title":"Revisar recebível vencido da Acme Indústria (somente leitura)","summary":"R$ 15.000 vencidos. Não executar cobrança, checkout, refund ou mutação Asaas neste cockpit.","source":{"system":"asaas","kind":"receivable-read","locator":"finance/receivables/open"},"observed_at":"2026-08-20T18:10:00Z","observed_at_local":"20/08/2026, 15:10 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":true,"confidence":0.86,"founder_override_action":"pin","kind":"rank-1"},{"id":"cc:priority-recommendation:01K3CC-FIRE-INBOUND","title":"Destravar inbound Warmbly (8 sem leitura)","summary":"Fila comercial em exceção. Runtime operacional continua Warmbly.","source":{"system":"warmbly","kind":"inbound-queue","locator":"inbound/unread"},"observed_at":"2026-08-20T18:12:00Z","observed_at_local":"20/08/2026, 15:12 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.84,"kind":"rank-2"},{"id":"cc:priority-recommendation:01K3CC-FIRE-CI","title":"Desbloquear CI vermelha em Governance","summary":"3 checks falhando e 1 incidente de engenharia aberto. Agente BLOCKED.","source":{"system":"github","kind":"repo-read","locator":"repos/tjsasakifln/Governance"},"observed_at":"2026-08-20T18:14:00Z","observed_at_local":"20/08/2026, 15:14 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.95,"kind":"rank-3"}],"shortcuts":[]},{"id":"incidents","label":"Incidentes/blockers/riscos","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:attention-item:01K3CC-FIRE-BLOCKER-CI","title":"Blocker: CI vermelha impede merge","summary":"Checks de autoridade comercial falhando no branch de campanha.","source":{"system":"github","kind":"check-run","locator":"repos/tjsasakifln/Governance/checks"},"observed_at":"2026-08-20T18:14:00Z","observed_at_local":"20/08/2026, 15:14 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.95,"severity":"critical","kind":"blocker"},{"id":"cc:attention-item:01K3CC-FIRE-RISK-CHURN","title":"Risco: Acme Indústria em churn com recebível vencido","summary":"Cliente at-risk no recorte Warmbly e fatura vencida no recorte Asaas.","source":{"system":"warmbly","kind":"client-record","locator":"clients/acme-industria"},"observed_at":"2026-08-20T18:05:00Z","observed_at_local":"20/08/2026, 15:05 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.8,"severity":"high","kind":"risk"}],"shortcuts":[]},{"id":"clients","label":"Clientes que exigem atenção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:client-status:acme-industria","title":"Acme Indústria","summary":"churn_risk + recebível vencido","source":{"system":"warmbly","kind":"client-record","locator":"clients/acme-industria"},"observed_at":"2026-08-20T18:05:00Z","observed_at_local":"20/08/2026, 15:05 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.8,"money":{"amount_cents":1500000,"currency":"BRL"},"kind":"churn_risk"},{"id":"cc:client-status:delta-logistica","title":"Delta Logística","summary":"contrato pausado — exige atenção comercial","source":{"system":"warmbly","kind":"client-record","locator":"clients/delta-logistica"},"observed_at":"2026-08-20T17:00:00Z","observed_at_local":"20/08/2026, 14:00 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.77,"kind":"paused"}],"shortcuts":[]},{"id":"commercial","label":"Comercial em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:commercial-snapshot:01K3CC-FIRE:inbound","title":"Inbound sem leitura","summary":"8 item(ns) no inbound Warmbly (somente leitura)","source":{"system":"warmbly","kind":"crm-read-model","locator":"commercial/pipeline"},"observed_at":"2026-08-20T18:12:00Z","observed_at_local":"20/08/2026, 15:12 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.84,"kind":"inbound"},{"id":"cc:commercial-snapshot:01K3CC-FIRE:at-risk","title":"Clientes em risco no recorte comercial","summary":"2 cliente(s) at-risk (autoridade operacional: Warmbly)","source":{"system":"warmbly","kind":"crm-read-model","locator":"commercial/pipeline"},"observed_at":"2026-08-20T18:12:00Z","observed_at_local":"20/08/2026, 15:12 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.84,"kind":"at-risk"}],"shortcuts":[]},{"id":"finance","label":"Financeiro em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:finance-snapshot:01K3CC-FIRE:overdue","title":"Recebíveis vencidos","summary":"Somente leitura. Cobrança, checkout, refund e mutação Asaas são proibidos neste cockpit.","source":{"system":"asaas","kind":"receivable-read","locator":"finance/receivables"},"observed_at":"2026-08-20T18:10:00Z","observed_at_local":"20/08/2026, 15:10 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.86,"money":{"amount_cents":1500000,"currency":"BRL"},"kind":"overdue"}],"shortcuts":[]},{"id":"engineering","label":"Engenharia/infra em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:engineering-snapshot:01K3CC-FIRE:checks","title":"Checks falhando","summary":"3 check(s) falhando","source":{"system":"github","kind":"repo-read","locator":"repos/tjsasakifln/Governance"},"observed_at":"2026-08-20T18:14:00Z","observed_at_local":"20/08/2026, 15:14 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.95,"severity":"high","kind":"failing-check"},{"id":"cc:engineering-snapshot:01K3CC-FIRE:incidents","title":"Incidentes de engenharia abertos","summary":"1 incidente(s) aberto(s)","source":{"system":"github","kind":"repo-read","locator":"repos/tjsasakifln/Governance"},"observed_at":"2026-08-20T18:14:00Z","observed_at_local":"20/08/2026, 15:14 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.95,"severity":"critical","kind":"eng-incident"},{"id":"cc:service-health:01K3CC-FIRE-CONTEXT","title":"context-service","summary":"probe recusou conexão","source":{"system":"collector","kind":"health-probe","locator":"health/context-service"},"observed_at":"2026-08-20T18:14:00Z","observed_at_local":"20/08/2026, 15:14 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"red","founder_override_visible":false,"confidence":0.99,"kind":"infra"}],"shortcuts":[]},{"id":"agents","label":"atividade recente de agentes","compressed":false,"compressed_summary":null,"rows":[{"id":"sess.cc-18-fire-blocked","title":"agent:grok-4.6 · BLOCKED","summary":"Agente bloqueado: check vermelho e context-service down.","source":{"system":"agent","kind":"report","locator":"sess.cc-18-fire-blocked"},"observed_at":"2026-08-20T18:13:00Z","observed_at_local":"20/08/2026, 15:13 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.9,"kind":"BLOCKED"},{"id":"sess.cc-18-fire-failed","title":"agent:collector · FAILED","summary":"Probe falhou.","source":{"system":"collector","kind":"health-probe","locator":"health/context-service"},"observed_at":"2026-08-20T18:11:00Z","observed_at_local":"20/08/2026, 15:11 (America/Sao_Paulo)","freshness_status":"FRESH","freshness_tone":"green","founder_override_visible":false,"confidence":0.99,"kind":"FAILED"}],"shortcuts":[]},{"id":"shortcuts","label":"shortcuts para registrar decisão/nota","compressed":false,"compressed_summary":null,"rows":[],"shortcuts":[{"kind":"decision","label":"Registrar decisão","hint":"Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda."},{"kind":"nota","label":"Registrar nota","hint":"Nota local. Sem POST externo nesta onda."}]}],"charts_emitted":false}</script>
+  <script src="./hoje.js"></script>
+</body>
+</html>

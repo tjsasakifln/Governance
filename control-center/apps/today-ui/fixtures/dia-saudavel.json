@@ -1,0 +1,177 @@
+{
+  "schema_version": "control-center.hoje-payload.v1",
+  "fixture_name": "dia-saudavel",
+  "generated_at": "2026-08-20T18:00:00Z",
+  "headline": "Dia saudável. Nada exige decisão agora.",
+  "recommended_actions": [
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-HEALTHY-COLLECTOR",
+      "scope": "company",
+      "rank": 1,
+      "title": "Confirmar que o coletor GitHub segue fresco",
+      "rationale": "Única ação de rotina; nenhum incidente aberto.",
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "collector-health",
+          "locator": "collectors/github"
+        },
+        "observed_at": "2026-08-20T17:58:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.96
+      },
+      "generated_at": "2026-08-20T18:00:00Z",
+      "horizon": "today"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-HEALTHY-WEEKLY",
+      "scope": "finance",
+      "rank": 2,
+      "title": "Manter a revisão semanal de recebíveis (somente leitura)",
+      "rationale": "Nenhum vencido. Não cobrar, não alterar Asaas.",
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-read",
+          "locator": "finance/receivables"
+        },
+        "observed_at": "2026-08-20T17:50:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.9
+      },
+      "generated_at": "2026-08-20T18:00:00Z",
+      "horizon": "this_week"
+    }
+  ],
+  "incidents": [],
+  "clients": [
+    {
+      "schema_version": "control-center.client-status.v1",
+      "id": "cc:client-status:beta-servicos",
+      "scope": "client:beta-servicos",
+      "client_slug": "beta-servicos",
+      "display_name": "Beta Serviços",
+      "lifecycle": "active",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "client-record",
+          "locator": "clients/beta-servicos"
+        },
+        "observed_at": "2026-08-20T17:40:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.88
+      }
+    }
+  ],
+  "commercial": {
+    "schema_version": "control-center.commercial-snapshot.v1",
+    "id": "cc:commercial-snapshot:01K3CC-HEALTHY",
+    "scope": "commercial",
+    "generated_at": "2026-08-20T17:40:00Z",
+    "provenance": {
+      "source": {
+        "system": "warmbly",
+        "kind": "crm-read-model",
+        "locator": "commercial/pipeline"
+      },
+      "observed_at": "2026-08-20T17:39:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.91
+    },
+    "authority": {
+      "catalog_authority": "governance",
+      "commercial_runtime": "warmbly",
+      "this_document": "read_model"
+    },
+    "pipeline_open_count": 3,
+    "inbound_unread_count": 0,
+    "at_risk_client_count": 0
+  },
+  "finance": {
+    "schema_version": "control-center.finance-snapshot.v1",
+    "id": "cc:finance-snapshot:01K3CC-HEALTHY",
+    "scope": "finance",
+    "generated_at": "2026-08-20T17:20:00Z",
+    "provenance": {
+      "source": {
+        "system": "asaas",
+        "kind": "receivable-read",
+        "locator": "finance/receivables"
+      },
+      "observed_at": "2026-08-20T17:18:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.93
+    },
+    "read_model_only": true,
+    "provider_mutations": "forbidden",
+    "receivables_open": { "amount_cents": 800000, "currency": "BRL" },
+    "receivables_overdue": { "amount_cents": 0, "currency": "BRL" }
+  },
+  "engineering": {
+    "schema_version": "control-center.engineering-snapshot.v1",
+    "id": "cc:engineering-snapshot:01K3CC-HEALTHY",
+    "scope": "repo:tjsasakifln/Governance",
+    "generated_at": "2026-08-20T17:55:00Z",
+    "provenance": {
+      "source": {
+        "system": "github",
+        "kind": "repo-read",
+        "locator": "repos/tjsasakifln/Governance"
+      },
+      "observed_at": "2026-08-20T17:54:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.97
+    },
+    "open_pr_count": 1,
+    "failing_check_count": 0,
+    "open_incident_count": 0,
+    "repo_scopes": ["repo:tjsasakifln/Governance"]
+  },
+  "infra": [
+    {
+      "schema_version": "control-center.service-health.v1",
+      "id": "cc:service-health:01K3CC-HEALTHY-CONTEXT",
+      "scope": "infrastructure",
+      "service_name": "context-service",
+      "status": "healthy",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "health-probe",
+          "locator": "health/context-service"
+        },
+        "observed_at": "2026-08-20T17:58:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.99
+      },
+      "checked_at": "2026-08-20T17:58:00Z"
+    }
+  ],
+  "agent_activity": [
+    {
+      "correlation_id": "sess.cc-18-healthy-done",
+      "agent": { "id": "agent:grok-4.6", "provider": "xai" },
+      "repo": "tjsasakifln/Governance",
+      "goal": "Rotina de coleta GitHub",
+      "campaign": null,
+      "started_at": "2026-08-20T16:00:00Z",
+      "finished_at": "2026-08-20T16:20:00Z",
+      "status": "DONE",
+      "summary": "Coleta concluída sem leftover.",
+      "blockers": [],
+      "residual_work": [],
+      "source": {
+        "system": "agent",
+        "kind": "report",
+        "locator": "sess.cc-18-healthy-done"
+      },
+      "observed_at": "2026-08-20T16:20:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 1
+    }
+  ],
+  "founder_override": null
+}

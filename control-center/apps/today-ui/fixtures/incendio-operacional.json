@@ -1,0 +1,339 @@
+{
+  "schema_version": "control-center.hoje-payload.v1",
+  "fixture_name": "incendio-operacional",
+  "generated_at": "2026-08-20T18:15:00Z",
+  "headline": "Incêndio operacional. Três ações agora; o resto pode esperar.",
+  "recommended_actions": [
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-FIRE-RECEIVABLE",
+      "scope": "finance",
+      "rank": 1,
+      "title": "Revisar recebível vencido da Acme Indústria (somente leitura)",
+      "rationale": "R$ 15.000 vencidos. Não executar cobrança, checkout, refund ou mutação Asaas neste cockpit.",
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-read",
+          "locator": "finance/receivables/open"
+        },
+        "observed_at": "2026-08-20T18:10:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.86
+      },
+      "generated_at": "2026-08-20T18:15:00Z",
+      "horizon": "now",
+      "attention_item_ids": ["cc:attention-item:01K3CC-FIRE-OVERDUE"]
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-FIRE-INBOUND",
+      "scope": "commercial",
+      "rank": 2,
+      "title": "Destravar inbound Warmbly (8 sem leitura)",
+      "rationale": "Fila comercial em exceção. Runtime operacional continua Warmbly.",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "inbound-queue",
+          "locator": "inbound/unread"
+        },
+        "observed_at": "2026-08-20T18:12:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.84
+      },
+      "generated_at": "2026-08-20T18:15:00Z",
+      "horizon": "now"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-FIRE-CI",
+      "scope": "repo:tjsasakifln/Governance",
+      "rank": 3,
+      "title": "Desbloquear CI vermelha em Governance",
+      "rationale": "3 checks falhando e 1 incidente de engenharia aberto. Agente BLOCKED.",
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "repo-read",
+          "locator": "repos/tjsasakifln/Governance"
+        },
+        "observed_at": "2026-08-20T18:14:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.95
+      },
+      "generated_at": "2026-08-20T18:15:00Z",
+      "horizon": "now"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-FIRE-COSMETIC",
+      "scope": "company",
+      "rank": 4,
+      "title": "Ajustar copy do README interno",
+      "rationale": "Cosmético. Não deve aparecer no Top 3.",
+      "provenance": {
+        "source": {
+          "system": "governance",
+          "kind": "manual-note",
+          "locator": "notes/copy"
+        },
+        "observed_at": "2026-08-20T18:00:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.5
+      },
+      "generated_at": "2026-08-20T18:15:00Z",
+      "horizon": "this_week"
+    }
+  ],
+  "incidents": [
+    {
+      "schema_version": "control-center.attention-item.v1",
+      "id": "cc:attention-item:01K3CC-FIRE-BLOCKER-CI",
+      "scope": "repo:tjsasakifln/Governance",
+      "severity": "critical",
+      "status": "open",
+      "title": "Blocker: CI vermelha impede merge",
+      "summary": "Checks de autoridade comercial falhando no branch de campanha.",
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "check-run",
+          "locator": "repos/tjsasakifln/Governance/checks"
+        },
+        "observed_at": "2026-08-20T18:14:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.95
+      },
+      "detected_at": "2026-08-20T18:14:00Z",
+      "homepage_eligible": true,
+      "incident_kind": "blocker",
+      "recommended_action": "Ler o log do check e corrigir no workstream dono. Não mergear na força."
+    },
+    {
+      "schema_version": "control-center.attention-item.v1",
+      "id": "cc:attention-item:01K3CC-FIRE-RISK-CHURN",
+      "scope": "client:acme-industria",
+      "severity": "high",
+      "status": "open",
+      "title": "Risco: Acme Indústria em churn com recebível vencido",
+      "summary": "Cliente at-risk no recorte Warmbly e fatura vencida no recorte Asaas.",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "client-record",
+          "locator": "clients/acme-industria"
+        },
+        "observed_at": "2026-08-20T18:05:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.8
+      },
+      "detected_at": "2026-08-20T18:05:00Z",
+      "homepage_eligible": true,
+      "incident_kind": "risk"
+    },
+    {
+      "schema_version": "control-center.attention-item.v1",
+      "id": "cc:attention-item:01K3CC-FIRE-RESOLVED",
+      "scope": "infrastructure",
+      "severity": "low",
+      "status": "resolved",
+      "title": "Incidente resolvido (não deve aparecer)",
+      "summary": "Já resolvido.",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "health-probe",
+          "locator": "health/old"
+        },
+        "observed_at": "2026-08-20T12:00:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      },
+      "detected_at": "2026-08-20T12:00:00Z",
+      "homepage_eligible": true,
+      "incident_kind": "incident"
+    }
+  ],
+  "clients": [
+    {
+      "schema_version": "control-center.client-status.v1",
+      "id": "cc:client-status:acme-industria",
+      "scope": "client:acme-industria",
+      "client_slug": "acme-industria",
+      "display_name": "Acme Indústria",
+      "lifecycle": "churn_risk",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "client-record",
+          "locator": "clients/acme-industria"
+        },
+        "observed_at": "2026-08-20T18:05:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.8
+      },
+      "open_receivables": { "amount_cents": 1500000, "currency": "BRL" },
+      "attention_item_ids": ["cc:attention-item:01K3CC-FIRE-RISK-CHURN"],
+      "notes": "churn_risk + recebível vencido"
+    },
+    {
+      "schema_version": "control-center.client-status.v1",
+      "id": "cc:client-status:delta-logistica",
+      "scope": "client:delta-logistica",
+      "client_slug": "delta-logistica",
+      "display_name": "Delta Logística",
+      "lifecycle": "paused",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "client-record",
+          "locator": "clients/delta-logistica"
+        },
+        "observed_at": "2026-08-20T17:00:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.77
+      },
+      "notes": "contrato pausado — exige atenção comercial"
+    }
+  ],
+  "commercial": {
+    "schema_version": "control-center.commercial-snapshot.v1",
+    "id": "cc:commercial-snapshot:01K3CC-FIRE",
+    "scope": "commercial",
+    "generated_at": "2026-08-20T18:12:00Z",
+    "provenance": {
+      "source": {
+        "system": "warmbly",
+        "kind": "crm-read-model",
+        "locator": "commercial/pipeline"
+      },
+      "observed_at": "2026-08-20T18:12:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.84
+    },
+    "authority": {
+      "catalog_authority": "governance",
+      "commercial_runtime": "warmbly",
+      "this_document": "read_model"
+    },
+    "pipeline_open_count": 6,
+    "inbound_unread_count": 8,
+    "at_risk_client_count": 2
+  },
+  "finance": {
+    "schema_version": "control-center.finance-snapshot.v1",
+    "id": "cc:finance-snapshot:01K3CC-FIRE",
+    "scope": "finance",
+    "generated_at": "2026-08-20T18:10:00Z",
+    "provenance": {
+      "source": {
+        "system": "asaas",
+        "kind": "receivable-read",
+        "locator": "finance/receivables"
+      },
+      "observed_at": "2026-08-20T18:10:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.86
+    },
+    "read_model_only": true,
+    "provider_mutations": "forbidden",
+    "receivables_open": { "amount_cents": 2500000, "currency": "BRL" },
+    "receivables_overdue": { "amount_cents": 1500000, "currency": "BRL" }
+  },
+  "engineering": {
+    "schema_version": "control-center.engineering-snapshot.v1",
+    "id": "cc:engineering-snapshot:01K3CC-FIRE",
+    "scope": "repo:tjsasakifln/Governance",
+    "generated_at": "2026-08-20T18:14:00Z",
+    "provenance": {
+      "source": {
+        "system": "github",
+        "kind": "repo-read",
+        "locator": "repos/tjsasakifln/Governance"
+      },
+      "observed_at": "2026-08-20T18:14:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.95
+    },
+    "open_pr_count": 4,
+    "failing_check_count": 3,
+    "open_incident_count": 1,
+    "repo_scopes": ["repo:tjsasakifln/Governance"]
+  },
+  "infra": [
+    {
+      "schema_version": "control-center.service-health.v1",
+      "id": "cc:service-health:01K3CC-FIRE-CONTEXT",
+      "scope": "infrastructure",
+      "service_name": "context-service",
+      "status": "down",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "health-probe",
+          "locator": "health/context-service"
+        },
+        "observed_at": "2026-08-20T18:14:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.99
+      },
+      "checked_at": "2026-08-20T18:14:00Z",
+      "message": "probe recusou conexão"
+    }
+  ],
+  "agent_activity": [
+    {
+      "correlation_id": "sess.cc-18-fire-blocked",
+      "agent": { "id": "agent:grok-4.6", "provider": "xai" },
+      "repo": "tjsasakifln/Governance",
+      "goal": "Corrigir CI da autoridade comercial",
+      "campaign": "CONFENGE-CONTROL-CENTER-FANOUT-2026-08-20",
+      "started_at": "2026-08-20T17:40:00Z",
+      "finished_at": null,
+      "status": "BLOCKED",
+      "summary": "Agente bloqueado: check vermelho e context-service down.",
+      "blockers": ["CI vermelha", "context-service down"],
+      "residual_work": ["Destravar CI", "Não mutar Asaas"],
+      "source": {
+        "system": "agent",
+        "kind": "report",
+        "locator": "sess.cc-18-fire-blocked"
+      },
+      "observed_at": "2026-08-20T18:13:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "correlation_id": "sess.cc-18-fire-failed",
+      "agent": { "id": "agent:collector", "provider": "system" },
+      "repo": "tjsasakifln/Governance",
+      "goal": "Health probe context-service",
+      "campaign": null,
+      "started_at": "2026-08-20T18:10:00Z",
+      "finished_at": "2026-08-20T18:11:00Z",
+      "status": "FAILED",
+      "summary": "Probe falhou.",
+      "blockers": ["connection refused"],
+      "residual_work": ["Reexecutar probe quando infra voltar"],
+      "source": {
+        "system": "collector",
+        "kind": "health-probe",
+        "locator": "health/context-service"
+      },
+      "observed_at": "2026-08-20T18:11:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.99
+    }
+  ],
+  "founder_override": {
+    "actor": {
+      "kind": "human",
+      "id": "human:operator",
+      "display_name": "Operador"
+    },
+    "at": "2026-08-20T18:14:30Z",
+    "action": "pin",
+    "target_ids": ["cc:priority-recommendation:01K3CC-FIRE-RECEIVABLE"]
+  }
+}
