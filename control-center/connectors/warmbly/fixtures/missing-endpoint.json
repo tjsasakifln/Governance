@@ -1,0 +1,111 @@
+{
+  "health": { "status": "ok" },
+  "api_version": "v1",
+  "pipelines": [],
+  "deals": {
+    "data": [
+      {
+        "id": "deal-healthy-1",
+        "name": "Diagnóstico — Construtora Beta",
+        "value": 1500.5,
+        "currency": "BRL",
+        "status": "open",
+        "created_at": "2026-08-18T12:00:00.000Z",
+        "updated_at": "2026-08-20T10:00:00.000Z"
+      }
+    ],
+    "pagination": { "total": 1, "has_more": false }
+  },
+  "deals_summary": {
+    "total": 1,
+    "open_count": 1,
+    "open_value": 1500.5,
+    "currency": "BRL",
+    "mixed_currency": false
+  },
+  "tasks": {
+    "data": [
+      {
+        "id": "task-overdue-1",
+        "title": "Ligar para Gama — follow-up da proposta",
+        "due_date": "2026-08-19T12:00:00.000Z",
+        "priority": "urgent",
+        "status": "pending",
+        "created_at": "2026-08-17T12:00:00.000Z",
+        "updated_at": "2026-08-17T12:00:00.000Z"
+      },
+      {
+        "id": "task-done-1",
+        "title": "Arquivar nota de reunião já concluída",
+        "due_date": "2026-08-18T12:00:00.000Z",
+        "priority": "low",
+        "status": "completed",
+        "completed_at": "2026-08-18T15:00:00.000Z",
+        "created_at": "2026-08-16T12:00:00.000Z",
+        "updated_at": "2026-08-18T15:00:00.000Z"
+      }
+    ],
+    "pagination": { "total": 2, "has_more": false }
+  },
+  "contacts": {
+    "data": [
+      {
+        "id": "contact-quiet-1",
+        "first_name": "Ana",
+        "last_name": "Quiet",
+        "company": "Escritório Gama",
+        "subscribed": true,
+        "created_at": "2026-06-01T12:00:00.000Z",
+        "updated_at": "2026-08-01T12:00:00.000Z"
+      }
+    ],
+    "pagination": { "total": 1, "has_more": false }
+  },
+  "campaigns": {
+    "data": [
+      {
+        "id": "camp-active-1",
+        "name": "Outbound engenharia — ativo",
+        "status": "active",
+        "created_at": "2026-08-01T12:00:00.000Z",
+        "updated_at": "2026-08-20T08:00:00.000Z"
+      }
+    ],
+    "pagination": { "total": 1, "has_more": false }
+  },
+  "campaigns_overview": { "total": 1, "active": 1, "paused": 0, "draft": 0, "completed": 0 },
+  "unibox_overview": {
+    "total": 2,
+    "unread": 0,
+    "awaiting_reply": 0,
+    "awaiting_agent_draft": 0,
+    "generated_at": "2026-08-20T14:55:00.000Z"
+  },
+  "confenge_status": { "enabled": false },
+  "unavailable": [
+    {
+      "method": "GET",
+      "path": "/v1/confenge/attention",
+      "status": 404,
+      "reason": "CONFENGE outreach is not enabled on this server"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/confenge/today",
+      "status": 404,
+      "reason": "CONFENGE outreach is not enabled on this server"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/confenge/inbound",
+      "status": 404,
+      "reason": "CONFENGE outreach is not enabled on this server"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/confenge/ops/health",
+      "status": 404,
+      "reason": "CONFENGE outreach is not enabled on this server"
+    }
+  ]
+}
