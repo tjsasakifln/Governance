@@ -1,0 +1,38 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "agent sobrescrevendo founder decision",
+  "case_kind": "adversarial",
+  "description": "An agent publishes a new decision that supersedes an active founder decision.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: only a human founder may supersede or mutate a founder decision",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:founder-price",
+        "kind": "decision",
+        "scope": "company",
+        "status": "active",
+        "title": "Diagnóstico price is R$ 4.900",
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+        "supersedes": null,
+        "audit": []
+      },
+      {
+        "id": "cc:directive:agent-override",
+        "kind": "decision",
+        "scope": "company",
+        "status": "active",
+        "title": "Diagnóstico price is R$ 1.000",
+        "created_by": { "kind": "agent", "id": "cc-agent-planner" },
+        "supersedes": ["cc:directive:founder-price"],
+        "audit": [
+          {
+            "at": "2026-08-20T13:00:00Z",
+            "actor": { "kind": "agent", "id": "cc-agent-planner" },
+            "action": "created"
+          }
+        ]
+      }
+    ]
+  }
+}

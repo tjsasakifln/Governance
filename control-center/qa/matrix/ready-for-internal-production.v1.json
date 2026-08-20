@@ -1,0 +1,29 @@
+{
+  "schema_version": "control-center.qa-ready.v1",
+  "name": "READY_FOR_INTERNAL_PRODUCTION",
+  "rule": "fail-closed conjunction",
+  "definition": "READY_FOR_INTERNAL_PRODUCTION is true if and only if every named attack check is present exactly once and its state is the string pass. UNKNOWN, unrun, missing, duplicate, or fail is not ready.",
+  "unknown_is_not_approval": true,
+  "unrun_is_not_ready": true,
+  "missing_is_not_ready": true,
+  "fail_is_not_ready": true,
+  "not_ready_states": ["fail", "UNKNOWN", "unrun", "missing"],
+  "required_checks": [
+    "stale data mostrado como saudável",
+    "double counting financeiro",
+    "hypothesis promovida a fact",
+    "agent sobrescrevendo founder decision",
+    "scope leakage entre cliente/repos",
+    "duplicated collector event",
+    "provider mutation acidental",
+    "secret/PII leakage",
+    "timezone boundary",
+    "partial outage",
+    "stale RUNNING agent session",
+    "conflicting directives/supersession",
+    "auth bypass assumptions",
+    "missing provenance"
+  ],
+  "reducer": "readyForInternalProduction",
+  "this_wave_does_not_grant_ready_to_live_control_center": true
+}

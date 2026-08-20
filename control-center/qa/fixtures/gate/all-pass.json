@@ -1,0 +1,20 @@
+{
+  "schema_version": "control-center.qa-checks.v1",
+  "description": "Every named attack check is explicitly pass. READY_FOR_INTERNAL_PRODUCTION may be true only in this shape.",
+  "checks": [
+    { "attack_id": "stale data mostrado como saudável", "state": "pass", "reason": "no healthy presentation of stale data" },
+    { "attack_id": "double counting financeiro", "state": "pass", "reason": "unique source_payment_id totals match" },
+    { "attack_id": "hypothesis promovida a fact", "state": "pass", "reason": "hypotheses not presented as facts" },
+    { "attack_id": "agent sobrescrevendo founder decision", "state": "pass", "reason": "founder decisions untouched by agents" },
+    { "attack_id": "scope leakage entre cliente/repos", "state": "pass", "reason": "resources stay inside granted_scopes" },
+    { "attack_id": "duplicated collector event", "state": "pass", "reason": "duplicate idempotency_key skipped" },
+    { "attack_id": "provider mutation acidental", "state": "pass", "reason": "no forbidden provider operations" },
+    { "attack_id": "secret/PII leakage", "state": "pass", "reason": "no secret keys or PII on surfaces" },
+    { "attack_id": "timezone boundary", "state": "pass", "reason": "UTC Z and America/Sao_Paulo presentation agree" },
+    { "attack_id": "partial outage", "state": "pass", "reason": "overall status reflects component failures" },
+    { "attack_id": "stale RUNNING agent session", "state": "pass", "reason": "no open session past TTL" },
+    { "attack_id": "conflicting directives/supersession", "state": "pass", "reason": "supersedees are not active" },
+    { "attack_id": "auth bypass assumptions", "state": "pass", "reason": "auth fail-closed with opaque actor" },
+    { "attack_id": "missing provenance", "state": "pass", "reason": "source, observed_at, freshness_status, confidence present" }
+  ]
+}

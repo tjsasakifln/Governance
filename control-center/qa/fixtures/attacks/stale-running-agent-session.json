@@ -1,0 +1,22 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "stale RUNNING agent session",
+  "case_kind": "adversarial",
+  "description": "An open (live/RUNNING) agent session started 48h ago is still open past the 4h TTL.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: open/live agent sessions past TTL must be closed or denied, not left RUNNING",
+  "payload": {
+    "as_of": "2026-08-20T12:00:00Z",
+    "sessions": [
+      {
+        "id": "cc:agent-session:stale-open",
+        "agent_id": "cc-agent-planner",
+        "status": "open",
+        "started_at": "2026-08-18T12:00:00Z",
+        "ended_at": null,
+        "ttl_seconds": 14400,
+        "granted_scopes": ["commercial"]
+      }
+    ]
+  }
+}

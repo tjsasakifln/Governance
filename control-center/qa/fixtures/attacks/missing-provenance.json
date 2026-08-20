@@ -1,0 +1,23 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "missing provenance",
+  "case_kind": "adversarial",
+  "description": "Aggregated snapshots omit source, observed_at, freshness_status, and/or confidence.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: aggregated records must carry source, observed_at, freshness_status, and confidence",
+  "payload": {
+    "records": [
+      {
+        "id": "cc:operational-snapshot:naked",
+        "headline": "Everything fine"
+      },
+      {
+        "id": "cc:finance-snapshot:partial",
+        "provenance": {
+          "source": { "system": "asaas", "kind": "receivable", "locator": "pay_1" },
+          "freshness_status": "FRESH"
+        }
+      }
+    ]
+  }
+}

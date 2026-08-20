@@ -1,0 +1,30 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "missing provenance",
+  "case_kind": "control",
+  "description": "Every aggregated record carries source, observed_at, freshness_status, and confidence.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: aggregated records must carry source, observed_at, freshness_status, and confidence",
+  "payload": {
+    "records": [
+      {
+        "id": "cc:operational-snapshot:today",
+        "provenance": {
+          "source": { "system": "collector", "kind": "aggregate", "locator": "ops/today" },
+          "observed_at": "2026-08-20T14:50:00Z",
+          "freshness_status": "FRESH",
+          "confidence": 0.82
+        }
+      },
+      {
+        "id": "cc:finance-snapshot:now",
+        "provenance": {
+          "source": { "system": "asaas", "kind": "receivable", "locator": "pay_1" },
+          "observed_at": "2026-08-20T14:40:00Z",
+          "freshness_status": "STALE",
+          "confidence": 0.4
+        }
+      }
+    ]
+  }
+}

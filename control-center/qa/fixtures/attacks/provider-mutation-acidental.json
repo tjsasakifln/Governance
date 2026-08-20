@@ -1,0 +1,25 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "provider mutation acidental",
+  "case_kind": "adversarial",
+  "description": "An MCP tool call attempts cobrança / Asaas write from Control Center.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: forbid cc_charge, checkout, refund, cancelamento, Asaas writes, commercial send; collectors stay read_only",
+  "payload": {
+    "operations": [
+      { "name": "cc_get_context", "read_only": true },
+      { "name": "cc_charge", "read_only": false, "provider": "asaas" },
+      { "name": "cc_refund" }
+    ],
+    "collectors": [
+      { "name": "asaas-finance", "read_only": false }
+    ],
+    "finance_snapshots": [
+      {
+        "id": "cc:finance-snapshot:now",
+        "read_model_only": false,
+        "provider_mutations": "allowed"
+      }
+    ]
+  }
+}

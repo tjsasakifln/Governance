@@ -1,0 +1,23 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "timezone boundary",
+  "case_kind": "adversarial",
+  "description": "UTC instants near midnight are shown on the UTC calendar date instead of America/Sao_Paulo, and one timestamp lacks Z.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: store UTC Z internally; presented dates must use America/Sao_Paulo conversion",
+  "payload": {
+    "instants": [
+      {
+        "id": "invoice-due",
+        "observed_at": "2026-08-20T02:30:00Z",
+        "presented_calendar_date": "2026-08-20",
+        "classified_using_utc_calendar": true
+      },
+      {
+        "id": "offset-local",
+        "observed_at": "2026-08-20T10:00:00-03:00",
+        "presented_calendar_date": "2026-08-20"
+      }
+    ]
+  }
+}

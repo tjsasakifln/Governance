@@ -1,0 +1,29 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "double counting financeiro",
+  "case_kind": "control",
+  "description": "Each source_payment_id appears once; reported totals match unique cents.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: unique source_payment_id per contributing bucket; totals must match unique integer cents",
+  "payload": {
+    "currency": "BRL",
+    "reported_totals": {
+      "receivables_open_cents": 10000,
+      "receivables_overdue_cents": 10000
+    },
+    "lines": [
+      {
+        "source_payment_id": "pay_asaas_111",
+        "amount_cents": 10000,
+        "currency": "BRL",
+        "bucket": "open"
+      },
+      {
+        "source_payment_id": "pay_asaas_222",
+        "amount_cents": 10000,
+        "currency": "BRL",
+        "bucket": "overdue"
+      }
+    ]
+  }
+}

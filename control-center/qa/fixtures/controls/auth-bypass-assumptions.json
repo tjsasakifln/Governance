@@ -1,0 +1,18 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "auth bypass assumptions",
+  "case_kind": "control",
+  "description": "Session-authenticated opaque founder actor, explicit granted scopes, empty scopes deny, no password fields.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: privileged actions require authenticated===true, opaque actor id, explicit scopes; empty scopes deny; no hardcoded passwords",
+  "payload": {
+    "authenticated": true,
+    "action": "read_company_directives",
+    "identity_source": "session",
+    "assume_founder": false,
+    "empty_scopes_mean": "deny",
+    "empty_scopes_policy": "deny",
+    "granted_scopes": ["company"],
+    "actor": { "kind": "human", "id": "cc-actor-founder-1", "role": "founder" }
+  }
+}

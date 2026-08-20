@@ -1,0 +1,25 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "partial outage",
+  "case_kind": "adversarial",
+  "description": "Cockpit overall status is healthy while GitHub collector is down and a required source is ERROR.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: overall healthy/success is forbidden while any required source or check is down/ERROR/failed",
+  "payload": {
+    "overall_status": "healthy",
+    "checks": [
+      { "name": "postgres", "status": "healthy" },
+      { "name": "github-collector", "status": "down" }
+    ],
+    "required_sources": [
+      { "system": "warmbly", "status": "ERROR", "freshness_status": "ERROR" }
+    ],
+    "collector_runs": [
+      {
+        "collector_name": "github",
+        "status": "failed",
+        "error": { "code": "timeout", "message": "upstream timeout" }
+      }
+    ]
+  }
+}

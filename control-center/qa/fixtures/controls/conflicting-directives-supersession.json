@@ -1,0 +1,42 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "conflicting directives/supersession",
+  "case_kind": "control",
+  "description": "Older pricing decision is superseded; only one active decision remains for the conflict_key.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: a supersedee must not stay active; concurrent active directives on the same conflict_key require supersession",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:price-a",
+        "kind": "decision",
+        "scope": "finance",
+        "status": "superseded",
+        "conflict_key": "pricing-policy",
+        "title": "List price A",
+        "supersedes": null,
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" }
+      },
+      {
+        "id": "cc:directive:price-b",
+        "kind": "decision",
+        "scope": "finance",
+        "status": "active",
+        "conflict_key": "pricing-policy",
+        "title": "List price B",
+        "supersedes": ["cc:directive:price-a"],
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" }
+      },
+      {
+        "id": "cc:directive:hyp-other",
+        "kind": "hypothesis",
+        "scope": "commercial",
+        "status": "active",
+        "conflict_key": "unrelated",
+        "title": "Maybe raise price",
+        "supersedes": null,
+        "created_by": { "kind": "agent", "id": "cc-agent-planner" }
+      }
+    ]
+  }
+}

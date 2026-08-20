@@ -1,0 +1,23 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "timezone boundary",
+  "case_kind": "control",
+  "description": "UTC Z instants; 02:30Z is presented as 2026-08-19 in America/Sao_Paulo.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: store UTC Z internally; presented dates must use America/Sao_Paulo conversion",
+  "payload": {
+    "instants": [
+      {
+        "id": "invoice-due",
+        "observed_at": "2026-08-20T02:30:00Z",
+        "presented_calendar_date": "2026-08-19",
+        "classified_using_utc_calendar": false
+      },
+      {
+        "id": "afternoon",
+        "observed_at": "2026-08-20T15:00:00Z",
+        "presented_calendar_date": "2026-08-20"
+      }
+    ]
+  }
+}
