@@ -283,6 +283,42 @@ def test_valid_in_memory_mapping_does_not_enable_checkout_or_real_money():
         assert v.mapping_ids_pending(row) is True
 
 
+def test_copyback_accepts_asaas_resource_id_shapes(tmp_path, capsys):
+    """Real Asaas cus_/sub_/pay_ identifiers are mapping IDs, not secrets."""
+    schema = copyback_schema()
+    cat = catalog()
+    mapping = mapping_doc()
+    gates = gates_doc()
+    token = "VXJBYgP2u0eO"
+    cus_id = "cus_" + token
+    sub_id = "sub_" + token
+    pay_id = "pay_" + token
+    assert v.scan_forbidden_secrets(cus_id) == []
+    assert v.scan_forbidden_secrets(sub_id) == []
+    assert v.scan_forbidden_secrets(pay_id) == []
+    payload = valid_copyback(offer_id="CFG-DIRB2G-FLEX-v1")
+    payload["records"][0]["asaas_product_id"] = cus_id
+    payload["records"][0]["checkout_id"] = pay_id
+    payload["records"][0]["subscription_mapping"] = sub_id
+    result = v.assert_mapping_copyback_payload(payload, cat, mapping, gates, schema)
+    assert result["production_checkout_enabled"] is False
+    assert result["real_money_mutation_approved"] is False
+    mapped = next(row for row in result["mapping"]["mappings"] if row["offer_id"] == "CFG-DIRB2G-FLEX-v1")
+    assert mapped["subscription_mapping"] == sub_id
+    assert mapped["asaas_product_id"] == cus_id
+    assert mapped["checkout_id"] == pay_id
+    for row in mapping_doc()["mappings"]:
+        assert v.mapping_ids_pending(row) is True
+    path = tmp_path / "asaas-ids.json"
+    path.write_text(v.canonical_json(payload), encoding="utf-8")
+    rc = v.main(["--check-mapping", str(path)])
+    out = capsys.readouterr()
+    assert rc == 0
+    assert "MAPPING_COPYBACK_OK" in out.out
+    assert "PRODUCTION_CHECKOUT_ENABLED false" in out.out
+    assert "secret" not in out.err.lower()
+
+
 def test_check_mapping_cli_entry_point(tmp_path, capsys):
     payload_path = tmp_path / "copyback.json"
     payload_path.write_text(v.canonical_json(valid_copyback()), encoding="utf-8")

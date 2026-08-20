@@ -164,10 +164,11 @@ SECRET_PATTERNS = (
     re.compile(r"asaas[_-]?api[_-]?key", re.I),
     re.compile(r"checkout\.asaas\.com", re.I),
     re.compile(r"asaas\.com/c/", re.I),
-    re.compile(r"\b(?:cus|sub|pay)_[A-Za-z0-9]{8,}\b"),
     re.compile(r"\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b"),
     re.compile(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b"),
 )
+# Asaas resource identifiers (cus_/sub_/pay_) are mapping IDs, not secrets.
+# They are accepted by --check-mapping and must not be treated as API keys.
 
 ARTIFACT_SPECS: tuple[dict[str, str], ...] = (
     {
