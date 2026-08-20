@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "control-center.pncp.metrics-snapshot/1.0",
+  "title": "PncpMetricsSnapshot",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source",
+    "source_kind",
+    "observed_at",
+    "last_item_observed_at",
+    "last_success_at",
+    "lag_seconds",
+    "recent_window_count",
+    "consecutive_errors",
+    "source_max_timestamp",
+    "collector_heartbeat_at",
+    "credential_status",
+    "error_code",
+    "read_error",
+    "raw_complete"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.pncp.freshness/1.0" },
+    "source": { "const": "pncp" },
+    "source_kind": { "enum": ["http_api", "db_view", "health_artifact"] },
+    "raw_source": { "type": ["string", "null"] },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "last_item_observed_at": { "type": ["string", "null"], "format": "date-time" },
+    "last_success_at": { "type": ["string", "null"], "format": "date-time" },
+    "lag_seconds": { "type": ["integer", "null"] },
+    "recent_window_count": { "type": ["integer", "null"] },
+    "consecutive_errors": { "type": ["integer", "null"] },
+    "source_max_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "collector_heartbeat_at": { "type": ["string", "null"], "format": "date-time" },
+    "credential_status": { "enum": ["available", "unavailable", "unknown"] },
+    "error_code": { "type": ["string", "null"] },
+    "read_error": { "type": ["string", "null"] },
+    "raw_complete": { "type": "boolean" }
+  }
+}

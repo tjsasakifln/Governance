@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "control-center.pncp.freshness-evidence/1.0",
+  "title": "FreshnessEvidence",
+  "type": "object",
+  "required": [
+    "last_item_observed_at",
+    "last_success_at",
+    "source_max_timestamp",
+    "recent_window_count",
+    "consecutive_errors",
+    "lag_seconds",
+    "collector_heartbeat_at",
+    "recent_window_hours",
+    "last_success_sla_hours",
+    "data_sla_hours"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "last_item_observed_at": { "type": ["string", "null"], "format": "date-time" },
+    "last_success_at": { "type": ["string", "null"], "format": "date-time" },
+    "source_max_timestamp": { "type": ["string", "null"], "format": "date-time" },
+    "recent_window_count": { "type": ["integer", "null"] },
+    "consecutive_errors": { "type": ["integer", "null"] },
+    "lag_seconds": { "type": ["integer", "null"] },
+    "collector_heartbeat_at": { "type": ["string", "null"], "format": "date-time" },
+    "recent_window_hours": { "type": "number" },
+    "last_success_sla_hours": { "type": "number" },
+    "data_sla_hours": { "type": "number" }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "fixture_name": "source silenciosa",
+  "kind": "health_artifact",
+  "evaluated_at": "2026-08-20T12:00:00.000Z",
+  "source": "pncp",
+  "metrics": {
+    "source": "pncp",
+    "last_item_observed_at": null,
+    "last_success_at": null,
+    "source_max_timestamp": null,
+    "recent_window_count": 0,
+    "consecutive_errors": 0,
+    "collector_heartbeat_at": null,
+    "lag_seconds": null,
+    "credential_status": "available"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "fixture_name": "pipeline morto",
+  "kind": "health_artifact",
+  "evaluated_at": "2026-08-20T12:00:00.000Z",
+  "source": "pncp",
+  "metrics": {
+    "source": "pncp",
+    "last_item_observed_at": "2026-08-06T12:00:00.000Z",
+    "last_success_at": "2026-08-06T12:00:00.000Z",
+    "source_max_timestamp": "2026-08-06T11:00:00.000Z",
+    "recent_window_count": 0,
+    "consecutive_errors": 2,
+    "collector_heartbeat_at": "2026-08-06T12:05:00.000Z",
+    "lag_seconds": 1209600,
+    "credential_status": "available"
+  }
+}
