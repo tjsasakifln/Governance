@@ -1,0 +1,19 @@
+{
+  "object": "list",
+  "hasMore": false,
+  "totalCount": 1,
+  "limit": 100,
+  "offset": 0,
+  "data": [
+    {
+      "id": "pix_fixtureTx01",
+      "status": "DONE",
+      "type": "CREDIT",
+      "value": 20000.0,
+      "dateCreated": "2026-07-05 09:00:00",
+      "effectiveDate": "2026-07-05 09:01:00",
+      "endToEndIdentifier": "E0000000020260705fixture01",
+      "payment": "pay_fixtureReceived01"
+    }
+  ]
+}
