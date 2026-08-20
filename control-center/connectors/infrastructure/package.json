@@ -1,0 +1,23 @@
+{
+  "name": "@confenge/cc-infrastructure-collector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Confenge Control Center collector for Netcup/24x7 infrastructure health.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --pretty false",
+    "typecheck": "tsc -p tsconfig.json --pretty false --noEmit",
+    "test": "tsc -p tsconfig.json --pretty false && node --test dist/tests/*.test.js",
+    "collect": "tsc -p tsconfig.json --pretty false && node dist/src/cli.js"
+  },
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

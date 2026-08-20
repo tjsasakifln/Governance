@@ -1,0 +1,53 @@
+{
+  "now": "2026-08-20T15:00:00.000Z",
+  "allowlist": {
+    "version": 1,
+    "collector_id": "infrastructure.netcup",
+    "source": "infrastructure",
+    "default_timeout_ms": 50,
+    "thresholds": {
+      "stale_after_seconds": 300,
+      "disk_warn_pct": 80,
+      "disk_crit_pct": 90,
+      "mem_warn_pct": 90,
+      "backup_max_age_seconds": 86400,
+      "tls_warn_days": 21,
+      "tls_crit_days": 7
+    },
+    "targets": [
+      {
+        "id": "netcup-vps-1",
+        "display_name": "Netcup VPS",
+        "host": "vps.internal.example",
+        "port": 443,
+        "checks": ["reachability", "host_metrics", "docker"]
+      },
+      {
+        "id": "cfg-health",
+        "display_name": "cfg-health HTTP",
+        "url": "http://127.0.0.1:18081/health",
+        "expect_status": 200,
+        "checks": ["http"]
+      }
+    ]
+  },
+  "reachability": {
+    "netcup-vps-1": { "ok": true, "latency_ms": 10 }
+  },
+  "http": {
+    "cfg-health": { "status": 200, "elapsed_ms": 7 }
+  },
+  "agent": {
+    "netcup-vps-1": {
+      "observed_at": "2026-08-20T12:00:00.000Z",
+      "disk": { "used_pct": 41 },
+      "memory": { "used_pct": 52 },
+      "load": { "load_1": 0.2, "load_5": 0.2, "load_15": 0.2 },
+      "docker": {
+        "services": [
+          { "name": "extra-crawler", "health": "healthy" }
+        ]
+      }
+    }
+  }
+}
