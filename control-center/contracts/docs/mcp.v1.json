@@ -1,0 +1,251 @@
+{
+  "mcp_version": "2024-11-05",
+  "server_name": "confenge-control-center",
+  "interface_role": "principal_agent_interface",
+  "schema_family": "control-center",
+  "schema_release": "v1",
+  "scope_rule": "Agents MUST query context by scope. requested_scopes minItems is 1. There is no whole-company dump tool. granted_scopes is a fail-closed subset of requested_scopes. Unknown future prefix:id scopes are opaque and not granted by default.",
+  "read_only_default": true,
+  "tools": [
+    {
+      "name": "cc_get_context",
+      "description": "Return AgentContext for the granted subset of requested scopes. Primary agent entry. Empty scopes are invalid.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scopes"],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+            }
+          },
+          "include_directives": { "type": "boolean" },
+          "include_snapshots": { "type": "boolean" },
+          "include_attention": { "type": "boolean" }
+        }
+      },
+      "output_schema_ref": "schemas/agent-context.v1.schema.json"
+    },
+    {
+      "name": "cc_list_directives",
+      "description": "List directives whose scope is in the requested scopes.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scopes"],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "active", "superseded", "revoked", "expired"]
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["decision", "directive", "fact", "constraint", "priority", "risk", "hypothesis"]
+          }
+        }
+      },
+      "output_schema_ref": "schemas/directive.v1.schema.json"
+    },
+    {
+      "name": "cc_list_attention",
+      "description": "List attention items (exceptions) for requested scopes.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scopes"],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "acknowledged", "resolved", "dismissed"]
+          }
+        }
+      },
+      "output_schema_ref": "schemas/attention-item.v1.schema.json"
+    },
+    {
+      "name": "cc_list_priorities",
+      "description": "List the current priority recommendations. Default limit 3 for homepage/cockpit.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scopes"],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+            }
+          },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 3, "default": 3 }
+        }
+      },
+      "output_schema_ref": "schemas/priority-recommendation.v1.schema.json"
+    },
+    {
+      "name": "cc_get_snapshot",
+      "description": "Fetch a named snapshot for a single scope.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scope", "kind"],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["operational", "commercial", "finance", "engineering"]
+          }
+        }
+      }
+    },
+    {
+      "name": "cc_get_client_status",
+      "description": "Fetch ClientStatus for client:<slug>.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["client_slug"],
+        "properties": {
+          "client_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      },
+      "output_schema_ref": "schemas/client-status.v1.schema.json"
+    },
+    {
+      "name": "cc_list_scopes",
+      "description": "List scopes the caller may request. Does not return memory payloads.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      }
+    },
+    {
+      "name": "cc_list_agent_activity",
+      "description": "List AgentActivity execution-ledger records for requested scopes. Distinct from AgentSession (context-consult grant).",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scopes"],
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+            }
+          }
+        }
+      },
+      "output_schema_ref": "schemas/agent-activity.v1.schema.json"
+    },
+    {
+      "name": "cc_get_service_health",
+      "description": "List ServiceHealth for a scope.",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scope"],
+        "properties": {
+          "scope": {
+            "type": "string",
+            "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+          }
+        }
+      },
+      "output_schema_ref": "schemas/service-health.v1.schema.json"
+    }
+  ],
+  "resources": [
+    {
+      "uri_template": "cc://context/{scope}",
+      "name": "Scoped agent context",
+      "description": "AgentContext for a single scope. Substituting a missing or ungranted scope is denied."
+    },
+    {
+      "uri_template": "cc://directives/{scope}",
+      "name": "Scoped directives"
+    },
+    {
+      "uri_template": "cc://attention/{scope}",
+      "name": "Scoped attention items"
+    },
+    {
+      "uri_template": "cc://agent-activity/{scope}",
+      "name": "Scoped agent activity",
+      "description": "AgentActivity execution records for a single scope. Not AgentSession."
+    }
+  ],
+  "forbidden_operations": [
+    {
+      "name": "cc_charge",
+      "reason": "Cobrança is a financial provider mutation. Forbidden in this campaign."
+    },
+    {
+      "name": "cc_checkout",
+      "reason": "Checkout is a financial mutation. Forbidden."
+    },
+    {
+      "name": "cc_refund",
+      "reason": "Refund is a financial mutation. Forbidden."
+    },
+    {
+      "name": "cc_cancel_subscription",
+      "reason": "Cancelamento is a financial mutation. Forbidden."
+    },
+    {
+      "name": "cc_asaas_write",
+      "reason": "Asaas writes remain in origin systems. Control Center is read-only toward providers."
+    },
+    {
+      "name": "cc_asaas_create_payment",
+      "reason": "Asaas payment creation is forbidden."
+    },
+    {
+      "name": "cc_send_commercial",
+      "reason": "Commercial send remains in Warmbly. Control Center does not send."
+    },
+    {
+      "name": "cc_dump_company_memory",
+      "reason": "Agents consult by scope; whole-company memory dump is forbidden."
+    }
+  ]
+}

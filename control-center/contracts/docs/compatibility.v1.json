@@ -1,0 +1,37 @@
+{
+  "schema_family": "control-center",
+  "release": "v1",
+  "rule": "Incompatible shapes MUST NOT be silently accepted. Each row is either reject (fail-closed) or adapter_required (translate at a boundary, then re-validate the canonical document).",
+  "shapes": [
+    {
+      "id": "lowercase_freshness",
+      "description": "freshness_status encoded in lowercase (fresh|stale|unknown|error).",
+      "verdict": "reject",
+      "reason": "Canonical freshness is FRESH|STALE|UNKNOWN|ERROR. Silent uppercasing is forbidden."
+    },
+    {
+      "id": "expired_as_freshness",
+      "description": "expired used as a freshness or error stand-in.",
+      "verdict": "reject",
+      "reason": "expired is a Directive status, not a freshness value. Persistence 'expired' is not ERROR and requires an adapter before it can enter this ontology."
+    },
+    {
+      "id": "withdrawn_or_inactive_status",
+      "description": "status encoded as withdrawn or inactive.",
+      "verdict": "reject",
+      "reason": "Canonical Directive status is draft|active|superseded|revoked|expired. withdrawn and inactive are not in the closed set."
+    },
+    {
+      "id": "scope_object",
+      "description": "scope encoded as an object instead of a string.",
+      "verdict": "adapter_required",
+      "reason": "Canonical scope is a STRING: company|commercial|finance|clients|infrastructure|inbound|repo:<name>|client:<slug>|prefix:id. Object scopes must be adapted, never silently coerced."
+    },
+    {
+      "id": "raw_uuid_id",
+      "description": "external resource id is a bare UUID.",
+      "verdict": "adapter_required",
+      "reason": "Canonical external ids are cc:<type>:<id>. Persistence UUIDs must be adapted at a boundary; a raw UUID is not a Control Center resource id."
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/engineering-snapshot.v1.schema.json",
+  "title": "EngineeringSnapshot v1",
+  "description": "Aggregated engineering/repo state. Scope is company, infrastructure, or repo:<name>.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "generated_at",
+    "provenance",
+    "open_pr_count",
+    "failing_check_count",
+    "open_incident_count"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.engineering-snapshot.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "oneOf": [
+        { "const": "infrastructure" },
+        { "const": "company" },
+        {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/repo_scope"
+        }
+      ]
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "open_pr_count": { "type": "integer", "minimum": 0 },
+    "failing_check_count": { "type": "integer", "minimum": 0 },
+    "open_incident_count": { "type": "integer", "minimum": 0 },
+    "repo_scopes": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/repo_scope"
+      }
+    },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/operational-snapshot.v1.schema.json",
+  "title": "OperationalSnapshot v1",
+  "description": "Cockpit roll-up for a scope. Privileges exceptions and at most three current priorities. Not a KPI wall.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "generated_at",
+    "provenance",
+    "headline",
+    "top_priorities",
+    "attention_items",
+    "health",
+    "commercial_snapshot_id",
+    "finance_snapshot_id",
+    "engineering_snapshot_id",
+    "client_status_ids"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.operational-snapshot.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "headline": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 280,
+      "description": "One-line 'what matters now' for the homepage."
+    },
+    "top_priorities": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "At most the three most important things now for this scope.",
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/priority-recommendation.v1.schema.json"
+      }
+    },
+    "attention_items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/attention-item.v1.schema.json"
+      }
+    },
+    "health": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/service-health.v1.schema.json"
+      }
+    },
+    "commercial_snapshot_id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_resource_id"
+    },
+    "finance_snapshot_id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_resource_id"
+    },
+    "engineering_snapshot_id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_resource_id"
+    },
+    "client_status_ids": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+export {
+  loadCatalog,
+  catalogType,
+  schemaVersionToType,
+  type Catalog,
+  type CatalogType,
+} from "./catalog.js";
+export {
+  validate,
+  validateUnknown,
+  validateFile,
+  listResourceTypes,
+  catalogFixturePath,
+  type ValidationIssue,
+  type ValidationResult,
+} from "./validate.js";
+export {
+  loadCompatibilityTable,
+  classifyCompatibility,
+  compatibilityShape,
+  type CompatibilityTable,
+  type CompatibilityShape,
+  type CompatibilityFinding,
+  type CompatibilityResult,
+  type CompatibilityVerdict,
+} from "./compatibility.js";
+export {
+  contractFingerprint,
+  fingerprintArtifacts,
+  publicOntologyArtifacts,
+  type PublicArtifact,
+} from "./fingerprint.js";
+export {
+  isResourceId,
+  isScope,
+  isClientSlug,
+  parseResourceId,
+  clientScope,
+  repoScope,
+  expectedIdType,
+  isResourceTypeName,
+} from "./ids.js";
+export {
+  loadMcpContract,
+  loadOpenApi,
+  allowedMcpToolNames,
+  forbiddenMcpOperationNames,
+  isForbiddenMcpOperation,
+  forbiddenHttpPaths,
+} from "./docs.js";
+export * from "./taxonomy.js";
+export type * from "./types.js";

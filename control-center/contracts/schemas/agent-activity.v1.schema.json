@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/agent-activity.v1.schema.json",
+  "title": "AgentActivity v1",
+  "description": "Execution ledger record of what an agent ran (goal, evidence, leftover work). Distinct from AgentSession, which is a scoped context-consult grant with status open|closed|denied. Not a chat log. Founder/human approval is never implied by this document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "agent_id",
+    "scope",
+    "status",
+    "started_at",
+    "finished_at",
+    "goal",
+    "summary",
+    "provenance",
+    "actor"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.agent-activity.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:@-]+$"
+    },
+    "session_id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "done", "partial", "blocked", "failed"]
+    },
+    "started_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "finished_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_utc_datetime"
+    },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "actor": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "residual_work": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "related_ids": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  },
+  "if": {
+    "properties": { "status": { "const": "running" } },
+    "required": ["status"]
+  },
+  "then": {
+    "properties": {
+      "finished_at": { "type": "null" }
+    }
+  }
+}

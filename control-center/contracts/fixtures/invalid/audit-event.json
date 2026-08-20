@@ -1,0 +1,14 @@
+{
+  "schema_version": "control-center.audit-event.v1",
+  "id": "cc:audit-event:01K3CC-SECRET-DETAIL",
+  "at": "2026-08-20T17:50:01Z",
+  "actor": { "kind": "agent", "id": "agent:cc-context" },
+  "action": "context.get",
+  "resource_type": "AgentSession",
+  "resource_id": "cc:agent-session:01K3CC-CTX-FINANCE",
+  "scope": "finance",
+  "outcome": "success",
+  "detail": {
+    "password": "this-must-be-rejected"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/priority-recommendation.v1.schema.json",
+  "title": "PriorityRecommendation v1",
+  "description": "Ranked 'what matters now' item. Homepage consumes ranks 1–3 for the requested scope. Not a KPI tile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "rank",
+    "title",
+    "rationale",
+    "provenance",
+    "generated_at",
+    "horizon"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.priority-recommendation.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "rank": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 99,
+      "description": "1 is most important. Homepage uses 1, 2, 3."
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "horizon": {
+      "type": "string",
+      "enum": ["now", "today", "this_week"]
+    },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    },
+    "directive_ids": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}

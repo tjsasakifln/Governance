@@ -1,0 +1,26 @@
+{
+  "schema_version": "control-center.finance-snapshot.v1",
+  "id": "cc:finance-snapshot:01K3CC-LOWER-FRESH",
+  "scope": "finance",
+  "generated_at": "2026-08-20T17:20:00Z",
+  "provenance": {
+    "source": {
+      "system": "asaas",
+      "kind": "receivable-read",
+      "locator": "finance/receivables"
+    },
+    "observed_at": "2026-08-20T17:10:00Z",
+    "freshness_status": "fresh",
+    "confidence": 0.7
+  },
+  "read_model_only": true,
+  "provider_mutations": "forbidden",
+  "contracted": { "amount_cents": 0, "currency": "BRL" },
+  "billed": { "amount_cents": 0, "currency": "BRL" },
+  "paid": { "amount_cents": 0, "currency": "BRL" },
+  "effectively_received": { "amount_cents": 0, "currency": "BRL" },
+  "overdue": { "amount_cents": 0, "currency": "BRL" },
+  "receivable": { "amount_cents": 0, "currency": "BRL" },
+  "refunds": { "amount_cents": 0, "currency": "BRL" },
+  "chargebacks": { "amount_cents": 0, "currency": "BRL" }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": "control-center.client-status.v1",
+  "id": "cc:client-status:acme-industria",
+  "scope": "company",
+  "client_slug": "acme-industria",
+  "display_name": "Acme Indústria",
+  "lifecycle": "churn_risk",
+  "provenance": {
+    "source": {
+      "system": "warmbly",
+      "kind": "client-record",
+      "locator": "clients/acme-industria"
+    },
+    "observed_at": "2026-08-20T16:30:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.8
+  }
+}

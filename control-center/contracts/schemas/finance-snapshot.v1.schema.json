@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/finance-snapshot.v1.schema.json",
+  "title": "FinanceSnapshot v1",
+  "description": "Read-only aggregated finance state. Stages are not aliases: contracted (signed obligation), billed (invoiced), paid (provider-confirmed, not caixa), effectively_received (settlement), overdue, receivable (open AR, includes overdue). Refunds and chargebacks are aggregated. cash_in, mrr, and runway are absent-or-gated. Provider/financial mutations (cobrança, checkout, refund, cancelamento, Asaas writes) are forbidden and MUST NOT appear on this document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "generated_at",
+    "provenance",
+    "read_model_only",
+    "provider_mutations",
+    "contracted",
+    "billed",
+    "paid",
+    "effectively_received",
+    "overdue",
+    "receivable",
+    "refunds",
+    "chargebacks"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.finance-snapshot.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "oneOf": [
+        { "const": "finance" },
+        { "const": "company" },
+        {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/client_scope"
+        }
+      ]
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "read_model_only": { "const": true },
+    "provider_mutations": { "const": "forbidden" },
+    "contracted": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "billed": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "paid": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "effectively_received": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "overdue": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "receivable": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "refunds": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "chargebacks": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "cash_in": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/evidenced_cash_in"
+    },
+    "mrr": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/applicable_mrr"
+    },
+    "runway": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/reliable_runway"
+    },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}
