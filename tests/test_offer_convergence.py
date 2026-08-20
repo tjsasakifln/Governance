@@ -67,6 +67,10 @@ def test_consumer_contract_names_consumers_and_public_internal_split():
     assert "commercial/offers/catalog.v1.json" in contract
     assert "commercial/compatibility/consumer-compatibility.v1.json" in contract
     assert "GOVERNANCE_WINS" in contract
+    compat = v.load_json(ROOT / "commercial" / "compatibility" / "consumer-compatibility.v1.json")
+    v.assert_compatibility_contract(compat, v.load_json(ROOT / "commercial" / "offers" / "catalog.v1.json"))
+    assert compat["rule"] == "GOVERNANCE_WINS"
+    assert {item["drift_id"] for item in compat["accepted_consumer_aliases"]} == set(v.REQUIRED_COMPAT_DRIFTS)
     assert "internal_code" in contract
     assert "description_asaas" in contract
     assert "PAUSED" in contract

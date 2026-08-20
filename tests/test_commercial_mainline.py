@@ -265,6 +265,11 @@ def test_mapping_copyback_rejects_fail_closed_cases():
     with pytest.raises(v.ValidationError, match="invented URL"):
         v.assert_mapping_copyback_payload(url_payload, cat, mapping, gates, schema)
 
+    extra_checkout = valid_copyback(offer_id="CFG-DIRB2G-FLEX-v1")
+    extra_checkout["records"][0]["checkout_id"] = "placeholder-checkout-on-recurring"
+    with pytest.raises(v.ValidationError, match="one-off vs recurring identifier mismatch"):
+        v.assert_mapping_copyback_payload(extra_checkout, cat, mapping, gates, schema)
+
 
 def test_valid_in_memory_mapping_does_not_enable_checkout_or_real_money():
     schema = copyback_schema()
@@ -296,21 +301,31 @@ def test_copyback_accepts_asaas_resource_id_shapes(tmp_path, capsys):
     assert v.scan_forbidden_secrets(cus_id) == []
     assert v.scan_forbidden_secrets(sub_id) == []
     assert v.scan_forbidden_secrets(pay_id) == []
-    payload = valid_copyback(offer_id="CFG-DIRB2G-FLEX-v1")
-    payload["records"][0]["asaas_product_id"] = cus_id
-    payload["records"][0]["checkout_id"] = pay_id
-    payload["records"][0]["subscription_mapping"] = sub_id
-    result = v.assert_mapping_copyback_payload(payload, cat, mapping, gates, schema)
+    recurring = valid_copyback(offer_id="CFG-DIRB2G-FLEX-v1")
+    recurring["records"][0]["asaas_product_id"] = cus_id
+    recurring["records"][0]["checkout_id"] = None
+    recurring["records"][0]["subscription_mapping"] = sub_id
+    result = v.assert_mapping_copyback_payload(recurring, cat, mapping, gates, schema)
     assert result["production_checkout_enabled"] is False
     assert result["real_money_mutation_approved"] is False
     mapped = next(row for row in result["mapping"]["mappings"] if row["offer_id"] == "CFG-DIRB2G-FLEX-v1")
     assert mapped["subscription_mapping"] == sub_id
     assert mapped["asaas_product_id"] == cus_id
-    assert mapped["checkout_id"] == pay_id
+    assert mapped["checkout_id"] is None
+    one_off = valid_copyback()
+    one_off["records"][0]["asaas_product_id"] = cus_id
+    one_off["records"][0]["checkout_id"] = pay_id
+    one_off["records"][0]["subscription_mapping"] = None
+    one_off_result = v.assert_mapping_copyback_payload(one_off, cat, mapping, gates, schema)
+    mapped_one_off = next(
+        row for row in one_off_result["mapping"]["mappings"] if row["offer_id"] == "CFG-DIAG-EXP-v1"
+    )
+    assert mapped_one_off["checkout_id"] == pay_id
+    assert mapped_one_off["subscription_mapping"] is None
     for row in mapping_doc()["mappings"]:
         assert v.mapping_ids_pending(row) is True
     path = tmp_path / "asaas-ids.json"
-    path.write_text(v.canonical_json(payload), encoding="utf-8")
+    path.write_text(v.canonical_json(recurring), encoding="utf-8")
     rc = v.main(["--check-mapping", str(path)])
     out = capsys.readouterr()
     assert rc == 0
@@ -320,6 +335,8 @@ def test_copyback_accepts_asaas_resource_id_shapes(tmp_path, capsys):
 
 
 def test_check_mapping_cli_entry_point(tmp_path, capsys):
+    mapping_path = ROOT / "commercial" / "providers" / "asaas-mapping.v1.json"
+    before = mapping_path.read_text(encoding="utf-8")
     payload_path = tmp_path / "copyback.json"
     payload_path.write_text(v.canonical_json(valid_copyback()), encoding="utf-8")
     rc = v.main(["--check-mapping", str(payload_path)])
@@ -328,6 +345,9 @@ def test_check_mapping_cli_entry_point(tmp_path, capsys):
     assert "MAPPING_COPYBACK_OK" in out.out
     assert "PRODUCTION_CHECKOUT_ENABLED false" in out.out
     assert "REAL_MONEY_MUTATION_APPROVED false" in out.out
+    assert mapping_path.read_text(encoding="utf-8") == before
+    for row in mapping_doc()["mappings"]:
+        assert v.mapping_ids_pending(row) is True
     bad = valid_copyback()
     bad["records"][0]["offer_id"] = "CFG-DOES-NOT-EXIST-v1"
     bad_path = tmp_path / "bad.json"
@@ -337,6 +357,23 @@ def test_check_mapping_cli_entry_point(tmp_path, capsys):
     assert rc_bad == 1
     assert "VALIDATION_ERROR" in err.err
     assert "unknown offer" in err.err
+    secret = valid_copyback()
+    secret["records"][0]["asaas_product_id"] = "$aact_" + "PLACEHOLDERTOKEN"
+    secret_path = tmp_path / "secret.json"
+    secret_path.write_text(v.canonical_json(secret), encoding="utf-8")
+    rc_secret = v.main(["--check-mapping", str(secret_path)])
+    secret_err = capsys.readouterr()
+    assert rc_secret == 1
+    assert "secret" in secret_err.err
+    url = valid_copyback()
+    url["records"][0]["checkout_id"] = "https://" + "example.invalid/pay"
+    url_path = tmp_path / "url.json"
+    url_path.write_text(v.canonical_json(url), encoding="utf-8")
+    rc_url = v.main(["--check-mapping", str(url_path)])
+    url_err = capsys.readouterr()
+    assert rc_url == 1
+    assert "invented URL" in url_err.err
+    assert mapping_path.read_text(encoding="utf-8") == before
 
 
 def test_extra_1000000_recurring_absent_from_public_catalog():
@@ -371,6 +408,65 @@ def test_low_friction_remains_pending_founder_input():
     assert pending["items"][0]["must_not_invent"] is True
 
 
+def test_foreign_consumer_values_are_not_aliases():
+    compat = contract()
+    diag = offer_by_id("CFG-DIAG-EXP-v1")
+    assert (
+        v.classify_consumer_value(
+            "billing_mode",
+            "monthly",
+            offer_id="CFG-DIAG-EXP-v1",
+            canonical=diag["billing_mode"],
+            contract=compat,
+        )
+        == "foreign"
+    )
+    assert (
+        v.classify_consumer_value(
+            "scope_version",
+            "CFG-SCOPE-INVENTED-v1",
+            offer_id="CFG-DIAG-EXP-v1",
+            canonical=diag["scope_version"],
+            contract=compat,
+        )
+        == "foreign"
+    )
+    assert (
+        v.classify_consumer_value(
+            "max_payments",
+            99,
+            offer_id="CFG-DIAG-EXP-v1",
+            canonical=diag["max_payments"],
+            contract=compat,
+        )
+        == "foreign"
+    )
+
+
+def test_founder_handoff_abc_and_per_offer_fields():
+    cat = catalog()
+    mapping = mapping_doc()
+    rendered = v.render_founder_handoff(cat, mapping)
+    handoff = (ROOT / "commercial" / "FOUNDER-ASAAS-REGISTRATION.md").read_text(encoding="utf-8")
+    assert handoff == rendered
+    assert "## A. você pode cadastrar agora" in handoff
+    assert "## B. não ativar/publicar ainda" in handoff
+    assert "## C. aguarda campo/decisão" in handoff
+    assert "PENDING_FOUNDER_INPUT" in handoff
+    for offer in cat["offers"]:
+        assert offer["public_name"] in handoff
+        assert offer["description_asaas"] in handoff
+        assert v.format_brl_cents(offer["amount_cents"]) in handoff
+        assert offer["billing_mode"] in handoff
+        assert v._cycle_label(offer) in handoff
+        assert v._max_payments_label(offer) in handoff
+        assert v._total_label(offer) in handoff
+        assert v._cadastrar_instruction(offer) in handoff
+        assert v._copyback_ids(offer) in handoff
+        assert v._mapping_fields_to_fill(offer) in handoff
+        assert "python scripts/validate_commercial_authority.py --check-mapping" in handoff
+
+
 def test_catalog_authority_manifest_excludes_partner_program():
     manifest = v.load_json(ROOT / "commercial" / "authority" / "authority-manifest.v1.json")
     v.assert_no_partner_in_catalog_manifest(manifest)
@@ -380,5 +476,10 @@ def test_catalog_authority_manifest_excludes_partner_program():
     assert not any("referral-cosell" in path.lower() for path in paths)
     assert v.is_received_revenue("partner_commission_accrual_candidate") is False
     assert v.is_received_revenue("partner_event") is False
+    assert v.is_received_revenue("commission_accrued") is False
+    for offer in catalog()["offers"]:
+        assert "commission" not in v.canonical_json(offer).lower()
+        assert "discount_percent" not in offer
+        assert offer["amount_cents"] in {800000, 2000000, 1500000, 1250000}
     assert v.COMPATIBILITY_CONTRACT_PATH in paths
     assert v.COMPATIBILITY_FIXTURE_PATH in paths

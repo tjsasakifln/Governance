@@ -1184,10 +1184,12 @@ def assert_mapping_identifier_modality(row: Mapping[str, Any], offer: Mapping[st
     if offer.get("billing_mode") == "ONE_TIME":
         if _id_present(subscription):
             raise ValidationError(f"{oid}: one-off vs recurring identifier mismatch")
-        if not (_id_present(product) or _id_present(checkout)):
+        if not _id_present(product) or not _id_present(checkout):
             raise ValidationError(f"{oid}: one-off vs recurring identifier mismatch")
         return
     if offer.get("billing_mode") == "RECURRING":
+        if _id_present(checkout):
+            raise ValidationError(f"{oid}: one-off vs recurring identifier mismatch")
         if not _id_present(product) or not _id_present(subscription):
             raise ValidationError(f"{oid}: one-off vs recurring identifier mismatch")
         return

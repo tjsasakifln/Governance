@@ -360,10 +360,25 @@ def test_validate_package_and_cli_twice(tmp_path, capsys):
     line2 = [line for line in out2.splitlines() if line.startswith("AUTHORITY_HASH ")][0]
     assert line1 == line2
     assert line1.split()[1] == first["authority_hash"]
+    compat1 = [line for line in out1.splitlines() if line.startswith("COMPATIBILITY_HASH ")][0]
+    compat2 = [line for line in out2.splitlines() if line.startswith("COMPATIBILITY_HASH ")][0]
+    assert compat1 == compat2
+    assert compat1.split()[1] == first["compatibility_hash"]
+    assert first["compatibility_hash"] == v.compatibility_hash(
+        v.load_json(ROOT / v.COMPATIBILITY_CONTRACT_PATH)
+    )
+    for token in (
+        "PRODUCTION_CHECKOUT_ENABLED false",
+        "REAL_MONEY_MUTATION_APPROVED false",
+        "PUBLIC_ACTIVATION_APPROVED false",
+        "RECURRING_PRODUCTION_CHECKOUT_ENABLED false",
+    ):
+        assert token in out1
+        assert token in out2
     verdict1 = [line for line in out1.splitlines() if line.startswith("VERDICT ")][0]
     verdict2 = [line for line in out2.splitlines() if line.startswith("VERDICT ")][0]
     assert verdict1 == verdict2
-    assert verdict1.split(" ", 1)[1] in {v.VERDICT_READY, v.VERDICT_BLOCKED}
+    assert verdict1.split(" ", 1)[1] == v.VERDICT_READY
 
 
 def overlay():
