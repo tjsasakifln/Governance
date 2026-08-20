@@ -1,0 +1,231 @@
+# Confenge Control Center — reference Compose pack for a Linux VPS (Netcup).
+# Project: confenge-control-center
+# This file does NOT apply itself to production. Do not bind host 80/443:
+# Warmbly continues to use the existing host nginx on those ports.
+# Sibling services (context, MCP, web-shell, persistence) are not in this
+# tree yet. Stubs satisfy health/readiness. Later convergence replaces
+# build contexts, for example:
+#   context:   ../services/context
+#   mcp:       ../services/mcp
+#   web-shell: ../apps/web-shell
+# Persistence applies migrations into schema control_center on `postgres`.
+# No Kubernetes. No Swarm. No production apply from this wave.
+
+name: confenge-control-center
+
+x-logging: &cc-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-stub-base: &stub-base
+  build:
+    context: .
+    dockerfile: docker/stub.Dockerfile
+  image: confenge-control-center-stub:local
+  restart: unless-stopped
+  logging: *cc-logging
+  mem_limit: 256m
+  cpus: 0.50
+  deploy:
+    resources:
+      limits:
+        cpus: "0.50"
+        memory: 256M
+      reservations:
+        cpus: "0.10"
+        memory: 64M
+  networks:
+    - ccnet
+  expose:
+    - "8080"
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+    interval: 10s
+    timeout: 3s
+    retries: 5
+    start_period: 8s
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
+    image: confenge-control-center-postgres:16
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 1g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-control_center}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set from a secret store}"
+      POSTGRES_DB: "${POSTGRES_DB:-control_center}"
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+    networks:
+      - ccnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - timezone=UTC
+      - -c
+      - log_timezone=UTC
+    security_opt:
+      - no-new-privileges:true
+
+  context:
+    <<: *stub-base
+    environment:
+      CONTROL_CENTER_STUB_SERVICE: context
+      HOST: 0.0.0.0
+      PORT: "8080"
+      STUB_READY: "${STUB_READY:-true}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp:
+    <<: *stub-base
+    environment:
+      CONTROL_CENTER_STUB_SERVICE: mcp
+      HOST: 0.0.0.0
+      PORT: "8080"
+      STUB_READY: "${STUB_READY:-true}"
+    depends_on:
+      context:
+        condition: service_healthy
+
+  web-shell:
+    <<: *stub-base
+    environment:
+      CONTROL_CENTER_STUB_SERVICE: web-shell
+      HOST: 0.0.0.0
+      PORT: "8080"
+      STUB_READY: "${STUB_READY:-true}"
+    depends_on:
+      context:
+        condition: service_healthy
+
+  caddy:
+    build:
+      context: .
+      dockerfile: docker/caddy.Dockerfile
+    image: confenge-control-center-caddy:local
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 128m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    environment:
+      CONTROL_CENTER_PUBLIC_HOST: "${CONTROL_CENTER_PUBLIC_HOST:-cc.internal.confenge.local}"
+      CONTROL_CENTER_CADDY_HTTP_PORT: "${CONTROL_CENTER_CADDY_HTTP_PORT:-18080}"
+      CONTROL_CENTER_CADDY_HTTPS_PORT: "${CONTROL_CENTER_CADDY_HTTPS_PORT:-18443}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - cc_caddy_data:/data
+      - cc_caddy_config:/config
+    ports:
+      - target: 18080
+        published: "${CONTROL_CENTER_CADDY_HTTP_PORT:-18080}"
+        protocol: tcp
+        host_ip: "127.0.0.1"
+      - target: 18443
+        published: "${CONTROL_CENTER_CADDY_HTTPS_PORT:-18443}"
+        protocol: tcp
+        host_ip: "127.0.0.1"
+    networks:
+      - ccnet
+    depends_on:
+      context:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+      web-shell:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:18080/healthz && wget -qO- http://127.0.0.1:18080/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  backup-ops:
+    profiles: ["ops"]
+    build:
+      context: .
+      dockerfile: docker/ops.Dockerfile
+    image: confenge-control-center-ops:local
+    restart: "no"
+    logging: *cc-logging
+    mem_limit: 256m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    environment:
+      CONTROL_CENTER_BACKUP_KEY: "${CONTROL_CENTER_BACKUP_KEY:?CONTROL_CENTER_BACKUP_KEY must be set from a secret store}"
+      CONTROL_CENTER_BACKUP_DIR: /backups
+      CONTROL_CENTER_BACKUP_RETAIN_DAYS: "${CONTROL_CENTER_BACKUP_RETAIN_DAYS:-14}"
+      CONTROL_CENTER_BACKUP_RETAIN_MIN: "${CONTROL_CENTER_BACKUP_RETAIN_MIN:-3}"
+      CONTROL_CENTER_DISK_MIN_BYTES: "${CONTROL_CENTER_DISK_MIN_BYTES:-1073741824}"
+      CONTROL_CENTER_DISK_PATH: /backups
+      CONTROL_CENTER_DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:-postgres://control_center@postgres:5432/control_center}"
+    volumes:
+      - cc_backup_data:/backups
+    networks:
+      - ccnet
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  cc_postgres_data:
+    name: confenge-control-center-postgres
+  cc_caddy_data:
+    name: confenge-control-center-caddy-data
+  cc_caddy_config:
+    name: confenge-control-center-caddy-config
+  cc_backup_data:
+    name: confenge-control-center-backups
+
+networks:
+  ccnet:
+    name: confenge-control-center
+    driver: bridge
