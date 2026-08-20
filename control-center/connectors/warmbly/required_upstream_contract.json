@@ -1,0 +1,64 @@
+{
+  "connector": "control-center/connectors/warmbly",
+  "discovered_from": "Warmbly fork internal/api/routes.go (read-only)",
+  "api_prefix": "/v1",
+  "api_version_header": "API-Version: v1",
+  "auth": "Authorization: Bearer <WARMBLY_API_TOKEN> (keys prefixed wmbly_)",
+  "mapped_reads": [
+    { "method": "GET", "path": "/health", "notes": "unauthenticated; {status}" },
+    { "method": "GET", "path": "/v1/crm/pipelines", "notes": "JSON array of pipelines+stages; not persisted as Control Center pipeline" },
+    { "method": "GET", "path": "/v1/crm/deals", "notes": "prefer GET list; query pipeline_id, stage_id, status, limit, cursor" },
+    { "method": "POST", "path": "/v1/crm/deals/search", "notes": "read query; empty body matches all org deals" },
+    { "method": "POST", "path": "/v1/crm/deals/summary", "notes": "read aggregate over the same filter body" },
+    { "method": "GET", "path": "/v1/crm/tasks", "notes": "prefer GET list; query status, contact_id, deal_id, limit, cursor" },
+    { "method": "POST", "path": "/v1/crm/tasks/search", "notes": "read query; overdue=true is the overdue filter GET list lacks" },
+    { "method": "POST", "path": "/v1/crm/tasks/summary", "notes": "read aggregate" },
+    { "method": "POST", "path": "/v1/contacts/search", "notes": "no GET /contacts list; empty JSON body is a valid read" },
+    { "method": "GET", "path": "/v1/contacts/:id", "notes": "detail; collect uses search, not per-id crawl" },
+    { "method": "GET", "path": "/v1/campaigns", "notes": "GET list (query q, cursor, folder, status, limit)" },
+    { "method": "GET", "path": "/v1/campaigns-overview", "notes": "status-bucket counts" },
+    { "method": "GET", "path": "/v1/unibox/overview", "notes": "unread / awaiting_reply / drafts" },
+    { "method": "GET", "path": "/v1/confenge/status", "notes": "always readable; enabled=false when feature-flagged off" },
+    { "method": "GET", "path": "/v1/confenge/ops/health", "notes": "feature-flagged; 404 when Confenge org is off" },
+    { "method": "GET", "path": "/v1/confenge/attention", "notes": "feature-flagged needs-attention accounts" },
+    { "method": "GET", "path": "/v1/confenge/today", "notes": "feature-flagged executable human work" },
+    { "method": "GET", "path": "/v1/confenge/inbound", "notes": "feature-flagged inbound-now queue (lead surface)" }
+  ],
+  "forbidden_in_this_connector": [
+    "PATCH/PUT/DELETE any path",
+    "POST /v1/campaigns, /start, /stop, /test-email, enroll, import, dispatch",
+    "POST /v1/confenge/import, /sync, /crm/bootstrap, /campaign/bootstrap, /inbound/:id/outcome, send/enroll/approve",
+    "POST /v1/unibox/reply, /compose, /snooze",
+    "POST /v1/crm/deals (create), POST /v1/crm/tasks (create), POST /v1/contacts (create)",
+    "Any Asaas / checkout / refund / financial mutation"
+  ],
+  "gaps": [
+    {
+      "id": "GET /v1/leads",
+      "method": "GET",
+      "path": "/v1/leads",
+      "reason": "Warmbly has no GET /leads. Connector maps POST /v1/contacts/search plus GET /v1/confenge/inbound as the lead surface.",
+      "min_request": {
+        "method": "GET",
+        "path": "/v1/leads",
+        "query": { "limit": "100" },
+        "headers": ["Authorization", "API-Version"]
+      },
+      "min_response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "id": "uuid",
+              "company": "string",
+              "status": "string",
+              "created_at": "RFC3339 UTC",
+              "updated_at": "RFC3339 UTC"
+            }
+          ],
+          "pagination": { "total": 0, "has_more": false }
+        }
+      }
+    }
+  ]
+}
