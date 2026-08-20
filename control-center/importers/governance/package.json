@@ -1,0 +1,28 @@
+{
+  "name": "@confenge/control-center-governance-importer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "READ-ONLY Governance importer: projects Git authority into Control Center memory candidates. Dry-run by default. Not a second catalog.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cc-governance-import": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "import": "tsx src/cli.ts",
+    "dry-run": "tsx src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
