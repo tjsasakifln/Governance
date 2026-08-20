@@ -1,0 +1,24 @@
+export { importGovernance, type ImportOptions } from "./import.js";
+export { classifyFile } from "./classify.js";
+export { contentHash } from "./hash.js";
+export { injectedGit, liveGit, resolveCommitSha, isUsableCommitSha } from "./git.js";
+export { parseArgv, runCli, helpText } from "./cli.js";
+export { refusePersistPort, recordingPersistPort } from "./persist.js";
+export { assertValidCandidate, assertValidResult } from "./validate.js";
+export { candidateId, idempotencyKey } from "./idempotency.js";
+export {
+  CANDIDATE_SCHEMA,
+  DIRECTIVE_KINDS,
+  DIRECTIVE_STATUSES,
+  FRESHNESS_STATUSES,
+  IMPORT_RESULT_SCHEMA,
+  IMPORTER_ACTOR_ID,
+  SOURCE_SYSTEM,
+  type MemoryCandidate,
+  type ImportResult,
+  type UnclassifiableItem,
+  type PersistPort,
+  type GitMetadataProvider,
+  type VirtualSourceFile,
+  type DirectiveKind,
+} from "./types.js";
