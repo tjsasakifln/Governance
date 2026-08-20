@@ -1,0 +1,21 @@
+{
+  "object": "list",
+  "hasMore": false,
+  "totalCount": 2,
+  "limit": 100,
+  "offset": 0,
+  "data": [
+    {
+      "object": "customer",
+      "id": "cus_fixtureAlfa",
+      "dateCreated": "2026-06-01",
+      "externalReference": "cfg:customer:alfa"
+    },
+    {
+      "object": "customer",
+      "id": "cus_fixtureBeta",
+      "dateCreated": "2026-06-15",
+      "externalReference": "cfg:customer:beta"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "evt_dup_received_1",
+    "event": "PAYMENT_RECEIVED",
+    "dateCreated": "2026-07-05 10:00:00",
+    "payment": {
+      "id": "pay_fixtureReceived01",
+      "status": "RECEIVED",
+      "value": 20000.0,
+      "deleted": false,
+      "customer": "cus_fixtureBeta",
+      "externalReference": "cfg:CFG-DIRB2G-FLEX-v1:corr-fixture-02"
+    }
+  },
+  {
+    "id": "evt_dup_received_2",
+    "event": "PAYMENT_RECEIVED",
+    "dateCreated": "2026-07-05 10:01:00",
+    "payment": {
+      "id": "pay_fixtureReceived01",
+      "status": "RECEIVED",
+      "value": 20000.0,
+      "deleted": false,
+      "customer": "cus_fixtureBeta",
+      "externalReference": "cfg:CFG-DIRB2G-FLEX-v1:corr-fixture-02"
+    }
+  },
+  {
+    "id": "evt_inconsistent_confirmed",
+    "event": "PAYMENT_RECEIVED",
+    "dateCreated": "2026-07-02 12:00:00",
+    "payment": {
+      "id": "pay_fixtureConfirmed01",
+      "status": "RECEIVED",
+      "value": 8000.0,
+      "deleted": false,
+      "customer": "cus_fixtureAlfa",
+      "externalReference": "cfg:CFG-DIAG-EXP-v1:corr-fixture-01"
+    }
+  },
+  {
+    "id": "evt_deleted_cancelled",
+    "event": "PAYMENT_DELETED",
+    "dateCreated": "2026-04-02 08:00:00",
+    "payment": {
+      "id": "pay_fixtureCancelled01",
+      "status": "PENDING",
+      "value": 8000.0,
+      "deleted": true,
+      "customer": "cus_fixtureAlfa",
+      "externalReference": "cfg:CFG-DIAG-EXP-v1:corr-fixture-05"
+    }
+  }
+]
