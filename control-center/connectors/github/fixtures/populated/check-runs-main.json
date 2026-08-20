@@ -1,0 +1,15 @@
+{
+  "total_count": 1,
+  "check_runs": [
+    {
+      "id": 55,
+      "name": "main-ci",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/tjsasakifln/Governance/runs/55",
+      "started_at": "2026-08-19T12:00:00Z",
+      "completed_at": "2026-08-19T12:04:00Z",
+      "head_sha": "abc123def4567890"
+    }
+  ]
+}

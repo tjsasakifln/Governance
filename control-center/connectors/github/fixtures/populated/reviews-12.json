@@ -1,0 +1,12 @@
+[
+  {
+    "id": 701,
+    "state": "COMMENTED",
+    "user": { "login": "reviewer" }
+  },
+  {
+    "id": 702,
+    "state": "PENDING",
+    "user": { "login": "reviewer" }
+  }
+]
