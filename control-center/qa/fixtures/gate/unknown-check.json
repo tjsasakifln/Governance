@@ -1,0 +1,20 @@
+{
+  "schema_version": "control-center.qa-checks.v1",
+  "description": "One named check is UNKNOWN. Fail-closed: not READY_FOR_INTERNAL_PRODUCTION.",
+  "checks": [
+    { "attack_id": "stale data mostrado como saudável", "state": "pass", "reason": "pass" },
+    { "attack_id": "double counting financeiro", "state": "pass", "reason": "pass" },
+    { "attack_id": "hypothesis promovida a fact", "state": "pass", "reason": "pass" },
+    { "attack_id": "agent sobrescrevendo founder decision", "state": "pass", "reason": "pass" },
+    { "attack_id": "scope leakage entre cliente/repos", "state": "pass", "reason": "pass" },
+    { "attack_id": "duplicated collector event", "state": "pass", "reason": "pass" },
+    { "attack_id": "provider mutation acidental", "state": "pass", "reason": "pass" },
+    { "attack_id": "secret/PII leakage", "state": "pass", "reason": "pass" },
+    { "attack_id": "timezone boundary", "state": "pass", "reason": "pass" },
+    { "attack_id": "partial outage", "state": "pass", "reason": "pass" },
+    { "attack_id": "stale RUNNING agent session", "state": "pass", "reason": "pass" },
+    { "attack_id": "conflicting directives/supersession", "state": "pass", "reason": "pass" },
+    { "attack_id": "auth bypass assumptions", "state": "pass", "reason": "pass" },
+    { "attack_id": "missing provenance", "state": "UNKNOWN", "reason": "collector evidence not produced" }
+  ]
+}

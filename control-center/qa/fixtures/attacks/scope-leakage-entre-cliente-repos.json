@@ -1,0 +1,27 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "scope leakage entre cliente/repos",
+  "case_kind": "adversarial",
+  "description": "Context granted only client:acme also includes client:globex and repo:Governance.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: every resource scope must be an exact member of granted_scopes",
+  "payload": {
+    "requested_scopes": ["client:acme"],
+    "granted_scopes": ["client:acme"],
+    "resources": [
+      {
+        "id": "cc:client-status:acme",
+        "scope": "client:acme"
+      },
+      {
+        "id": "cc:client-status:globex",
+        "scope": "client:globex"
+      },
+      {
+        "id": "cc:engineering-snapshot:gov",
+        "scope": "repo:tjsasakifln/Governance",
+        "embedded_scopes": ["repo:tjsasakifln/Governance"]
+      }
+    ]
+  }
+}

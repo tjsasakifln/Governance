@@ -1,0 +1,134 @@
+{
+  "schema_version": "control-center.qa-threat-matrix.v1",
+  "title": "Control Center threat/quality matrix",
+  "hostile": true,
+  "unknown_is_not_ready": true,
+  "attacks": [
+    {
+      "attack_id": "stale data mostrado como saudável",
+      "category": "freshness",
+      "severity": "critical",
+      "what": "Aggregated data with freshness STALE/UNKNOWN/ERROR or outside freshness_window is painted as healthy/FRESH.",
+      "detector": "evaluateStaleDataShownAsHealthy",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "double counting financeiro",
+      "category": "finance",
+      "severity": "critical",
+      "what": "The same source_payment_id or cents line is summed twice, or a payment sits in both open and overdue.",
+      "detector": "evaluateDoubleCountingFinanceiro",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "hypothesis promovida a fact",
+      "category": "memory",
+      "severity": "critical",
+      "what": "A hypothesis is stored or presented as fact without audited human founder promotion.",
+      "detector": "evaluateHypothesisPromotedToFact",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "agent sobrescrevendo founder decision",
+      "category": "authority",
+      "severity": "critical",
+      "what": "An agent supersedes, rewrites, or status-changes a founder (human) decision.",
+      "detector": "evaluateAgentOverwritingFounderDecision",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "scope leakage entre cliente/repos",
+      "category": "isolation",
+      "severity": "critical",
+      "what": "Agent context granted for one client or repo includes another client's or repo's resources.",
+      "detector": "evaluateScopeLeakage",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "duplicated collector event",
+      "category": "idempotency",
+      "severity": "high",
+      "what": "Two collector events with the same idempotency_key both succeed/apply.",
+      "detector": "evaluateDuplicatedCollectorEvent",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "provider mutation acidental",
+      "category": "safety",
+      "severity": "critical",
+      "what": "Control Center attempts cobrança, checkout, refund, cancelamento, Asaas write, or commercial send.",
+      "detector": "evaluateProviderMutationAcidental",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "secret/PII leakage",
+      "category": "security",
+      "severity": "critical",
+      "what": "Secrets or PII appear in logs, URLs, analytics, git, or client-visible payloads.",
+      "detector": "evaluateSecretPiiLeakage",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "timezone boundary",
+      "category": "time",
+      "severity": "high",
+      "what": "Non-UTC-Z storage or America/Sao_Paulo calendar dates taken from the UTC date near midnight.",
+      "detector": "evaluateTimezoneBoundary",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "partial outage",
+      "category": "availability",
+      "severity": "high",
+      "what": "Overall status is healthy/success while a required source or check is down/ERROR/failed.",
+      "detector": "evaluatePartialOutage",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "stale RUNNING agent session",
+      "category": "agents",
+      "severity": "high",
+      "what": "A still-live/open agent session (architecture status `open`, attack id RUNNING) remains past TTL.",
+      "detector": "evaluateStaleRunningAgentSession",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "conflicting directives/supersession",
+      "category": "memory",
+      "severity": "high",
+      "what": "Two active directives collide on scope+conflict_key, or a listed supersedee stays active.",
+      "detector": "evaluateConflictingDirectives",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "auth bypass assumptions",
+      "category": "auth",
+      "severity": "critical",
+      "what": "Missing actor, unauthenticated privileged action, empty scopes as allow-all, hardcoded/default identity, or password in identity payload.",
+      "detector": "evaluateAuthBypassAssumptions",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    },
+    {
+      "attack_id": "missing provenance",
+      "category": "provenance",
+      "severity": "critical",
+      "what": "Aggregated record lacks source, observed_at, freshness_status, or confidence.",
+      "detector": "evaluateMissingProvenance",
+      "reject_outcome": "fail",
+      "merge_blocker": true
+    }
+  ]
+}

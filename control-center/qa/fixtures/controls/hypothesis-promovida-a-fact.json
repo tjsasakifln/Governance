@@ -1,0 +1,45 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "hypothesis promovida a fact",
+  "case_kind": "control",
+  "description": "Hypothesis remains hypothesis; a separate fact was promoted by the founder with audit.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: hypothesis cannot be stored or presented as fact unless a human founder promotion is audited",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:still-hyp",
+        "kind": "hypothesis",
+        "origin_kind": "hypothesis",
+        "scope": "commercial",
+        "status": "active",
+        "title": "Pipeline may close this week",
+        "created_by": { "kind": "agent", "id": "cc-agent-research" },
+        "audit": [
+          {
+            "at": "2026-08-20T11:00:00Z",
+            "actor": { "kind": "agent", "id": "cc-agent-research" },
+            "action": "created"
+          }
+        ]
+      },
+      {
+        "id": "cc:directive:human-fact",
+        "kind": "fact",
+        "origin_kind": "hypothesis",
+        "scope": "commercial",
+        "status": "active",
+        "title": "Diagnóstico offer is founder-approved",
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+        "promoted_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+        "audit": [
+          {
+            "at": "2026-08-20T12:00:00Z",
+            "actor": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+            "action": "promoted_to_fact"
+          }
+        ]
+      }
+    ]
+  }
+}

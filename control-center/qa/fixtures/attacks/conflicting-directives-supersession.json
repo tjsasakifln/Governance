@@ -1,0 +1,32 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "conflicting directives/supersession",
+  "case_kind": "adversarial",
+  "description": "Two active pricing decisions share scope and conflict_key; the newer one lists supersedes but the older remains active.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: a supersedee must not stay active; concurrent active directives on the same conflict_key require supersession",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:price-a",
+        "kind": "decision",
+        "scope": "finance",
+        "status": "active",
+        "conflict_key": "pricing-policy",
+        "title": "List price A",
+        "supersedes": null,
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" }
+      },
+      {
+        "id": "cc:directive:price-b",
+        "kind": "decision",
+        "scope": "finance",
+        "status": "active",
+        "conflict_key": "pricing-policy",
+        "title": "List price B",
+        "supersedes": ["cc:directive:price-a"],
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" }
+      }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "stale data mostrado como saudável",
+  "case_kind": "adversarial",
+  "description": "Warmbly snapshot is STALE and outside its freshness window but the cockpit paints it healthy.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: do not render STALE/UNKNOWN/ERROR or expired observations as healthy/FRESH",
+  "payload": {
+    "as_of": "2026-08-20T15:00:00Z",
+    "records": [
+      {
+        "id": "cc:operational-snapshot:today",
+        "freshness_status": "STALE",
+        "observed_at": "2026-08-18T12:00:00Z",
+        "freshness_window_seconds": 3600,
+        "presented_as": "healthy",
+        "health_status": "healthy"
+      },
+      {
+        "id": "cc:source-observation:asaas-balance",
+        "freshness_status": "FRESH",
+        "observed_at": "2026-08-19T10:00:00Z",
+        "freshness_window_seconds": 1800,
+        "presented_as": "FRESH",
+        "health_status": "healthy"
+      }
+    ]
+  }
+}

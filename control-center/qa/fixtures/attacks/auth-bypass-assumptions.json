@@ -1,0 +1,19 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "auth bypass assumptions",
+  "case_kind": "adversarial",
+  "description": "Unauthenticated default identity is treated as founder with allow-all empty scopes and a password field.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: privileged actions require authenticated===true, opaque actor id, explicit scopes; empty scopes deny; no hardcoded passwords",
+  "payload": {
+    "authenticated": false,
+    "action": "read_company_directives",
+    "identity_source": "default",
+    "assume_founder": true,
+    "empty_scopes_mean": "allow-all",
+    "granted_scopes": ["company"],
+    "actor": { "kind": "human", "id": "", "role": "anonymous" },
+    "password": "not-a-real-password",
+    "hardcoded_password": "admin"
+  }
+}

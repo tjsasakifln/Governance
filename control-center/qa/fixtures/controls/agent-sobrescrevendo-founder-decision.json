@@ -1,0 +1,46 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "agent sobrescrevendo founder decision",
+  "case_kind": "control",
+  "description": "Founder supersedes their own decision; the agent only files a hypothesis.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: only a human founder may supersede or mutate a founder decision",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:founder-price",
+        "kind": "decision",
+        "scope": "company",
+        "status": "superseded",
+        "title": "Diagnóstico price is R$ 4.900",
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+        "supersedes": null,
+        "audit": [
+          {
+            "at": "2026-08-20T13:00:00Z",
+            "actor": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+            "action": "superseded"
+          }
+        ]
+      },
+      {
+        "id": "cc:directive:founder-price-v2",
+        "kind": "decision",
+        "scope": "company",
+        "status": "active",
+        "title": "Diagnóstico price is R$ 5.900",
+        "created_by": { "kind": "human", "id": "cc-actor-founder", "role": "founder" },
+        "supersedes": ["cc:directive:founder-price"]
+      },
+      {
+        "id": "cc:directive:agent-note",
+        "kind": "hypothesis",
+        "scope": "commercial",
+        "status": "active",
+        "title": "Price sensitivity may be high",
+        "created_by": { "kind": "agent", "id": "cc-agent-planner" },
+        "supersedes": null
+      }
+    ]
+  }
+}

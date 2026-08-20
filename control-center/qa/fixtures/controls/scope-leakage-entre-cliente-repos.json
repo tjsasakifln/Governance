@@ -1,0 +1,23 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "scope leakage entre cliente/repos",
+  "case_kind": "control",
+  "description": "Granted client:acme contains only client:acme resources.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: every resource scope must be an exact member of granted_scopes",
+  "payload": {
+    "requested_scopes": ["client:acme"],
+    "granted_scopes": ["client:acme"],
+    "resources": [
+      {
+        "id": "cc:client-status:acme",
+        "scope": "client:acme"
+      },
+      {
+        "id": "cc:attention-item:acme-overdue",
+        "scope": "client:acme",
+        "embedded_scopes": ["client:acme"]
+      }
+    ]
+  }
+}
