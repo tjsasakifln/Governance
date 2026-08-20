@@ -1,0 +1,128 @@
+# Control Center contracts (v1)
+
+Canonical machine contract for the Confenge Control Center. Other workstreams (persistence, context service, MCP server, collectors, UI) MUST implement against this tree and MUST NOT guess field names, enums, or authority.
+
+This package is **schemas, types, HTTP/MCP documentation, fixtures, and a validator**. It is not a service, not a UI, not a database, and not an MCP runtime.
+
+## Decisions (frozen)
+
+1. Governance is strategic/canonical authority (catalog, terms, directives).
+2. Warmbly is commercial/CRM operational runtime. `CommercialSnapshot` is a read model, not a second catalog.
+3. Collectors and snapshots are read-only aggregates with `provenance`.
+4. Aggregated information carries `source`, `observed_at`, `freshness_status`, and `confidence`.
+5. Freshness ∈ `FRESH | STALE | UNKNOWN | ERROR` and is **not** confidence. Confidence is `[0, 1]`.
+6. Directive kinds: `decision`, `directive`, `fact`, `constraint`, `priority`, `risk`, `hypothesis`. Required: `scope`, `status`, `effective_from`, `expires_at`, `supersedes`, `created_by`, plus `audit`.
+7. Agents query **by scope**. Empty scope lists are invalid. There is no whole-company dump.
+8. MCP is the principal agent interface (`docs/mcp.v1.json`). HTTP is the internal companion (`docs/http.openapi.json`).
+9. Financial/provider mutations are forbidden: cobrança, checkout, refund, cancelamento, Asaas writes, commercial send.
+10. Homepage consumes exceptions (`AttentionItem`) and at most three `PriorityRecommendation`s — not a KPI wall.
+11. Money is integer cents + ISO-4217 currency. Timestamps are UTC with a `Z` suffix. Presentation MAY use `America/Sao_Paulo`.
+12. IDs: `cc:<type-kebab>:<ulid-or-slug>` as listed in `catalog.json`.
+13. Fail-closed: no secrets in git, logs, URLs, or payloads. `ActorRef.id` is an opaque handle, not a password.
+
+See `docs/ADR-CC-001-ARCHITECTURE-BOUNDARIES.md`.
+
+## Scope taxonomy
+
+Exact v1 literals:
+
+- `company`
+- `commercial`
+- `finance`
+- `clients`
+- `infrastructure`
+- `inbound`
+
+Parameterized:
+
+- `repo:<name>` — short name or `owner/name`
+- `client:<slug>` — kebab-case; `ClientStatus.scope` MUST equal `client:<client_slug>`
+
+Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix). Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
+
+## The 13 resource types
+
+| Type | `schema_version` | ID type |
+|---|---|---|
+| Directive | `control-center.directive.v1` | `directive` |
+| OperationalSnapshot | `control-center.operational-snapshot.v1` | `operational-snapshot` |
+| SourceObservation | `control-center.source-observation.v1` | `source-observation` |
+| AttentionItem | `control-center.attention-item.v1` | `attention-item` |
+| PriorityRecommendation | `control-center.priority-recommendation.v1` | `priority-recommendation` |
+| AgentSession | `control-center.agent-session.v1` | `agent-session` |
+| ClientStatus | `control-center.client-status.v1` | `client-status` |
+| CommercialSnapshot | `control-center.commercial-snapshot.v1` | `commercial-snapshot` |
+| FinanceSnapshot | `control-center.finance-snapshot.v1` | `finance-snapshot` |
+| EngineeringSnapshot | `control-center.engineering-snapshot.v1` | `engineering-snapshot` |
+| ServiceHealth | `control-center.service-health.v1` | `service-health` |
+| CollectorRun | `control-center.collector-run.v1` | `collector-run` |
+| AuditEvent | `control-center.audit-event.v1` | `audit-event` |
+
+`AgentContext` (`control-center.agent-context.v1`) is the HTTP/MCP envelope, not a stored core resource.
+
+## Layout
+
+```
+catalog.json                 # machine index of the 13 types
+schemas/                     # JSON Schema 2020-12
+src/types.ts                 # TypeScript types in lockstep
+src/validate.ts              # shipped validator (Ajv + semantic checks)
+src/cli.ts                   # shipped CLI entry
+fixtures/valid|invalid/      # at least one each per type
+docs/http.openapi.json
+docs/mcp.v1.json
+docs/ADR-CC-001-ARCHITECTURE-BOUNDARIES.md
+tests/contract.test.ts
+```
+
+## Run validation and tests
+
+Requires Node.js ≥ 20. No other services.
+
+```bash
+cd control-center/contracts
+npm install
+npm test
+npm run typecheck
+npx tsx src/cli.ts --list-types
+npx tsx src/cli.ts --type Directive fixtures/valid/directive.json
+npx tsx src/cli.ts --type Directive fixtures/invalid/directive.json
+```
+
+The CLI prints JSON with `"ok": true` or `"ok": false` plus `errors`. Exit 0 only when valid.
+
+A non-test consumer of the same shipped `validate` function:
+
+```bash
+npx tsx scripts/consume-validate.ts fixtures/valid/directive.json
+```
+
+## Environment variables
+
+This package has **no required environment variables** and ships no `.env`.
+
+Later workstreams (not implemented here) are expected to introduce their own, for example:
+
+| Variable | Later owner | Notes |
+|---|---|---|
+| `DATABASE_URL` | persistence | PostgreSQL for snapshots and memory |
+| `CC_ACTOR_ID` | auth | Opaque `ActorRef.id`; never a password in git |
+| `WARMBLY_READ_BASE_URL` | collectors | Read-only |
+| `GITHUB_TOKEN` | github collector | Server-side only; never in client bundle or URLs |
+
+Absence of a variable is fail-closed in those services. Do not invent defaults that open writes.
+
+## Expected convergence (later campaign)
+
+Do **not** implement these from this package:
+
+- Wire `control-center/` into the Governance root README, `commercial/`, `decisions/`, or `scripts/`.
+- Absorb PR Governance #8 (partner program).
+- Edit Warmbly, web-cfg, or extra-cli.
+- Boot HTTP/MCP servers or migrate PostgreSQL.
+
+Convergence should pin `catalog.json` + schema `$id`s, consume `AgentContext` by scope, and keep origin systems authoritative. Collectors remain idempotent and read-only.
+
+## Versioning
+
+Breaking change → `v2` file and new `schema_version` const; keep `v1`. Additive optional fields → `v1.1`. v1 schemas set `additionalProperties: false`.

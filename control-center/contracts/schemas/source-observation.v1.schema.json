@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/source-observation.v1.schema.json",
+  "title": "SourceObservation v1",
+  "description": "Atomic collector observation. Collectors are read-only and MUST send idempotency_key.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "provenance",
+    "collected_at",
+    "idempotency_key",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.source-observation.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "collected_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "idempotency_key": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/idempotency_key"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Opaque source payload. Property names MUST NOT look like secrets.",
+      "propertyNames": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/non_secret_property_names"
+      }
+    },
+    "payload_schema_ref": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "error": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/error_object"
+    }
+  },
+  "if": {
+    "properties": {
+      "provenance": {
+        "type": "object",
+        "properties": { "freshness_status": { "const": "ERROR" } },
+        "required": ["freshness_status"]
+      }
+    },
+    "required": ["provenance"]
+  },
+  "then": {
+    "required": ["error"],
+    "properties": {
+      "error": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/error_object"
+      }
+    }
+  }
+}

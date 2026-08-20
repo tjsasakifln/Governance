@@ -1,0 +1,127 @@
+{
+  "schema_version": "control-center.operational-snapshot.v1",
+  "id": "cc:operational-snapshot:01K3CC-COMPANY-NOW",
+  "scope": "company",
+  "generated_at": "2026-08-20T17:59:00Z",
+  "provenance": {
+    "source": {
+      "system": "collector",
+      "kind": "snapshot-composer",
+      "locator": "snapshots/company"
+    },
+    "observed_at": "2026-08-20T17:58:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.82
+  },
+  "headline": "Three inbound items unread; one overdue receivable; GitHub collector healthy.",
+  "top_priorities": [
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-RANK-1-INBOUND",
+      "scope": "company",
+      "rank": 1,
+      "title": "Clear three unread inbound items",
+      "rationale": "Inbound queue has unread items older than four hours.",
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "inbound-queue",
+          "locator": "inbound/unread"
+        },
+        "observed_at": "2026-08-20T17:45:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.88
+      },
+      "generated_at": "2026-08-20T17:46:00Z",
+      "horizon": "now"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-RANK-2-RECEIVABLE",
+      "scope": "company",
+      "rank": 2,
+      "title": "Review overdue receivable for acme-industria",
+      "rationale": "Open receivable is stale in the origin read model.",
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-read",
+          "locator": "finance/receivables/open"
+        },
+        "observed_at": "2026-08-20T17:00:00Z",
+        "freshness_status": "STALE",
+        "confidence": 0.74
+      },
+      "generated_at": "2026-08-20T17:46:00Z",
+      "horizon": "today"
+    },
+    {
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id": "cc:priority-recommendation:01K3CC-RANK-3-DIRECTIVE",
+      "scope": "company",
+      "rank": 3,
+      "title": "Keep provider mutations out of this cockpit",
+      "rationale": "Active constraint forbids cobrança, checkout, refund and Asaas writes from Control Center.",
+      "provenance": {
+        "source": {
+          "system": "governance",
+          "kind": "directive",
+          "locator": "cc:directive:01K3CC-NO-PROVIDER-MUTATION"
+        },
+        "observed_at": "2026-08-20T12:00:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      },
+      "generated_at": "2026-08-20T17:46:00Z",
+      "horizon": "this_week",
+      "directive_ids": ["cc:directive:01K3CC-NO-PROVIDER-MUTATION"]
+    }
+  ],
+  "attention_items": [
+    {
+      "schema_version": "control-center.attention-item.v1",
+      "id": "cc:attention-item:01K3CC-OVERDUE-INVOICE",
+      "scope": "client:acme-industria",
+      "severity": "high",
+      "status": "open",
+      "title": "Overdue invoice for acme-industria",
+      "summary": "Open receivable older than the agreed window.",
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-read",
+          "locator": "finance/receivables/open"
+        },
+        "observed_at": "2026-08-20T17:00:00Z",
+        "freshness_status": "STALE",
+        "confidence": 0.74
+      },
+      "detected_at": "2026-08-20T17:00:00Z",
+      "homepage_eligible": true
+    }
+  ],
+  "health": [
+    {
+      "schema_version": "control-center.service-health.v1",
+      "id": "cc:service-health:01K3CC-CONTEXT-API",
+      "scope": "infrastructure",
+      "service_name": "context-service",
+      "status": "healthy",
+      "provenance": {
+        "source": {
+          "system": "collector",
+          "kind": "health-probe",
+          "locator": "health/context-service"
+        },
+        "observed_at": "2026-08-20T17:58:00Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.99
+      },
+      "checked_at": "2026-08-20T17:58:00Z"
+    }
+  ],
+  "commercial_snapshot_id": "cc:commercial-snapshot:01K3CC-WARMBLY-OPS",
+  "finance_snapshot_id": "cc:finance-snapshot:01K3CC-RO-RECEIVABLES",
+  "engineering_snapshot_id": "cc:engineering-snapshot:01K3CC-GOVERNANCE-REPO",
+  "client_status_ids": ["cc:client-status:acme-industria"]
+}

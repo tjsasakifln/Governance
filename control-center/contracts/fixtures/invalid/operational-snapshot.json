@@ -1,0 +1,14 @@
+{
+  "schema_version": "control-center.operational-snapshot.v1",
+  "id": "cc:operational-snapshot:01K3CC-NO-PROVENANCE",
+  "scope": "company",
+  "generated_at": "2026-08-20T17:59:00Z",
+  "headline": "Missing provenance must be rejected.",
+  "top_priorities": [],
+  "attention_items": [],
+  "health": [],
+  "commercial_snapshot_id": null,
+  "finance_snapshot_id": null,
+  "engineering_snapshot_id": null,
+  "client_status_ids": []
+}

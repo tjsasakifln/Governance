@@ -1,0 +1,19 @@
+{
+  "schema_version": "control-center.engineering-snapshot.v1",
+  "id": "cc:engineering-snapshot:01K3CC-OFFSET-TS",
+  "scope": "repo:tjsasakifln/Governance",
+  "generated_at": "2026-08-20T14:55:00-03:00",
+  "provenance": {
+    "source": {
+      "system": "github",
+      "kind": "repo-read",
+      "locator": "repos/tjsasakifln/Governance"
+    },
+    "observed_at": "2026-08-20T17:54:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.95
+  },
+  "open_pr_count": 1,
+  "failing_check_count": 0,
+  "open_incident_count": 0
+}

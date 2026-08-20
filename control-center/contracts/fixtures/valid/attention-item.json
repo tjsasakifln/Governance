@@ -1,0 +1,23 @@
+{
+  "schema_version": "control-center.attention-item.v1",
+  "id": "cc:attention-item:01K3CC-OVERDUE-INVOICE",
+  "scope": "client:acme-industria",
+  "severity": "high",
+  "status": "open",
+  "title": "Overdue invoice for acme-industria",
+  "summary": "Open receivable older than the agreed window. Origin system is Asaas via read-only observation; do not charge from Control Center.",
+  "provenance": {
+    "source": {
+      "system": "asaas",
+      "kind": "receivable-read",
+      "locator": "finance/receivables/open"
+    },
+    "observed_at": "2026-08-20T17:00:00Z",
+    "freshness_status": "STALE",
+    "confidence": 0.74,
+    "freshness_window_seconds": 1800
+  },
+  "detected_at": "2026-08-20T17:00:00Z",
+  "homepage_eligible": true,
+  "recommended_action": "Review in Warmbly/Asaas origin; do not mutate from this cockpit."
+}

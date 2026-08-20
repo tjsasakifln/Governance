@@ -1,0 +1,24 @@
+{
+  "schema_version": "control-center.directive.v1",
+  "id": "cc:directive:01K3CC-NO-PROVIDER-MUTATION",
+  "kind": "constraint",
+  "scope": "finance",
+  "status": "active",
+  "title": "No provider financial mutations in Control Center",
+  "body": "Control Center collectors and agents MUST NOT execute cobrança, checkout, refund, cancelamento, Asaas writes, or commercial send. Those remain in origin systems under separate authority.",
+  "effective_from": "2026-08-20T00:00:00Z",
+  "expires_at": null,
+  "supersedes": null,
+  "created_by": { "kind": "human", "id": "human:operator" },
+  "created_at": "2026-08-20T12:00:00Z",
+  "updated_at": "2026-08-20T12:00:00Z",
+  "audit": [
+    {
+      "at": "2026-08-20T12:00:00Z",
+      "actor": { "kind": "human", "id": "human:operator" },
+      "action": "created",
+      "to_status": "active"
+    }
+  ],
+  "tags": ["fail-closed", "finance"]
+}

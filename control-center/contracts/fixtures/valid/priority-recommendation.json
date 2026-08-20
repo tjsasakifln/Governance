@@ -1,0 +1,21 @@
+{
+  "schema_version": "control-center.priority-recommendation.v1",
+  "id": "cc:priority-recommendation:01K3CC-RANK-1-INBOUND",
+  "scope": "company",
+  "rank": 1,
+  "title": "Clear three unread inbound items",
+  "rationale": "Inbound queue has unread items older than four hours. Homepage shows this as the first of at most three current priorities.",
+  "provenance": {
+    "source": {
+      "system": "warmbly",
+      "kind": "inbound-queue",
+      "locator": "inbound/unread"
+    },
+    "observed_at": "2026-08-20T17:45:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.88
+  },
+  "generated_at": "2026-08-20T17:46:00Z",
+  "horizon": "now",
+  "attention_item_ids": ["cc:attention-item:01K3CC-OVERDUE-INVOICE"]
+}

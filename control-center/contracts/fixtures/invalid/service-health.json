@@ -1,0 +1,18 @@
+{
+  "schema_version": "control-center.service-health.v1",
+  "id": "cc:service-health:01K3CC-BAD-STATUS",
+  "scope": "infrastructure",
+  "service_name": "context-service",
+  "status": "ok",
+  "provenance": {
+    "source": {
+      "system": "collector",
+      "kind": "health-probe",
+      "locator": "health/context-service"
+    },
+    "observed_at": "2026-08-20T17:58:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.99
+  },
+  "checked_at": "2026-08-20T17:58:00Z"
+}

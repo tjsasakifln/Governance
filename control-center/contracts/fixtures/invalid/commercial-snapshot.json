@@ -1,0 +1,24 @@
+{
+  "schema_version": "control-center.commercial-snapshot.v1",
+  "id": "cc:commercial-snapshot:01K3CC-BAD-AUTHORITY",
+  "scope": "commercial",
+  "generated_at": "2026-08-20T17:40:00Z",
+  "provenance": {
+    "source": {
+      "system": "warmbly",
+      "kind": "crm-read-model",
+      "locator": "commercial/pipeline"
+    },
+    "observed_at": "2026-08-20T17:39:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.84
+  },
+  "authority": {
+    "catalog_authority": "warmbly",
+    "commercial_runtime": "warmbly",
+    "this_document": "read_model"
+  },
+  "pipeline_open_count": 4,
+  "inbound_unread_count": 3,
+  "at_risk_client_count": 1
+}

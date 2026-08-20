@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/commercial-snapshot.v1.schema.json",
+  "title": "CommercialSnapshot v1",
+  "description": "Read model of commercial/CRM operational state. Warmbly is the commercial runtime; Governance remains catalog/terms authority. This document is not a second catalog and does not authorize checkout or send.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "generated_at",
+    "provenance",
+    "authority",
+    "pipeline_open_count",
+    "inbound_unread_count",
+    "at_risk_client_count"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.commercial-snapshot.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "oneOf": [
+        { "const": "commercial" },
+        { "const": "company" },
+        { "const": "inbound" },
+        { "const": "clients" },
+        {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/client_scope"
+        }
+      ]
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_authority", "commercial_runtime", "this_document"],
+      "properties": {
+        "catalog_authority": { "const": "governance" },
+        "commercial_runtime": { "const": "warmbly" },
+        "this_document": { "const": "read_model" }
+      }
+    },
+    "pipeline_open_count": { "type": "integer", "minimum": 0 },
+    "inbound_unread_count": { "type": "integer", "minimum": 0 },
+    "at_risk_client_count": { "type": "integer", "minimum": 0 },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}

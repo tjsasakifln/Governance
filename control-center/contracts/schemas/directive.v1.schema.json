@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/directive.v1.schema.json",
+  "title": "Directive v1",
+  "description": "Human-authored structured memory. Governance is canonical for strategic directives. Not a chat message.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "kind",
+    "scope",
+    "status",
+    "title",
+    "body",
+    "effective_from",
+    "expires_at",
+    "supersedes",
+    "created_by",
+    "created_at",
+    "updated_at",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.directive.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "decision",
+        "directive",
+        "fact",
+        "constraint",
+        "priority",
+        "risk",
+        "hypothesis"
+      ]
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "superseded", "revoked", "expired"]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "body": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "effective_from": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "expires_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_utc_datetime"
+    },
+    "supersedes": {
+      "type": ["array", "null"],
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      },
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "created_by": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref"
+    },
+    "created_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "updated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "audit": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/audit_entry" }
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 48, "pattern": "^[a-z0-9][a-z0-9-]*$" }
+    },
+    "related_ids": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  },
+  "if": {
+    "properties": { "status": { "const": "expired" } },
+    "required": ["status"]
+  },
+  "then": {
+    "required": ["expires_at"],
+    "properties": {
+      "expires_at": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+      }
+    }
+  },
+  "$defs": {
+    "audit_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "actor", "action"],
+      "properties": {
+        "at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "actor": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["created", "updated", "status_changed", "superseded", "revoked"]
+        },
+        "from_status": {
+          "type": "string",
+          "enum": ["draft", "active", "superseded", "revoked", "expired"]
+        },
+        "to_status": {
+          "type": "string",
+          "enum": ["draft", "active", "superseded", "revoked", "expired"]
+        },
+        "note": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  }
+}

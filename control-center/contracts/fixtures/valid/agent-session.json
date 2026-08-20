@@ -1,0 +1,15 @@
+{
+  "schema_version": "control-center.agent-session.v1",
+  "id": "cc:agent-session:01K3CC-CTX-FINANCE",
+  "agent_id": "agent:cc-context",
+  "requested_scopes": ["finance", "client:acme-industria"],
+  "granted_scopes": ["finance", "client:acme-industria"],
+  "purpose": "Prepare a scoped briefing for overdue receivables. Must not dump company-wide memory.",
+  "started_at": "2026-08-20T17:50:00Z",
+  "ended_at": null,
+  "status": "open",
+  "created_by": { "kind": "agent", "id": "agent:cc-context" },
+  "include_directives": true,
+  "include_snapshots": true,
+  "include_attention": true
+}

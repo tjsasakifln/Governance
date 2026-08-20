@@ -1,0 +1,16 @@
+{
+  "schema_version": "control-center.attention-item.v1",
+  "id": "cc:attention-item:01K3CC-MISSING-SOURCE",
+  "scope": "client:acme-industria",
+  "severity": "high",
+  "status": "open",
+  "title": "Missing provenance source",
+  "summary": "Aggregated items require source, observed_at, freshness_status and confidence.",
+  "provenance": {
+    "observed_at": "2026-08-20T17:00:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.8
+  },
+  "detected_at": "2026-08-20T17:00:00Z",
+  "homepage_eligible": true
+}

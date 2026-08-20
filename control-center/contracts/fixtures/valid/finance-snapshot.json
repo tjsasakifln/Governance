@@ -1,0 +1,20 @@
+{
+  "schema_version": "control-center.finance-snapshot.v1",
+  "id": "cc:finance-snapshot:01K3CC-RO-RECEIVABLES",
+  "scope": "finance",
+  "generated_at": "2026-08-20T17:20:00Z",
+  "provenance": {
+    "source": {
+      "system": "asaas",
+      "kind": "receivable-read",
+      "locator": "finance/receivables"
+    },
+    "observed_at": "2026-08-20T17:10:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.7
+  },
+  "read_model_only": true,
+  "provider_mutations": "forbidden",
+  "receivables_open": { "amount_cents": 2500000, "currency": "BRL" },
+  "receivables_overdue": { "amount_cents": 1500000, "currency": "BRL" }
+}
