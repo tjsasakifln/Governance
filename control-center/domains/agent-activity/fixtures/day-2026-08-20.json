@@ -1,0 +1,35 @@
+{
+  "note": "Documentary shape of the synthetic UTC day. The consumer and tests seed via the shipped start/report API, not by loading this file as a store dump.",
+  "day": "2026-08-20",
+  "from": "2026-08-20T00:00:00.000Z",
+  "to": "2026-08-21T00:00:00.000Z",
+  "sessions": [
+    {
+      "correlation_id": "sess.cc-15-ledger-partial",
+      "status": "PARTIAL",
+      "agent": { "id": "agent:grok-4.6", "provider": "xai" },
+      "summary": "Shipped agent-activity ledger with start/report, audit trail, and timeline.",
+      "evidence": [
+        "control-center/domains/agent-activity/tests/ledger.test.ts",
+        "git:cc/15-agent-ledger"
+      ],
+      "residual_work": [
+        "Wire MCP confenge.report_session_result at convergence",
+        "Persist ledger rows in control-center/persistence agent-activity table (not agent_sessions)"
+      ]
+    },
+    {
+      "correlation_id": "sess.cc-15-ledger-done",
+      "status": "DONE",
+      "summary": "Collected GitHub refs for the campaign branch.",
+      "evidence": ["commit:e2b0498a68092c1bdbf64aa31854d652c07afdc0"],
+      "residual_work": []
+    },
+    {
+      "correlation_id": "sess.cc-15-ledger-outside",
+      "status": "DONE",
+      "started_at": "2026-08-18T10:00:00.000Z",
+      "note": "Outside the 2026-08-20 window; timeline must omit it."
+    }
+  ]
+}
