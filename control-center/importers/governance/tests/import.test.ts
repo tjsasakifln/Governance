@@ -12,6 +12,7 @@ import {
   FIXED_NOW,
   FIXED_SHA,
   FIXTURE_ROOT,
+  NESTED_MANIFEST,
   UNCLASSIFIABLE,
   fixtureBytes,
   fixtureGit,
@@ -146,12 +147,14 @@ describe("importGovernance shipped entry", () => {
     const before = {
       adr: sha256OfFile(EXPLICIT_ADR),
       json: sha256OfFile(EXPLICIT_JSON),
+      nested: sha256OfFile(NESTED_MANIFEST),
       prose: sha256OfFile(AMBIGUOUS_PROSE),
       blob: sha256OfFile(UNCLASSIFIABLE),
     };
     await importFixtures();
     assert.equal(sha256OfFile(EXPLICIT_ADR), before.adr);
     assert.equal(sha256OfFile(EXPLICIT_JSON), before.json);
+    assert.equal(sha256OfFile(NESTED_MANIFEST), before.nested);
     assert.equal(sha256OfFile(AMBIGUOUS_PROSE), before.prose);
     assert.equal(sha256OfFile(UNCLASSIFIABLE), before.blob);
     assert.equal(contentHash(fixtureBytes(EXPLICIT_ADR)), before.adr);
@@ -190,6 +193,30 @@ describe("importGovernance shipped entry", () => {
     });
     assert.equal(result.dry_run, true);
     assert.equal(sink.length, 0);
+  });
+
+  it("projects nested JSON authority without stripping catalog fields from Git", async () => {
+    const result = await importFixtures();
+    const fact = candidateFor(
+      result,
+      "commercial/authority/synthetic-nested-manifest.v1.json",
+    );
+    assert.ok(fact, "expected nested manifest candidate");
+    assert.equal(fact.kind, "fact");
+    assert.notEqual(fact.kind, "decision");
+    const source = readFileSync(NESTED_MANIFEST, "utf8");
+    assert.match(source, /offer_id/);
+    assert.match(source, /amount_cents/);
+    assert.match(fact.body, /CFG-SYNTH-NESTED-v1/);
+    assert.match(fact.body, /amount_cents/);
+    assert.match(fact.body, /12345/);
+    assert.match(fact.body, /synthetic-consumer#1/);
+    assert.match(fact.body, /commercial\/offers\/synthetic-catalog.v1.json/);
+    assert.match(fact.body, /content_hash/);
+    assert.doesNotMatch(fact.body, /"offers"\s*:\s*\[\s*\{\s*\}\s*\]/);
+    assert.doesNotMatch(fact.body, /"consumers"\s*:\s*\[\s*\{\s*\}\s*\]/);
+    assert.doesNotMatch(fact.body, /"artifacts"\s*:\s*\[\s*\{\s*\}\s*\]/);
+    assert.equal(fact.content_hash, sha256OfFile(NESTED_MANIFEST));
   });
 
   it("never infers decision from the word decided in unlabeled text", async () => {

@@ -98,4 +98,55 @@ describe("classifyFile conservative rules", () => {
     }
     assert.equal(result.reason, "binary_or_non_text");
   });
+
+  it("keeps nested catalog fields when projecting JSON without a body field", () => {
+    const source = JSON.stringify({
+      schema_version: "synthetic-nested-manifest.v1",
+      catalog_authority: "APPROVED",
+      consumers: [{ id: "synthetic-consumer#1", role: "test_pin" }],
+      artifacts: [
+        {
+          path: "commercial/offers/synthetic-catalog.v1.json",
+          content_hash:
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      ],
+      offers: [{ offer_id: "CFG-SYNTH-NESTED-v1", amount_cents: 12345, currency: "BRL" }],
+    });
+    const result = classifyFile("commercial/authority/nested.json", encode(source));
+    assert.equal(result.classifiable, true);
+    if (!result.classifiable) {
+      return;
+    }
+    const body = result.records[0]?.body ?? "";
+    assert.equal(result.records[0]?.kind, "fact");
+    assert.match(body, /CFG-SYNTH-NESTED-v1/);
+    assert.match(body, /amount_cents/);
+    assert.match(body, /12345/);
+    assert.match(body, /synthetic-consumer#1/);
+    assert.match(body, /commercial\/offers\/synthetic-catalog.v1.json/);
+    assert.match(body, /content_hash/);
+    assert.doesNotMatch(body, /"offers"\s*:\s*\[\s*\{\s*\}\s*\]/);
+  });
+
+  it("does not strip nested keys on a labeled child record without body", () => {
+    const source = JSON.stringify({
+      records: [
+        {
+          kind: "fact",
+          title: "synthetic nested child",
+          offers: [{ offer_id: "CFG-SYNTH-CHILD-v1", amount_cents: 999 }],
+        },
+      ],
+    });
+    const result = classifyFile("commercial/authority/nested-child.json", encode(source));
+    assert.equal(result.classifiable, true);
+    if (!result.classifiable) {
+      return;
+    }
+    const body = result.records[0]?.body ?? "";
+    assert.match(body, /CFG-SYNTH-CHILD-v1/);
+    assert.match(body, /amount_cents/);
+    assert.match(body, /999/);
+  });
 });

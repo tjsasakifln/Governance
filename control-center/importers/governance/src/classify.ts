@@ -87,7 +87,7 @@ function classifyJson(text: string): FileClassification {
   }
 
   const object = parsed as Record<string, unknown>;
-  const self = labeledJsonRecord(object);
+  const self = labeledJsonRecord(object, text);
   if (self) {
     const nested = labeledChildren(object);
     return { classifiable: true, records: [self, ...nested] };
@@ -102,7 +102,7 @@ function classifyJson(text: string): FileClassification {
     return {
       classifiable: true,
       records: [
-        jsonAsKind(object, "fact", "structured_authority_projection"),
+        jsonAsKind(object, "fact", "structured_authority_projection", text),
       ],
     };
   }
@@ -110,7 +110,7 @@ function classifyJson(text: string): FileClassification {
   if (hasProse(object)) {
     return {
       classifiable: true,
-      records: [jsonAsKind(object, "hypothesis", "unlabeled_json_prose")],
+      records: [jsonAsKind(object, "hypothesis", "unlabeled_json_prose", text)],
     };
   }
 
@@ -134,7 +134,7 @@ function labeledChildren(object: Record<string, unknown>): ClassifiedRecord[] {
   return records;
 }
 
-function labeledJsonRecord(value: unknown): ClassifiedRecord | null {
+function labeledJsonRecord(value: unknown, sourceText?: string): ClassifiedRecord | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -148,18 +148,21 @@ function labeledJsonRecord(value: unknown): ClassifiedRecord | null {
   if (kindRaw === null || !KIND_SET.has(kindRaw)) {
     return null;
   }
-  return jsonAsKind(object, kindRaw as DirectiveKind, "explicit_json_kind");
+  return jsonAsKind(object, kindRaw as DirectiveKind, "explicit_json_kind", sourceText);
 }
 
 function jsonAsKind(
   object: Record<string, unknown>,
   kind: DirectiveKind,
   tag: string,
+  sourceText?: string,
 ): ClassifiedRecord {
   const title = pickString(object, ["title", "name", "id", "schema_version"]) ?? kind;
   const body =
     pickString(object, ["body", "text", "description", "decision"]) ??
-    stableJsonBody(object);
+    (typeof sourceText === "string" && sourceText.length > 0
+      ? sourceText
+      : stableJsonBody(object));
   return {
     kind,
     title: clipTitle(title),
@@ -401,9 +404,30 @@ function hasProse(object: Record<string, unknown>): boolean {
   );
 }
 
+/**
+ * JSON.stringify(obj, Object.keys(obj).sort(), 2) is unsafe: an array replacer
+ * is applied at every nesting level, so nested objects that do not share the
+ * root keys are stripped (empty consumers, offers without amount_cents).
+ * Prefer original source UTF-8 when available; otherwise deep-sort keys.
+ */
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortKeysDeep(item));
+  }
+  if (value !== null && typeof value === "object") {
+    const input = value as Record<string, unknown>;
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(input).sort()) {
+      sorted[key] = sortKeysDeep(input[key]);
+    }
+    return sorted;
+  }
+  return value;
+}
+
 function stableJsonBody(object: Record<string, unknown>): string {
   try {
-    return JSON.stringify(object, Object.keys(object).sort(), 2);
+    return JSON.stringify(sortKeysDeep(object), null, 2);
   } catch {
     return JSON.stringify(object);
   }

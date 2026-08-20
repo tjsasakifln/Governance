@@ -1,0 +1,26 @@
+{
+  "schema_version": "synthetic-nested-manifest.v1",
+  "catalog_authority": "APPROVED",
+  "production_checkout_enabled": false,
+  "consumers": [
+    {
+      "id": "synthetic-consumer#1",
+      "role": "test_pin",
+      "pin": "authority_hash"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "commercial/offers/synthetic-catalog.v1.json",
+      "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "effective_at": "2026-08-20T00:00:00Z"
+    }
+  ],
+  "offers": [
+    {
+      "offer_id": "CFG-SYNTH-NESTED-v1",
+      "amount_cents": 12345,
+      "currency": "BRL"
+    }
+  ]
+}

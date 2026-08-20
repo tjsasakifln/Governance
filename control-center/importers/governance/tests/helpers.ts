@@ -32,6 +32,12 @@ export const UNCLASSIFIABLE = join(
   "blobs",
   "unclassifiable.json",
 );
+export const NESTED_MANIFEST = join(
+  FIXTURE_ROOT,
+  "commercial",
+  "authority",
+  "synthetic-nested-manifest.v1.json",
+);
 
 export const FIXED_NOW = new Date("2026-08-20T15:00:00.000Z");
 export const FIXED_SHA = "a1b2c3d4e5f6789012345678901234567890abcd";
