@@ -1,0 +1,8 @@
+{
+  "state": "failure",
+  "sha": "deadbeef01cafe",
+  "total_count": 1,
+  "statuses": [
+    { "state": "failure", "context": "ci/old" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "total_count": 2,
+  "check_runs": [
+    {
+      "id": 99,
+      "name": "tests",
+      "conclusion": "failure",
+      "status": "completed",
+      "html_url": "https://github.com/tjsasakifln/Governance/runs/99",
+      "started_at": "2026-08-19T11:00:00Z",
+      "completed_at": "2026-08-19T11:05:00Z",
+      "head_sha": "deadbeef01cafe"
+    },
+    {
+      "id": 100,
+      "name": "lint",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/tjsasakifln/Governance/runs/100",
+      "started_at": "2026-08-19T11:00:00Z",
+      "completed_at": "2026-08-19T11:02:00Z",
+      "head_sha": "deadbeef01cafe"
+    }
+  ]
+}

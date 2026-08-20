@@ -1,0 +1,109 @@
+{
+  "repos": ["tjsasakifln/Governance", "tjsasakifln/web-cfg"],
+  "routes": [
+    {
+      "path": "/repos/tjsasakifln/Governance",
+      "status": 200,
+      "headers": { "etag": "W/\"repo-gov-1\"", "x-ratelimit-remaining": "4999" },
+      "bodyFile": "repo-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits",
+      "queryIncludes": { "sha": "main" },
+      "status": 200,
+      "headers": { "etag": "W/\"commits-gov-1\"", "x-ratelimit-remaining": "4998" },
+      "bodyFile": "commits-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/issues",
+      "queryIncludes": { "state": "open" },
+      "status": 200,
+      "headers": { "etag": "W/\"issues-gov-1\"", "x-ratelimit-remaining": "4997" },
+      "bodyFile": "issues-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/pulls",
+      "queryIncludes": { "state": "open" },
+      "status": 200,
+      "headers": { "etag": "W/\"pulls-gov-1\"", "x-ratelimit-remaining": "4996" },
+      "bodyFile": "pulls-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/pulls/12/reviews",
+      "status": 200,
+      "headers": { "etag": "W/\"reviews-12-1\"", "x-ratelimit-remaining": "4995" },
+      "bodyFile": "reviews-12.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/deadbeef01cafe/check-runs",
+      "status": 200,
+      "headers": { "etag": "W/\"checks-pr-1\"", "x-ratelimit-remaining": "4994" },
+      "bodyFile": "check-runs-pr.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/deadbeef01cafe/status",
+      "status": 200,
+      "headers": { "etag": "W/\"status-pr-1\"", "x-ratelimit-remaining": "4993" },
+      "bodyFile": "status-pr.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/abc123def4567890/check-runs",
+      "status": 200,
+      "headers": { "etag": "W/\"checks-main-1\"", "x-ratelimit-remaining": "4992" },
+      "bodyFile": "check-runs-main.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/actions/runs",
+      "queryIncludes": { "status": "completed" },
+      "status": 200,
+      "headers": { "etag": "W/\"workflows-gov-1\"", "x-ratelimit-remaining": "4991" },
+      "bodyFile": "workflow-runs-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/compare/main...cc/05-github-collector",
+      "status": 200,
+      "headers": { "etag": "W/\"compare-gov-1\"", "x-ratelimit-remaining": "4990" },
+      "bodyFile": "compare-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg",
+      "status": 200,
+      "headers": { "etag": "W/\"repo-web-1\"", "x-ratelimit-remaining": "4989" },
+      "bodyFile": "repo-web-cfg.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg/commits",
+      "queryIncludes": { "sha": "main" },
+      "status": 200,
+      "headers": { "etag": "W/\"commits-web-1\"", "x-ratelimit-remaining": "4988" },
+      "bodyFile": "commits-web-cfg.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg/issues",
+      "queryIncludes": { "state": "open" },
+      "status": 200,
+      "headers": { "etag": "W/\"issues-web-1\"", "x-ratelimit-remaining": "4987" },
+      "bodyFile": "issues-empty.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg/pulls",
+      "queryIncludes": { "state": "open" },
+      "status": 200,
+      "headers": { "etag": "W/\"pulls-web-1\"", "x-ratelimit-remaining": "4986" },
+      "bodyFile": "pulls-empty.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg/commits/111aaa222bbb333c/check-runs",
+      "status": 200,
+      "headers": { "etag": "W/\"checks-web-1\"", "x-ratelimit-remaining": "4985" },
+      "bodyFile": "check-runs-web-cfg.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/web-cfg/actions/runs",
+      "queryIncludes": { "status": "completed" },
+      "status": 200,
+      "headers": { "etag": "W/\"workflows-web-1\"", "x-ratelimit-remaining": "4984" },
+      "bodyFile": "workflow-runs-web-cfg.json"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "repos": ["tjsasakifln/Governance"],
+  "routes": [
+    {
+      "path": "/repos/tjsasakifln/Governance",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4999" },
+      "bodyFile": "../populated/repo-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits",
+      "queryIncludes": { "sha": "main" },
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4998" },
+      "bodyFile": "../populated/commits-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/issues",
+      "queryIncludes": { "state": "open" },
+      "status": 500,
+      "headers": { "x-ratelimit-remaining": "4997" },
+      "body": { "message": "Internal Server Error" }
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/pulls",
+      "queryIncludes": { "state": "open" },
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4996" },
+      "bodyFile": "../populated/pulls-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/pulls/12/reviews",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4995" },
+      "bodyFile": "../populated/reviews-12.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/deadbeef01cafe/check-runs",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4994" },
+      "bodyFile": "../populated/check-runs-pr.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/deadbeef01cafe/status",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4993" },
+      "bodyFile": "../populated/status-pr.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/commits/abc123def4567890/check-runs",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4992" },
+      "bodyFile": "../populated/check-runs-main.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/actions/runs",
+      "queryIncludes": { "status": "completed" },
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4991" },
+      "bodyFile": "../populated/workflow-runs-governance.json"
+    },
+    {
+      "path": "/repos/tjsasakifln/Governance/compare/main...cc/05-github-collector",
+      "status": 200,
+      "headers": { "x-ratelimit-remaining": "4990" },
+      "bodyFile": "../populated/compare-governance.json"
+    }
+  ]
+}

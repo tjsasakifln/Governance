@@ -1,0 +1,11 @@
+{
+  "repos": ["tjsasakifln/Governance"],
+  "routes": [
+    {
+      "path": "/repos/tjsasakifln/Governance",
+      "status": 304,
+      "headers": { "etag": "W/\"repo-gov-1\"", "x-ratelimit-remaining": "4999" },
+      "body": ""
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "total_count": 2,
+  "workflow_runs": [
+    {
+      "id": 555,
+      "name": "CI",
+      "head_branch": "cc/05-github-collector",
+      "head_sha": "deadbeef01cafe",
+      "conclusion": "failure",
+      "status": "completed",
+      "html_url": "https://github.com/tjsasakifln/Governance/actions/runs/555",
+      "run_started_at": "2026-08-19T11:00:00Z",
+      "updated_at": "2026-08-19T11:06:00Z"
+    },
+    {
+      "id": 556,
+      "name": "CI",
+      "head_branch": "main",
+      "head_sha": "abc123def4567890",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/tjsasakifln/Governance/actions/runs/556",
+      "run_started_at": "2026-08-19T12:00:00Z",
+      "updated_at": "2026-08-19T12:04:00Z"
+    }
+  ]
+}
