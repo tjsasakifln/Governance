@@ -23,14 +23,31 @@ export { COLLECTOR_IDEMPOTENCY_KEY_FORMAT } from './contracts/collectors.js';
 export type { AgentContext, AgentContextPort, AgentContextQuery } from './contracts/mcp.js';
 export type { CockpitPort, CockpitQuery, CockpitSnapshot } from './contracts/ui.js';
 export {
+  AGENT_ACTIVITY_STATUSES,
   ATTENTION_SEVERITIES,
   ATTENTION_STATUSES,
   COLLECTOR_RUN_STATUSES,
   DIRECTIVE_KINDS,
   DIRECTIVE_STATUSES,
   FRESHNESS_STATUSES,
+  SCOPE_LITERALS,
 } from './types.js';
+export {
+  isConfidence,
+  isDirectiveStatus,
+  isFreshnessStatus,
+  isResourceId,
+  isScope,
+  isSourceRef,
+  isUuid,
+  RESOURCE_ID_PATTERN,
+  SCOPE_PATTERN,
+} from './canonical.js';
+export { generatePublicId, assertPublicId } from './ids.js';
 export type {
+  AgentActivity,
+  AgentActivityRevision,
+  AgentActivityStatus,
   AgentSession,
   AppendAuditEventInput,
   AttentionItem,
@@ -51,9 +68,11 @@ export type {
   Money,
   OperationalSnapshot,
   Provenance,
+  RecordAgentActivityInput,
   RecordObservationInput,
   RecordSnapshotInput,
   SourceObservation,
+  SourceRef,
   StartAgentSessionInput,
   StartCollectorRunInput,
   SupersedeDirectiveInput,

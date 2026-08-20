@@ -1,17 +1,24 @@
 import type { Persistence } from '../../src/index.js';
 
+const SOURCE = {
+  system: 'manual',
+  kind: 'consumer',
+  locator: 'synthetic-consumer',
+  label: 'consumer-script',
+} as const;
+
 export async function persistConsumerSample(persistence: Persistence) {
   const observedAt = new Date('2026-03-01T15:04:05.000Z');
   const created = await persistence.createDirective({
     kind: 'decision',
-    scope: 'ops.exceptions',
+    scope: 'company',
     title: 'Synthetic consumer: prefer exceptions over KPI walls',
     body: 'Consumer-flow sample. No live systems and no personal data.',
     effectiveFrom: observedAt,
     createdBy: 'synthetic-operator-01',
-    source: 'synthetic-consumer',
+    source: SOURCE,
     observedAt,
-    freshnessStatus: 'fresh',
+    freshnessStatus: 'FRESH',
     confidence: 1,
   });
   const audit = await persistence.appendAuditEvent({
@@ -19,11 +26,11 @@ export async function persistConsumerSample(persistence: Persistence) {
     action: 'consumer.sample',
     entityType: 'directive',
     entityId: created.directive.id,
-    scope: 'ops.exceptions',
+    scope: 'company',
     payload: { kind: created.directive.kind },
-    source: 'synthetic-consumer',
+    source: SOURCE,
     observedAt,
-    freshnessStatus: 'fresh',
+    freshnessStatus: 'FRESH',
     confidence: 1,
   });
   return {
@@ -36,29 +43,29 @@ export async function persistConsumerSample(persistence: Persistence) {
 export function assertConsumerSample(
   sample: Awaited<ReturnType<typeof persistConsumerSample>>,
 ): void {
-  if (!sample.directive.id || !sample.directive.currentRevisionId) {
-    throw new Error('directive identity missing');
+  if (!sample.directive.id.startsWith('cc:') || !sample.directive.currentRevisionId.startsWith('cc:')) {
+    throw new Error('directive identity missing cc:* public id');
   }
-  if (sample.revision.source !== 'synthetic-consumer') {
-    throw new Error('revision source missing');
+  if (sample.revision.source.system !== 'manual' || sample.revision.source.kind !== 'consumer') {
+    throw new Error('revision SourceRef missing structured fields');
   }
-  if (!(sample.revision.observedAt instanceof Date)) {
+  if (!(sample.revision.observedAt instanceof Date) || sample.revision.observedAt.toISOString().length === 0) {
     throw new Error('revision observedAt missing');
   }
-  if (sample.revision.freshnessStatus !== 'fresh') {
-    throw new Error('revision freshnessStatus missing');
+  if (sample.revision.freshnessStatus !== 'FRESH') {
+    throw new Error('revision freshnessStatus must be FRESH');
   }
   if (sample.revision.confidence !== 1) {
     throw new Error('revision confidence missing');
   }
-  if (sample.audit.source !== 'synthetic-consumer') {
-    throw new Error('audit source missing');
+  if (sample.audit.source.system !== 'manual' || !sample.audit.source.locator) {
+    throw new Error('audit SourceRef missing');
   }
   if (!(sample.audit.observedAt instanceof Date)) {
     throw new Error('audit observedAt missing');
   }
-  if (sample.audit.freshnessStatus !== 'fresh') {
-    throw new Error('audit freshnessStatus missing');
+  if (sample.audit.freshnessStatus !== 'FRESH') {
+    throw new Error('audit freshnessStatus must be FRESH');
   }
   if (sample.audit.action !== 'consumer.sample') {
     throw new Error('audit action missing');

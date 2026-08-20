@@ -1,23 +1,34 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { generatePublicId } from '../ids.js';
 import { NotFoundError } from '../errors.js';
 import { logEvent } from '../log.js';
+import { sourceColumns, toUtcIso } from '../money.js';
 import { mapAuditEvent, type AuditEventRow } from '../rows.js';
 import type { AppendAuditEventInput, AuditEvent } from '../types.js';
-import { appendAuditEventInputSchema, parseInput, scopedIdQuerySchema, scopeQuerySchema } from '../validation.js';
+import {
+  appendAuditEventInputSchema,
+  parseInput,
+  publicIdQuerySchema,
+  scopedIdQuerySchema,
+  scopeQuerySchema,
+} from '../validation.js';
 
 const AUDIT_COLUMNS = `
   id, occurred_at, actor, action, entity_type, entity_id, scope, payload,
-  source, observed_at, freshness_status
+  source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence
 `;
 
 export async function insertAuditEvent(tx: PoolClient, raw: AppendAuditEventInput): Promise<AuditEvent> {
   const input = parseInput(appendAuditEventInputSchema, raw, 'appendAuditEvent');
-  const id = randomUUID();
+  const id = generatePublicId('audit-event');
+  const source = sourceColumns(input.source);
   const result = await tx.query(
     `INSERT INTO control_center.audit_events (
-       id, actor, action, entity_type, entity_id, scope, payload, source, observed_at, freshness_status
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)
+       id, actor, action, entity_type, entity_id, scope, payload,
+       source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14)
      RETURNING ${AUDIT_COLUMNS}`,
     [
       id,
@@ -27,9 +38,13 @@ export async function insertAuditEvent(tx: PoolClient, raw: AppendAuditEventInpu
       input.entityId ?? null,
       input.scope,
       JSON.stringify(input.payload ?? {}),
-      input.source,
-      input.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
+      input.confidence,
     ],
   );
   logEvent('audit.append', {
@@ -42,12 +57,13 @@ export async function insertAuditEvent(tx: PoolClient, raw: AppendAuditEventInpu
 }
 
 export async function getAuditEvent(tx: PoolClient, id: string): Promise<AuditEvent> {
+  const parsed = parseInput(publicIdQuerySchema, { id }, 'getAuditEvent');
   const result = await tx.query(
     `SELECT ${AUDIT_COLUMNS} FROM control_center.audit_events WHERE id = $1`,
-    [id],
+    [parsed.id],
   );
   if (result.rowCount !== 1) {
-    throw new NotFoundError(`audit event ${id} not found`);
+    throw new NotFoundError(`audit event ${parsed.id} not found`);
   }
   return mapAuditEvent(result.rows[0] as AuditEventRow);
 }

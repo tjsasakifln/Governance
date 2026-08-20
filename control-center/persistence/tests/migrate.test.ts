@@ -57,6 +57,21 @@ test('migrate up then down then up recreates named tables and current-state obje
   assert.ok(indexNames.includes('source_observations_scope_observed_idx'));
   assert.ok(indexNames.includes('audit_events_scope_occurred_idx'));
   assert.ok(indexNames.includes('current_directives_scope_status_idx'));
+  assert.ok(indexNames.includes('agent_activities_scope_started_idx'));
+  assert.ok(afterFirstUp.tables.includes('agent_activities'));
+  assert.ok(afterFirstUp.tables.includes('directive_supersedes'));
+
+  const freshnessFn = await ctx.pool.query<{ ok: boolean }>(
+    `SELECT control_center.is_freshness('FRESH') AND NOT control_center.is_freshness('fresh')
+            AND NOT control_center.is_freshness('expired')
+            AND control_center.is_freshness('ERROR') AS ok`,
+  );
+  assert.equal(freshnessFn.rows[0]?.ok, true);
+  const statusFn = await ctx.pool.query<{ ok: boolean }>(
+    `SELECT control_center.is_directive_status('revoked')
+            AND NOT control_center.is_directive_status('withdrawn') AS ok`,
+  );
+  assert.equal(statusFn.rows[0]?.ok, true);
 
   const down = await migrateDown(ctx.pool);
   assert.deepEqual(down, ['002_current_state', '001_init']);

@@ -1,31 +1,38 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { NotFoundError } from '../errors.js';
+import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
-import { moneyColumns } from '../money.js';
+import { moneyColumns, sourceColumns, toUtcIso } from '../money.js';
 import { mapAttention, type AttentionRow } from '../rows.js';
 import type { AttentionItem, CreateAttentionItemInput } from '../types.js';
 import { createAttentionItemInputSchema, parseInput, scopedIdQuerySchema, scopeQuerySchema } from '../validation.js';
 import { insertAuditEvent } from './audit.js';
 
 const ATTENTION_COLUMNS = `
-  id, scope, severity, title, body, status, source, observed_at, freshness_status,
+  id, scope, severity, title, body, status,
+  source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status,
   confidence, related_directive_id, money_amount_cents, money_currency, expires_at,
   created_at, updated_at
 `;
 
 async function upsertCurrentAttention(tx: PoolClient, item: AttentionItem): Promise<void> {
+  const source = sourceColumns(item.source);
   await tx.query(
     `INSERT INTO control_center.current_attention_items (
-       attention_item_id, scope, severity, status, title, source, observed_at,
-       freshness_status, confidence, money_amount_cents, money_currency, updated_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+       attention_item_id, scope, severity, status, title,
+       source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence, money_amount_cents, money_currency, updated_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
      ON CONFLICT (attention_item_id) DO UPDATE SET
        scope = EXCLUDED.scope,
        severity = EXCLUDED.severity,
        status = EXCLUDED.status,
        title = EXCLUDED.title,
-       source = EXCLUDED.source,
+       source_system = EXCLUDED.source_system,
+       source_kind = EXCLUDED.source_kind,
+       source_locator = EXCLUDED.source_locator,
+       source_label = EXCLUDED.source_label,
        observed_at = EXCLUDED.observed_at,
        freshness_status = EXCLUDED.freshness_status,
        confidence = EXCLUDED.confidence,
@@ -38,8 +45,11 @@ async function upsertCurrentAttention(tx: PoolClient, item: AttentionItem): Prom
       item.severity,
       item.status,
       item.title,
-      item.source,
-      item.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(item.observedAt),
       item.freshnessStatus,
       item.confidence,
       item.money?.amountCents ?? null,
@@ -55,12 +65,15 @@ async function refreshOpenAttention(tx: PoolClient): Promise<void> {
 export async function createAttentionItem(tx: PoolClient, raw: CreateAttentionItemInput): Promise<AttentionItem> {
   const input = parseInput(createAttentionItemInputSchema, raw, 'createAttentionItem');
   const money = moneyColumns(input.money ?? null);
-  const id = randomUUID();
+  const source = sourceColumns(input.source);
+  const id = generatePublicId('attention-item');
   const result = await tx.query(
     `INSERT INTO control_center.attention_items (
-       id, scope, severity, title, body, status, source, observed_at, freshness_status,
+       id, scope, severity, title, body, status,
+       source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status,
        confidence, related_directive_id, money_amount_cents, money_currency, expires_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING ${ATTENTION_COLUMNS}`,
     [
       id,
@@ -69,14 +82,17 @@ export async function createAttentionItem(tx: PoolClient, raw: CreateAttentionIt
       input.title,
       input.body,
       input.status,
-      input.source,
-      input.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
-      input.confidence ?? null,
+      input.confidence,
       input.relatedDirectiveId ?? null,
       money.amountCents,
       money.currency,
-      input.expiresAt ? input.expiresAt.toISOString() : null,
+      input.expiresAt ? toUtcIso(input.expiresAt) : null,
     ],
   );
   const item = mapAttention(result.rows[0] as AttentionRow);
@@ -110,7 +126,7 @@ export async function resolveAttentionItem(
      SET status = 'resolved', updated_at = now(), observed_at = $3
      WHERE id = $1 AND scope = $2
      RETURNING ${ATTENTION_COLUMNS}`,
-    [parsed.id, parsed.scope, observedAt.toISOString()],
+    [parsed.id, parsed.scope, toUtcIso(observedAt)],
   );
   if (result.rowCount !== 1) {
     throw new NotFoundError(`attention item ${parsed.id} not found in scope ${parsed.scope}`);

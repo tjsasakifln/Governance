@@ -1,23 +1,26 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
-import { moneyColumns } from '../money.js';
+import { moneyColumns, sourceColumns, toUtcIso } from '../money.js';
 import { mapObservation, type ObservationRow } from '../rows.js';
 import type { RecordObservationInput, SourceObservation } from '../types.js';
 import { parseInput, recordObservationInputSchema, scopeQuerySchema } from '../validation.js';
 import { insertAuditEvent } from './audit.js';
 
 const OBSERVATION_COLUMNS = `
-  id, source, observed_at, freshness_status, confidence, scope, observation_kind,
+  id, source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence, scope, observation_kind,
   payload, money_amount_cents, money_currency, idempotency_key, collector_run_id, created_at
 `;
 
 async function upsertCurrentObservation(tx: PoolClient, observation: SourceObservation): Promise<void> {
+  const source = sourceColumns(observation.source);
   await tx.query(
     `INSERT INTO control_center.current_source_observations (
-       source, scope, observation_id, observed_at, freshness_status, confidence, updated_at
-     ) VALUES ($1,$2,$3,$4,$5,$6, now())
-     ON CONFLICT (source, scope) DO UPDATE SET
+       source_system, source_kind, source_locator, scope, observation_id,
+       observed_at, freshness_status, confidence, updated_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())
+     ON CONFLICT (source_system, source_kind, source_locator, scope) DO UPDATE SET
        observation_id = EXCLUDED.observation_id,
        observed_at = EXCLUDED.observed_at,
        freshness_status = EXCLUDED.freshness_status,
@@ -25,10 +28,12 @@ async function upsertCurrentObservation(tx: PoolClient, observation: SourceObser
        updated_at = now()
      WHERE EXCLUDED.observed_at >= control_center.current_source_observations.observed_at`,
     [
-      observation.source,
+      source.system,
+      source.kind,
+      source.locator,
       observation.scope,
       observation.id,
-      observation.observedAt.toISOString(),
+      toUtcIso(observation.observedAt),
       observation.freshnessStatus,
       observation.confidence,
     ],
@@ -42,20 +47,25 @@ export async function recordObservation(
   const input = parseInput(recordObservationInputSchema, raw, 'recordObservation');
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [input.idempotencyKey]);
   const money = moneyColumns(input.money ?? null);
-  const id = randomUUID();
+  const source = sourceColumns(input.source);
+  const id = generatePublicId('source-observation');
   const insert = await tx.query(
     `INSERT INTO control_center.source_observations (
-       id, source, observed_at, freshness_status, confidence, scope, observation_kind,
+       id, source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence, scope, observation_kind,
        payload, money_amount_cents, money_currency, idempotency_key, collector_run_id
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15)
      ON CONFLICT (idempotency_key) DO NOTHING
      RETURNING ${OBSERVATION_COLUMNS}`,
     [
       id,
-      input.source,
-      input.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
-      input.confidence ?? null,
+      input.confidence,
       input.scope,
       input.observationKind,
       JSON.stringify(input.payload ?? {}),
@@ -96,7 +106,6 @@ export async function recordObservation(
     logEvent('observation.record', {
       observationId: observation.id,
       scope: observation.scope,
-      source: observation.source,
     });
   }
   return { observation, inserted };

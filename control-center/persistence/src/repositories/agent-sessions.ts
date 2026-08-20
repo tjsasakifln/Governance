@@ -1,34 +1,42 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { NotFoundError } from '../errors.js';
+import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
+import { sourceColumns, toUtcIso } from '../money.js';
 import { mapAgentSession, type AgentSessionRow } from '../rows.js';
 import type { AgentSession, StartAgentSessionInput } from '../types.js';
 import { parseInput, scopedIdQuerySchema, scopeQuerySchema, startAgentSessionInputSchema } from '../validation.js';
 import { insertAuditEvent } from './audit.js';
 
 const SESSION_COLUMNS = `
-  id, scope, agent_id, started_at, ended_at, context_query, source, observed_at,
-  freshness_status, confidence
+  id, scope, agent_id, started_at, ended_at, context_query,
+  source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence
 `;
 
 export async function startAgentSession(tx: PoolClient, raw: StartAgentSessionInput): Promise<AgentSession> {
   const input = parseInput(startAgentSessionInputSchema, raw, 'startAgentSession');
-  const id = randomUUID();
+  const id = generatePublicId('agent-session');
+  const source = sourceColumns(input.source);
   const result = await tx.query(
     `INSERT INTO control_center.agent_sessions (
-       id, scope, agent_id, context_query, source, observed_at, freshness_status, confidence
-     ) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8)
+       id, scope, agent_id, context_query,
+       source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence
+     ) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11)
      RETURNING ${SESSION_COLUMNS}`,
     [
       id,
       input.scope,
       input.agentId,
       JSON.stringify(input.contextQuery ?? {}),
-      input.source,
-      input.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
-      input.confidence ?? null,
+      input.confidence,
     ],
   );
   const session = mapAgentSession(result.rows[0] as AgentSessionRow);

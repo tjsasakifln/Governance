@@ -1,6 +1,18 @@
 import { z } from 'zod';
+import {
+  isConfidence,
+  isFreshnessStatus,
+  isResourceId,
+  isScope,
+  isSourceRef,
+  isUuid,
+  RESOURCE_ID_PATTERN,
+  SOURCE_KIND_PATTERN,
+  SOURCE_SYSTEM_PATTERN,
+} from './canonical.js';
 import { ValidationError } from './errors.js';
 import {
+  AGENT_ACTIVITY_STATUSES,
   ATTENTION_SEVERITIES,
   ATTENTION_STATUSES,
   DIRECTIVE_KINDS,
@@ -15,16 +27,41 @@ export const moneySchema = z.object({
   currency: isoCurrency,
 });
 
-export const scopeSchema = z.string().trim().min(1).max(256);
-export const sourceSchema = z.string().trim().min(1).max(256);
+export const scopeSchema = z.string().superRefine((value, ctx) => {
+  if (!isScope(value)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'scope is not the canonical Control Center grammar' });
+  }
+});
+
+export const resourceIdSchema = z.string().superRefine((value, ctx) => {
+  if (isUuid(value)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'UUID is not a public identity' });
+    return;
+  }
+  if (!isResourceId(value)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `must match ${RESOURCE_ID_PATTERN}` });
+  }
+});
+
+export const nullableResourceIdSchema = z.union([resourceIdSchema, z.null()]).optional().default(null);
+
+export const sourceRefSchema = z
+  .object({
+    system: z.string().regex(new RegExp(SOURCE_SYSTEM_PATTERN)).min(1).max(64),
+    kind: z.string().regex(new RegExp(SOURCE_KIND_PATTERN)).min(1).max(64),
+    locator: z.string().min(1).max(512),
+    label: z.string().min(1).max(128).optional(),
+  })
+  .strict();
+
 export const freshnessSchema = z.enum(FRESHNESS_STATUSES);
-export const confidenceSchema = z.number().min(0).max(1).nullable();
+export const confidenceSchema = z.number().min(0).max(1);
 
 export const provenanceSchema = z.object({
-  source: sourceSchema,
+  source: sourceRefSchema,
   observedAt: z.date(),
   freshnessStatus: freshnessSchema,
-  confidence: confidenceSchema.optional().default(null),
+  confidence: confidenceSchema,
 });
 
 export const createDirectiveInputSchema = provenanceSchema.extend({
@@ -37,11 +74,11 @@ export const createDirectiveInputSchema = provenanceSchema.extend({
   expiresAt: z.date().nullable().optional().default(null),
   createdBy: z.string().trim().min(1).max(256),
   recordedBy: z.string().trim().min(1).max(256).optional(),
-  supersedes: z.string().uuid().nullable().optional().default(null),
+  supersedes: z.array(resourceIdSchema).optional().default([]),
 });
 
 export const supersedeDirectiveInputSchema = provenanceSchema.extend({
-  existingId: z.string().uuid(),
+  existingId: resourceIdSchema,
   kind: z.enum(DIRECTIVE_KINDS),
   scope: scopeSchema,
   title: z.string().trim().min(1).max(512),
@@ -58,7 +95,7 @@ export const recordObservationInputSchema = provenanceSchema.extend({
   payload: z.record(z.unknown()).optional().default({}),
   money: moneySchema.nullable().optional().default(null),
   idempotencyKey: z.string().trim().min(1).max(512),
-  collectorRunId: z.string().uuid().nullable().optional().default(null),
+  collectorRunId: nullableResourceIdSchema,
 });
 
 export const startCollectorRunInputSchema = provenanceSchema.extend({
@@ -68,13 +105,13 @@ export const startCollectorRunInputSchema = provenanceSchema.extend({
 });
 
 export const finishCollectorRunInputSchema = z.object({
-  id: z.string().uuid(),
+  id: resourceIdSchema,
   status: z.enum(['succeeded', 'failed', 'skipped'] as const),
   errorCode: z.string().trim().min(1).max(64).nullable().optional().default(null),
   stats: z.record(z.unknown()).optional().default({}),
   observedAt: z.date(),
   freshnessStatus: freshnessSchema,
-  confidence: confidenceSchema.optional().default(null),
+  confidence: confidenceSchema,
 });
 
 export const recordSnapshotInputSchema = provenanceSchema.extend({
@@ -90,7 +127,7 @@ export const createAttentionItemInputSchema = provenanceSchema.extend({
   title: z.string().trim().min(1).max(512),
   body: z.string().min(1).max(20000),
   status: z.enum(ATTENTION_STATUSES).optional().default('open'),
-  relatedDirectiveId: z.string().uuid().nullable().optional().default(null),
+  relatedDirectiveId: nullableResourceIdSchema,
   money: moneySchema.nullable().optional().default(null),
   expiresAt: z.date().nullable().optional().default(null),
 });
@@ -101,11 +138,23 @@ export const startAgentSessionInputSchema = provenanceSchema.extend({
   contextQuery: z.record(z.unknown()).optional().default({}),
 });
 
+export const recordAgentActivityInputSchema = provenanceSchema.extend({
+  correlationId: z.string().trim().min(1).max(128),
+  agentId: z.string().trim().min(1).max(256),
+  scope: scopeSchema,
+  status: z.enum(AGENT_ACTIVITY_STATUSES).optional().default('RUNNING'),
+  goal: z.string().trim().min(1).max(512),
+  summary: z.string().min(1).max(20000),
+  startedAt: z.date().optional(),
+  finishedAt: z.date().nullable().optional().default(null),
+  payload: z.record(z.unknown()).optional().default({}),
+});
+
 export const appendAuditEventInputSchema = provenanceSchema.extend({
   actor: z.string().trim().min(1).max(256),
   action: z.string().trim().min(1).max(128),
   entityType: z.string().trim().min(1).max(64),
-  entityId: z.string().uuid().nullable().optional().default(null),
+  entityId: nullableResourceIdSchema,
   scope: scopeSchema,
   payload: z.record(z.unknown()).optional().default({}),
 });
@@ -116,7 +165,11 @@ export const scopeQuerySchema = z.object({
 
 export const scopedIdQuerySchema = z.object({
   scope: scopeSchema,
-  id: z.string().uuid(),
+  id: resourceIdSchema,
+});
+
+export const publicIdQuerySchema = z.object({
+  id: resourceIdSchema,
 });
 
 export function parseInput<S extends z.ZodTypeAny>(schema: S, value: unknown, label: string): z.output<S> {
@@ -125,4 +178,29 @@ export function parseInput<S extends z.ZodTypeAny>(schema: S, value: unknown, la
     throw new ValidationError(`${label}: ${result.error.issues.map((issue) => issue.message).join('; ')}`);
   }
   return result.data;
+}
+
+export function assertCanonicalWrite(value: {
+  freshnessStatus?: unknown;
+  status?: unknown;
+  scope?: unknown;
+  source?: unknown;
+  confidence?: unknown;
+  id?: unknown;
+}): void {
+  if (value.freshnessStatus !== undefined && !isFreshnessStatus(value.freshnessStatus)) {
+    throw new ValidationError('freshnessStatus must be FRESH|STALE|UNKNOWN|ERROR');
+  }
+  if (value.scope !== undefined && !isScope(value.scope)) {
+    throw new ValidationError('scope is not the canonical Control Center grammar');
+  }
+  if (value.source !== undefined && !isSourceRef(value.source)) {
+    throw new ValidationError('source must be a structured SourceRef');
+  }
+  if (value.confidence !== undefined && !isConfidence(value.confidence)) {
+    throw new ValidationError('confidence must be in [0,1]');
+  }
+  if (value.id !== undefined && isUuid(value.id)) {
+    throw new ValidationError('UUID is not a public identity');
+  }
 }

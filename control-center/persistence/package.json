@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test --test-concurrency=1 tests/migrate.test.ts tests/invariants.test.ts tests/concurrency.test.ts tests/consumer.test.ts",
+    "test": "node --import tsx --test --test-concurrency=1 tests/migrate.test.ts tests/invariants.test.ts tests/concurrency.test.ts tests/canonical.test.ts tests/consumer.test.ts",
     "migrate:up": "tsx src/cli.ts migrate:up",
     "migrate:down": "tsx src/cli.ts migrate:down",
     "seed": "tsx src/cli.ts seed"

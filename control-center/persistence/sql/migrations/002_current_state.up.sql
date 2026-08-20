@@ -1,18 +1,20 @@
 CREATE TABLE control_center.current_directives (
-  directive_id UUID PRIMARY KEY REFERENCES control_center.directives (id),
-  revision_id UUID NOT NULL REFERENCES control_center.directive_revisions (id),
+  directive_id TEXT PRIMARY KEY REFERENCES control_center.directives (id),
+  revision_id TEXT NOT NULL REFERENCES control_center.directive_revisions (id),
   kind TEXT NOT NULL CHECK (kind IN ('decision', 'directive', 'fact', 'constraint', 'priority', 'risk', 'hypothesis')),
-  scope TEXT NOT NULL CHECK (char_length(btrim(scope)) BETWEEN 1 AND 256),
-  status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'superseded', 'expired', 'withdrawn')),
+  scope TEXT NOT NULL CHECK (control_center.is_scope(scope)),
+  status TEXT NOT NULL CHECK (control_center.is_directive_status(status)),
   title TEXT NOT NULL CHECK (char_length(btrim(title)) BETWEEN 1 AND 512),
   effective_from TIMESTAMPTZ NOT NULL,
   expires_at TIMESTAMPTZ,
-  supersedes UUID,
   created_by TEXT NOT NULL,
-  source TEXT NOT NULL CHECK (char_length(btrim(source)) BETWEEN 1 AND 256),
+  source_system TEXT NOT NULL CHECK (control_center.is_source_system(source_system)),
+  source_kind TEXT NOT NULL CHECK (control_center.is_source_kind(source_kind)),
+  source_locator TEXT NOT NULL CHECK (char_length(btrim(source_locator)) BETWEEN 1 AND 512),
+  source_label TEXT CHECK (source_label IS NULL OR char_length(btrim(source_label)) BETWEEN 1 AND 128),
   observed_at TIMESTAMPTZ NOT NULL,
-  freshness_status TEXT NOT NULL CHECK (freshness_status IN ('fresh', 'stale', 'unknown', 'expired')),
-  confidence NUMERIC(5, 4) CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+  freshness_status TEXT NOT NULL CHECK (control_center.is_freshness(freshness_status)),
+  confidence NUMERIC(5, 4) NOT NULL CHECK (control_center.is_confidence(confidence)),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -20,15 +22,18 @@ CREATE INDEX current_directives_scope_status_idx
   ON control_center.current_directives (scope, status, kind);
 
 CREATE TABLE control_center.current_attention_items (
-  attention_item_id UUID PRIMARY KEY REFERENCES control_center.attention_items (id),
-  scope TEXT NOT NULL CHECK (char_length(btrim(scope)) BETWEEN 1 AND 256),
+  attention_item_id TEXT PRIMARY KEY REFERENCES control_center.attention_items (id),
+  scope TEXT NOT NULL CHECK (control_center.is_scope(scope)),
   severity TEXT NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'low')),
   status TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved', 'dismissed')),
   title TEXT NOT NULL,
-  source TEXT NOT NULL CHECK (char_length(btrim(source)) BETWEEN 1 AND 256),
+  source_system TEXT NOT NULL CHECK (control_center.is_source_system(source_system)),
+  source_kind TEXT NOT NULL CHECK (control_center.is_source_kind(source_kind)),
+  source_locator TEXT NOT NULL CHECK (char_length(btrim(source_locator)) BETWEEN 1 AND 512),
+  source_label TEXT CHECK (source_label IS NULL OR char_length(btrim(source_label)) BETWEEN 1 AND 128),
   observed_at TIMESTAMPTZ NOT NULL,
-  freshness_status TEXT NOT NULL CHECK (freshness_status IN ('fresh', 'stale', 'unknown', 'expired')),
-  confidence NUMERIC(5, 4) CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+  freshness_status TEXT NOT NULL CHECK (control_center.is_freshness(freshness_status)),
+  confidence NUMERIC(5, 4) NOT NULL CHECK (control_center.is_confidence(confidence)),
   money_amount_cents BIGINT,
   money_currency CHAR(3),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -38,14 +43,16 @@ CREATE INDEX current_attention_items_scope_status_idx
   ON control_center.current_attention_items (scope, status, severity);
 
 CREATE TABLE control_center.current_source_observations (
-  source TEXT NOT NULL CHECK (char_length(btrim(source)) BETWEEN 1 AND 256),
-  scope TEXT NOT NULL CHECK (char_length(btrim(scope)) BETWEEN 1 AND 256),
-  observation_id UUID NOT NULL REFERENCES control_center.source_observations (id),
+  source_system TEXT NOT NULL CHECK (control_center.is_source_system(source_system)),
+  source_kind TEXT NOT NULL CHECK (control_center.is_source_kind(source_kind)),
+  source_locator TEXT NOT NULL CHECK (char_length(btrim(source_locator)) BETWEEN 1 AND 512),
+  scope TEXT NOT NULL CHECK (control_center.is_scope(scope)),
+  observation_id TEXT NOT NULL REFERENCES control_center.source_observations (id),
   observed_at TIMESTAMPTZ NOT NULL,
-  freshness_status TEXT NOT NULL CHECK (freshness_status IN ('fresh', 'stale', 'unknown', 'expired')),
-  confidence NUMERIC(5, 4) CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
+  freshness_status TEXT NOT NULL CHECK (control_center.is_freshness(freshness_status)),
+  confidence NUMERIC(5, 4) NOT NULL CHECK (control_center.is_confidence(confidence)),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (source, scope)
+  PRIMARY KEY (source_system, source_kind, source_locator, scope)
 );
 
 CREATE MATERIALIZED VIEW control_center.mv_open_attention AS
@@ -55,7 +62,10 @@ SELECT
   severity,
   title,
   status,
-  source,
+  source_system,
+  source_kind,
+  source_locator,
+  source_label,
   observed_at,
   freshness_status,
   confidence,

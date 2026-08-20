@@ -1,5 +1,5 @@
 import { ValidationError } from './errors.js';
-import type { Money } from './types.js';
+import type { Money, SourceRef } from './types.js';
 
 export function parseCents(value: string | number | null): number | null {
   if (value === null) {
@@ -12,9 +12,9 @@ export function parseCents(value: string | number | null): number | null {
   return n;
 }
 
-export function parseConfidence(value: string | number | null): number | null {
+export function parseConfidence(value: string | number | null): number {
   if (value === null) {
-    return null;
+    throw new ValidationError('confidence is required');
   }
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n) || n < 0 || n > 1) {
@@ -45,4 +45,46 @@ export function moneyColumns(money: Money | null | undefined): {
     return { amountCents: null, currency: null };
   }
   return { amountCents: money.amountCents, currency: money.currency };
+}
+
+export function sourceColumns(source: SourceRef): {
+  system: string;
+  kind: string;
+  locator: string;
+  label: string | null;
+} {
+  return {
+    system: source.system,
+    kind: source.kind,
+    locator: source.locator,
+    label: source.label ?? null,
+  };
+}
+
+export function mapSourceRef(row: {
+  source_system: string;
+  source_kind: string;
+  source_locator: string;
+  source_label: string | null;
+}): SourceRef {
+  const source: SourceRef = {
+    system: row.source_system,
+    kind: row.source_kind,
+    locator: row.source_locator,
+  };
+  if (row.source_label) {
+    source.label = row.source_label;
+  }
+  return source;
+}
+
+export function asTextArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string');
+  }
+  return [];
+}
+
+export function toUtcIso(value: Date): string {
+  return value.toISOString();
 }

@@ -11,7 +11,12 @@ This workstream does not chat, does not replace origin systems, and does not mut
 - Current state is derived into `current_directives`, `current_attention_items`, `current_source_observations`, plus materialized view `mv_open_attention`.
 - Soft supersession inserts a replacement directive (`supersedes = old id`), appends a new superseded revision on the old identity, and updates current pointers. The original revision row is left unchanged.
 - Collectors are idempotent on `idempotency_key` (`UNIQUE` + `INSERT ... ON CONFLICT DO NOTHING`).
-- Aggregated facts require `source`, `observed_at`, `freshness_status`. `confidence` is optional (`0..1`).
+- Aggregated facts require structured `SourceRef` (`system`, `kind`, `locator`, optional `label`), `observed_at`, `freshness_status`, and `confidence` in `[0,1]`.
+- Public identities are text `cc:<type>:<id>`. UUID columns exist only as non-exported internal surrogates.
+- `freshness_status` is exactly `FRESH|STALE|UNKNOWN|ERROR`. `expired` is a directive status, not freshness. Lowercase tokens are rejected.
+- Directive `status` is `draft|active|superseded|revoked|expired`. `withdrawn` is rejected.
+- `supersedes` is a list of public `cc:*` ids stored on join tables.
+- AgentActivity lives on `agent_activities` (+ append-only `agent_activity_revisions`), not on `agent_sessions`.
 - Money is integer cents plus a 3-letter currency code. Internal timestamps are `timestamptz` (UTC). Presentation may use `America/Sao_Paulo` in consumers, not in this package.
 - Agents and UI must query by `scope`. There is no public “list entire company memory” API.
 - Database credentials come from `CONTROL_CENTER_DATABASE_URL`. No identity or password is hardcoded.
@@ -72,6 +77,7 @@ This campaign does **not** implement destructive purge (audit is append-only). D
 | `operational_snapshots` | 90 days hot | cold archive |
 | `attention_items` | resolved/dismissed 1 year | archive |
 | `agent_sessions` | 1 year | archive |
+| `agent_activities`, `agent_activity_revisions` | 2 years | archive; never mixed with `agent_sessions` |
 | current-state tables / `mv_open_attention` | derived | rebuilt from history, not a system of record |
 
 No production or personal data is imported here. Seeds use opaque synthetic tokens (`synthetic-operator-01`, `synthetic-agent-mcp-01`).
@@ -87,6 +93,7 @@ See `sql/queries/principal.sql`. All list queries take a `scope` parameter.
 - Collector run by idempotency key
 - Scoped audit trail for an entity
 - Recent agent sessions for a scope
+- Agent activity execution ledger for a scope (separate table)
 
 ## Convergence contracts
 
@@ -107,7 +114,9 @@ Financial/provider mutations stay forbidden. This package will not grow checkout
 
 - `kind` ∈ `{decision, directive, fact, constraint, priority, risk, hypothesis}`
 - Directives carry `scope`, `status`, `effective_from`, `expires_at`, `supersedes`, `created_by`
-- `freshness_status` ∈ `{fresh, stale, unknown, expired}`
+- `freshness_status` ∈ `{FRESH, STALE, UNKNOWN, ERROR}`
+- Directive `status` ∈ `{draft, active, superseded, revoked, expired}`
 - Unique collector/observation `idempotency_key`
 - Unique `(directive_id, revision_no)`
 - Append-only history; current pointers are the only derived overwrite
+- Public ids match `cc:*`; UUID is never the public identity

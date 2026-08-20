@@ -1,6 +1,8 @@
 import { jsonObject } from './db.js';
-import { moneyFromColumns, parseConfidence } from './money.js';
+import { asTextArray, mapSourceRef, moneyFromColumns, parseConfidence } from './money.js';
 import type {
+  AgentActivity,
+  AgentActivityRevision,
   AgentSession,
   AttentionItem,
   AuditEvent,
@@ -15,6 +17,13 @@ import type {
   SourceObservation,
 } from './types.js';
 
+type SourceColumns = {
+  source_system: string;
+  source_kind: string;
+  source_locator: string;
+  source_label: string | null;
+};
+
 export type DirectiveRow = {
   id: string;
   kind: DirectiveKind;
@@ -24,7 +33,7 @@ export type DirectiveRow = {
   body: string;
   effective_from: Date;
   expires_at: Date | null;
-  supersedes: string | null;
+  supersedes: unknown;
   created_by: string;
   created_at: Date;
   current_revision_id: string;
@@ -41,15 +50,14 @@ export type DirectiveRevisionRow = {
   body: string;
   effective_from: Date;
   expires_at: Date | null;
-  supersedes: string | null;
+  supersedes: unknown;
   created_by: string;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   recorded_at: Date;
   recorded_by: string;
-};
+} & SourceColumns;
 
 export type CurrentDirectiveRow = {
   directive_id: string;
@@ -60,14 +68,13 @@ export type CurrentDirectiveRow = {
   title: string;
   effective_from: Date;
   expires_at: Date | null;
-  supersedes: string | null;
+  supersedes: unknown;
   created_by: string;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   updated_at: Date;
-};
+} & SourceColumns;
 
 export type CollectorRunRow = {
   id: string;
@@ -76,21 +83,19 @@ export type CollectorRunRow = {
   status: CollectorRun['status'];
   started_at: Date;
   finished_at: Date | null;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   scope: string;
   error_code: string | null;
   stats: unknown;
-};
+} & SourceColumns;
 
 export type ObservationRow = {
   id: string;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   scope: string;
   observation_kind: string;
   payload: unknown;
@@ -99,21 +104,20 @@ export type ObservationRow = {
   idempotency_key: string;
   collector_run_id: string | null;
   created_at: Date;
-};
+} & SourceColumns;
 
 export type SnapshotRow = {
   id: string;
   scope: string;
   snapshot_kind: string;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   payload: unknown;
   money_amount_cents: string | number | null;
   money_currency: string | null;
   created_at: Date;
-};
+} & SourceColumns;
 
 export type AttentionRow = {
   id: string;
@@ -122,17 +126,16 @@ export type AttentionRow = {
   title: string;
   body: string;
   status: AttentionItem['status'];
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
+  confidence: string | number;
   related_directive_id: string | null;
   money_amount_cents: string | number | null;
   money_currency: string | null;
   expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
-};
+} & SourceColumns;
 
 export type AgentSessionRow = {
   id: string;
@@ -141,11 +144,40 @@ export type AgentSessionRow = {
   started_at: Date;
   ended_at: Date | null;
   context_query: unknown;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-  confidence: string | number | null;
-};
+  confidence: string | number;
+} & SourceColumns;
+
+export type AgentActivityRow = {
+  id: string;
+  correlation_id: string;
+  scope: string;
+  agent_id: string;
+  status: AgentActivity['status'];
+  goal: string;
+  summary: string;
+  started_at: Date;
+  finished_at: Date | null;
+  observed_at: Date;
+  freshness_status: FreshnessStatus;
+  confidence: string | number;
+  payload: unknown;
+  current_revision_no: number;
+  created_at: Date;
+} & SourceColumns;
+
+export type AgentActivityRevisionRow = {
+  id: string;
+  activity_id: string;
+  revision_no: number;
+  status: AgentActivity['status'];
+  summary: string;
+  observed_at: Date;
+  freshness_status: FreshnessStatus;
+  confidence: string | number;
+  recorded_at: Date;
+} & SourceColumns;
 
 export type AuditEventRow = {
   id: string;
@@ -156,10 +188,10 @@ export type AuditEventRow = {
   entity_id: string | null;
   scope: string;
   payload: unknown;
-  source: string;
   observed_at: Date;
   freshness_status: FreshnessStatus;
-};
+  confidence: string | number;
+} & SourceColumns;
 
 export function mapDirective(row: DirectiveRow): Directive {
   return {
@@ -171,7 +203,7 @@ export function mapDirective(row: DirectiveRow): Directive {
     body: row.body,
     effectiveFrom: row.effective_from,
     expiresAt: row.expires_at,
-    supersedes: row.supersedes,
+    supersedes: asTextArray(row.supersedes),
     createdBy: row.created_by,
     createdAt: row.created_at,
     currentRevisionId: row.current_revision_id,
@@ -190,9 +222,9 @@ export function mapRevision(row: DirectiveRevisionRow): DirectiveRevision {
     body: row.body,
     effectiveFrom: row.effective_from,
     expiresAt: row.expires_at,
-    supersedes: row.supersedes,
+    supersedes: asTextArray(row.supersedes),
     createdBy: row.created_by,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -211,9 +243,9 @@ export function mapCurrentDirective(row: CurrentDirectiveRow): CurrentDirective 
     title: row.title,
     effectiveFrom: row.effective_from,
     expiresAt: row.expires_at,
-    supersedes: row.supersedes,
+    supersedes: asTextArray(row.supersedes),
     createdBy: row.created_by,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -229,7 +261,7 @@ export function mapCollectorRun(row: CollectorRunRow): CollectorRun {
     status: row.status,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -242,7 +274,7 @@ export function mapCollectorRun(row: CollectorRunRow): CollectorRun {
 export function mapObservation(row: ObservationRow): SourceObservation {
   return {
     id: row.id,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -261,7 +293,7 @@ export function mapSnapshot(row: SnapshotRow): OperationalSnapshot {
     id: row.id,
     scope: row.scope,
     snapshotKind: row.snapshot_kind,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -279,7 +311,7 @@ export function mapAttention(row: AttentionRow): AttentionItem {
     title: row.title,
     body: row.body,
     status: row.status,
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
@@ -299,10 +331,46 @@ export function mapAgentSession(row: AgentSessionRow): AgentSession {
     startedAt: row.started_at,
     endedAt: row.ended_at,
     contextQuery: jsonObject(row.context_query),
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
     confidence: parseConfidence(row.confidence),
+  };
+}
+
+export function mapAgentActivity(row: AgentActivityRow): AgentActivity {
+  return {
+    id: row.id,
+    correlationId: row.correlation_id,
+    scope: row.scope,
+    agentId: row.agent_id,
+    status: row.status,
+    goal: row.goal,
+    summary: row.summary,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    source: mapSourceRef(row),
+    observedAt: row.observed_at,
+    freshnessStatus: row.freshness_status,
+    confidence: parseConfidence(row.confidence),
+    payload: jsonObject(row.payload),
+    currentRevisionNo: row.current_revision_no,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapAgentActivityRevision(row: AgentActivityRevisionRow): AgentActivityRevision {
+  return {
+    id: row.id,
+    activityId: row.activity_id,
+    revisionNo: row.revision_no,
+    status: row.status,
+    summary: row.summary,
+    source: mapSourceRef(row),
+    observedAt: row.observed_at,
+    freshnessStatus: row.freshness_status,
+    confidence: parseConfidence(row.confidence),
+    recordedAt: row.recorded_at,
   };
 }
 
@@ -316,9 +384,9 @@ export function mapAuditEvent(row: AuditEventRow): AuditEvent {
     entityId: row.entity_id,
     scope: row.scope,
     payload: jsonObject(row.payload),
-    source: row.source,
+    source: mapSourceRef(row),
     observedAt: row.observed_at,
     freshnessStatus: row.freshness_status,
-    confidence: null,
+    confidence: parseConfidence(row.confidence),
   };
 }

@@ -1,25 +1,15 @@
-export const DIRECTIVE_KINDS = [
-  'decision',
-  'directive',
-  'fact',
-  'constraint',
-  'priority',
-  'risk',
-  'hypothesis',
-] as const;
-export type DirectiveKind = (typeof DIRECTIVE_KINDS)[number];
+export {
+  DIRECTIVE_KINDS,
+  DIRECTIVE_STATUSES,
+  FRESHNESS_STATUSES,
+  SCOPE_LITERALS,
+  type DirectiveKind,
+  type DirectiveStatus,
+  type FreshnessStatus,
+  type SourceRef,
+} from './canonical.js';
 
-export const DIRECTIVE_STATUSES = [
-  'draft',
-  'active',
-  'superseded',
-  'expired',
-  'withdrawn',
-] as const;
-export type DirectiveStatus = (typeof DIRECTIVE_STATUSES)[number];
-
-export const FRESHNESS_STATUSES = ['fresh', 'stale', 'unknown', 'expired'] as const;
-export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
+import type { DirectiveKind, DirectiveStatus, FreshnessStatus, SourceRef } from './canonical.js';
 
 export const COLLECTOR_RUN_STATUSES = ['started', 'succeeded', 'failed', 'skipped'] as const;
 export type CollectorRunStatus = (typeof COLLECTOR_RUN_STATUSES)[number];
@@ -30,16 +20,26 @@ export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
 export const ATTENTION_STATUSES = ['open', 'acknowledged', 'resolved', 'dismissed'] as const;
 export type AttentionStatus = (typeof ATTENTION_STATUSES)[number];
 
+export const AGENT_ACTIVITY_STATUSES = [
+  'RUNNING',
+  'DONE',
+  'PARTIAL',
+  'BLOCKED',
+  'FAILED',
+  'UNKNOWN',
+] as const;
+export type AgentActivityStatus = (typeof AGENT_ACTIVITY_STATUSES)[number];
+
 export type Money = {
   amountCents: number;
   currency: string;
 };
 
 export type Provenance = {
-  source: string;
+  source: SourceRef;
   observedAt: Date;
   freshnessStatus: FreshnessStatus;
-  confidence: number | null;
+  confidence: number;
 };
 
 export type Directive = {
@@ -51,7 +51,7 @@ export type Directive = {
   body: string;
   effectiveFrom: Date;
   expiresAt: Date | null;
-  supersedes: string | null;
+  supersedes: string[];
   createdBy: string;
   createdAt: Date;
   currentRevisionId: string;
@@ -68,7 +68,7 @@ export type DirectiveRevision = {
   body: string;
   effectiveFrom: Date;
   expiresAt: Date | null;
-  supersedes: string | null;
+  supersedes: string[];
   createdBy: string;
   recordedAt: Date;
   recordedBy: string;
@@ -83,7 +83,7 @@ export type CurrentDirective = {
   title: string;
   effectiveFrom: Date;
   expiresAt: Date | null;
-  supersedes: string | null;
+  supersedes: string[];
   createdBy: string;
   updatedAt: Date;
 } & Provenance;
@@ -143,6 +143,30 @@ export type AgentSession = {
   contextQuery: Record<string, unknown>;
 } & Provenance;
 
+export type AgentActivity = {
+  id: string;
+  correlationId: string;
+  scope: string;
+  agentId: string;
+  status: AgentActivityStatus;
+  goal: string;
+  summary: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  payload: Record<string, unknown>;
+  currentRevisionNo: number;
+  createdAt: Date;
+} & Provenance;
+
+export type AgentActivityRevision = {
+  id: string;
+  activityId: string;
+  revisionNo: number;
+  status: AgentActivityStatus;
+  summary: string;
+  recordedAt: Date;
+} & Provenance;
+
 export type AuditEvent = {
   id: string;
   occurredAt: Date;
@@ -164,7 +188,7 @@ export type CreateDirectiveInput = {
   expiresAt?: Date | null;
   createdBy: string;
   recordedBy?: string;
-  supersedes?: string | null;
+  supersedes?: string[];
 } & Provenance;
 
 export type SupersedeDirectiveInput = {
@@ -201,7 +225,7 @@ export type FinishCollectorRunInput = {
   stats?: Record<string, unknown>;
   observedAt: Date;
   freshnessStatus: FreshnessStatus;
-  confidence?: number | null;
+  confidence: number;
 };
 
 export type RecordSnapshotInput = {
@@ -226,6 +250,18 @@ export type StartAgentSessionInput = {
   scope: string;
   agentId: string;
   contextQuery?: Record<string, unknown>;
+} & Provenance;
+
+export type RecordAgentActivityInput = {
+  correlationId: string;
+  agentId: string;
+  scope: string;
+  status?: AgentActivityStatus;
+  goal: string;
+  summary: string;
+  startedAt?: Date;
+  finishedAt?: Date | null;
+  payload?: Record<string, unknown>;
 } & Provenance;
 
 export type AppendAuditEventInput = {

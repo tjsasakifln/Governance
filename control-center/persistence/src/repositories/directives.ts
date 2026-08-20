@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { NotFoundError, ValidationError } from '../errors.js';
+import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
+import { sourceColumns, toUtcIso } from '../money.js';
 import {
   mapCurrentDirective,
   mapDirective,
@@ -15,32 +16,70 @@ import type {
   CurrentDirective,
   Directive,
   DirectiveRevision,
+  SourceRef,
   SupersedeDirectiveInput,
 } from '../types.js';
 import {
   parseInput,
   createDirectiveInputSchema,
+  publicIdQuerySchema,
   scopedIdQuerySchema,
   scopeQuerySchema,
   supersedeDirectiveInputSchema,
 } from '../validation.js';
 import { insertAuditEvent } from './audit.js';
 
+const DIRECTIVE_SUPERSEDES_SQL = `(
+  SELECT COALESCE(array_agg(s.superseded_id ORDER BY s.superseded_id), ARRAY[]::text[])
+  FROM control_center.directive_supersedes s
+  WHERE s.directive_id = control_center.directives.id
+) AS supersedes`;
+
+const REVISION_SUPERSEDES_SQL = `(
+  SELECT COALESCE(array_agg(s.superseded_id ORDER BY s.superseded_id), ARRAY[]::text[])
+  FROM control_center.directive_revision_supersedes s
+  WHERE s.revision_id = control_center.directive_revisions.id
+) AS supersedes`;
+
+const CURRENT_SUPERSEDES_SQL = `(
+  SELECT COALESCE(array_agg(s.superseded_id ORDER BY s.superseded_id), ARRAY[]::text[])
+  FROM control_center.directive_supersedes s
+  WHERE s.directive_id = control_center.current_directives.directive_id
+) AS supersedes`;
+
 const DIRECTIVE_COLUMNS = `
-  id, kind, scope, status, title, body, effective_from, expires_at, supersedes,
-  created_by, created_at, current_revision_id
+  id, kind, scope, status, title, body, effective_from, expires_at,
+  created_by, created_at, current_revision_id, ${DIRECTIVE_SUPERSEDES_SQL}
 `;
 
 const REVISION_COLUMNS = `
   id, directive_id, revision_no, kind, scope, status, title, body, effective_from,
-  expires_at, supersedes, created_by, source, observed_at, freshness_status,
-  confidence, recorded_at, recorded_by
+  expires_at, created_by, source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence, recorded_at, recorded_by,
+  ${REVISION_SUPERSEDES_SQL}
 `;
 
 const CURRENT_COLUMNS = `
   directive_id, revision_id, kind, scope, status, title, effective_from, expires_at,
-  supersedes, created_by, source, observed_at, freshness_status, confidence, updated_at
+  created_by, source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence, updated_at,
+  ${CURRENT_SUPERSEDES_SQL}
 `;
+
+async function insertSupersedes(
+  tx: PoolClient,
+  table: 'directive_supersedes' | 'directive_revision_supersedes',
+  ownerColumn: 'directive_id' | 'revision_id',
+  ownerId: string,
+  supersededIds: string[],
+): Promise<void> {
+  for (const supersededId of supersededIds) {
+    await tx.query(
+      `INSERT INTO control_center.${table} (${ownerColumn}, superseded_id) VALUES ($1, $2)`,
+      [ownerId, supersededId],
+    );
+  }
+}
 
 async function insertRevision(
   tx: PoolClient,
@@ -55,23 +94,24 @@ async function insertRevision(
     body: string;
     effectiveFrom: Date;
     expiresAt: Date | null;
-    supersedes: string | null;
+    supersedes: string[];
     createdBy: string;
-    source: string;
+    source: SourceRef;
     observedAt: Date;
     freshnessStatus: string;
-    confidence: number | null;
+    confidence: number;
     recordedBy: string;
   },
 ): Promise<DirectiveRevision> {
-  const result = await tx.query(
+  const source = sourceColumns(params.source);
+  await tx.query(
     `INSERT INTO control_center.directive_revisions (
        id, directive_id, revision_no, kind, scope, status, title, body, effective_from,
-       expires_at, supersedes, created_by, source, observed_at, freshness_status,
-       confidence, recorded_by
+       expires_at, created_by, source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence, recorded_by
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
-     ) RETURNING ${REVISION_COLUMNS}`,
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+     )`,
     [
       params.id,
       params.directiveId,
@@ -81,27 +121,42 @@ async function insertRevision(
       params.status,
       params.title,
       params.body,
-      params.effectiveFrom.toISOString(),
-      params.expiresAt ? params.expiresAt.toISOString() : null,
-      params.supersedes,
+      toUtcIso(params.effectiveFrom),
+      params.expiresAt ? toUtcIso(params.expiresAt) : null,
       params.createdBy,
-      params.source,
-      params.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(params.observedAt),
       params.freshnessStatus,
       params.confidence,
       params.recordedBy,
     ],
   );
-  return mapRevision(result.rows[0] as DirectiveRevisionRow);
+  await insertSupersedes(
+    tx,
+    'directive_revision_supersedes',
+    'revision_id',
+    params.id,
+    params.supersedes,
+  );
+  const loaded = await tx.query(
+    `SELECT ${REVISION_COLUMNS} FROM control_center.directive_revisions WHERE id = $1`,
+    [params.id],
+  );
+  return mapRevision(loaded.rows[0] as DirectiveRevisionRow);
 }
 
 async function upsertCurrent(tx: PoolClient, revision: DirectiveRevision): Promise<void> {
+  const source = sourceColumns(revision.source);
   await tx.query(
     `INSERT INTO control_center.current_directives (
        directive_id, revision_id, kind, scope, status, title, effective_from, expires_at,
-       supersedes, created_by, source, observed_at, freshness_status, confidence, updated_at
+       created_by, source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence, updated_at
      ) VALUES (
-       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now()
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now()
      )
      ON CONFLICT (directive_id) DO UPDATE SET
        revision_id = EXCLUDED.revision_id,
@@ -111,9 +166,11 @@ async function upsertCurrent(tx: PoolClient, revision: DirectiveRevision): Promi
        title = EXCLUDED.title,
        effective_from = EXCLUDED.effective_from,
        expires_at = EXCLUDED.expires_at,
-       supersedes = EXCLUDED.supersedes,
        created_by = EXCLUDED.created_by,
-       source = EXCLUDED.source,
+       source_system = EXCLUDED.source_system,
+       source_kind = EXCLUDED.source_kind,
+       source_locator = EXCLUDED.source_locator,
+       source_label = EXCLUDED.source_label,
        observed_at = EXCLUDED.observed_at,
        freshness_status = EXCLUDED.freshness_status,
        confidence = EXCLUDED.confidence,
@@ -125,12 +182,14 @@ async function upsertCurrent(tx: PoolClient, revision: DirectiveRevision): Promi
       revision.scope,
       revision.status,
       revision.title,
-      revision.effectiveFrom.toISOString(),
-      revision.expiresAt ? revision.expiresAt.toISOString() : null,
-      revision.supersedes,
+      toUtcIso(revision.effectiveFrom),
+      revision.expiresAt ? toUtcIso(revision.expiresAt) : null,
       revision.createdBy,
-      revision.source,
-      revision.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(revision.observedAt),
       revision.freshnessStatus,
       revision.confidence,
     ],
@@ -145,16 +204,17 @@ export async function createDirective(tx: PoolClient, raw: CreateDirectiveInput)
   if (input.expiresAt && input.expiresAt <= input.effectiveFrom) {
     throw new ValidationError('expiresAt must be after effectiveFrom');
   }
-  const directiveId = randomUUID();
-  const revisionId = randomUUID();
+  const directiveId = generatePublicId('directive');
+  const revisionId = generatePublicId('directive-revision');
   const recordedBy = input.recordedBy ?? input.createdBy;
   const status = input.status;
+  const supersedes = input.supersedes ?? [];
 
   await tx.query(
     `INSERT INTO control_center.directives (
-       id, kind, scope, status, title, body, effective_from, expires_at, supersedes,
+       id, kind, scope, status, title, body, effective_from, expires_at,
        created_by, current_revision_id
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
       directiveId,
       input.kind,
@@ -162,9 +222,8 @@ export async function createDirective(tx: PoolClient, raw: CreateDirectiveInput)
       status,
       input.title,
       input.body,
-      input.effectiveFrom.toISOString(),
-      input.expiresAt ? input.expiresAt.toISOString() : null,
-      input.supersedes ?? null,
+      toUtcIso(input.effectiveFrom),
+      input.expiresAt ? toUtcIso(input.expiresAt) : null,
       input.createdBy,
       revisionId,
     ],
@@ -181,14 +240,15 @@ export async function createDirective(tx: PoolClient, raw: CreateDirectiveInput)
     body: input.body,
     effectiveFrom: input.effectiveFrom,
     expiresAt: input.expiresAt ?? null,
-    supersedes: input.supersedes ?? null,
+    supersedes,
     createdBy: input.createdBy,
     source: input.source,
     observedAt: input.observedAt,
     freshnessStatus: input.freshnessStatus,
-    confidence: input.confidence ?? null,
+    confidence: input.confidence,
     recordedBy,
   });
+  await insertSupersedes(tx, 'directive_supersedes', 'directive_id', directiveId, supersedes);
 
   const directiveResult = await tx.query(
     `SELECT ${DIRECTIVE_COLUMNS} FROM control_center.directives WHERE id = $1`,
@@ -206,7 +266,7 @@ export async function createDirective(tx: PoolClient, raw: CreateDirectiveInput)
     source: input.source,
     observedAt: input.observedAt,
     freshnessStatus: input.freshnessStatus,
-    confidence: input.confidence ?? null,
+    confidence: input.confidence,
   });
   logEvent('directive.create', { directiveId, kind: input.kind, scope: input.scope });
   return { directive, revision };
@@ -246,16 +306,16 @@ export async function supersedeDirective(tx: PoolClient, raw: SupersedeDirective
     expiresAt: input.expiresAt ?? null,
     createdBy: input.createdBy,
     recordedBy: input.recordedBy ?? input.createdBy,
-    supersedes: input.existingId,
+    supersedes: [input.existingId],
     source: input.source,
     observedAt: input.observedAt,
     freshnessStatus: input.freshnessStatus,
-    confidence: input.confidence ?? null,
+    confidence: input.confidence,
   });
 
   const nextRevisionNo = originalRevision.revisionNo + 1;
   const supersededRevision = await insertRevision(tx, {
-    id: randomUUID(),
+    id: generatePublicId('directive-revision'),
     directiveId: originalDirective.id,
     revisionNo: nextRevisionNo,
     kind: originalDirective.kind,
@@ -270,7 +330,7 @@ export async function supersedeDirective(tx: PoolClient, raw: SupersedeDirective
     source: input.source,
     observedAt: input.observedAt,
     freshnessStatus: input.freshnessStatus,
-    confidence: input.confidence ?? null,
+    confidence: input.confidence,
     recordedBy: input.recordedBy ?? input.createdBy,
   });
 
@@ -299,11 +359,11 @@ export async function supersedeDirective(tx: PoolClient, raw: SupersedeDirective
     entityType: 'directive',
     entityId: replacement.id,
     scope: input.scope,
-    payload: { supersedes: originalDirective.id, originalRevisionId: originalRevision.id },
+    payload: { supersedes: [originalDirective.id], originalRevisionId: originalRevision.id },
     source: input.source,
     observedAt: input.observedAt,
     freshnessStatus: input.freshnessStatus,
-    confidence: input.confidence ?? null,
+    confidence: input.confidence,
   });
   logEvent('directive.supersede', {
     directiveId: replacement.id,
@@ -321,23 +381,25 @@ export async function supersedeDirective(tx: PoolClient, raw: SupersedeDirective
 }
 
 export async function getDirective(tx: PoolClient, id: string): Promise<Directive> {
+  const parsed = parseInput(publicIdQuerySchema, { id }, 'getDirective');
   const result = await tx.query(
     `SELECT ${DIRECTIVE_COLUMNS} FROM control_center.directives WHERE id = $1`,
-    [id],
+    [parsed.id],
   );
   if (result.rowCount !== 1) {
-    throw new NotFoundError(`directive ${id} not found`);
+    throw new NotFoundError(`directive ${parsed.id} not found`);
   }
   return mapDirective(result.rows[0] as DirectiveRow);
 }
 
 export async function getRevision(tx: PoolClient, id: string): Promise<DirectiveRevision> {
+  const parsed = parseInput(publicIdQuerySchema, { id }, 'getRevision');
   const result = await tx.query(
     `SELECT ${REVISION_COLUMNS} FROM control_center.directive_revisions WHERE id = $1`,
-    [id],
+    [parsed.id],
   );
   if (result.rowCount !== 1) {
-    throw new NotFoundError(`directive revision ${id} not found`);
+    throw new NotFoundError(`directive revision ${parsed.id} not found`);
   }
   return mapRevision(result.rows[0] as DirectiveRevisionRow);
 }

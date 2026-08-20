@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { NotFoundError } from '../errors.js';
+import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
+import { sourceColumns, toUtcIso } from '../money.js';
 import { mapCollectorRun, type CollectorRunRow } from '../rows.js';
 import type { CollectorRun, FinishCollectorRunInput, StartCollectorRunInput } from '../types.js';
 import {
@@ -13,7 +14,8 @@ import {
 import { insertAuditEvent } from './audit.js';
 
 const RUN_COLUMNS = `
-  id, collector_name, idempotency_key, status, started_at, finished_at, source,
+  id, collector_name, idempotency_key, status, started_at, finished_at,
+  source_system, source_kind, source_locator, source_label,
   observed_at, freshness_status, confidence, scope, error_code, stats
 `;
 
@@ -23,22 +25,27 @@ export async function startCollectorRun(
 ): Promise<{ run: CollectorRun; inserted: boolean }> {
   const input = parseInput(startCollectorRunInputSchema, raw, 'startCollectorRun');
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [input.idempotencyKey]);
-  const id = randomUUID();
+  const id = generatePublicId('collector-run');
+  const source = sourceColumns(input.source);
   const insert = await tx.query(
     `INSERT INTO control_center.collector_runs (
-       id, collector_name, idempotency_key, status, source, observed_at, freshness_status,
-       confidence, scope, stats
-     ) VALUES ($1,$2,$3,'started',$4,$5,$6,$7,$8,'{}'::jsonb)
+       id, collector_name, idempotency_key, status,
+       source_system, source_kind, source_locator, source_label,
+       observed_at, freshness_status, confidence, scope, stats
+     ) VALUES ($1,$2,$3,'started',$4,$5,$6,$7,$8,$9,$10,$11,'{}'::jsonb)
      ON CONFLICT (idempotency_key) DO NOTHING
      RETURNING ${RUN_COLUMNS}`,
     [
       id,
       input.collectorName,
       input.idempotencyKey,
-      input.source,
-      input.observedAt.toISOString(),
+      source.system,
+      source.kind,
+      source.locator,
+      source.label,
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
-      input.confidence ?? null,
+      input.confidence,
       input.scope,
     ],
   );
@@ -86,9 +93,9 @@ export async function finishCollectorRun(tx: PoolClient, raw: FinishCollectorRun
     [
       input.id,
       input.status,
-      input.observedAt.toISOString(),
+      toUtcIso(input.observedAt),
       input.freshnessStatus,
-      input.confidence ?? null,
+      input.confidence,
       input.errorCode ?? null,
       JSON.stringify(input.stats ?? {}),
     ],

@@ -6,6 +6,10 @@ import {
   migrateDown,
   migrateUp,
 } from './migrate.js';
+import {
+  listAgentActivitiesByScope,
+  recordAgentActivity,
+} from './repositories/agent-activities.js';
 import { endAgentSession, listAgentSessionsByScope, startAgentSession } from './repositories/agent-sessions.js';
 import { createAttentionItem, listAttentionItemsByScope, resolveAttentionItem } from './repositories/attention-items.js';
 import { getAuditEvent, insertAuditEvent, listAuditEventsByScope, listAuditEventsForEntity } from './repositories/audit.js';
@@ -30,6 +34,7 @@ import type {
   CreateAttentionItemInput,
   CreateDirectiveInput,
   FinishCollectorRunInput,
+  RecordAgentActivityInput,
   RecordObservationInput,
   RecordSnapshotInput,
   StartAgentSessionInput,
@@ -138,6 +143,14 @@ export class Persistence {
 
   async listAgentSessionsByScope(scope: string) {
     return withTransaction(this.pool, (tx) => listAgentSessionsByScope(tx, scope));
+  }
+
+  async recordAgentActivity(input: RecordAgentActivityInput) {
+    return withTransaction(this.pool, (tx) => recordAgentActivity(tx, input));
+  }
+
+  async listAgentActivitiesByScope(scope: string) {
+    return withTransaction(this.pool, (tx) => listAgentActivitiesByScope(tx, scope));
   }
 
   async appendAuditEvent(input: AppendAuditEventInput) {
