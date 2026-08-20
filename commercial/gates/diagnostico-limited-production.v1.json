@@ -1,0 +1,21 @@
+{
+  "schema_version": "diagnostico-limited-production.v1",
+  "overlay_id": "CFG-DIAG-LIMITED-PRODUCTION-v1",
+  "decision_token": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW_2026_08_18",
+  "source_package": "commercial/legal/founder-approved-v1/",
+  "approved_offer_id": "CFG-DIAG-EXP-v1",
+  "approved_amount_cents": 800000,
+  "approved_billing_mode": "ONE_TIME",
+  "scoped_terms_version": "CFG-LEGAL-TERMS-DIAG-EXP-FOUNDER-v1",
+  "portfolio_terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "portfolio_terms_replaced": false,
+  "public_activation_approved": true,
+  "production_checkout_approved": true,
+  "recurring_checkout_approved": false,
+  "automated_refund_approved": false,
+  "automated_nfse_approved": false,
+  "does_not_flip_portfolio_gates": true,
+  "legal_approved_claim_forbidden": true,
+  "effective_from": "2026-08-18T00:00:00Z",
+  "effective_to": null
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/mapping-copyback.v1.schema.json",
+  "title": "CONFENGE founder Asaas mapping copy-back payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "records"],
+  "properties": {
+    "schema_version": { "const": "mapping-copyback.v1" },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/record" }
+    }
+  },
+  "$defs": {
+    "nullable_id": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offer_id",
+        "asaas_product_id",
+        "checkout_id",
+        "subscription_mapping",
+        "environment",
+        "created_at",
+        "copied_at"
+      ],
+      "properties": {
+        "offer_id": { "type": "string", "minLength": 1 },
+        "asaas_product_id": { "$ref": "#/$defs/nullable_id" },
+        "checkout_id": { "$ref": "#/$defs/nullable_id" },
+        "subscription_mapping": { "$ref": "#/$defs/nullable_id" },
+        "environment": { "type": "string", "enum": ["SANDBOX", "PRODUCTION"] },
+        "created_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "copied_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        }
+      }
+    }
+  }
+}

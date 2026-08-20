@@ -3,12 +3,14 @@
 This directory is the only commercial-offer truth plane for CONFENGE v1.  
 Do not copy these files into web-cfg or Warmbly as a second catalog. Pin them.
 
+The stable consumer contract is `commercial/CONSUMER-CONTRACT.md`. The compatibility contract (`commercial/compatibility/consumer-compatibility.v1.json`, rule `GOVERNANCE_WINS`) records canonical representation vs accepted consumer aliases. Do not copy aliases back into Governance.
+
 ## Who consumes what
 
 | Consumer | Role | What to read |
 |---|---|---|
-| `web-cfg#88` | delivery parent — catalog, contracting, capacity, terms | `catalog.public.v1.json` for any public surface; `catalog.v1.json` for the internal registry; `production-gates.v1.json` before any checkout flag; `capacity-policy.v1.json` before a recurring hold |
-| `Warmbly#47` | reconciliation / learning consumer | `authority-manifest.v1.json` plus gates and capacity; never treat provider `customer`/`checkout`/`subscription`/`payment` **created** as received revenue |
+| `web-cfg#88` | delivery parent — catalog, contracting, capacity, terms | `catalog.public.v1.json` for any public surface; `catalog.v1.json` for the internal registry; `production-gates.v1.json` before any checkout flag; `diagnostico-limited-production.v1.json` for the Diagnóstico overlay; `asaas-mapping.v1.json` for provider IDs; `capacity-policy.v1.json` before a recurring hold |
+| `Warmbly#47` | reconciliation / learning consumer | `authority-manifest.v1.json` plus gates, overlay, mapping and capacity; never treat provider `customer`/`checkout`/`subscription`/`payment` **created** as received revenue |
 | Governance #1 | residual human issue | stays open; not a machine source after this package exists |
 
 ## How to pin (no second truth plane)
@@ -47,6 +49,8 @@ manual_preparation_approved    = true
 `ACTIVE` is illegal while required gates are `UNKNOWN` or `PENDING`.  
 `UNKNOWN` is not approval.
 
+Diagnóstico limited production is a **scoped overlay** (`commercial/gates/diagnostico-limited-production.v1.json`) for `CFG-DIAG-EXP-v1` / `800000` / `ONE_TIME` only. It does not flip the portfolio flags above, does not authorize recurring checkout, and does not replace `CFG-TERMS-B2B-2026-08-17-v1`. `PAUSED`, `sold_out` and `RETIRED` still block checkout.
+
 ## Public vs private
 
 - Public surface: `commercial/offers/catalog.public.v1.json` only.
@@ -67,5 +71,11 @@ manual_preparation_approved    = true
 - `schemas/offer-catalog.v1.schema.json`
 - `schemas/production-gates.v1.schema.json`
 - `schemas/authority-manifest.v1.schema.json`
+- `schemas/provider-mapping.v1.schema.json`
+- `schemas/diagnostico-limited-production.v1.schema.json`
+- `schemas/consumer-compatibility.v1.schema.json`
+- `schemas/mapping-copyback.v1.schema.json`
+
+Read-only CI fixture: `commercial/fixtures/consumer-compatibility.ci.v1.json`. Founder mapping copy-back: `python scripts/validate_commercial_authority.py --check-mapping <payload.json>` (no Asaas call).
 
 Validate local fixtures with the shipped validator functions. Do not re-implement totals or hashing.

@@ -1,0 +1,17 @@
+{
+  "campaign": "CONFENGE-GOVERNANCE-OFFER-AUTHORITY-CONVERGENCE-01",
+  "repository": "tjsasakifln/Governance",
+  "branch": "campaign/CONFENGE-GOVERNANCE-OFFER-AUTHORITY-CONVERGENCE-01",
+  "baseline_main_sha": "4d4388ce7208ddac0f78576b69185bbaf2203d30",
+  "governance_issue": 1,
+  "consumers": ["web-cfg#88", "Warmbly#47"],
+  "verdict": "OFFER_CATALOG_AUTHORITY_READY_FOR_ASAAS_REGISTRATION",
+  "authority_hash": "sha256:3ddf29b13971e8dcfcef2be7df6649fa7d8dd43d80a67c9f4bd4c484ccceed38",
+  "compatibility_hash": "sha256:5c81196fc6db9b5e03a7dd0a89458699722491d55905ad6ba8a3951c784ba689",
+  "catalog_authority": "APPROVED",
+  "production_checkout_enabled": false,
+  "recurring_checkout_approved": false,
+  "diagnostico_limited_production_overlay": true,
+  "asaas_mapping_status": "PENDING_MANUAL_CADASTRO",
+  "low_friction_sku": "PENDING_FOUNDER_INPUT"
+}

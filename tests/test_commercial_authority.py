@@ -360,3 +360,130 @@ def test_validate_package_and_cli_twice(tmp_path, capsys):
     line2 = [line for line in out2.splitlines() if line.startswith("AUTHORITY_HASH ")][0]
     assert line1 == line2
     assert line1.split()[1] == first["authority_hash"]
+    verdict1 = [line for line in out1.splitlines() if line.startswith("VERDICT ")][0]
+    verdict2 = [line for line in out2.splitlines() if line.startswith("VERDICT ")][0]
+    assert verdict1 == verdict2
+    assert verdict1.split(" ", 1)[1] in {v.VERDICT_READY, v.VERDICT_BLOCKED}
+
+
+def overlay():
+    return v.load_json(ROOT / "commercial" / "gates" / "diagnostico-limited-production.v1.json")
+
+
+def mapping_doc():
+    return v.load_json(ROOT / "commercial" / "providers" / "asaas-mapping.v1.json")
+
+
+def test_named_fields_present_for_four_documented_offers():
+    offers = {item["offer_id"]: item for item in catalog()["offers"]}
+    assert set(offers) == set(v.CANONICAL_OFFER_CODES)
+    for item in offers.values():
+        for field in v.NAMED_OFFER_FIELDS:
+            assert field in item
+        v.assert_named_offer_fields(item)
+        assert item["offer_id"] == item["offer_code"]
+        assert item["status"] in {"DRAFT", "APPROVED", "ACTIVE", "PAUSED", "RETIRED"}
+        assert item["currency"] == "BRL"
+        assert isinstance(item["amount_cents"], int)
+
+
+def test_documented_v1_amounts_and_totals_hold():
+    offers = {item["offer_id"]: item for item in catalog()["offers"]}
+    assert offers["CFG-DIAG-EXP-v1"]["amount_cents"] == 800000
+    assert offers["CFG-DIAG-EXP-v1"]["billing_mode"] == "ONE_TIME"
+    flex = offers["CFG-DIRB2G-FLEX-v1"]
+    assert flex["amount_cents"] == 2000000
+    assert flex["max_payments"] is None
+    plan_180 = offers["CFG-DIRB2G-180-v1"]
+    assert plan_180["total_commitment_cents"] == 6 * 1500000
+    plan_365 = offers["CFG-DIRB2G-365-v1"]
+    assert plan_365["total_commitment_cents"] == 12 * 1250000
+
+
+def test_paused_sold_out_and_retired_cannot_checkout():
+    diag = offer_by_code("CFG-DIAG-EXP-v1")
+    gates = gates_doc()
+    ov = overlay()
+    assert v.commercial_checkout_permitted(offer=diag, gates_doc=gates, overlay=ov) is True
+
+    paused = deepcopy(diag)
+    paused["status"] = "PAUSED"
+    assert v.offer_checkout_blocked_by_lifecycle(paused) is True
+    assert v.commercial_checkout_permitted(offer=paused, gates_doc=gates, overlay=ov) is False
+
+    sold = deepcopy(diag)
+    sold["sold_out"] = True
+    assert v.commercial_checkout_permitted(offer=sold, gates_doc=gates, overlay=ov) is False
+
+    retired = deepcopy(diag)
+    retired["status"] = "RETIRED"
+    assert v.commercial_checkout_permitted(offer=retired, gates_doc=gates, overlay=ov) is False
+
+    draft = deepcopy(diag)
+    draft["status"] = "DRAFT"
+    assert v.commercial_checkout_permitted(offer=draft, gates_doc=gates, overlay=ov) is False
+
+
+def test_recurring_checkout_blocked_while_overlay_does_not_flip_gates():
+    gates = gates_doc()
+    ov = overlay()
+    v.assert_overlay_does_not_flip_portfolio_gates(ov, gates)
+    assert gates["production_checkout_enabled"] is False
+    assert ov["production_checkout_approved"] is True
+    assert ov["recurring_checkout_approved"] is False
+    for code in ("CFG-DIRB2G-FLEX-v1", "CFG-DIRB2G-180-v1", "CFG-DIRB2G-365-v1"):
+        offer = offer_by_code(code)
+        assert v.commercial_checkout_permitted(offer=offer, gates_doc=gates, overlay=ov) is False
+        assert (
+            v.recurring_checkout_allowed(
+                offer=offer,
+                gates_doc=gates,
+                policy=capacity_doc(),
+                available_slots=50,
+                hold=None,
+                catalog_authority="APPROVED",
+            )
+            is False
+        )
+    flipped = deepcopy(gates)
+    flipped["production_checkout_enabled"] = True
+    with pytest.raises(v.ValidationError, match="must not flip portfolio"):
+        v.assert_overlay_does_not_flip_portfolio_gates(ov, flipped)
+
+
+def test_mapping_ids_may_be_null_and_contain_no_secrets():
+    mapping = mapping_doc()
+    v.assert_mapping_invariants(mapping, catalog())
+    for row in mapping["mappings"]:
+        assert v.mapping_ids_pending(row) is True
+        assert row["asaas_product_id"] is None
+        assert row["checkout_id"] is None
+        assert row["subscription_mapping"] is None
+        assert v.scan_forbidden_secrets(v.canonical_json(row)) == []
+    diag = offer_by_code("CFG-DIAG-EXP-v1")
+    row = next(item for item in mapping["mappings"] if item["offer_id"] == "CFG-DIAG-EXP-v1")
+    assert (
+        v.checkout_may_create_provider_object(
+            offer=diag,
+            gates_doc=gates_doc(),
+            overlay=overlay(),
+            mapping_row=row,
+        )
+        is False
+    )
+
+
+def test_kickoff_requires_confirmed_payment_and_silent_renewal_false():
+    assert v.onboarding_allowed(payment_confirmed=False, terms_accepted=True, recurring=False, capacity_reserved=True) is False
+    assert v.onboarding_allowed(payment_confirmed=True, terms_accepted=True, recurring=False, capacity_reserved=True) is True
+    for item in catalog()["offers"]:
+        assert item["silent_renewal"] is False
+        v.assert_offer_invariants(item)
+
+
+def test_extra_1000000_cannot_serialize_public():
+    extra = exceptions_doc()["exceptions"][0]
+    assert extra["amount_cents"] == 1000000
+    assert v.exception_may_serialize_public(extra) is False
+    for item in public_catalog()["offers"]:
+        assert not (item["amount_cents"] == 1000000 and item["billing_mode"] == "RECURRING")

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/diagnostico-limited-production.v1.schema.json",
+  "title": "CONFENGE Diagnóstico limited-production overlay v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "overlay_id",
+    "decision_token",
+    "source_package",
+    "approved_offer_id",
+    "approved_amount_cents",
+    "approved_billing_mode",
+    "scoped_terms_version",
+    "portfolio_terms_version",
+    "portfolio_terms_replaced",
+    "public_activation_approved",
+    "production_checkout_approved",
+    "recurring_checkout_approved",
+    "automated_refund_approved",
+    "automated_nfse_approved",
+    "does_not_flip_portfolio_gates",
+    "legal_approved_claim_forbidden",
+    "effective_from",
+    "effective_to"
+  ],
+  "properties": {
+    "schema_version": { "const": "diagnostico-limited-production.v1" },
+    "overlay_id": { "const": "CFG-DIAG-LIMITED-PRODUCTION-v1" },
+    "decision_token": {
+      "const": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW_2026_08_18"
+    },
+    "source_package": { "const": "commercial/legal/founder-approved-v1/" },
+    "approved_offer_id": { "const": "CFG-DIAG-EXP-v1" },
+    "approved_amount_cents": { "const": 800000 },
+    "approved_billing_mode": { "const": "ONE_TIME" },
+    "scoped_terms_version": { "const": "CFG-LEGAL-TERMS-DIAG-EXP-FOUNDER-v1" },
+    "portfolio_terms_version": { "const": "CFG-TERMS-B2B-2026-08-17-v1" },
+    "portfolio_terms_replaced": { "const": false },
+    "public_activation_approved": { "const": true },
+    "production_checkout_approved": { "const": true },
+    "recurring_checkout_approved": { "const": false },
+    "automated_refund_approved": { "const": false },
+    "automated_nfse_approved": { "const": false },
+    "does_not_flip_portfolio_gates": { "const": true },
+    "legal_approved_claim_forbidden": { "const": true },
+    "effective_from": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "effective_to": { "type": "null" }
+  }
+}

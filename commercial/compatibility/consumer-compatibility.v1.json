@@ -1,0 +1,90 @@
+{
+  "schema_version": "consumer-compatibility.v1",
+  "contract_id": "CFG-CONSUMER-COMPAT-v1",
+  "rule": "GOVERNANCE_WINS",
+  "consumers": ["web-cfg#88", "Warmbly#47"],
+  "canonical_catalog": "commercial/offers/catalog.v1.json",
+  "pin_command": "python scripts/validate_commercial_authority.py",
+  "exact_hash_rule": "sha256 of canonical JSON of this file (sorted keys, UTF-8, compact separators). Printed as COMPATIBILITY_HASH by the shipped validator. Copied into commercial/fixtures/consumer-compatibility.ci.v1.json by the derived-artifact writer. Never paste a guessed digest into this file.",
+  "canonical_representation": {
+    "billing_mode": ["ONE_TIME", "RECURRING"],
+    "one_off_null_fields": [
+      "cycle",
+      "commitment_months",
+      "max_payments",
+      "total_commitment_cents",
+      "notice_days"
+    ],
+    "scope_version_by_offer": {
+      "CFG-DIAG-EXP-v1": "CFG-SCOPE-DIAG-EXP-v1",
+      "CFG-DIRB2G-FLEX-v1": "CFG-SCOPE-DIRB2G-STD-v1",
+      "CFG-DIRB2G-180-v1": "CFG-SCOPE-DIRB2G-STD-v1",
+      "CFG-DIRB2G-365-v1": "CFG-SCOPE-DIRB2G-STD-v1"
+    }
+  },
+  "accepted_consumer_aliases": [
+    {
+      "drift_id": "one_off_null_vs_0_1",
+      "applies_to": ["CFG-DIAG-EXP-v1"],
+      "canonical": {
+        "commitment_months": null,
+        "max_payments": null,
+        "total_commitment_cents": null,
+        "notice_days": null
+      },
+      "aliases": [
+        {
+          "source": "web-cfg#88",
+          "commitment_months": 0,
+          "max_payments": 1,
+          "total_commitment_cents": 800000,
+          "notice_days": 0
+        }
+      ],
+      "alias_only": true
+    },
+    {
+      "drift_id": "billing_enum_casing",
+      "canonical": {
+        "ONE_TIME": "ONE_TIME",
+        "RECURRING": "RECURRING"
+      },
+      "aliases": [
+        {
+          "source": "web-cfg#88",
+          "one_time": "ONE_TIME",
+          "subscription": "RECURRING"
+        }
+      ],
+      "alias_only": true
+    },
+    {
+      "drift_id": "scope_version_local_freeze",
+      "canonical_by_offer": {
+        "CFG-DIAG-EXP-v1": "CFG-SCOPE-DIAG-EXP-v1",
+        "CFG-DIRB2G-FLEX-v1": "CFG-SCOPE-DIRB2G-STD-v1",
+        "CFG-DIRB2G-180-v1": "CFG-SCOPE-DIRB2G-STD-v1",
+        "CFG-DIRB2G-365-v1": "CFG-SCOPE-DIRB2G-STD-v1"
+      },
+      "aliases": [
+        {
+          "source": "web-cfg#88",
+          "value": "CFG-SCOPE-B2B-2026-08-17-v1"
+        }
+      ],
+      "alias_only": true
+    }
+  ],
+  "forbidden_silent_coercions": [
+    "persist consumer 0 or 1 as Governance one-off commitment_months/max_payments/notice_days/total_commitment_cents",
+    "persist lowercase billing_mode one_time or subscription as Governance truth",
+    "persist CFG-SCOPE-B2B-2026-08-17-v1 as Governance scope_version"
+  ],
+  "migration_notes": [
+    "Governance is the only commercial truth plane. Consumers may adapt at their adapter boundary; they must not rewrite catalog.v1.json.",
+    "web-cfg#88 registry.cjs one-off 0/1, lowercase billing, and CFG-SCOPE-B2B-2026-08-17-v1 are consumer-local aliases. Map them to canonical null / ONE_TIME / RECURRING / per-offer scope_version. Do not copy aliases back.",
+    "Warmbly#47 must pin AUTHORITY_HASH and read Governance billing_mode and scope_version as-is. Do not normalize Governance down to the local B2B freeze.",
+    "Deprecation: aliases remain recognized as aliases only. They never become a second catalog. A later consumer version should emit canonical values.",
+    "No writes to web-cfg or Warmbly from this package."
+  ]
+}
