@@ -1,18 +1,24 @@
 import { frozenClock } from "../src/clock.ts";
 import { sequentialIds } from "../src/ids.ts";
 import { silentLogger } from "../src/log.ts";
+import { REPRESENTATIVE_REPO_DOMAINS } from "../src/representative.ts";
 import { createContextService, type ContextService } from "../src/service.ts";
 import { createFixtureStore } from "../src/store/fixture.ts";
-import type { Actor } from "../src/types.ts";
-import type { CreateDirectiveInput } from "../src/types.ts";
-import type { PersistenceAdapter } from "../src/store/adapter.ts";
+import type { ActorRef, CreateDirectiveInput, SourceRef } from "../src/types.ts";
+import type { PersistencePort } from "../src/store/adapter.ts";
 
 export const NOW = "2026-08-20T12:00:00.000Z";
 
-export const FOUNDER: Actor = { id: "founder-test", role: "founder" };
-export const AGENT: Actor = { id: "agent-session-1", role: "agent" };
+export const FOUNDER: ActorRef = { id: "founder-test", kind: "human" };
+export const AGENT: ActorRef = { id: "agent-session-1", kind: "agent" };
 
-export function makeService(): { service: ContextService; store: PersistenceAdapter } {
+export const DEFAULT_SOURCE: SourceRef = {
+  system: "manual",
+  kind: "founder-entry",
+  locator: "test",
+};
+
+export function makeService(): { service: ContextService; store: PersistencePort } {
   const store = createFixtureStore();
   const service = createContextService({
     store,
@@ -20,7 +26,8 @@ export function makeService(): { service: ContextService; store: PersistenceAdap
     ids: sequentialIds("id"),
     founderActorId: FOUNDER.id,
     logger: silentLogger,
-    defaultCompany: "confenge",
+    defaultScope: "company",
+    repoDomains: REPRESENTATIVE_REPO_DOMAINS,
   });
   return { service, store };
 }
@@ -34,8 +41,9 @@ export function createInput(
     kind,
     title,
     body: extras.body ?? `${title} body`,
-    scope: extras.scope ?? { company: "confenge" },
-    source: extras.source ?? "founder",
+    scope: extras.scope ?? "company",
+    source: extras.source ?? DEFAULT_SOURCE,
+    confidence: extras.confidence ?? 1,
   };
   if (extras.status !== undefined) {
     input.status = extras.status;
@@ -54,9 +62,6 @@ export function createInput(
   }
   if (extras.freshness_status !== undefined) {
     input.freshness_status = extras.freshness_status;
-  }
-  if (extras.confidence !== undefined) {
-    input.confidence = extras.confidence;
   }
   if (extras.body !== undefined) {
     input.body = extras.body;

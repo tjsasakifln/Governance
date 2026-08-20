@@ -1,24 +1,24 @@
 import { authError, forbidden } from "./errors.ts";
 import { sanitizeActorId } from "./sanitize.ts";
-import { ACTOR_ROLES, type Actor, type ActorRole } from "./types.ts";
+import { ACTOR_KINDS, type ActorKind, type ActorRef } from "./types.ts";
 
-export function parseActorRole(value: unknown): ActorRole {
+export function parseActorKind(value: unknown): ActorKind {
   if (typeof value !== "string" || value.trim() === "") {
-    throw authError("missing_actor", "actor role is required");
+    throw authError("missing_actor", "actor kind is required");
   }
-  const role = value.trim();
-  if (!(ACTOR_ROLES as readonly string[]).includes(role)) {
-    throw authError("unknown_actor_role", "actor role is unknown");
+  const kind = value.trim();
+  if (!(ACTOR_KINDS as readonly string[]).includes(kind)) {
+    throw authError("unknown_actor_role", "actor kind is unknown");
   }
-  return role as ActorRole;
+  return kind as ActorKind;
 }
 
-export function parseActor(idRaw: unknown, roleRaw: unknown): Actor {
+export function parseActor(idRaw: unknown, kindRaw: unknown): ActorRef {
   if (idRaw === undefined || idRaw === null || idRaw === "") {
     throw authError("missing_actor", "actor id is required");
   }
-  if (roleRaw === undefined || roleRaw === null || roleRaw === "") {
-    throw authError("missing_actor", "actor role is required");
+  if (kindRaw === undefined || kindRaw === null || kindRaw === "") {
+    throw authError("missing_actor", "actor kind is required");
   }
   let id: string;
   try {
@@ -26,32 +26,36 @@ export function parseActor(idRaw: unknown, roleRaw: unknown): Actor {
   } catch {
     throw authError("invalid_actor_id", "actor id is invalid");
   }
-  const role = parseActorRole(roleRaw);
-  return { id, role };
+  const kind = parseActorKind(kindRaw);
+  return { kind, id };
 }
 
-export function assertReadable(actor: Actor, founderActorId: string): void {
+export function sameActor(a: ActorRef, b: ActorRef): boolean {
+  return a.kind === b.kind && a.id === b.id;
+}
+
+export function assertReadable(actor: ActorRef, founderActorId: string): void {
   if (!founderActorId) {
     throw authError("unknown_actor", "founder identity is not configured");
   }
-  if (actor.role === "founder" && actor.id !== founderActorId) {
+  if (actor.kind === "human" && actor.id !== founderActorId) {
     throw authError("unknown_actor", "founder identity does not match");
   }
 }
 
-export function assertFounder(actor: Actor, founderActorId: string): void {
+export function assertFounder(actor: ActorRef, founderActorId: string): void {
   assertReadable(actor, founderActorId);
-  if (actor.role !== "founder") {
-    throw forbidden("agent_mutation_forbidden", "only the founder may mutate directives");
+  if (actor.kind !== "human") {
+    throw forbidden("agent_mutation_forbidden", "only the configured human founder may mutate directives");
   }
   if (actor.id !== founderActorId) {
     throw authError("unknown_actor", "founder identity does not match");
   }
 }
 
-export function assertAgent(actor: Actor, founderActorId: string): void {
+export function assertAgent(actor: ActorRef, founderActorId: string): void {
   assertReadable(actor, founderActorId);
-  if (actor.role !== "agent") {
+  if (actor.kind !== "agent") {
     throw forbidden("agent_mutation_forbidden", "proposals are submitted by agents");
   }
 }

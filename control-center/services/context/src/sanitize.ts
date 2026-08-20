@@ -1,7 +1,9 @@
 import { invalid, payloadTooLarge } from "./errors.ts";
+import { ACTOR_ID_PATTERN } from "./taxonomy.ts";
 import { LIMITS } from "./types.ts";
 
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const ACTOR_ID_RE = new RegExp(`^${ACTOR_ID_PATTERN.slice(1, -1)}$`);
 
 export function utf8Bytes(value: string): number {
   return Buffer.byteLength(value, "utf8");
@@ -49,23 +51,12 @@ export function sanitizeMultiline(value: unknown, field: string, maxChars: numbe
   return stripped;
 }
 
-export const ACTOR_ID_RE = /^[A-Za-z0-9:_-]{1,128}$/;
-export const SCOPE_PART_RE = /^[A-Za-z0-9:._-]{1,64}$/;
-
 export function sanitizeActorId(value: unknown, field = "actor_id"): string {
   const id = sanitizeLine(value, field, LIMITS.actorIdChars);
   if (!ACTOR_ID_RE.test(id) || id.includes("@")) {
     throw invalid(`${field} must be an opaque id (no email or whitespace)`);
   }
   return id;
-}
-
-export function sanitizeScopePart(value: unknown, field: string): string {
-  const part = sanitizeLine(value, field, LIMITS.scopePartChars);
-  if (!SCOPE_PART_RE.test(part)) {
-    throw invalid(`${field} contains unsupported characters`);
-  }
-  return part;
 }
 
 export function rejectUnknownKeys(obj: Record<string, unknown>, allowed: readonly string[], label: string): void {

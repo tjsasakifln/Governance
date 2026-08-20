@@ -1,14 +1,17 @@
-import type { AuditEvent, DirectiveRecord, ProposalRecord } from "../types.ts";
+import type { AuditEvent, DirectiveProposal, DirectiveRecord } from "../types.ts";
 
 /**
- * Persistence contract expected from control-center/persistence at
- * convergence. This workstream ships a fixture implementation only.
+ * Persistence port expected from control-center/persistence at convergence.
+ * This workstream ships an in-memory fixture implementation only.
  *
  * All methods are synchronous on the fixture store so policy tests can
  * run without I/O. A PostgreSQL adapter MUST provide the same semantics
  * and MUST write the audit event in the same commit as the mutation.
+ *
+ * `src/store/expected-schema.sql` is a test-only contract snapshot of
+ * these records. The service MUST NOT load or apply that file.
  */
-export interface PersistenceAdapter {
+export interface PersistencePort {
   insertRevision(record: DirectiveRecord): void;
   getRevision(revisionId: string): DirectiveRecord | undefined;
   getCurrent(id: string): DirectiveRecord | undefined;
@@ -17,10 +20,13 @@ export interface PersistenceAdapter {
   setCurrent(id: string, revisionId: string): void;
   appendAudit(event: AuditEvent): void;
   listAudit(): AuditEvent[];
-  insertProposal(record: ProposalRecord): void;
-  getProposal(id: string): ProposalRecord | undefined;
-  listProposals(): ProposalRecord[];
-  updateProposal(record: ProposalRecord): void;
+  insertProposal(record: DirectiveProposal): void;
+  getProposal(id: string): DirectiveProposal | undefined;
+  listProposals(): DirectiveProposal[];
+  updateProposal(record: DirectiveProposal): void;
 }
+
+/** @deprecated Use PersistencePort. */
+export type PersistenceAdapter = PersistencePort;
 
 export const ADAPTER_CONTRACT_VERSION = "control-center.context.persistence.v1";

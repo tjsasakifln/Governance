@@ -27,19 +27,22 @@ function parseArgs(argv: string[]): { command: Command; scope?: Scope } {
     flags[key] = value;
     i += 1;
   }
-  const extra = Object.keys(flags).filter((k) => k !== "company" && k !== "domain" && k !== "resource");
+  if (flags.company !== undefined || flags.domain !== undefined || flags.resource !== undefined) {
+    throw invalid("scope must be --scope <string>; --company/--domain/--resource are not accepted");
+  }
+  const extra = Object.keys(flags).filter((k) => k !== "scope");
   if (extra.length > 0) {
     throw invalid(`unknown flags: ${extra.sort().join(", ")}`);
   }
   if (command === "get_priorities" || command === "get_decisions") {
-    if (!flags.company && !flags.domain && !flags.resource) {
+    if (!flags.scope) {
       return { command };
     }
   }
-  if (!flags.company) {
-    throw invalid("--company is required");
+  if (!flags.scope) {
+    throw invalid("--scope is required");
   }
-  return { command: command as Command, scope: parseScope(flags) };
+  return { command: command as Command, scope: parseScope(flags.scope) };
 }
 
 export function runCli(argv: string[], env: NodeJS.ProcessEnv = process.env): string {
@@ -49,14 +52,11 @@ export function runCli(argv: string[], env: NodeJS.ProcessEnv = process.env): st
   let result: unknown;
   switch (parsed.command) {
     case "get_context":
-      result = boot.service.getContext(actor, parsed.scope ?? parseScope({ company: boot.defaultCompany }));
+      result = boot.service.getContext(actor, parsed.scope ?? boot.defaultScope);
       break;
     case "get_active_directives":
       result = {
-        items: boot.service.getActiveDirectives(
-          actor,
-          parsed.scope ?? parseScope({ company: boot.defaultCompany }),
-        ),
+        items: boot.service.getActiveDirectives(actor, parsed.scope ?? boot.defaultScope),
       };
       break;
     case "get_priorities":

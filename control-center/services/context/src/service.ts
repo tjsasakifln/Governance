@@ -1,81 +1,80 @@
-import { assertAgent, assertFounder, assertReadable } from "./actor.ts";
+import { assertAgent, assertFounder, assertReadable, sameActor } from "./actor.ts";
 import { toUtcIso, type Clock } from "./clock.ts";
 import { conflict, invalid, notFound } from "./errors.ts";
 import type { IdGenerator } from "./ids.ts";
 import type { Logger } from "./log.ts";
 import { compareDirectives, isActiveAt, isProtectedKind, partitionByKind, terminalStatus } from "./policy.ts";
-import { parseScope, scopeVisibleUnderQuery, sortScope } from "./scope.ts";
-import type { PersistenceAdapter } from "./store/adapter.ts";
+import { parseScope, scopeVisibleUnderQuery, type RepoDomainMap } from "./scope.ts";
+import type { PersistencePort } from "./store/adapter.ts";
 import type {
-  Actor,
+  ActorRef,
   AuditEvent,
   ContextPayload,
   CreateDirectiveInput,
+  DirectiveProposal,
   DirectiveRecord,
   DirectiveView,
-  ProposalRecord,
   Provenance,
+  ResourceId,
   Scope,
 } from "./types.ts";
 import { parseCreateInput, parsePathId, parseProposalInput, parseVersionInput } from "./validate.ts";
 
 export interface ContextServiceDeps {
-  store: PersistenceAdapter;
+  store: PersistencePort;
   clock: Clock;
   ids: IdGenerator;
   founderActorId: string;
   logger: Logger;
-  defaultCompany: string;
+  defaultScope: Scope;
+  repoDomains: RepoDomainMap;
 }
 
 export interface ContextService {
-  createDirective(actor: Actor, raw: unknown): DirectiveRecord;
-  getDirective(actor: Actor, id: string): DirectiveRecord;
-  listRevisions(actor: Actor, id: string): DirectiveRecord[];
-  createVersion(actor: Actor, id: string, raw: unknown): DirectiveRecord;
-  supersede(actor: Actor, id: string, raw: unknown): DirectiveRecord;
-  expire(actor: Actor, id: string, raw?: unknown): DirectiveRecord;
-  activate(actor: Actor, id: string): DirectiveRecord;
-  deactivate(actor: Actor, id: string): DirectiveRecord;
-  submitProposal(actor: Actor, raw: unknown): ProposalRecord;
-  listProposals(actor: Actor): ProposalRecord[];
-  rejectProposal(actor: Actor, id: string): ProposalRecord;
-  getContext(actor: Actor, scope: Scope): ContextPayload;
-  getActiveDirectives(actor: Actor, scope: Scope): DirectiveView[];
-  getPriorities(actor: Actor, scope?: Scope): DirectiveView[];
-  getDecisions(actor: Actor, scope?: Scope): DirectiveView[];
-  listAudit(actor: Actor): AuditEvent[];
+  createDirective(actor: ActorRef, raw: unknown): DirectiveRecord;
+  getDirective(actor: ActorRef, id: string): DirectiveRecord;
+  listRevisions(actor: ActorRef, id: string): DirectiveRecord[];
+  createVersion(actor: ActorRef, id: string, raw: unknown): DirectiveRecord;
+  supersede(actor: ActorRef, id: string, raw: unknown): DirectiveRecord;
+  expire(actor: ActorRef, id: string, raw?: unknown): DirectiveRecord;
+  activate(actor: ActorRef, id: string): DirectiveRecord;
+  revoke(actor: ActorRef, id: string): DirectiveRecord;
+  submitProposal(actor: ActorRef, raw: unknown): DirectiveProposal;
+  listProposals(actor: ActorRef): DirectiveProposal[];
+  rejectProposal(actor: ActorRef, id: string): DirectiveProposal;
+  getContext(actor: ActorRef, scope: Scope): ContextPayload;
+  getActiveDirectives(actor: ActorRef, scope: Scope): DirectiveView[];
+  getPriorities(actor: ActorRef, scope?: Scope): DirectiveView[];
+  getDecisions(actor: ActorRef, scope?: Scope): DirectiveView[];
+  listAudit(actor: ActorRef): AuditEvent[];
 }
 
 function provenanceFromInput(input: {
-  source: string;
+  source: Provenance["source"];
   observed_at?: string;
   freshness_status?: Provenance["freshness_status"];
-  confidence?: number;
+  confidence: number;
 }): Provenance {
   if (!input.observed_at || !input.freshness_status) {
     throw invalid("provenance is incomplete");
   }
-  const provenance: Provenance = {
+  return {
     source: input.source,
     observed_at: input.observed_at,
     freshness_status: input.freshness_status,
+    confidence: input.confidence,
   };
-  if (input.confidence !== undefined) {
-    provenance.confidence = input.confidence;
-  }
-  return provenance;
 }
 
 function toView(record: DirectiveRecord): DirectiveView {
-  const view: DirectiveView = {
+  return {
     id: record.id,
     revision_id: record.revision_id,
     version: record.version,
     kind: record.kind,
     title: record.title,
     body: record.body,
-    scope: sortScope(record.scope),
+    scope: record.scope,
     status: record.status,
     effective_from: record.effective_from,
     expires_at: record.expires_at,
@@ -84,15 +83,24 @@ function toView(record: DirectiveRecord): DirectiveView {
     source: record.provenance.source,
     observed_at: record.provenance.observed_at,
     freshness_status: record.provenance.freshness_status,
+    confidence: record.provenance.confidence,
   };
-  if (record.provenance.confidence !== undefined) {
-    view.confidence = record.provenance.confidence;
-  }
-  return view;
 }
 
 function viewsOf(records: readonly DirectiveRecord[]): DirectiveView[] {
   return [...records].sort(compareDirectives).map(toView);
+}
+
+function uniqueIds(ids: readonly ResourceId[]): ResourceId[] {
+  const seen = new Set<ResourceId>();
+  const out: ResourceId[] = [];
+  for (const id of ids) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
 }
 
 export function createContextService(deps: ContextServiceDeps): ContextService {
@@ -110,18 +118,17 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
   };
 
   const writeAudit = (
-    actor: Actor,
+    actor: ActorRef,
     action: string,
     entityType: AuditEvent["entity_type"],
-    entityId: string,
-    revisionId: string | null,
+    entityId: ResourceId,
+    revisionId: ResourceId | null,
     metadata: AuditEvent["metadata"],
   ): void => {
     const event: AuditEvent = {
-      id: deps.ids.next(),
+      id: deps.ids.next("audit-event"),
       at: toUtcIso(deps.clock.now()),
-      actor_id: actor.id,
-      actor_role: actor.role,
+      actor: { kind: actor.kind, id: actor.id },
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -132,7 +139,7 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
     deps.logger.info(action, {
       entity_type: entityType,
       entity_id: entityId,
-      actor_role: actor.role,
+      actor_kind: actor.kind,
       kind: typeof metadata.kind === "string" ? metadata.kind : null,
     });
   };
@@ -142,28 +149,34 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
     deps.store.setCurrent(record.id, record.revision_id);
   };
 
-  const buildFromCreate = (actor: Actor, input: CreateDirectiveInput, id: string, version: number): DirectiveRecord => {
+  const buildFromCreate = (
+    actor: ActorRef,
+    input: CreateDirectiveInput,
+    id: ResourceId,
+    version: number,
+  ): DirectiveRecord => {
     const now = toUtcIso(deps.clock.now());
     return {
       id,
-      revision_id: deps.ids.next(),
+      revision_id: deps.ids.next("directive-revision"),
       version,
       kind: input.kind,
       title: input.title,
       body: input.body,
-      scope: sortScope(input.scope),
+      scope: input.scope,
       status: input.status ?? "active",
       effective_from: input.effective_from ?? now,
       expires_at: input.expires_at ?? null,
       supersedes: input.supersedes ?? null,
-      created_by: actor.id,
+      created_by: { kind: actor.kind, id: actor.id },
       created_at: now,
+      updated_at: now,
       provenance: provenanceFromInput(input),
     };
   };
 
   const snapshot = (
-    actor: Actor,
+    actor: ActorRef,
     current: DirectiveRecord,
     patch: Partial<Pick<DirectiveRecord, "title" | "body" | "status" | "effective_from" | "expires_at" | "supersedes">> & {
       provenance?: Provenance;
@@ -172,27 +185,47 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
     const now = toUtcIso(deps.clock.now());
     return {
       id: current.id,
-      revision_id: deps.ids.next(),
+      revision_id: deps.ids.next("directive-revision"),
       version: current.version + 1,
       kind: current.kind,
       title: patch.title ?? current.title,
       body: patch.body ?? current.body,
-      scope: sortScope(current.scope),
+      scope: current.scope,
       status: patch.status ?? current.status,
       effective_from: patch.effective_from ?? current.effective_from,
       expires_at: patch.expires_at !== undefined ? patch.expires_at : current.expires_at,
       supersedes: patch.supersedes !== undefined ? patch.supersedes : current.supersedes,
-      created_by: actor.id,
-      created_at: now,
+      created_by: { kind: actor.kind, id: actor.id },
+      created_at: current.created_at,
+      updated_at: now,
       provenance: patch.provenance ?? current.provenance,
     };
+  };
+
+  const closeAsSuperseded = (actor: ActorRef, ids: readonly ResourceId[]): void => {
+    for (const predecessorId of ids) {
+      const current = mustCurrent(predecessorId);
+      if (current.status === "superseded") {
+        throw conflict(`directive ${predecessorId} is already superseded`);
+      }
+      if (terminalStatus(current.status)) {
+        throw conflict(`cannot supersede a ${current.status} directive`);
+      }
+      const closed = snapshot(actor, current, { status: "superseded" });
+      insertCurrent(closed);
+      writeAudit(actor, "directive.supersede", "directive", closed.id, closed.revision_id, {
+        kind: closed.kind,
+        version: closed.version,
+        successor_pending: true,
+      });
+    }
   };
 
   const visibleActive = (scope: Scope): DirectiveRecord[] => {
     const now = deps.clock.now();
     return deps.store
       .listCurrent()
-      .filter((rec) => isActiveAt(rec, now) && scopeVisibleUnderQuery(rec.scope, scope))
+      .filter((rec) => isActiveAt(rec, now) && scopeVisibleUnderQuery(rec.scope, scope, deps.repoDomains))
       .sort(compareDirectives);
   };
 
@@ -200,29 +233,33 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
     if (scope) {
       return parseScope(scope);
     }
-    return parseScope({ company: deps.defaultCompany });
+    return parseScope(deps.defaultScope);
   };
 
   return {
-    createDirective(actor: Actor, raw: unknown): DirectiveRecord {
+    createDirective(actor: ActorRef, raw: unknown): DirectiveRecord {
       assertFounder(actor, founderActorId);
       const input = parseCreateInput(raw, deps.clock);
-      const record = buildFromCreate(actor, input, deps.ids.next(), 1);
+      const predecessors = input.supersedes ?? [];
+      if (predecessors.length > 0) {
+        closeAsSuperseded(actor, predecessors);
+      }
+      const record = buildFromCreate(actor, input, deps.ids.next("directive"), 1);
       insertCurrent(record);
       writeAudit(actor, "directive.create", "directive", record.id, record.revision_id, {
         kind: record.kind,
         version: record.version,
-        scope: `${record.scope.company}/${record.scope.domain ?? ""}/${record.scope.resource ?? ""}`,
+        scope: record.scope,
       });
       return record;
     },
 
-    getDirective(actor: Actor, id: string): DirectiveRecord {
+    getDirective(actor: ActorRef, id: string): DirectiveRecord {
       assertReadable(actor, founderActorId);
       return mustCurrent(parsePathId(id, "id"));
     },
 
-    listRevisions(actor: Actor, id: string): DirectiveRecord[] {
+    listRevisions(actor: ActorRef, id: string): DirectiveRecord[] {
       assertReadable(actor, founderActorId);
       const parsed = parsePathId(id, "id");
       const revs = deps.store.listRevisions(parsed);
@@ -232,22 +269,24 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return revs;
     },
 
-    createVersion(actor: Actor, id: string, raw: unknown): DirectiveRecord {
+    createVersion(actor: ActorRef, id: string, raw: unknown): DirectiveRecord {
       assertFounder(actor, founderActorId);
       const current = mustCurrent(parsePathId(id, "id"));
       if (current.status === "superseded") {
         throw conflict("cannot version a superseded directive; create a successor via supersede");
+      }
+      if (current.status === "revoked" || current.status === "expired") {
+        throw conflict(`cannot version a ${current.status} directive`);
       }
       const input = parseVersionInput(raw, deps.clock);
       const provenance: Provenance = {
         source: input.source ?? current.provenance.source,
         observed_at: input.observed_at ?? toUtcIso(deps.clock.now()),
         freshness_status: input.freshness_status ?? current.provenance.freshness_status,
+        confidence: current.provenance.confidence,
       };
       if (input.confidence !== undefined && input.confidence !== null) {
         provenance.confidence = input.confidence;
-      } else if (input.confidence !== null && current.provenance.confidence !== undefined) {
-        provenance.confidence = current.provenance.confidence;
       }
       const patch: Partial<
         Pick<DirectiveRecord, "title" | "body" | "status" | "effective_from" | "expires_at" | "supersedes">
@@ -273,39 +312,31 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return next;
     },
 
-    supersede(actor: Actor, id: string, raw: unknown): DirectiveRecord {
+    supersede(actor: ActorRef, id: string, raw: unknown): DirectiveRecord {
       assertFounder(actor, founderActorId);
-      const current = mustCurrent(parsePathId(id, "id"));
-      if (current.status === "superseded") {
-        throw conflict("directive is already superseded");
-      }
+      const currentId = parsePathId(id, "id");
       const input = parseCreateInput(raw, deps.clock);
-      const closed = snapshot(actor, current, { status: "superseded" });
-      insertCurrent(closed);
-      writeAudit(actor, "directive.supersede", "directive", closed.id, closed.revision_id, {
-        kind: closed.kind,
-        version: closed.version,
-        successor_pending: true,
-      });
+      const predecessors = uniqueIds([currentId, ...(input.supersedes ?? [])]);
+      closeAsSuperseded(actor, predecessors);
       const successorInput: CreateDirectiveInput = {
         ...input,
-        supersedes: current.id,
+        supersedes: predecessors,
       };
-      const successor = buildFromCreate(actor, successorInput, deps.ids.next(), 1);
+      const successor = buildFromCreate(actor, successorInput, deps.ids.next("directive"), 1);
       insertCurrent(successor);
       writeAudit(actor, "directive.create", "directive", successor.id, successor.revision_id, {
         kind: successor.kind,
         version: successor.version,
-        supersedes: current.id,
+        supersedes: predecessors.join(","),
       });
       return successor;
     },
 
-    expire(actor: Actor, id: string, raw?: unknown): DirectiveRecord {
+    expire(actor: ActorRef, id: string, raw?: unknown): DirectiveRecord {
       assertFounder(actor, founderActorId);
       const current = mustCurrent(parsePathId(id, "id"));
-      if (current.status === "superseded") {
-        throw conflict("cannot expire a superseded directive");
+      if (terminalStatus(current.status)) {
+        throw conflict(`cannot expire a ${current.status} directive`);
       }
       let expiresAt = toUtcIso(deps.clock.now());
       if (raw !== undefined && raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
@@ -326,11 +357,11 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return next;
     },
 
-    activate(actor: Actor, id: string): DirectiveRecord {
+    activate(actor: ActorRef, id: string): DirectiveRecord {
       assertFounder(actor, founderActorId);
       const current = mustCurrent(parsePathId(id, "id"));
       if (terminalStatus(current.status)) {
-        throw conflict("cannot activate a superseded or expired directive");
+        throw conflict("cannot activate a superseded, revoked, or expired directive");
       }
       const next = snapshot(actor, current, { status: "active" });
       insertCurrent(next);
@@ -341,22 +372,22 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return next;
     },
 
-    deactivate(actor: Actor, id: string): DirectiveRecord {
+    revoke(actor: ActorRef, id: string): DirectiveRecord {
       assertFounder(actor, founderActorId);
       const current = mustCurrent(parsePathId(id, "id"));
       if (terminalStatus(current.status)) {
-        throw conflict("cannot deactivate a superseded or expired directive");
+        throw conflict("cannot revoke a superseded, revoked, or expired directive");
       }
-      const next = snapshot(actor, current, { status: "inactive" });
+      const next = snapshot(actor, current, { status: "revoked" });
       insertCurrent(next);
-      writeAudit(actor, "directive.deactivate", "directive", next.id, next.revision_id, {
+      writeAudit(actor, "directive.revoke", "directive", next.id, next.revision_id, {
         kind: next.kind,
         version: next.version,
       });
       return next;
     },
 
-    submitProposal(actor: Actor, raw: unknown): ProposalRecord {
+    submitProposal(actor: ActorRef, raw: unknown): DirectiveProposal {
       assertAgent(actor, founderActorId);
       const input = parseProposalInput(raw, deps.clock);
       if (input.target_directive_id) {
@@ -366,31 +397,36 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
         }
         if (isProtectedKind(target.kind) && input.action !== "create") {
           deps.logger.warn("proposal.protected_target", {
-            actor_role: actor.role,
+            actor_kind: actor.kind,
             kind: target.kind,
             action: input.action,
           });
         }
       }
-      if (isProtectedKind(input.kind) && (input.action === "supersede" || input.action === "expire" || input.action === "deactivate" || input.action === "version")) {
-        // Accepted as a suggestion only; never applied here.
+      if (
+        isProtectedKind(input.kind) &&
+        (input.action === "supersede" ||
+          input.action === "expire" ||
+          input.action === "revoke" ||
+          input.action === "version")
+      ) {
         deps.logger.warn("proposal.protected_kind", {
-          actor_role: actor.role,
+          actor_kind: actor.kind,
           kind: input.kind,
           action: input.action,
         });
       }
-      const record: ProposalRecord = {
-        id: deps.ids.next(),
+      const record: DirectiveProposal = {
+        id: deps.ids.next("directive-proposal"),
         status: "pending",
         action: input.action,
         kind: input.kind,
         title: input.title,
         body: input.body,
-        scope: sortScope(input.scope),
+        scope: input.scope,
         target_directive_id: input.target_directive_id ?? null,
         rationale: input.rationale,
-        created_by: actor.id,
+        created_by: { kind: actor.kind, id: actor.id },
         created_at: toUtcIso(deps.clock.now()),
         provenance: provenanceFromInput(input),
       };
@@ -403,22 +439,22 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return record;
     },
 
-    listProposals(actor: Actor): ProposalRecord[] {
+    listProposals(actor: ActorRef): DirectiveProposal[] {
       assertReadable(actor, founderActorId);
       const all = deps.store.listProposals();
-      if (actor.role === "agent") {
-        return all.filter((p) => p.created_by === actor.id);
+      if (actor.kind === "agent") {
+        return all.filter((p) => sameActor(p.created_by, actor));
       }
       return all;
     },
 
-    rejectProposal(actor: Actor, id: string): ProposalRecord {
+    rejectProposal(actor: ActorRef, id: string): DirectiveProposal {
       assertFounder(actor, founderActorId);
       const current = deps.store.getProposal(parsePathId(id, "id"));
       if (!current) {
         throw notFound("proposal_not_found", "proposal not found");
       }
-      const next: ProposalRecord = { ...current, status: "rejected" };
+      const next: DirectiveProposal = { ...current, status: "rejected" };
       deps.store.updateProposal(next);
       writeAudit(actor, "proposal.reject", "proposal", next.id, null, {
         kind: next.kind,
@@ -427,13 +463,13 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       return next;
     },
 
-    getContext(actor: Actor, scope: Scope): ContextPayload {
+    getContext(actor: ActorRef, scope: Scope): ContextPayload {
       assertReadable(actor, founderActorId);
       const query = parseScope(scope);
       const active = visibleActive(query);
       const parts = partitionByKind(active);
       return {
-        scope: sortScope(query),
+        scope: query,
         active_directives: viewsOf(active),
         decisions: viewsOf(parts.decisions),
         facts: viewsOf(parts.facts),
@@ -445,24 +481,24 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       };
     },
 
-    getActiveDirectives(actor: Actor, scope: Scope): DirectiveView[] {
+    getActiveDirectives(actor: ActorRef, scope: Scope): DirectiveView[] {
       assertReadable(actor, founderActorId);
       return viewsOf(visibleActive(parseScope(scope)));
     },
 
-    getPriorities(actor: Actor, scope?: Scope): DirectiveView[] {
+    getPriorities(actor: ActorRef, scope?: Scope): DirectiveView[] {
       assertReadable(actor, founderActorId);
       const query = resolveScope(scope);
       return viewsOf(visibleActive(query).filter((r) => r.kind === "priority"));
     },
 
-    getDecisions(actor: Actor, scope?: Scope): DirectiveView[] {
+    getDecisions(actor: ActorRef, scope?: Scope): DirectiveView[] {
       assertReadable(actor, founderActorId);
       const query = resolveScope(scope);
       return viewsOf(visibleActive(query).filter((r) => r.kind === "decision"));
     },
 
-    listAudit(actor: Actor): AuditEvent[] {
+    listAudit(actor: ActorRef): AuditEvent[] {
       assertFounder(actor, founderActorId);
       return deps.store.listAudit();
     },

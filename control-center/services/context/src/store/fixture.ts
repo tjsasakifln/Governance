@@ -1,31 +1,45 @@
-import type { AuditEvent, DirectiveRecord, ProposalRecord } from "../types.ts";
-import type { PersistenceAdapter } from "./adapter.ts";
+import type { AuditEvent, DirectiveProposal, DirectiveRecord, Provenance } from "../types.ts";
+import type { PersistencePort } from "./adapter.ts";
+
+function cloneProvenance(provenance: Provenance): Provenance {
+  const cloned: Provenance = {
+    source: { ...provenance.source },
+    observed_at: provenance.observed_at,
+    freshness_status: provenance.freshness_status,
+    confidence: provenance.confidence,
+  };
+  if (provenance.freshness_window_seconds !== undefined) {
+    cloned.freshness_window_seconds = provenance.freshness_window_seconds;
+  }
+  return cloned;
+}
 
 function cloneDirective(record: DirectiveRecord): DirectiveRecord {
   return {
     ...record,
-    scope: { ...record.scope },
-    provenance: { ...record.provenance },
+    supersedes: record.supersedes ? [...record.supersedes] : null,
+    created_by: { ...record.created_by },
+    provenance: cloneProvenance(record.provenance),
   };
 }
 
 function cloneAudit(event: AuditEvent): AuditEvent {
-  return { ...event, metadata: { ...event.metadata } };
+  return { ...event, actor: { ...event.actor }, metadata: { ...event.metadata } };
 }
 
-function cloneProposal(record: ProposalRecord): ProposalRecord {
+function cloneProposal(record: DirectiveProposal): DirectiveProposal {
   return {
     ...record,
-    scope: { ...record.scope },
-    provenance: { ...record.provenance },
+    created_by: { ...record.created_by },
+    provenance: cloneProvenance(record.provenance),
   };
 }
 
-export function createFixtureStore(): PersistenceAdapter {
+export function createFixtureStore(): PersistencePort {
   const revisions = new Map<string, DirectiveRecord>();
   const current = new Map<string, string>();
   const audits: AuditEvent[] = [];
-  const proposals = new Map<string, ProposalRecord>();
+  const proposals = new Map<string, DirectiveProposal>();
 
   return {
     insertRevision(record: DirectiveRecord): void {
@@ -78,20 +92,20 @@ export function createFixtureStore(): PersistenceAdapter {
     listAudit(): AuditEvent[] {
       return audits.map(cloneAudit);
     },
-    insertProposal(record: ProposalRecord): void {
+    insertProposal(record: DirectiveProposal): void {
       if (proposals.has(record.id)) {
         throw new Error(`duplicate proposal id ${record.id}`);
       }
       proposals.set(record.id, cloneProposal(record));
     },
-    getProposal(id: string): ProposalRecord | undefined {
+    getProposal(id: string): DirectiveProposal | undefined {
       const found = proposals.get(id);
       return found ? cloneProposal(found) : undefined;
     },
-    listProposals(): ProposalRecord[] {
+    listProposals(): DirectiveProposal[] {
       return [...proposals.values()].map(cloneProposal);
     },
-    updateProposal(record: ProposalRecord): void {
+    updateProposal(record: DirectiveProposal): void {
       if (!proposals.has(record.id)) {
         throw new Error(`unknown proposal ${record.id}`);
       }

@@ -3,51 +3,70 @@ import { test } from "node:test";
 import { canonicalStringify } from "../src/index.ts";
 import { AGENT, FOUNDER, createInput, makeService } from "./helpers.ts";
 
-const RESOURCE = {
-  company: "confenge",
-  domain: "commercial",
-  resource: "offer:CFG-DIAG-EXP-v1",
-};
-const SIBLING = {
-  company: "confenge",
-  domain: "commercial",
-  resource: "offer:OTHER-SKU",
-};
-const DOMAIN = { company: "confenge", domain: "commercial" };
-const COMPANY = { company: "confenge" };
-
-test("scope inheritance is company + domain + resource and does not leak siblings or descendants", () => {
+test("repo query inherits company + configured domain + repo and does not leak siblings or descendants", () => {
   const { service } = makeService();
-  const company = service.createDirective(FOUNDER, createInput("priority", "Company priority", { scope: COMPANY }));
-  const domain = service.createDirective(FOUNDER, createInput("directive", "Domain directive", { scope: DOMAIN }));
-  const resource = service.createDirective(FOUNDER, createInput("fact", "Resource fact", { scope: RESOURCE }));
-  const sibling = service.createDirective(FOUNDER, createInput("fact", "Sibling fact", { scope: SIBLING }));
+  const company = service.createDirective(FOUNDER, createInput("priority", "Company priority", { scope: "company" }));
+  const domain = service.createDirective(FOUNDER, createInput("directive", "Domain directive", { scope: "commercial" }));
+  const resource = service.createDirective(
+    FOUNDER,
+    createInput("fact", "Repo fact", { scope: "repo:Governance" }),
+  );
+  const sibling = service.createDirective(FOUNDER, createInput("fact", "Sibling fact", { scope: "repo:Warmbly" }));
   const otherDomain = service.createDirective(
     FOUNDER,
-    createInput("risk", "Finance risk", { scope: { company: "confenge", domain: "finance" } }),
+    createInput("risk", "Finance risk", { scope: "finance" }),
   );
+  const client = service.createDirective(FOUNDER, createInput("fact", "Client fact", { scope: "client:acme" }));
 
-  const ctx = service.getContext(FOUNDER, RESOURCE);
+  const ctx = service.getContext(FOUNDER, "repo:Governance");
+  assert.equal(ctx.scope, "repo:Governance");
   const ids = ctx.active_directives.map((d) => d.id);
   assert.ok(ids.includes(company.id));
   assert.ok(ids.includes(domain.id));
   assert.ok(ids.includes(resource.id));
   assert.equal(ids.includes(sibling.id), false);
   assert.equal(ids.includes(otherDomain.id), false);
+  assert.equal(ids.includes(client.id), false);
 
-  const companyCtx = service.getContext(FOUNDER, COMPANY);
+  const companyCtx = service.getContext(FOUNDER, "company");
   const companyIds = companyCtx.active_directives.map((d) => d.id);
   assert.ok(companyIds.includes(company.id));
   assert.equal(companyIds.includes(domain.id), false);
   assert.equal(companyIds.includes(resource.id), false);
   assert.equal(companyIds.includes(sibling.id), false);
 
-  const siblingCtx = service.getContext(AGENT, SIBLING);
+  const siblingCtx = service.getContext(AGENT, "repo:Warmbly");
   assert.ok(siblingCtx.active_directives.some((d) => d.id === sibling.id));
   assert.equal(
     siblingCtx.active_directives.some((d) => d.id === resource.id),
     false,
   );
+});
+
+test("client query inherits company + clients + client and does not leak siblings", () => {
+  const { service } = makeService();
+  const company = service.createDirective(FOUNDER, createInput("decision", "Company decision", { scope: "company" }));
+  const clients = service.createDirective(FOUNDER, createInput("directive", "Clients domain", { scope: "clients" }));
+  const acme = service.createDirective(FOUNDER, createInput("fact", "Acme fact", { scope: "client:acme" }));
+  const other = service.createDirective(FOUNDER, createInput("fact", "Other client", { scope: "client:other" }));
+  const commercial = service.createDirective(FOUNDER, createInput("fact", "Commercial fact", { scope: "commercial" }));
+  const repo = service.createDirective(FOUNDER, createInput("fact", "Repo fact", { scope: "repo:Governance" }));
+
+  const ctx = service.getContext(FOUNDER, "client:acme");
+  const ids = ctx.active_directives.map((d) => d.id);
+  assert.ok(ids.includes(company.id));
+  assert.ok(ids.includes(clients.id));
+  assert.ok(ids.includes(acme.id));
+  assert.equal(ids.includes(other.id), false);
+  assert.equal(ids.includes(commercial.id), false);
+  assert.equal(ids.includes(repo.id), false);
+
+  const clientsOnly = service.getContext(FOUNDER, "clients");
+  const clientsIds = clientsOnly.active_directives.map((d) => d.id);
+  assert.ok(clientsIds.includes(company.id));
+  assert.ok(clientsIds.includes(clients.id));
+  assert.equal(clientsIds.includes(acme.id), false);
+  assert.equal(clientsIds.includes(other.id), false);
 });
 
 test("hypothesis is separated from fact and decision; provenance is present; get_context is deterministic", () => {
@@ -60,8 +79,8 @@ test("hypothesis is separated from fact and decision; provenance is present; get
   );
   service.createDirective(FOUNDER, createInput("priority", "A priority"));
 
-  const ctx1 = service.getContext(FOUNDER, COMPANY);
-  const ctx2 = service.getContext(FOUNDER, COMPANY);
+  const ctx1 = service.getContext(FOUNDER, "company");
+  const ctx2 = service.getContext(FOUNDER, "company");
   assert.equal(canonicalStringify(ctx1), canonicalStringify(ctx2));
 
   assert.ok(ctx1.hypotheses.length === 1);
@@ -80,9 +99,14 @@ test("hypothesis is separated from fact and decision; provenance is present; get
   assert.equal(ctx1.facts[0]?.kind, "fact");
 
   for (const item of ctx1.active_directives) {
-    assert.equal(typeof item.source, "string");
+    assert.equal(typeof item.source, "object");
+    assert.equal(typeof item.source.system, "string");
+    assert.equal(typeof item.source.kind, "string");
+    assert.equal(typeof item.source.locator, "string");
     assert.ok(item.observed_at.endsWith("Z"));
-    assert.ok(item.freshness_status === "fresh" || item.freshness_status === "stale" || item.freshness_status === "unknown");
+    assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(item.freshness_status));
+    assert.equal(typeof item.confidence, "number");
+    assert.equal(item.created_by.kind, "human");
   }
   assert.equal(ctx1.hypotheses[0]?.confidence, 0.2);
 
@@ -105,7 +129,7 @@ test("expired and superseded items stay out of get_context and remain readable a
   service.expire(FOUNDER, expiring.id);
   const successor = service.supersede(FOUNDER, old.id, createInput("constraint", "New constraint"));
 
-  const ctx = service.getContext(FOUNDER, COMPANY);
+  const ctx = service.getContext(FOUNDER, "company");
   const ids = ctx.active_directives.map((d) => d.id);
   assert.ok(ids.includes(live.id));
   assert.ok(ids.includes(successor.id));

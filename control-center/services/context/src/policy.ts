@@ -92,5 +92,5 @@ export function partitionByKind(records: readonly DirectiveRecord[]): {
 }
 
 export function terminalStatus(status: DirectiveStatus): boolean {
-  return status === "superseded" || status === "expired";
+  return status === "superseded" || status === "expired" || status === "revoked";
 }

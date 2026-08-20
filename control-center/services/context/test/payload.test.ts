@@ -41,17 +41,9 @@ test("oversized and unsanitized inputs are rejected", () => {
       }),
     (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
   );
-  assert.throws(
-    () =>
-      service.createDirective(
-        FOUNDER,
-        createInput("fact", "ok", { scope: { company: "confenge", resource: "no-domain" } }),
-      ),
-    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
-  );
   const created = service.createDirective(FOUNDER, createInput("fact", "Sanitized   title"));
   assert.equal(created.title, "Sanitized title");
-  assert.equal(created.created_by, FOUNDER.id);
+  assert.equal(created.created_by.id, FOUNDER.id);
 });
 
 test("kind cannot change across versions", () => {
@@ -59,6 +51,43 @@ test("kind cannot change across versions", () => {
   const rec = service.createDirective(FOUNDER, createInput("fact", "A fact"));
   assert.throws(
     () => service.createVersion(FOUNDER, rec.id, { kind: "hypothesis", title: "now a guess" }),
+    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
+  );
+});
+
+test("parallel ontology payloads are rejected", () => {
+  const { service } = makeService();
+  assert.throws(
+    () =>
+      service.createDirective(FOUNDER, {
+        ...createInput("fact", "ok"),
+        scope: { company: "confenge", domain: "commercial", resource: "offer:x" },
+      }),
+    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
+  );
+  assert.throws(
+    () => service.createDirective(FOUNDER, createInput("fact", "ok", { status: "inactive" as never })),
+    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
+  );
+  assert.throws(
+    () =>
+      service.createDirective(FOUNDER, createInput("fact", "ok", { freshness_status: "fresh" as never })),
+    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
+  );
+  assert.throws(
+    () =>
+      service.createDirective(FOUNDER, {
+        ...createInput("fact", "ok"),
+        source: "founder",
+      }),
+    (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
+  );
+  assert.throws(
+    () =>
+      service.createDirective(FOUNDER, {
+        ...createInput("fact", "ok"),
+        supersedes: "cc:directive:other",
+      }),
     (err: unknown) => err instanceof ServiceError && err.code === "invalid_input",
   );
 });

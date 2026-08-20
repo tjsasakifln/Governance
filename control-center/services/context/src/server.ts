@@ -29,10 +29,7 @@ export function startServer(
   const boot = bootFromEnv(env, { logger });
   const host = listenHost(env);
   const port = listenPort(env);
-  const listener = createRequestListener(
-    { service: boot.service, logger },
-    boot.defaultCompany,
-  );
+  const listener = createRequestListener({ service: boot.service, logger });
   const server = createServer(listener);
   return new Promise((resolve, reject) => {
     server.once("error", reject);

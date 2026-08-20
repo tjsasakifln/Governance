@@ -12,20 +12,25 @@ test("creates all seven kinds with required fields and one audit per create", ()
     );
     assert.equal(rec.kind, kind);
     assert.equal(rec.status, "active");
-    assert.ok(rec.scope);
+    assert.equal(rec.scope, "company");
+    assert.match(rec.id, /^cc:directive:/);
+    assert.match(rec.revision_id, /^cc:directive-revision:/);
     assert.ok(rec.effective_from.endsWith("Z"));
     assert.equal(rec.expires_at, null);
     assert.equal(rec.supersedes, null);
-    assert.equal(rec.created_by, FOUNDER.id);
+    assert.equal(rec.created_by.kind, "human");
+    assert.equal(rec.created_by.id, FOUNDER.id);
     assert.equal(rec.created_at, NOW);
-    assert.equal(rec.provenance.source, "founder");
+    assert.equal(rec.provenance.source.system, "manual");
     assert.ok(rec.provenance.observed_at.endsWith("Z"));
-    assert.ok(rec.provenance.freshness_status);
+    assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(rec.provenance.freshness_status));
+    assert.equal(typeof rec.provenance.confidence, "number");
   }
   const audits = service.listAudit(FOUNDER);
   assert.equal(audits.length, DIRECTIVE_KINDS.length);
   assert.ok(audits.every((a) => a.action === "directive.create"));
   assert.ok(audits.every((a) => a.at.endsWith("Z")));
+  assert.ok(audits.every((a) => a.actor.kind === "human"));
 });
 
 test("versioning is non-destructive and audited", () => {
@@ -54,7 +59,7 @@ test("supersede closes the predecessor and creates a successor", () => {
     original.id,
     createInput("constraint", "New constraint", { body: "Replacement text" }),
   );
-  assert.equal(successor.supersedes, original.id);
+  assert.deepEqual(successor.supersedes, [original.id]);
   assert.equal(successor.status, "active");
   const closed = service.getDirective(FOUNDER, original.id);
   assert.equal(closed.status, "superseded");
@@ -65,11 +70,30 @@ test("supersede closes the predecessor and creates a successor", () => {
   assert.ok(history.length >= 2);
   assert.ok(history.some((r) => r.status === "active"));
   assert.ok(history.some((r) => r.status === "superseded"));
-  const active = service.getActiveDirectives(FOUNDER, { company: "confenge" });
+  const active = service.getActiveDirectives(FOUNDER, "company");
   assert.ok(active.every((d) => d.id !== original.id));
   assert.ok(active.some((d) => d.id === successor.id));
   const actions = service.listAudit(FOUNDER).map((a) => a.action);
   assert.deepEqual(actions, ["directive.create", "directive.supersede", "directive.create"]);
+});
+
+test("one successor can supersede multiple canonical predecessors", () => {
+  const { service } = makeService();
+  const a = service.createDirective(FOUNDER, createInput("constraint", "Constraint A"));
+  const b = service.createDirective(FOUNDER, createInput("constraint", "Constraint B"));
+  const successor = service.createDirective(
+    FOUNDER,
+    createInput("constraint", "Merged constraint", { supersedes: [a.id, b.id] }),
+  );
+  assert.deepEqual(successor.supersedes, [a.id, b.id]);
+  assert.equal(service.getDirective(FOUNDER, a.id).status, "superseded");
+  assert.equal(service.getDirective(FOUNDER, b.id).status, "superseded");
+  const active = service.getActiveDirectives(FOUNDER, "company");
+  assert.equal(active.some((d) => d.id === a.id), false);
+  assert.equal(active.some((d) => d.id === b.id), false);
+  assert.ok(active.some((d) => d.id === successor.id));
+  assert.ok(service.getDirective(FOUNDER, a.id).id, a.id);
+  assert.ok(service.listRevisions(FOUNDER, a.id).length >= 2);
 });
 
 test("expire removes from active set and keeps history", () => {
@@ -78,31 +102,34 @@ test("expire removes from active set and keeps history", () => {
   const expired = service.expire(FOUNDER, rec.id);
   assert.equal(expired.status, "expired");
   assert.equal(expired.expires_at, NOW);
-  const active = service.getActiveDirectives(FOUNDER, { company: "confenge" });
+  const active = service.getActiveDirectives(FOUNDER, "company");
   assert.ok(active.every((d) => d.id !== rec.id));
   const history = service.listRevisions(FOUNDER, rec.id);
   assert.equal(history.length, 2);
   assert.equal(service.listAudit(FOUNDER).filter((a) => a.action === "directive.expire").length, 1);
+  assert.equal(service.getDirective(FOUNDER, rec.id).status, "expired");
 });
 
-test("activate and deactivate toggle membership of the active set", () => {
+test("draft then activate then revoke toggles membership of the active set", () => {
   const { service } = makeService();
-  const rec = service.createDirective(FOUNDER, createInput("directive", "Draft", { status: "inactive" }));
+  const rec = service.createDirective(FOUNDER, createInput("directive", "Draft", { status: "draft" }));
+  assert.equal(rec.status, "draft");
   assert.equal(
-    service.getActiveDirectives(FOUNDER, { company: "confenge" }).some((d) => d.id === rec.id),
+    service.getActiveDirectives(FOUNDER, "company").some((d) => d.id === rec.id),
     false,
   );
   const activated = service.activate(FOUNDER, rec.id);
   assert.equal(activated.status, "active");
-  assert.ok(service.getActiveDirectives(FOUNDER, { company: "confenge" }).some((d) => d.id === rec.id));
-  const deactivated = service.deactivate(FOUNDER, rec.id);
-  assert.equal(deactivated.status, "inactive");
+  assert.ok(service.getActiveDirectives(FOUNDER, "company").some((d) => d.id === rec.id));
+  const revoked = service.revoke(FOUNDER, rec.id);
+  assert.equal(revoked.status, "revoked");
   assert.equal(
-    service.getActiveDirectives(FOUNDER, { company: "confenge" }).some((d) => d.id === rec.id),
+    service.getActiveDirectives(FOUNDER, "company").some((d) => d.id === rec.id),
     false,
   );
+  assert.equal(service.getDirective(FOUNDER, rec.id).status, "revoked");
   const actions = service.listAudit(FOUNDER).map((a) => a.action);
-  assert.deepEqual(actions, ["directive.create", "directive.activate", "directive.deactivate"]);
+  assert.deepEqual(actions, ["directive.create", "directive.activate", "directive.revoke"]);
 });
 
 test("items past expires_at are absent from the active set even if status is still active", () => {
@@ -115,7 +142,7 @@ test("items past expires_at are absent from the active set even if status is sti
     }),
   );
   assert.equal(rec.status, "active");
-  const active = service.getActiveDirectives(FOUNDER, { company: "confenge" });
+  const active = service.getActiveDirectives(FOUNDER, "company");
   assert.ok(active.every((d) => d.id !== rec.id));
   assert.equal(service.getDirective(FOUNDER, rec.id).id, rec.id);
 });

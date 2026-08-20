@@ -6,7 +6,7 @@ import type { Logger } from "./log.ts";
 import { assertJsonSize } from "./sanitize.ts";
 import { parseScope } from "./scope.ts";
 import type { ContextService } from "./service.ts";
-import { LIMITS, type Actor, type Scope } from "./types.ts";
+import { LIMITS, type ActorRef, type Scope } from "./types.ts";
 
 export interface HttpDeps {
   service: ContextService;
@@ -21,8 +21,8 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return raw;
 }
 
-function actorFromRequest(req: IncomingMessage): Actor {
-  return parseActor(header(req, "x-actor-id"), header(req, "x-actor-role"));
+function actorFromRequest(req: IncomingMessage): ActorRef {
+  return parseActor(header(req, "x-actor-id"), header(req, "x-actor-kind"));
 }
 
 function send(res: ServerResponse, status: number, body: unknown): void {
@@ -68,52 +68,40 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   }
 }
 
-function queryScope(url: URL, fallbackCompany: string): Scope {
-  const company = url.searchParams.get("company") ?? fallbackCompany;
-  const domain = url.searchParams.get("domain");
-  const resource = url.searchParams.get("resource");
-  const raw: Record<string, string> = { company };
-  if (domain) {
-    raw.domain = domain;
+function rejectLegacyScopeParams(url: URL): void {
+  if (url.searchParams.has("company") || url.searchParams.has("domain") || url.searchParams.has("resource")) {
+    throw invalid("scope must be a single string parameter; company/domain/resource are not accepted");
   }
-  if (resource) {
-    raw.resource = resource;
+}
+
+function queryScope(url: URL): Scope {
+  rejectLegacyScopeParams(url);
+  const scope = url.searchParams.get("scope");
+  if (!scope) {
+    throw invalid("scope query parameter is required");
   }
-  return parseScope(raw);
+  return parseScope(scope);
 }
 
 function optionalQueryScope(url: URL): Scope | undefined {
-  const company = url.searchParams.get("company");
-  const domain = url.searchParams.get("domain");
-  const resource = url.searchParams.get("resource");
-  if (!company && !domain && !resource) {
+  rejectLegacyScopeParams(url);
+  const scope = url.searchParams.get("scope");
+  if (!scope) {
     return undefined;
   }
-  if (!company) {
-    throw invalid("company is required when domain or resource is present");
-  }
-  const raw: Record<string, string> = { company };
-  if (domain) {
-    raw.domain = domain;
-  }
-  if (resource) {
-    raw.resource = resource;
-  }
-  return parseScope(raw);
+  return parseScope(scope);
 }
 
 export function createRequestListener(
   deps: HttpDeps,
-  defaultCompany: string,
 ): (req: IncomingMessage, res: ServerResponse) => void {
   return (req, res) => {
-    void handle(deps, defaultCompany, req, res);
+    void handle(deps, req, res);
   };
 }
 
 async function handle(
   deps: HttpDeps,
-  defaultCompany: string,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -129,11 +117,11 @@ async function handle(
     const parts = url.pathname.split("/").filter(Boolean);
 
     if (method === "GET" && url.pathname === "/v1/context") {
-      send(res, 200, deps.service.getContext(actor, queryScope(url, defaultCompany)));
+      send(res, 200, deps.service.getContext(actor, queryScope(url)));
       return;
     }
     if (method === "GET" && url.pathname === "/v1/active-directives") {
-      send(res, 200, { items: deps.service.getActiveDirectives(actor, queryScope(url, defaultCompany)) });
+      send(res, 200, { items: deps.service.getActiveDirectives(actor, queryScope(url)) });
       return;
     }
     if (method === "GET" && url.pathname === "/v1/priorities") {
@@ -194,8 +182,8 @@ async function handle(
         send(res, 200, deps.service.activate(actor, id));
         return;
       }
-      if (action === "deactivate") {
-        send(res, 200, deps.service.deactivate(actor, id));
+      if (action === "revoke") {
+        send(res, 200, deps.service.revoke(actor, id));
         return;
       }
     }

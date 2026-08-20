@@ -1,32 +1,33 @@
-export const DIRECTIVE_KINDS = [
-  "decision",
-  "directive",
-  "fact",
-  "constraint",
-  "priority",
-  "risk",
-  "hypothesis",
-] as const;
+import type {
+  ActorKind,
+  CreateStatus,
+  DirectiveKind,
+  DirectiveStatus,
+  FreshnessStatus,
+} from "./taxonomy.ts";
 
-export type DirectiveKind = (typeof DIRECTIVE_KINDS)[number];
+export type {
+  ActorKind,
+  CreateStatus,
+  DirectiveKind,
+  DirectiveStatus,
+  DomainLiteral,
+  FreshnessStatus,
+  ScopeLiteral,
+} from "./taxonomy.ts";
+
+export {
+  ACTOR_KINDS,
+  CREATE_STATUSES,
+  DIRECTIVE_KINDS,
+  DIRECTIVE_STATUSES,
+  DOMAIN_LITERALS,
+  FRESHNESS_STATUSES,
+  SCOPE_LITERALS,
+} from "./taxonomy.ts";
 
 export const PROTECTED_KINDS = ["constraint", "decision"] as const;
 export type ProtectedKind = (typeof PROTECTED_KINDS)[number];
-
-export const DIRECTIVE_STATUSES = [
-  "active",
-  "inactive",
-  "expired",
-  "superseded",
-] as const;
-
-export type DirectiveStatus = (typeof DIRECTIVE_STATUSES)[number];
-
-export const FRESHNESS_STATUSES = ["fresh", "stale", "unknown"] as const;
-export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
-
-export const ACTOR_ROLES = ["founder", "agent"] as const;
-export type ActorRole = (typeof ACTOR_ROLES)[number];
 
 export const PROPOSAL_ACTIONS = [
   "create",
@@ -34,34 +35,45 @@ export const PROPOSAL_ACTIONS = [
   "supersede",
   "expire",
   "activate",
-  "deactivate",
+  "revoke",
 ] as const;
 export type ProposalAction = (typeof PROPOSAL_ACTIONS)[number];
 
 export const PROPOSAL_STATUSES = ["pending", "rejected"] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 
-export interface Scope {
-  company: string;
-  domain?: string;
-  resource?: string;
+/** v1 scope: literal, `repo:<name>`, `client:<slug>`, or future prefix:id. */
+export type Scope = string;
+
+export type ResourceId = string;
+
+export interface SourceRef {
+  system: string;
+  kind: string;
+  locator: string;
+  label?: string;
 }
 
-export interface Actor {
+export interface ActorRef {
+  kind: ActorKind;
   id: string;
-  role: ActorRole;
+  display_name?: string;
 }
+
+/** @deprecated Use ActorRef. Alias so existing call sites compile during this PR. */
+export type Actor = ActorRef;
 
 export interface Provenance {
-  source: string;
+  source: SourceRef;
   observed_at: string;
   freshness_status: FreshnessStatus;
-  confidence?: number;
+  confidence: number;
+  freshness_window_seconds?: number;
 }
 
 export interface DirectiveRecord {
-  id: string;
-  revision_id: string;
+  id: ResourceId;
+  revision_id: ResourceId;
   version: number;
   kind: DirectiveKind;
   title: string;
@@ -70,15 +82,16 @@ export interface DirectiveRecord {
   status: DirectiveStatus;
   effective_from: string;
   expires_at: string | null;
-  supersedes: string | null;
-  created_by: string;
+  supersedes: ResourceId[] | null;
+  created_by: ActorRef;
   created_at: string;
+  updated_at: string;
   provenance: Provenance;
 }
 
 export interface DirectiveView {
-  id: string;
-  revision_id: string;
+  id: ResourceId;
+  revision_id: ResourceId;
   version: number;
   kind: DirectiveKind;
   title: string;
@@ -87,12 +100,12 @@ export interface DirectiveView {
   status: DirectiveStatus;
   effective_from: string;
   expires_at: string | null;
-  supersedes: string | null;
-  created_by: string;
-  source: string;
+  supersedes: ResourceId[] | null;
+  created_by: ActorRef;
+  source: SourceRef;
   observed_at: string;
   freshness_status: FreshnessStatus;
-  confidence?: number;
+  confidence: number;
 }
 
 export interface ContextPayload {
@@ -108,45 +121,46 @@ export interface ContextPayload {
 }
 
 export interface AuditEvent {
-  id: string;
+  id: ResourceId;
   at: string;
-  actor_id: string;
-  actor_role: ActorRole;
+  actor: ActorRef;
   action: string;
   entity_type: "directive" | "proposal";
-  entity_id: string;
-  revision_id: string | null;
+  entity_id: ResourceId;
+  revision_id: ResourceId | null;
   metadata: Record<string, string | number | boolean | null>;
 }
 
-export interface ProposalRecord {
-  id: string;
+export interface DirectiveProposal {
+  id: ResourceId;
   status: ProposalStatus;
   action: ProposalAction;
   kind: DirectiveKind;
   title: string;
   body: string;
   scope: Scope;
-  target_directive_id: string | null;
+  target_directive_id: ResourceId | null;
   rationale: string;
-  created_by: string;
+  created_by: ActorRef;
   created_at: string;
   provenance: Provenance;
 }
+
+export type ProposalRecord = DirectiveProposal;
 
 export interface CreateDirectiveInput {
   kind: DirectiveKind;
   title: string;
   body: string;
   scope: Scope;
-  status?: "active" | "inactive";
+  status?: CreateStatus;
   effective_from?: string;
   expires_at?: string | null;
-  supersedes?: string | null;
-  source: string;
+  supersedes?: ResourceId[] | null;
+  source: SourceRef;
   observed_at?: string;
   freshness_status?: FreshnessStatus;
-  confidence?: number;
+  confidence: number;
 }
 
 export interface VersionDirectiveInput {
@@ -154,7 +168,7 @@ export interface VersionDirectiveInput {
   body?: string;
   effective_from?: string;
   expires_at?: string | null;
-  source?: string;
+  source?: SourceRef;
   observed_at?: string;
   freshness_status?: FreshnessStatus;
   confidence?: number | null;
@@ -166,21 +180,25 @@ export interface SubmitProposalInput {
   title: string;
   body: string;
   scope: Scope;
-  target_directive_id?: string | null;
+  target_directive_id?: ResourceId | null;
   rationale: string;
-  source: string;
+  source: SourceRef;
   observed_at?: string;
   freshness_status?: FreshnessStatus;
-  confidence?: number;
+  confidence: number;
 }
 
 export const LIMITS = {
   jsonBytes: 32 * 1024,
   titleChars: 200,
   bodyChars: 8000,
-  sourceChars: 128,
-  scopePartChars: 64,
+  sourceSystemChars: 64,
+  sourceKindChars: 64,
+  sourceLocatorChars: 512,
+  sourceLabelChars: 128,
+  scopeChars: 128,
   actorIdChars: 128,
   rationaleChars: 4000,
-  companyChars: 64,
+  resourceIdChars: 128,
+  supersedesMax: 32,
 } as const;
