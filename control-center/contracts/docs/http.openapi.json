@@ -31,8 +31,8 @@
             "name": "scopes",
             "in": "query",
             "required": true,
-            "schema": { "type": "string", "minLength": 2, "examples": ["finance", "finance,client:acme-industria"] },
-            "description": "Comma-separated scopes. minItems 1 after split."
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" },
+            "description": "Comma-separated scopes. minItems 1 after split. Each token matches Scope."
           },
           {
             "name": "include_directives",
@@ -74,7 +74,7 @@
             "name": "scopes",
             "in": "query",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
           },
           {
             "name": "status",
@@ -119,7 +119,7 @@
             "name": "scopes",
             "in": "query",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
           },
           {
             "name": "status",
@@ -158,7 +158,7 @@
             "name": "scopes",
             "in": "query",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
           },
           {
             "name": "limit",
@@ -193,7 +193,7 @@
         "tags": ["snapshots"],
         "operationId": "getOperationalSnapshot",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -212,7 +212,7 @@
         "tags": ["snapshots"],
         "operationId": "getCommercialSnapshot",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -232,7 +232,7 @@
         "operationId": "getFinanceSnapshot",
         "description": "Read-only finance aggregate. Does not create charges.",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -251,7 +251,7 @@
         "tags": ["snapshots"],
         "operationId": "getEngineeringSnapshot",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -294,7 +294,7 @@
         "tags": ["cockpit"],
         "operationId": "listServiceHealth",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -322,7 +322,7 @@
         "tags": ["collectors"],
         "operationId": "listCollectorRuns",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -363,7 +363,9 @@
                   "requested_scopes": {
                     "type": "array",
                     "minItems": 1,
-                    "items": { "type": "string" }
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": { "$ref": "#/components/schemas/Scope" }
                   },
                   "purpose": { "type": "string" },
                   "include_directives": { "type": "boolean" },
@@ -412,7 +414,13 @@
         "tags": ["memory"],
         "operationId": "listAuditEvents",
         "parameters": [
-          { "name": "scope", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Scope" },
+            "description": "Required. Unscoped audit lists are a whole-company dump and are 400."
+          },
           { "name": "resource_id", "in": "query", "schema": { "type": "string" } }
         ],
         "responses": {
@@ -441,7 +449,7 @@
         "tags": ["collectors"],
         "operationId": "listSourceObservations",
         "parameters": [
-          { "name": "scope", "in": "query", "required": true, "schema": { "type": "string" } }
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
         ],
         "responses": {
           "200": {
@@ -477,6 +485,18 @@
       }
     },
     "schemas": {
+      "Scope": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 128,
+        "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+      },
+      "ScopeCsv": {
+        "type": "string",
+        "minLength": 2,
+        "description": "Comma-separated scopes. Empty list is 400. Each token must match Scope.",
+        "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)(?:,(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+))*$"
+      },
       "ErrorBody": {
         "type": "object",
         "additionalProperties": false,

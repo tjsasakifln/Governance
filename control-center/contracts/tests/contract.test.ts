@@ -11,12 +11,14 @@ import {
   forbiddenMcpOperationNames,
   HOMEPAGE_PRIORITY_LIMIT,
   isForbiddenMcpOperation,
+  isScope,
   listResourceTypes,
   loadCatalog,
   loadMcpContract,
   loadOpenApi,
   RESOURCE_ID_PATTERN,
   RESOURCE_TYPE_NAMES,
+  SCOPE_CSV_PATTERN,
   SCOPE_PATTERN,
   UTC_DATETIME_PATTERN,
   validate,
@@ -160,6 +162,37 @@ describe("Directive semantics", () => {
     assert.equal(result.ok, false);
     assert.ok(result.errors.some((e) => e.path === "/expires_at"));
   });
+
+  it("compares instants, not RFC3339 strings, when fractional seconds are mixed", () => {
+    const laterFrac = clone(valid) as Record<string, unknown>;
+    laterFrac.effective_from = "2026-08-20T12:00:00Z";
+    laterFrac.expires_at = "2026-08-20T12:00:00.001Z";
+    const laterResult = validate("Directive", laterFrac);
+    assert.equal(laterResult.ok, true, JSON.stringify(laterResult.errors));
+
+    const earlierWhole = clone(valid) as Record<string, unknown>;
+    earlierWhole.effective_from = "2026-08-20T12:00:00.500Z";
+    earlierWhole.expires_at = "2026-08-20T12:00:00Z";
+    const earlierResult = validate("Directive", earlierWhole);
+    assert.equal(earlierResult.ok, false);
+    assert.ok(earlierResult.errors.some((e) => e.path === "/expires_at"));
+  });
+});
+
+describe("scope taxonomy exclusivity", () => {
+  it("accepts literals, repo, kebab client, and extra prefix:id", () => {
+    assert.equal(isScope("company"), true);
+    assert.equal(isScope("repo:tjsasakifln/Governance"), true);
+    assert.equal(isScope("client:acme-industria"), true);
+    assert.equal(isScope("campaign:CONFENGE-CC"), true);
+  });
+
+  it("rejects reserved names with a colon and ill-formed client slugs", () => {
+    assert.equal(isScope("company:foo"), false);
+    assert.equal(isScope("client:Acme"), false);
+    assert.equal(isScope("client:foo_bar"), false);
+    assert.equal(isScope("hr"), false);
+  });
 });
 
 describe("freshness vs confidence", () => {
@@ -290,6 +323,20 @@ describe("MCP principal agent interface", () => {
     assert.ok(required.includes("scopes"));
   });
 
+  it("encodes SCOPE_PATTERN on every scoped MCP tool input", () => {
+    const skip = new Set(["cc_list_scopes", "cc_get_client_status"]);
+    for (const tool of mcp.tools) {
+      if (skip.has(tool.name)) {
+        continue;
+      }
+      const props = tool.input_schema.properties as Record<string, unknown>;
+      const scopes = props.scopes as { items?: { pattern?: string } } | undefined;
+      const scope = props.scope as { pattern?: string } | undefined;
+      const pattern = scopes?.items?.pattern ?? scope?.pattern;
+      assert.equal(pattern, SCOPE_PATTERN, `${tool.name} missing SCOPE_PATTERN`);
+    }
+  });
+
   it("forbids financial and provider mutations and company-memory dump", () => {
     const forbidden = forbiddenMcpOperationNames();
     for (const name of [
@@ -337,5 +384,17 @@ describe("internal HTTP contract", () => {
     for (const p of forbidden) {
       assert.equal(p in spec.paths, false, `forbidden path defined: ${p}`);
     }
+  });
+
+  it("requires scope on GET /v1/audit and encodes ScopeCsv", () => {
+    const audit = spec.paths["/v1/audit"] as {
+      get: { parameters: Array<{ name: string; required?: boolean }> };
+    };
+    const scopeParam = audit.get.parameters.find((p) => p.name === "scope");
+    assert.equal(scopeParam?.required, true);
+    const schemas = (spec as unknown as { components: { schemas: Record<string, { pattern?: string }> } })
+      .components.schemas;
+    assert.equal(schemas.Scope?.pattern, SCOPE_PATTERN);
+    assert.equal(schemas.ScopeCsv?.pattern, SCOPE_CSV_PATTERN);
   });
 });

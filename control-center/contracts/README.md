@@ -38,7 +38,7 @@ Parameterized:
 - `repo:<name>` — short name or `owner/name`
 - `client:<slug>` — kebab-case; `ClientStatus.scope` MUST equal `client:<client_slug>`
 
-Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix). Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
+Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix) that are **not** the reserved literals or `repo`/`client`. `company:foo` and `client:Acme` are invalid. Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
 
 ## The 13 resource types
 

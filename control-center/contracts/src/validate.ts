@@ -119,6 +119,12 @@ function stringField(rec: Record<string, unknown>, key: string): string | undefi
   return typeof v === "string" ? v : undefined;
 }
 
+/** Instant compare for UTC RFC3339. String order is not chronological when fractional seconds are mixed. */
+function utcMillis(value: string): number | undefined {
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : undefined;
+}
+
 function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[] {
   const rec = asRecord(data);
   if (rec === null) {
@@ -161,10 +167,14 @@ function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[
   if (type === "Directive") {
     const from = stringField(rec, "effective_from");
     const expires = rec.expires_at;
-    if (typeof from === "string" && typeof expires === "string" && expires < from) {
-      errors.push(
-        issue("/expires_at", "expires_at must be >= effective_from when not null", "dates"),
-      );
+    if (typeof from === "string" && typeof expires === "string") {
+      const fromMs = utcMillis(from);
+      const expiresMs = utcMillis(expires);
+      if (fromMs === undefined || expiresMs === undefined || expiresMs < fromMs) {
+        errors.push(
+          issue("/expires_at", "expires_at must be >= effective_from when not null", "dates"),
+        );
+      }
     }
     const audit = rec.audit;
     if (!Array.isArray(audit) || audit.length < 1) {

@@ -41,14 +41,24 @@ export const SCOPE_PREFIXES = ["repo", "client"] as const;
 export type ScopePrefix = (typeof SCOPE_PREFIXES)[number];
 
 /**
+ * Unanchored scope alternative used by SCOPE_PATTERN and CSV query params.
+ * Catch-all prefix:id excludes well-known literals and repo/client so those
+ * stay on their dedicated grammars.
+ */
+export const SCOPE_CORE =
+  "(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)";
+
+/**
  * Full scope pattern:
  * - the six literals
  * - repo:<name> (short name or owner/name)
  * - client:<kebab-slug>
- * - future namespaced `<prefix>:<id>` (lowercase prefix)
+ * - future namespaced `<prefix>:<id>` (lowercase prefix, not a reserved name)
  */
-export const SCOPE_PATTERN =
-  "^(company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$";
+export const SCOPE_PATTERN = `^${SCOPE_CORE}$`;
+
+/** Comma-separated scopes for HTTP query parameters. */
+export const SCOPE_CSV_PATTERN = `^${SCOPE_CORE}(?:,${SCOPE_CORE})*$`;
 
 export const FRESHNESS_STATUSES = ["FRESH", "STALE", "UNKNOWN", "ERROR"] as const;
 export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
