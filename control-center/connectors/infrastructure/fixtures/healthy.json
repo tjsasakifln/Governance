@@ -1,0 +1,67 @@
+{
+  "now": "2026-08-20T15:00:00.000Z",
+  "allowlist": {
+    "version": 1,
+    "collector_id": "infrastructure.netcup",
+    "source": "infrastructure",
+    "default_timeout_ms": 50,
+    "thresholds": {
+      "stale_after_seconds": 300,
+      "disk_warn_pct": 80,
+      "disk_crit_pct": 90,
+      "mem_warn_pct": 90,
+      "backup_max_age_seconds": 86400,
+      "tls_warn_days": 21,
+      "tls_crit_days": 7
+    },
+    "targets": [
+      {
+        "id": "netcup-vps-1",
+        "display_name": "Netcup VPS",
+        "host": "vps.internal.example",
+        "port": 443,
+        "checks": ["reachability", "host_metrics", "docker", "tls", "backup", "uptime"]
+      },
+      {
+        "id": "extra-contracts",
+        "display_name": "extra-contracts HTTP",
+        "url": "http://127.0.0.1:18080/health",
+        "expect_status": 200,
+        "checks": ["http"]
+      },
+      {
+        "id": "cfg-health",
+        "display_name": "cfg-health HTTP",
+        "url": "http://127.0.0.1:18081/health",
+        "expect_status": 200,
+        "checks": ["http"]
+      }
+    ]
+  },
+  "reachability": {
+    "netcup-vps-1": { "ok": true, "latency_ms": 12 }
+  },
+  "http": {
+    "extra-contracts": { "status": 200, "elapsed_ms": 18 },
+    "cfg-health": { "status": 200, "elapsed_ms": 9 }
+  },
+  "tls": {
+    "netcup-vps-1": { "not_after": "2027-08-20T00:00:00.000Z" }
+  },
+  "agent": {
+    "netcup-vps-1": {
+      "observed_at": "2026-08-20T15:00:00.000Z",
+      "disk": { "used_pct": 41, "used_bytes": 41000000000, "total_bytes": 100000000000 },
+      "memory": { "used_pct": 52, "available_bytes": 4000000000, "total_bytes": 8300000000 },
+      "load": { "load_1": 0.21, "load_5": 0.18, "load_15": 0.15 },
+      "docker": {
+        "services": [
+          { "name": "extra-crawler", "health": "healthy", "restart_count": 0, "uptime_seconds": 86400 },
+          { "name": "extra-health-check", "health": "healthy", "restart_count": 0, "uptime_seconds": 86400 }
+        ]
+      },
+      "backup": { "status": "ok", "last_success_at": "2026-08-20T14:00:00.000Z" },
+      "host": { "uptime_seconds": 604800, "restart_count": 1 }
+    }
+  }
+}
