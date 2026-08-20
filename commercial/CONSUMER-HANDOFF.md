@@ -3,7 +3,7 @@
 This directory is the only commercial-offer truth plane for CONFENGE v1.  
 Do not copy these files into web-cfg or Warmbly as a second catalog. Pin them.
 
-The stable consumer contract is `commercial/CONSUMER-CONTRACT.md`.
+The stable consumer contract is `commercial/CONSUMER-CONTRACT.md`. The compatibility contract (`commercial/compatibility/consumer-compatibility.v1.json`, rule `GOVERNANCE_WINS`) records canonical representation vs accepted consumer aliases. Do not copy aliases back into Governance.
 
 ## Who consumes what
 
@@ -73,5 +73,9 @@ Diagnóstico limited production is a **scoped overlay** (`commercial/gates/diagn
 - `schemas/authority-manifest.v1.schema.json`
 - `schemas/provider-mapping.v1.schema.json`
 - `schemas/diagnostico-limited-production.v1.schema.json`
+- `schemas/consumer-compatibility.v1.schema.json`
+- `schemas/mapping-copyback.v1.schema.json`
+
+Read-only CI fixture: `commercial/fixtures/consumer-compatibility.ci.v1.json`. Founder mapping copy-back: `python scripts/validate_commercial_authority.py --check-mapping <payload.json>` (no Asaas call).
 
 Validate local fixtures with the shipped validator functions. Do not re-implement totals or hashing.

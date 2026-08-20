@@ -15,8 +15,11 @@ Canonical artifacts:
 - `commercial/DECISIONS-CHANGELOG.md`
 - `commercial/gates/diagnostico-limited-production.v1.json`
 - `commercial/fixtures/consumer-catalog.example.v1.json`
+- `commercial/compatibility/consumer-compatibility.v1.json`
+- `commercial/fixtures/consumer-compatibility.ci.v1.json`
 
 Validator: `python scripts/validate_commercial_authority.py`
-Tests: `python -m pytest tests/test_commercial_authority.py tests/test_offer_convergence.py -q`
+Mapping copy-back: `python scripts/validate_commercial_authority.py --check-mapping <payload.json>`
+Tests: `python -m pytest tests/test_commercial_authority.py tests/test_offer_convergence.py tests/test_commercial_mainline.py -q`
 
 No Asaas API call. No secrets. No Extra republication. No SmartLic billing.

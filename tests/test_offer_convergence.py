@@ -46,8 +46,18 @@ def test_human_catalog_and_handoff_match_shipped_renderer():
             assert f"`{field}`:" in human
     assert "Do NOT activate yet" in handoff
     assert "recurring production checkout" in handoff
+    assert "você pode cadastrar agora" in handoff
+    assert "não ativar/publicar ainda" in handoff
+    assert "aguarda campo/decisão" in handoff
+    assert "python scripts/validate_commercial_authority.py --check-mapping" in handoff
+    assert "PENDING_FOUNDER_INPUT" in handoff
+    assert "maxPayments" in handoff
     assert "web-cfg#88" in human
     assert "Warmbly#47" in human
+    for offer in catalog["offers"]:
+        assert v._total_label(offer) in handoff
+        assert v._cadastrar_instruction(offer) in handoff
+        assert v._copyback_ids(offer) in handoff
 
 
 def test_consumer_contract_names_consumers_and_public_internal_split():
@@ -55,6 +65,8 @@ def test_consumer_contract_names_consumers_and_public_internal_split():
     assert "web-cfg#88" in contract
     assert "Warmbly#47" in contract
     assert "commercial/offers/catalog.v1.json" in contract
+    assert "commercial/compatibility/consumer-compatibility.v1.json" in contract
+    assert "GOVERNANCE_WINS" in contract
     assert "internal_code" in contract
     assert "description_asaas" in contract
     assert "PAUSED" in contract

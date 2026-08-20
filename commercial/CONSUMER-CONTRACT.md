@@ -17,6 +17,8 @@ This is the stable contract for commercial-offer consumers. It does not authoriz
 | Portfolio terms | `commercial/terms/CFG-TERMS-B2B-2026-08-17-v1.md` |
 | Pin | `commercial/authority/authority-manifest.v1.json` |
 | Example fixture (no real provider IDs) | `commercial/fixtures/consumer-catalog.example.v1.json` |
+| Consumer compatibility contract | `commercial/compatibility/consumer-compatibility.v1.json` |
+| Read-only CI compatibility fixture | `commercial/fixtures/consumer-compatibility.ci.v1.json` |
 
 Governance is the only commercial truth plane. `web-cfg#88` is the delivery parent. `Warmbly#47` is the reconciliation/learning consumer. Do not copy these files into those repos as a writable second catalog.
 
@@ -35,6 +37,8 @@ Known freeze drift (do not copy back into Governance):
 - web-cfg one-off uses `commitment_months=0`, `max_payments=1`, `total_commitment_cents=800000`, `notice_days=0`; Governance one-off uses `null`.
 - web-cfg billing enums `one_time` / `subscription`; Governance enums `ONE_TIME` / `RECURRING`.
 - web-cfg `scope_version` freeze `CFG-SCOPE-B2B-2026-08-17-v1`; Governance per-offer `CFG-SCOPE-DIAG-EXP-v1` / `CFG-SCOPE-DIRB2G-STD-v1`.
+
+The versioned compatibility contract is `commercial/compatibility/consumer-compatibility.v1.json`. Rule: `GOVERNANCE_WINS`. Consumers may keep those values as **aliases only**. Silent coercions that would persist `0`/`1`, lowercase billing, or `CFG-SCOPE-B2B-2026-08-17-v1` as Governance truth are forbidden. Pin `COMPATIBILITY_HASH` from the shipped validator (also copied into the read-only CI fixture). Do not edit web-cfg or Warmbly from this package.
 
 ## Offer lifecycle
 

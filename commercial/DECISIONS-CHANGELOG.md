@@ -20,6 +20,8 @@ Base: origin/main `4d4388ce7208ddac0f78576b69185bbaf2203d30`
 | `internal_code` values `CFG-DIAG-EXP` / `CFG-DIRB2G-FLEX` / `CFG-DIRB2G-180` / `CFG-DIRB2G-365` | web-cfg `registry.cjs` freeze of Governance#1 | catalog |
 | `checkout_mode` DETACHED vs SUBSCRIPTION | Governance#1 “detached checkout/link”; web-cfg freeze | catalog |
 | `externalReference` `cfg:{offer_id}:{correlation_id}` | web-cfg Asaas sandbox fixtures | mapping table policy |
+| Consumer compatibility contract (canonical vs aliases vs forbidden silent coercions) | Known web-cfg#88 / Warmbly#47 freeze drift | `commercial/compatibility/consumer-compatibility.v1.json` + CI fixture |
+| Fail-closed Asaas ID copy-back (no provider call) | Founder manual cadastro | `scripts/validate_commercial_authority.py --check-mapping` |
 | Upsell is next action, not promise | Governance#1 Diagnóstico credit window | `upsell_policy` |
 
 ## Explicitly not incorporated
@@ -27,7 +29,7 @@ Base: origin/main `4d4388ce7208ddac0f78576b69185bbaf2203d30`
 | Item | Why |
 |---|---|
 | Priced baixa-fricção / low-friction SKU | Not in origin/main, #1, or last-72h evidence. `PENDING_FOUNDER_INPUT` on name, amount, billing, scope. |
-| web-cfg one-off `max_payments=1` / `commitment_months=0` / `notice_days=0` | Contradicts Governance one-off nulls and schema. Governance remains canonical. |
+| web-cfg one-off `max_payments=1` / `commitment_months=0` / `notice_days=0` | Contradicts Governance one-off nulls and schema. Recorded as alias-only in `consumer-compatibility.v1.json`. Governance remains canonical (`GOVERNANCE_WINS`). |
 | Partner program (Governance#7 / PR#8) | Out of this catalog. |
 | Extra as public offer or coupon | Forbidden. |
 | SmartLic billing | Forbidden. |

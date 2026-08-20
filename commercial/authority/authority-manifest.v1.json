@@ -93,25 +93,25 @@
     {
       "path": "commercial/CONSUMER-HANDOFF.md",
       "schema_version": "consumer-handoff.v1",
-      "content_hash": "sha256:4cf9845bd19e64820c5c02ec5574b0548a9dfebb5a15973cb0301fecf20188c4",
+      "content_hash": "sha256:0f77634faae6f5bb89f29790233f6c5cf9f03aab9486a59af63da3c95185d9f1",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/CONSUMER-CONTRACT.md",
       "schema_version": "consumer-contract.v1",
-      "content_hash": "sha256:299f00ddfbb31554f45147fb52e3e40d5c864b5799ab190afe4f180b0f5c21cf",
+      "content_hash": "sha256:41fd1ee8cb0f517da929576130f7c22cbedabda480eb61c73cf06b355be3e069",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/DECISIONS-CHANGELOG.md",
       "schema_version": "decisions-changelog.v1",
-      "content_hash": "sha256:23465cc85626309aa418e151a7005fe27a0c577cb2376a924bb615b1865f6896",
+      "content_hash": "sha256:dc01025d78558fbea1f46dc3e20065718fda4594fcb3aa97c3470da280e4a1af",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/FOUNDER-ASAAS-REGISTRATION.md",
       "schema_version": "founder-asaas-registration.v1",
-      "content_hash": "sha256:6782a97246b4bc481091e8765e2509ffa6bf4c657e2588518d9cd1e298f5055b",
+      "content_hash": "sha256:ef1da69255c624a45bffcde7a035e1d86999bd337b4cbbc2f37de747088fbbcd",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
@@ -154,6 +154,30 @@
       "path": "schemas/diagnostico-limited-production.v1.schema.json",
       "schema_version": "diagnostico-limited-production.v1.schema",
       "content_hash": "sha256:b6f10fa775e3538d027506222252ae4afa1142ca7e3fc71d6988d7f058852772",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/compatibility/consumer-compatibility.v1.json",
+      "schema_version": "consumer-compatibility.v1",
+      "content_hash": "sha256:5c81196fc6db9b5e03a7dd0a89458699722491d55905ad6ba8a3951c784ba689",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/fixtures/consumer-compatibility.ci.v1.json",
+      "schema_version": "consumer-compatibility-fixture.v1",
+      "content_hash": "sha256:d9150f8d64ea48c679141f2c412fc86198cc9b484d441cb1b13f45f29c0fa972",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/consumer-compatibility.v1.schema.json",
+      "schema_version": "consumer-compatibility.v1.schema",
+      "content_hash": "sha256:7f8847f09acaf6e22a7c324c3397fdd507ce2e533c5f5de24bdfb409e2812fbb",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/mapping-copyback.v1.schema.json",
+      "schema_version": "mapping-copyback.v1.schema",
+      "content_hash": "sha256:9f308d59205c802ccb31a51a76f45669f21e5405e5b91775b5880f3ae425f8d8",
       "effective_at": "2026-08-17T00:00:00Z"
     }
   ]
