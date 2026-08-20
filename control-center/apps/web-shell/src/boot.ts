@@ -1,0 +1,74 @@
+import { mount, type MountableRoot } from "./app";
+import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
+
+export const SHELL_VERSION = "0.1.0";
+export const SHELL_GLOBAL_KEY = "__CONFENGE_CONTROL_CENTER__";
+
+export const FILE_PROTOCOL_NOTICE_TITLE = "Control Center precisa de um servidor local";
+export const FILE_PROTOCOL_DEV = "npm run dev";
+export const FILE_PROTOCOL_PREVIEW = "npm run preview";
+
+export interface ShellGlobals {
+  version: string;
+  destinations: readonly string[];
+  primarySurface: typeof PRIMARY_SURFACE;
+  mount: typeof mount;
+}
+
+export interface ShellWindow {
+  location: { protocol: string };
+  __CONFENGE_CONTROL_CENTER__?: ShellGlobals;
+}
+
+export function installShellGlobals(win: ShellWindow): ShellGlobals {
+  const globals: ShellGlobals = {
+    version: SHELL_VERSION,
+    destinations: DESTINATION_IDS,
+    primarySurface: PRIMARY_SURFACE,
+    mount,
+  };
+  win.__CONFENGE_CONTROL_CENTER__ = globals;
+  return globals;
+}
+
+export function isFileProtocol(protocol: string): boolean {
+  return protocol === "file:";
+}
+
+export function fileProtocolHtml(): string {
+  return (
+    `<main class="file-protocol" role="alert">` +
+    `<h1>${FILE_PROTOCOL_NOTICE_TITLE}</h1>` +
+    `<p>Abrir este arquivo via <code>file:</code> não carrega o módulo ES. ` +
+    `No diretório <code>control-center/apps/web-shell</code> execute:</p>` +
+    `<pre>${FILE_PROTOCOL_DEV}\n# ou\n${FILE_PROTOCOL_PREVIEW}</pre>` +
+    `</main>`
+  );
+}
+
+export function applyFileProtocolGuard(
+  location: { protocol: string },
+  root: { innerHTML: string },
+): boolean {
+  if (!isFileProtocol(location.protocol)) return false;
+  root.innerHTML = fileProtocolHtml();
+  return true;
+}
+
+export function startBrowser(
+  win: ShellWindow | undefined = globalThis.window as unknown as ShellWindow | undefined,
+  doc: { getElementById(id: string): MountableRoot | null } | undefined = globalThis.document,
+): void {
+  if (win == null || doc == null) {
+    return;
+  }
+  installShellGlobals(win);
+  const root = doc.getElementById("root");
+  if (!root) {
+    throw new Error("Control Center shell: missing #root");
+  }
+  if (applyFileProtocolGuard(win.location, root)) {
+    return;
+  }
+  mount(root);
+}
