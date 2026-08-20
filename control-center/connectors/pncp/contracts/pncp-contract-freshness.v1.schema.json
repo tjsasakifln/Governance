@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "control-center.pncp.contract-freshness/1.0",
+  "title": "PNCP_CONTRACT_FRESHNESS/1.0 adapter input",
+  "description": "Subset of extra-cli PNCP_CONTRACT_FRESHNESS/1.0 that this Control Center adapter parses. Control Center does not classify lag/windows; it maps extra-cli status.",
+  "type": "object",
+  "required": ["contract_version", "status", "reason_codes", "as_of"],
+  "properties": {
+    "contract_version": { "const": "PNCP_CONTRACT_FRESHNESS/1.0" },
+    "status": { "enum": ["FRESH", "DEGRADED", "STALE", "UNKNOWN"] },
+    "reason_codes": { "type": "array", "items": { "type": "string" } },
+    "as_of": { "type": "string", "minLength": 1 },
+    "deployed_sha": { "type": ["string", "null"] },
+    "policy_version": { "type": ["string", "null"] },
+    "current_lag_hours": { "type": ["number", "null"] },
+    "source_publication_or_update_at": { "type": ["string", "null"] },
+    "first_observed_at": { "type": ["string", "null"] },
+    "persisted_at": { "type": ["string", "null"] },
+    "last_run_at": { "type": ["string", "null"] },
+    "next_run_at": { "type": ["string", "null"] },
+    "latest_successful_closed_window": { "type": ["string", "null"] },
+    "oldest_unresolved_gap": { "type": ["string", "null"] },
+    "unresolved_window_count": { "type": ["integer", "null"] },
+    "health_exit": { "type": ["integer", "null"] }
+  }
+}

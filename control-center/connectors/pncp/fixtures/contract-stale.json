@@ -1,0 +1,52 @@
+{
+  "contract_version": "PNCP_CONTRACT_FRESHNESS/1.0",
+  "status": "STALE",
+  "reason_codes": [
+    "CADENCE_CANNOT_MEET_6H",
+    "CADENCE_CANNOT_MEET_24H",
+    "LAG_ABOVE_HARD_GUARDRAIL"
+  ],
+  "as_of": "2026-08-20T12:00:00Z",
+  "deployed_sha": "9c5e7d47f99902d9d97cf479aefbba8cd391a14d",
+  "policy_version": "pncp-contracts.timer/Mon,Wed,Fri *-*-* 06:00:00",
+  "slo": {
+    "desired_operational_target_hours": 6.0,
+    "desired_operational_percentile": 95,
+    "desired_hard_guardrail_hours": 24.0,
+    "timer_unit": "pncp-contracts.timer",
+    "timer_on_calendar": "Mon,Wed,Fri *-*-* 06:00:00",
+    "timer_timezone_note": "unit does not set UTC; host local America/Sao_Paulo",
+    "timer_max_inter_run_hours": 72.0,
+    "sustainable_operational_target": false,
+    "sustainable_hard_guardrail": false
+  },
+  "source_publication_or_update_at": "2026-08-19T00:00:47Z",
+  "first_observed_at": "2026-08-19T09:21:09Z",
+  "persisted_at": "2026-08-19T09:21:09Z",
+  "source_window": {
+    "start": "2026-08-12",
+    "end": "2026-08-19"
+  },
+  "latest_successful_closed_window": "20260812_20260819",
+  "oldest_unresolved_gap": "20260810_20260817",
+  "unresolved_window_count": 1,
+  "current_lag_hours": 28.8,
+  "lag_p50_hours": 8.85,
+  "lag_p95_hours": 9.34,
+  "lag_p99_hours": 9.34,
+  "lag_sample_n": 5,
+  "last_run_at": "2026-08-19T09:00:20Z",
+  "next_run_at": "2026-08-21T09:00:00Z",
+  "timer": {
+    "unit": "pncp-contracts.timer",
+    "active": true,
+    "enabled": true,
+    "last_run_at": "2026-08-19T09:00:20Z",
+    "next_run_at": "2026-08-21T09:00:00Z",
+    "last_result": "success",
+    "last_exec_status": 0,
+    "on_calendar": "Mon,Wed,Fri *-*-* 06:00:00"
+  },
+  "health_exit": 2,
+  "campaign_verdict_hint": "FRESHNESS_DEGRADED"
+}

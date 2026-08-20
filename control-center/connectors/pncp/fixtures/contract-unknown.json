@@ -1,0 +1,47 @@
+{
+  "contract_version": "PNCP_CONTRACT_FRESHNESS/1.0",
+  "status": "UNKNOWN",
+  "reason_codes": [
+    "MISSING_EVIDENCE",
+    "TIMER_ACTIVE_NOT_PROOF",
+    "HTTP_200_NOT_PROOF"
+  ],
+  "as_of": "2026-08-20T12:00:00Z",
+  "deployed_sha": "9c5e7d47f99902d9d97cf479aefbba8cd391a14d",
+  "policy_version": "pncp-contracts.timer/*-*-* 00,04,08,12,16,20:00:00 America/Sao_Paulo",
+  "slo": {
+    "desired_operational_target_hours": 6.0,
+    "desired_operational_percentile": 95,
+    "desired_hard_guardrail_hours": 24.0,
+    "timer_unit": "pncp-contracts.timer",
+    "timer_on_calendar": "*-*-* 00,04,08,12,16,20:00:00 America/Sao_Paulo",
+    "timer_max_inter_run_hours": 4.0,
+    "sustainable_operational_target": true,
+    "sustainable_hard_guardrail": true
+  },
+  "source_publication_or_update_at": null,
+  "first_observed_at": null,
+  "persisted_at": null,
+  "source_window": null,
+  "latest_successful_closed_window": null,
+  "oldest_unresolved_gap": null,
+  "unresolved_window_count": 0,
+  "current_lag_hours": null,
+  "lag_p50_hours": null,
+  "lag_p95_hours": null,
+  "lag_p99_hours": null,
+  "lag_sample_n": 0,
+  "last_run_at": null,
+  "next_run_at": "2026-08-20T14:00:00Z",
+  "timer": {
+    "unit": "pncp-contracts.timer",
+    "active": true,
+    "enabled": true,
+    "last_run_at": null,
+    "next_run_at": "2026-08-20T14:00:00Z",
+    "last_result": null,
+    "on_calendar": "*-*-* 00,04,08,12,16,20:00:00 America/Sao_Paulo"
+  },
+  "health_exit": 2,
+  "campaign_verdict_hint": "FRESHNESS_DEGRADED"
+}
