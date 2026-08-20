@@ -1,0 +1,22 @@
+{
+  "schema_version": "pending-founder-inputs.v1",
+  "catalog_id": "CFG-OFFER-CATALOG-v1",
+  "blocks_catalog_verdict": false,
+  "items": [
+    {
+      "id": "LOW_FRICTION_ENTRY_OFFER",
+      "status": "PENDING_FOUNDER_INPUT",
+      "reason": "No priced baixa-fricção / low-friction SKU exists in origin/main, Governance#1, or last-72h docs/issues/commits. Outreach copy about a low-friction next step is not a catalog offer. Do not invent name, amount, billing or scope.",
+      "absent_fields": [
+        "offer_id",
+        "public_name",
+        "amount_cents",
+        "billing_mode",
+        "scope_version"
+      ],
+      "must_not_invent": true,
+      "funnel_role_if_created": "ENTRY_ONE_OFF",
+      "upsell_if_created": "NEXT_ACTION_NOT_PROMISE"
+    }
+  ]
+}

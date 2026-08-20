@@ -27,13 +27,13 @@
     {
       "path": "commercial/offers/catalog.v1.json",
       "schema_version": "offer-catalog.v1",
-      "content_hash": "sha256:a451ad3c7cc74a25ebde536664fb25e459073add5e8fc850a33ace1b859736e9",
+      "content_hash": "sha256:69a849acabc762728c75faedae5f4aed10d6fec995d6429b9a7870a17f111737",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/offers/catalog.public.v1.json",
       "schema_version": "offer-catalog.v1",
-      "content_hash": "sha256:52b70ab3646548ec41b0650d4a2d29c509594f969dfa4bc3117e06368019ed34",
+      "content_hash": "sha256:9abd963145254ea329d1be270be216af06e8ec4dd08cb42575af662e8d3218a9",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
@@ -69,13 +69,13 @@
     {
       "path": "decisions/ADR-CFG-OFFER-CATALOG-001.md",
       "schema_version": "ADR-CFG-OFFER-CATALOG-001",
-      "content_hash": "sha256:473ab3537a97e44fc3ea3ea8ad55160e997826eb8beb80edadb416a87f15834c",
+      "content_hash": "sha256:c89845f1f0fc315b2f138298be6a3ace4381abc136251f964cb1cc506f18b675",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "schemas/offer-catalog.v1.schema.json",
       "schema_version": "offer-catalog.v1.schema",
-      "content_hash": "sha256:b2bb2bbbe60bbe58b7bfd4b7dedf9f18a7a6f0e66e6dac25a21c6d01fa424a0a",
+      "content_hash": "sha256:ff74fa11f3fca4351a3b45810915239589edfcd6dafde085f50b7c72b5e8179e",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
@@ -93,7 +93,67 @@
     {
       "path": "commercial/CONSUMER-HANDOFF.md",
       "schema_version": "consumer-handoff.v1",
-      "content_hash": "sha256:66c6e2a29bff566b61b0a72992d43e1b3588c287db7a9c50d371a48fb8f2f5b7",
+      "content_hash": "sha256:4cf9845bd19e64820c5c02ec5574b0548a9dfebb5a15973cb0301fecf20188c4",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/CONSUMER-CONTRACT.md",
+      "schema_version": "consumer-contract.v1",
+      "content_hash": "sha256:299f00ddfbb31554f45147fb52e3e40d5c864b5799ab190afe4f180b0f5c21cf",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/DECISIONS-CHANGELOG.md",
+      "schema_version": "decisions-changelog.v1",
+      "content_hash": "sha256:23465cc85626309aa418e151a7005fe27a0c577cb2376a924bb615b1865f6896",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/FOUNDER-ASAAS-REGISTRATION.md",
+      "schema_version": "founder-asaas-registration.v1",
+      "content_hash": "sha256:6782a97246b4bc481091e8765e2509ffa6bf4c657e2588518d9cd1e298f5055b",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/offers/catalog.human.v1.md",
+      "schema_version": "offer-catalog.human.v1",
+      "content_hash": "sha256:c6daa9172bf2d3ebd98d9aef29eb7e05390e3d4ac39ec93fd93c402b26a552a0",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/offers/pending-founder-inputs.v1.json",
+      "schema_version": "pending-founder-inputs.v1",
+      "content_hash": "sha256:399b23c6c84b171e392d892798eff50d2c666059dc4cba903a2818f94dee375f",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/providers/asaas-mapping.v1.json",
+      "schema_version": "provider-mapping.v1",
+      "content_hash": "sha256:5625c3a9df6b567ca9bd3bdbfd1147e9ca1532e9fd0f9c5ac34961f38e79d3b6",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/gates/diagnostico-limited-production.v1.json",
+      "schema_version": "diagnostico-limited-production.v1",
+      "content_hash": "sha256:b389855f51657f8c5d888e48b36ee65ac54e88a6c6b894f9576c1eb1e494c28c",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "commercial/fixtures/consumer-catalog.example.v1.json",
+      "schema_version": "consumer-catalog-fixture.v1",
+      "content_hash": "sha256:eabae3097e8aa2453f6312e03a282db0e0c919ef90722eabbd75a7b438844062",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/provider-mapping.v1.schema.json",
+      "schema_version": "provider-mapping.v1.schema",
+      "content_hash": "sha256:6cc5ca36fefcb5a6e18726aae959d3df0c80b2eef05ebd51472b7f0d473ddecf",
+      "effective_at": "2026-08-17T00:00:00Z"
+    },
+    {
+      "path": "schemas/diagnostico-limited-production.v1.schema.json",
+      "schema_version": "diagnostico-limited-production.v1.schema",
+      "content_hash": "sha256:b6f10fa775e3538d027506222252ae4afa1142ca7e3fc71d6988d7f058852772",
       "effective_at": "2026-08-17T00:00:00Z"
     }
   ]

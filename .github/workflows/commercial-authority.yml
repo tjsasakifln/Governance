@@ -22,4 +22,4 @@ jobs:
       - name: Validate founder-approved legal package
         run: python scripts/validate_legal_founder_approved.py
       - name: Adversarial tests
-        run: python -m pytest tests/test_commercial_authority.py tests/test_legal_provisional.py tests/test_legal_founder_approved.py -q
+        run: python -m pytest tests/test_commercial_authority.py tests/test_offer_convergence.py tests/test_legal_provisional.py tests/test_legal_founder_approved.py -q

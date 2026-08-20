@@ -29,6 +29,81 @@ CANONICAL_OFFER_CODES = (
     "CFG-DIRB2G-180-v1",
     "CFG-DIRB2G-365-v1",
 )
+NAMED_OFFER_FIELDS = (
+    "offer_id",
+    "offer_version",
+    "public_name",
+    "internal_code",
+    "description_short",
+    "description_asaas",
+    "amount_cents",
+    "currency",
+    "billing_mode",
+    "cycle",
+    "commitment_months",
+    "max_payments",
+    "total_commitment_cents",
+    "notice_days",
+    "scope_version",
+    "terms_version",
+    "capacity_required",
+    "capacity_units",
+    "checkout_mode",
+    "provider_mapping_status",
+    "status",
+    "effective_from",
+    "effective_to",
+    "approval_state",
+    "change_reason",
+)
+PUBLIC_SURFACE_FIELDS = frozenset(
+    {
+        "offer_id",
+        "offer_version",
+        "public_name",
+        "description_short",
+        "amount_cents",
+        "currency",
+        "billing_mode",
+        "cycle",
+        "commitment_months",
+        "max_payments",
+        "total_commitment_cents",
+        "notice_days",
+        "checkout_mode",
+        "status",
+        "recommended",
+        "silent_renewal",
+        "scope_version",
+        "terms_version",
+        "deliverables",
+        "commercial_credit",
+        "delivery_business_days_min",
+        "delivery_business_days_max",
+        "recomposition",
+    }
+)
+INTERNAL_FIELDS = frozenset(
+    {
+        "internal_code",
+        "description_asaas",
+        "provider_mapping_status",
+        "approval_state",
+        "change_reason",
+        "capacity_required",
+        "capacity_units",
+        "effective_from",
+        "effective_to",
+        "sold_out",
+        "funnel_role",
+        "upsell_policy",
+        "offer_code",
+    }
+)
+CHECKOUT_BLOCKING_STATUSES = frozenset({"PAUSED", "RETIRED", "DRAFT"})
+MAPPING_ID_FIELDS = ("asaas_product_id", "checkout_id", "subscription_mapping")
+VERDICT_READY = "OFFER_CATALOG_AUTHORITY_READY_FOR_ASAAS_REGISTRATION"
+VERDICT_BLOCKED = "OFFER_CATALOG_BLOCKED_ON_NAMED_FOUNDER_FIELDS"
 OFFER_STATES = frozenset({"DRAFT", "APPROVED", "ACTIVE", "PAUSED", "RETIRED"})
 GATE_STATES = frozenset({"UNKNOWN", "PENDING", "APPROVED", "REJECTED", "WAIVED"})
 REQUIRED_GATES_FOR_ACTIVE = (
@@ -113,6 +188,46 @@ ARTIFACT_SPECS: tuple[dict[str, str], ...] = (
     {
         "path": "commercial/CONSUMER-HANDOFF.md",
         "schema_version": "consumer-handoff.v1",
+    },
+    {
+        "path": "commercial/CONSUMER-CONTRACT.md",
+        "schema_version": "consumer-contract.v1",
+    },
+    {
+        "path": "commercial/DECISIONS-CHANGELOG.md",
+        "schema_version": "decisions-changelog.v1",
+    },
+    {
+        "path": "commercial/FOUNDER-ASAAS-REGISTRATION.md",
+        "schema_version": "founder-asaas-registration.v1",
+    },
+    {
+        "path": "commercial/offers/catalog.human.v1.md",
+        "schema_version": "offer-catalog.human.v1",
+    },
+    {
+        "path": "commercial/offers/pending-founder-inputs.v1.json",
+        "schema_version": "pending-founder-inputs.v1",
+    },
+    {
+        "path": "commercial/providers/asaas-mapping.v1.json",
+        "schema_version": "provider-mapping.v1",
+    },
+    {
+        "path": "commercial/gates/diagnostico-limited-production.v1.json",
+        "schema_version": "diagnostico-limited-production.v1",
+    },
+    {
+        "path": "commercial/fixtures/consumer-catalog.example.v1.json",
+        "schema_version": "consumer-catalog-fixture.v1",
+    },
+    {
+        "path": "schemas/provider-mapping.v1.schema.json",
+        "schema_version": "provider-mapping.v1.schema",
+    },
+    {
+        "path": "schemas/diagnostico-limited-production.v1.schema.json",
+        "schema_version": "diagnostico-limited-production.v1.schema",
     },
 )
 
@@ -317,23 +432,58 @@ def build_public_catalog(full_catalog: Mapping[str, Any], exceptions_doc: Mappin
 
 def assert_public_catalog_matches(full_catalog: Mapping[str, Any], public_catalog: Mapping[str, Any], exceptions_doc: Mapping[str, Any]) -> None:
     derived = build_public_catalog(full_catalog, exceptions_doc)
-    derived_offers = {offer["offer_code"]: offer for offer in derived["offers"]}
-    public_offers = {offer["offer_code"]: offer for offer in public_catalog.get("offers") or ()}
+    derived_offers = {offer_id_of(offer): offer for offer in derived["offers"]}
+    public_offers = {offer_id_of(offer): offer for offer in public_catalog.get("offers") or ()}
     if set(derived_offers) != set(public_offers):
         raise ValidationError("public catalog offer set does not match derived public offers")
     if public_catalog.get("visibility") != "PUBLIC_CANDIDATE":
         raise ValidationError("public catalog visibility must be PUBLIC_CANDIDATE until publication is approved")
     if public_catalog.get("publication_status") != "NOT_PUBLISHED":
         raise ValidationError("public catalog is not published")
+    if canonical_json(derived) != canonical_json(public_catalog):
+        raise ValidationError("public catalog must equal derived public catalog")
     for offer in public_catalog.get("offers") or ():
         if offer.get("amount_cents") == 1000000 and offer.get("billing_mode") == "RECURRING":
             raise ValidationError("no public offer may be 1000000 cents/month")
-        if "EXTRA" in str(offer.get("offer_code", "")).upper() or "HISTORICAL_LIGHTHOUSE" in json.dumps(offer):
+        code = str(offer.get("offer_code") or offer.get("offer_id") or "")
+        if "EXTRA" in code.upper() or "HISTORICAL_LIGHTHOUSE" in json.dumps(offer):
             raise ValidationError("Extra exception leaked into public catalog")
+
+
+def offer_id_of(offer: Mapping[str, Any]) -> str:
+    return str(offer.get("offer_id") or offer.get("offer_code") or "")
+
+
+def assert_named_offer_fields(offer: Mapping[str, Any]) -> None:
+    for field in NAMED_OFFER_FIELDS:
+        if field not in offer:
+            raise ValidationError(f"{offer_id_of(offer)}: missing named field {field}")
+    if offer.get("offer_id") != offer.get("offer_code"):
+        raise ValidationError(f"{offer_id_of(offer)}: offer_id must equal offer_code")
+    if offer.get("status") not in OFFER_STATES:
+        raise ValidationError(f"invalid offer status: {offer.get('status')!r}")
+    if offer.get("provider_mapping_status") not in {"PENDING", "MAPPED", "VERIFIED"}:
+        raise ValidationError(f"{offer_id_of(offer)}: invalid provider_mapping_status")
+    if offer.get("checkout_mode") not in {"DETACHED", "SUBSCRIPTION"}:
+        raise ValidationError(f"{offer_id_of(offer)}: invalid checkout_mode")
+    if not isinstance(offer.get("sold_out"), bool):
+        raise ValidationError(f"{offer_id_of(offer)}: sold_out must be boolean")
+    if offer.get("upsell_policy") not in (None, "NEXT_ACTION_NOT_PROMISE"):
+        raise ValidationError("upsell must be next action, not a promise")
+
+
+def required_commercial_fields_missing(offer: Mapping[str, Any]) -> list[str]:
+    missing: list[str] = []
+    for field in ("public_name", "amount_cents", "billing_mode", "scope_version"):
+        value = offer.get(field)
+        if value in (None, "", "PENDING_FOUNDER_INPUT"):
+            missing.append(field)
+    return missing
 
 
 def assert_offer_invariants(offer: Mapping[str, Any]) -> None:
     reject_float_money(offer)
+    assert_named_offer_fields(offer)
     status = offer.get("status")
     if status not in OFFER_STATES:
         raise ValidationError(f"invalid offer status: {status!r}")
@@ -348,11 +498,20 @@ def assert_offer_invariants(offer: Mapping[str, Any]) -> None:
     if not is_int_money(offer.get("amount_cents")):
         raise ValidationError("amount_cents must be integer centavos")
 
+    if offer.get("capacity_required") is not bool(offer.get("consumes_recurring_slot")):
+        raise ValidationError(f"{offer_id_of(offer)}: capacity_required must match consumes_recurring_slot")
+
     if offer.get("offer_code") == "CFG-DIAG-EXP-v1":
         if offer.get("billing_mode") != "ONE_TIME" or offer.get("amount_cents") != 800000:
             raise ValidationError("Diagnóstico amount/mode mismatch")
         if offer.get("consumes_recurring_slot") is not False:
             raise ValidationError("Diagnóstico must not consume a recurring slot")
+        if offer.get("checkout_mode") != "DETACHED" or offer.get("capacity_units") != 0:
+            raise ValidationError("Diagnóstico must be DETACHED with capacity_units 0")
+        if offer.get("funnel_role") != "ENTRY_ONE_OFF":
+            raise ValidationError("Diagnóstico funnel_role must be ENTRY_ONE_OFF")
+        if offer.get("internal_code") != "CFG-DIAG-EXP":
+            raise ValidationError("Diagnóstico internal_code mismatch")
         credit = offer.get("commercial_credit") or {}
         if credit.get("amount_cents") != 200000 or credit.get("cumulative") is not False:
             raise ValidationError("Diagnóstico credit must be 200000 non-cumulative")
@@ -372,18 +531,26 @@ def assert_offer_invariants(offer: Mapping[str, Any]) -> None:
             raise ValidationError("Flex must not invent total_commitment_cents")
         if offer.get("notice_days") != 30:
             raise ValidationError("Flex notice_days must be 30")
+        if offer.get("checkout_mode") != "SUBSCRIPTION" or offer.get("capacity_units") != 1:
+            raise ValidationError("Flex must be SUBSCRIPTION with capacity_units 1")
+        if offer.get("internal_code") != "CFG-DIRB2G-FLEX":
+            raise ValidationError("Flex internal_code mismatch")
 
     if offer.get("offer_code") == "CFG-DIRB2G-180-v1":
         _assert_fixed_commitment(offer, amount=1500000, payments=6, total=9000000)
         reco = offer.get("recomposition") or {}
         if reco.get("base_cents_per_started_month") != 500000:
             raise ValidationError("180 recomposition-base must be 500000 cents")
+        if offer.get("checkout_mode") != "SUBSCRIPTION" or offer.get("internal_code") != "CFG-DIRB2G-180":
+            raise ValidationError("180 checkout_mode/internal_code mismatch")
 
     if offer.get("offer_code") == "CFG-DIRB2G-365-v1":
         _assert_fixed_commitment(offer, amount=1250000, payments=12, total=15000000)
         reco = offer.get("recomposition") or {}
         if reco.get("base_cents_per_started_month") != 750000:
             raise ValidationError("365 recomposition-base must be 750000 cents")
+        if offer.get("checkout_mode") != "SUBSCRIPTION" or offer.get("internal_code") != "CFG-DIRB2G-365":
+            raise ValidationError("365 checkout_mode/internal_code mismatch")
 
     if offer.get("billing_mode") == "RECURRING" and is_int_money(offer.get("max_payments")):
         expected = offer["max_payments"] * offer["amount_cents"]
@@ -420,8 +587,11 @@ def assert_catalog_invariants(catalog: Mapping[str, Any]) -> None:
         raise ValidationError("catalog currency must be BRL")
     offers = catalog.get("offers") or []
     codes = [offer.get("offer_code") for offer in offers]
+    ids = [offer.get("offer_id") for offer in offers]
     if sorted(codes) != sorted(CANONICAL_OFFER_CODES):
         raise ValidationError(f"canonical offer set mismatch: {codes}")
+    if ids != codes:
+        raise ValidationError("offer_id set must match offer_code set")
     if len(set(codes)) != len(codes):
         raise ValidationError("duplicate offer_code")
     for offer in offers:
@@ -584,6 +754,329 @@ def onboarding_allowed(*, payment_confirmed: bool, terms_accepted: bool, recurri
     if recurring and not capacity_reserved:
         return False
     return True
+
+
+def format_brl_cents(cents: int | None) -> str:
+    if cents is None:
+        return "n/a"
+    if not is_int_money(cents):
+        raise ValidationError(f"money must be integer centavos, got {cents!r}")
+    reais, frac = divmod(cents, 100)
+    grouped = f"{reais:,}".replace(",", ".")
+    return f"R$ {grouped},{frac:02d}"
+
+
+def mapping_ids_pending(row: Mapping[str, Any]) -> bool:
+    return all(row.get(field) in (None, "") for field in MAPPING_ID_FIELDS)
+
+
+def provider_mapping_ready(row: Mapping[str, Any], offer: Mapping[str, Any]) -> bool:
+    if row.get("status") != "VERIFIED":
+        return False
+    if mapping_ids_pending(row):
+        return False
+    if offer.get("billing_mode") == "ONE_TIME":
+        return bool(row.get("asaas_product_id") or row.get("checkout_id"))
+    return bool(row.get("asaas_product_id") and row.get("subscription_mapping"))
+
+
+def offer_checkout_blocked_by_lifecycle(offer: Mapping[str, Any]) -> bool:
+    if offer.get("status") in CHECKOUT_BLOCKING_STATUSES:
+        return True
+    if offer.get("sold_out") is True:
+        return True
+    return False
+
+
+def overlay_authorizes_diagnostico(overlay: Mapping[str, Any], offer: Mapping[str, Any]) -> bool:
+    if overlay.get("approved_offer_id") != "CFG-DIAG-EXP-v1":
+        return False
+    if overlay.get("approved_amount_cents") != 800000:
+        return False
+    if overlay.get("approved_billing_mode") != "ONE_TIME":
+        return False
+    if overlay.get("production_checkout_approved") is not True:
+        return False
+    if overlay.get("recurring_checkout_approved") is True:
+        return False
+    if overlay.get("portfolio_terms_replaced") is True:
+        return False
+    if offer_id_of(offer) != "CFG-DIAG-EXP-v1":
+        return False
+    if offer.get("amount_cents") != 800000 or offer.get("billing_mode") != "ONE_TIME":
+        return False
+    return True
+
+
+def assert_overlay_does_not_flip_portfolio_gates(overlay: Mapping[str, Any], gates_doc: Mapping[str, Any]) -> None:
+    if overlay.get("does_not_flip_portfolio_gates") is not True:
+        raise ValidationError("overlay must declare it does not flip portfolio gates")
+    if overlay.get("portfolio_terms_replaced") is not False:
+        raise ValidationError("Diagnóstico overlay must not replace portfolio terms")
+    if overlay.get("recurring_checkout_approved") is not False:
+        raise ValidationError("overlay must keep recurring checkout false")
+    if overlay.get("automated_refund_approved") is not False:
+        raise ValidationError("overlay must keep automated refund false")
+    if overlay.get("automated_nfse_approved") is not False:
+        raise ValidationError("overlay must keep automated NFS-e false")
+    if overlay.get("legal_approved_claim_forbidden") is not True:
+        raise ValidationError("overlay must forbid LEGAL_APPROVED claim")
+    if overlay.get("scoped_terms_version") != "CFG-LEGAL-TERMS-DIAG-EXP-FOUNDER-v1":
+        raise ValidationError("scoped Diagnóstico terms overlay identity mismatch")
+    if overlay.get("portfolio_terms_version") != TERMS_VERSION:
+        raise ValidationError("portfolio terms identity mismatch")
+    if gates_doc.get("production_checkout_enabled") is True:
+        raise ValidationError("Diagnóstico overlay must not flip portfolio production_checkout_enabled")
+    if gates_doc.get("public_activation_approved") is True:
+        raise ValidationError("Diagnóstico overlay must not flip portfolio public_activation_approved")
+    if gates_doc.get("real_money_mutation_approved") is True:
+        raise ValidationError("Diagnóstico overlay must not flip portfolio real_money_mutation_approved")
+
+
+def commercial_checkout_permitted(
+    *,
+    offer: Mapping[str, Any],
+    gates_doc: Mapping[str, Any],
+    overlay: Mapping[str, Any],
+) -> bool:
+    if offer_checkout_blocked_by_lifecycle(offer):
+        return False
+    if offer.get("billing_mode") == "RECURRING":
+        return False
+    return overlay_authorizes_diagnostico(overlay, offer)
+
+
+def checkout_may_create_provider_object(
+    *,
+    offer: Mapping[str, Any],
+    gates_doc: Mapping[str, Any],
+    overlay: Mapping[str, Any],
+    mapping_row: Mapping[str, Any],
+) -> bool:
+    if not commercial_checkout_permitted(offer=offer, gates_doc=gates_doc, overlay=overlay):
+        return False
+    return provider_mapping_ready(mapping_row, offer)
+
+
+def visitor_surface_fields(offer: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: deepcopy(offer[key]) for key in PUBLIC_SURFACE_FIELDS if key in offer}
+
+
+def assert_mapping_invariants(mapping: Mapping[str, Any], catalog: Mapping[str, Any]) -> None:
+    if mapping.get("provider") != "asaas":
+        raise ValidationError("mapping provider must be asaas")
+    if mapping.get("secrets_forbidden") is not True:
+        raise ValidationError("mapping must forbid secrets")
+    if mapping.get("external_reference_policy") != "cfg:{offer_id}:{correlation_id}":
+        raise ValidationError("external_reference_policy mismatch")
+    rows = mapping.get("mappings") or []
+    ids = [row.get("offer_id") for row in rows]
+    if sorted(ids) != sorted(CANONICAL_OFFER_CODES):
+        raise ValidationError(f"mapping offer set mismatch: {ids}")
+    by_id = {row["offer_id"]: row for row in rows}
+    for offer in catalog.get("offers") or ():
+        row = by_id[offer_id_of(offer)]
+        pending = mapping_ids_pending(row)
+        if pending and offer.get("provider_mapping_status") != "PENDING":
+            raise ValidationError(f"{offer_id_of(offer)}: null mapping IDs require provider_mapping_status=PENDING")
+        if row.get("status") == "PENDING_MANUAL_CADASTRO" and not pending:
+            raise ValidationError(f"{offer_id_of(offer)}: PENDING_MANUAL_CADASTRO cannot carry provider IDs")
+        payload = canonical_json(row)
+        if scan_forbidden_secrets(payload):
+            raise ValidationError(f"{offer_id_of(offer)}: mapping row contains forbidden secret/token")
+
+
+def assert_pending_founder_inputs(doc: Mapping[str, Any], catalog: Mapping[str, Any]) -> None:
+    if doc.get("blocks_catalog_verdict") is not False:
+        raise ValidationError("low-friction pending input must not block the documented v1 catalog")
+    items = doc.get("items") or []
+    if not items:
+        raise ValidationError("pending founder inputs must record the absent low-friction SKU")
+    low = items[0]
+    if low.get("id") != "LOW_FRICTION_ENTRY_OFFER" or low.get("status") != "PENDING_FOUNDER_INPUT":
+        raise ValidationError("low-friction SKU must remain PENDING_FOUNDER_INPUT")
+    if low.get("must_not_invent") is not True:
+        raise ValidationError("pending input must forbid invention")
+    catalog_ids = {offer_id_of(offer) for offer in catalog.get("offers") or ()}
+    if "PENDING_FOUNDER_INPUT" in catalog_ids:
+        raise ValidationError("do not insert an invented pending offer_id into the catalog")
+
+
+def assert_consumer_fixture(fixture: Mapping[str, Any], mapping: Mapping[str, Any]) -> None:
+    consumers = fixture.get("consumers") or []
+    if "web-cfg#88" not in consumers or "Warmbly#47" not in consumers:
+        raise ValidationError("consumer fixture must name web-cfg#88 and Warmbly#47")
+    if fixture.get("canonical_catalog") != "commercial/offers/catalog.v1.json":
+        raise ValidationError("fixture canonical catalog path mismatch")
+    for offer in fixture.get("offers") or ():
+        for field in ("asaas_product_id", "checkout_id", "subscription_mapping"):
+            if offer.get(field) not in (None, "", False):
+                raise ValidationError("consumer fixture must not contain real provider IDs")
+    for row in mapping.get("mappings") or ():
+        if not mapping_ids_pending(row):
+            raise ValidationError("current mapping template must not ship real provider IDs")
+    text = canonical_json(fixture)
+    if scan_forbidden_secrets(text):
+        raise ValidationError("consumer fixture contains forbidden secret/token")
+
+
+def catalog_verdict(catalog: Mapping[str, Any], pending_doc: Mapping[str, Any]) -> str:
+    missing: list[str] = []
+    for offer in catalog.get("offers") or ():
+        missing.extend(f"{offer_id_of(offer)}.{field}" for field in required_commercial_fields_missing(offer))
+    if missing:
+        return VERDICT_BLOCKED
+    if pending_doc.get("blocks_catalog_verdict") is True:
+        return VERDICT_BLOCKED
+    return VERDICT_READY
+
+
+def render_human_catalog(catalog: Mapping[str, Any]) -> str:
+    lines = [
+        "# CONFENGE offer catalog v1 (human-readable)",
+        "",
+        "Derived from `commercial/offers/catalog.v1.json`. Do not edit by hand.",
+        "",
+        f"- `catalog_id`: {catalog.get('catalog_id')}",
+        f"- `catalog_authority`: {catalog.get('catalog_authority')}",
+        f"- `terms_version`: {catalog.get('terms_version')}",
+        f"- `currency`: {catalog.get('currency')}",
+        "",
+        "Consumers: `web-cfg#88`, `Warmbly#47`. Extra historical `1000000` cents/month is not listed.",
+        "",
+    ]
+    for offer in catalog.get("offers") or ():
+        lines.append(f"## {offer_id_of(offer)}")
+        lines.append("")
+        for field in NAMED_OFFER_FIELDS:
+            value = offer.get(field)
+            if field.endswith("_cents") and isinstance(value, int):
+                display = f"{value} ({format_brl_cents(value)})"
+            elif value is None:
+                display = "null"
+            elif isinstance(value, bool):
+                display = "true" if value else "false"
+            else:
+                display = str(value)
+            lines.append(f"- `{field}`: {display}")
+        sold = offer.get("sold_out")
+        lines.append(f"- `sold_out`: {'true' if sold else 'false'}")
+        lines.append(f"- `funnel_role`: {offer.get('funnel_role')}")
+        lines.append(f"- `upsell_policy`: {offer.get('upsell_policy')}")
+        lines.append("")
+    lines.append("Verdict token is recorded in `commercial/DECISIONS-CHANGELOG.md`.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _billing_label(offer: Mapping[str, Any]) -> str:
+    if offer.get("billing_mode") == "ONE_TIME":
+        return "cobrança única"
+    return "recorrente"
+
+
+def _cycle_label(offer: Mapping[str, Any]) -> str:
+    if offer.get("cycle") == "MONTHLY":
+        return "MONTHLY"
+    return "n/a (não preencher ciclo)"
+
+
+def _max_payments_label(offer: Mapping[str, Any]) -> str:
+    if offer.get("max_payments") is None:
+        return "sem máximo — não preencher maxPayments nem endDate"
+    return str(offer.get("max_payments"))
+
+
+def render_founder_handoff(catalog: Mapping[str, Any], mapping: Mapping[str, Any]) -> str:
+    lines = [
+        "# Founder Asaas registration handoff",
+        "",
+        "Open Asaas. Type the fields below. Do not interpret architecture.",
+        "Do not create a customer, cobrança, checkout or webhook from this document.",
+        "Do not paste API keys or checkout URLs back into git.",
+        "",
+        "Policy de `externalReference`: `cfg:{offer_id}:{correlation_id}`",
+        "",
+        "After cadastro, copy back into `commercial/providers/asaas-mapping.v1.json`:",
+        "`asaas_product_id`, `checkout_id`, `subscription_mapping` (if any), `environment`, `created_at`.",
+        "Then set `status` to `MAPPED` only after a human verifies the IDs. `verified_at` stays null until that check.",
+        "",
+        "## Do NOT activate yet (every offer)",
+        "",
+        "- recurring production checkout",
+        "- automated refund or cancellation",
+        "- automated NFS-e",
+        "- Extra historical R$ 10.000/mês",
+        "- SmartLic billing",
+        "- silent renewal",
+        "- live charge before IDs are copied back and verified",
+        "",
+    ]
+    by_id = {row["offer_id"]: row for row in mapping.get("mappings") or ()}
+    for offer in catalog.get("offers") or ():
+        oid = offer_id_of(offer)
+        row = by_id[oid]
+        lines.extend(
+            [
+                f"## {oid}",
+                "",
+                f"- Nome exato: `{offer['public_name']}`",
+                f"- Descrição para Asaas: `{offer['description_asaas']}`",
+                f"- Valor: `{format_brl_cents(offer['amount_cents'])}` (`{offer['amount_cents']}` centavos)",
+                f"- Cobrança: `{_billing_label(offer)}` (`{offer['billing_mode']}`)",
+                f"- Ciclo: `{_cycle_label(offer)}`",
+                f"- Número máximo de cobranças: `{_max_payments_label(offer)}`",
+                f"- `externalReference` policy: `cfg:{oid}:{{correlation_id}}`",
+                f"- Mapping atual: asaas_product_id=`{row.get('asaas_product_id') if row.get('asaas_product_id') is not None else 'null'}`, checkout_id=`{row.get('checkout_id') if row.get('checkout_id') is not None else 'null'}`, subscription_mapping=`{row.get('subscription_mapping') if row.get('subscription_mapping') is not None else 'null'}`, status=`{row.get('status')}`",
+                "- Copiar de volta após cadastrar: asaas_product_id, checkout_id, subscription_mapping, environment, created_at",
+                "- NÃO ativar ainda: checkout recorrente, refund automático, NFS-e automática, Extra, SmartLic, cobrança ao vivo",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def assert_derived_documents(
+    root: Path,
+    catalog: Mapping[str, Any],
+    mapping: Mapping[str, Any],
+) -> None:
+    human_path = root / "commercial" / "offers" / "catalog.human.v1.md"
+    handoff_path = root / "commercial" / "FOUNDER-ASAAS-REGISTRATION.md"
+    expected_human = render_human_catalog(catalog)
+    expected_handoff = render_founder_handoff(catalog, mapping)
+    if load_text(human_path) != expected_human:
+        raise ValidationError("human catalog drifted from renderer")
+    if load_text(handoff_path) != expected_handoff:
+        raise ValidationError("founder handoff drifted from renderer")
+    contract = load_text(root / "commercial" / "CONSUMER-CONTRACT.md")
+    changelog = load_text(root / "commercial" / "DECISIONS-CHANGELOG.md")
+    for required in ("web-cfg#88", "Warmbly#47", "PAUSED", "RETIRED", "offer_version"):
+        if required not in contract:
+            raise ValidationError(f"consumer contract missing {required}")
+    if VERDICT_READY not in changelog and VERDICT_BLOCKED not in changelog:
+        raise ValidationError("changelog must record a catalog verdict token")
+    if "PENDING_FOUNDER_INPUT" not in changelog:
+        raise ValidationError("changelog must name PENDING_FOUNDER_INPUT")
+
+
+def write_derived_artifacts(root: Path) -> None:
+    catalog = load_json(root / "commercial" / "offers" / "catalog.v1.json")
+    exceptions = load_json(root / "commercial" / "exceptions" / "extra-historical.v1.json")
+    mapping = load_json(root / "commercial" / "providers" / "asaas-mapping.v1.json")
+    public = build_public_catalog(catalog, exceptions)
+    (root / "commercial" / "offers" / "catalog.public.v1.json").write_text(
+        json.dumps(public, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (root / "commercial" / "offers" / "catalog.human.v1.md").write_text(
+        render_human_catalog(catalog),
+        encoding="utf-8",
+    )
+    (root / "commercial" / "FOUNDER-ASAAS-REGISTRATION.md").write_text(
+        render_founder_handoff(catalog, mapping),
+        encoding="utf-8",
+    )
 
 
 def is_received_revenue(event_type: str) -> bool:
@@ -788,11 +1281,17 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     catalog_schema = load_json(root / "schemas" / "offer-catalog.v1.schema.json")
     gates_schema = load_json(root / "schemas" / "production-gates.v1.schema.json")
     manifest_schema = load_json(root / "schemas" / "authority-manifest.v1.schema.json")
+    mapping_schema = load_json(root / "schemas" / "provider-mapping.v1.schema.json")
+    overlay_schema = load_json(root / "schemas" / "diagnostico-limited-production.v1.schema.json")
 
     catalog = load_json(root / "commercial" / "offers" / "catalog.v1.json")
     public = load_json(root / "commercial" / "offers" / "catalog.public.v1.json")
     exceptions = load_json(root / "commercial" / "exceptions" / "extra-historical.v1.json")
     gates = load_json(root / "commercial" / "gates" / "production-gates.v1.json")
+    overlay = load_json(root / "commercial" / "gates" / "diagnostico-limited-production.v1.json")
+    mapping = load_json(root / "commercial" / "providers" / "asaas-mapping.v1.json")
+    pending = load_json(root / "commercial" / "offers" / "pending-founder-inputs.v1.json")
+    fixture = load_json(root / "commercial" / "fixtures" / "consumer-catalog.example.v1.json")
     capacity = load_json(root / "commercial" / "capacity" / "capacity-policy.v1.json")
     terms_manifest = load_json(root / "commercial" / "terms" / "CFG-TERMS-B2B-2026-08-17-v1.manifest.json")
     terms_text = load_text(root / "commercial" / "terms" / "CFG-TERMS-B2B-2026-08-17-v1.md")
@@ -802,15 +1301,22 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     schema_validate(public, catalog_schema)
     schema_validate(gates, gates_schema)
     schema_validate(manifest, manifest_schema)
+    schema_validate(mapping, mapping_schema)
+    schema_validate(overlay, overlay_schema)
 
     assert_catalog_invariants(catalog)
     assert_catalog_invariants(public)
     assert_exceptions(exceptions)
     assert_public_catalog_matches(catalog, public, exceptions)
     assert_gates_invariants(gates)
+    assert_overlay_does_not_flip_portfolio_gates(overlay, gates)
     assert_no_active_while_gates_pending(catalog, gates)
     assert_no_active_while_gates_pending(public, gates)
     assert_capacity_invariants(capacity)
+    assert_mapping_invariants(mapping, catalog)
+    assert_pending_founder_inputs(pending, catalog)
+    assert_consumer_fixture(fixture, mapping)
+    assert_derived_documents(root, catalog, mapping)
     assert_terms_manifest(terms_manifest)
     assert_authority_flags(manifest)
     assert_manifest_hashes(root, manifest)
@@ -822,6 +1328,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     digest = authority_hash(manifest)
     legal_mod = load_legal_validator(root)
     legal = legal_mod.validate_all_legal_packages(root)
+    verdict = catalog_verdict(catalog, pending)
     return {
         "root": str(root),
         "authority_hash": digest,
@@ -830,11 +1337,15 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
         "catalog_authority": manifest["catalog_authority"],
         "offers": [offer["offer_code"] for offer in catalog["offers"]],
         "pending_gates": gates_pending_for_active(gates),
+        "verdict": verdict,
+        "overlay_diagnostico_authorized": overlay.get("production_checkout_approved") is True,
+        "recurring_checkout_approved": False,
     }
 
 
 def write_hashes(root: Path | None = None) -> dict[str, Any]:
     root = repo_root(root)
+    write_derived_artifacts(root)
     artifacts = build_authority_artifacts(root)
     # Hashing the manifest would include itself; write artifacts first, then validate.
     # Temporarily write a stub so hash_artifact can run on everything except the manifest
@@ -863,6 +1374,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     print("PRODUCTION_CHECKOUT_ENABLED false")
     print("REAL_MONEY_MUTATION_APPROVED false")
     print("PUBLIC_ACTIVATION_APPROVED false")
+    print("RECURRING_PRODUCTION_CHECKOUT_ENABLED false")
+    print(f"VERDICT {result['verdict']}")
     return 0
 
 
