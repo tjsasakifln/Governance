@@ -1,0 +1,37 @@
+{
+  "schema_version": "control-center.commercial-observations.v1",
+  "observed_at": null,
+  "source": {
+    "system": "warmbly",
+    "kind": "commercial-observation",
+    "locator": "fixture:incomplete-unknown"
+  },
+  "freshness_status": "UNKNOWN",
+  "records": [
+    {
+      "id": "deal-partial-1",
+      "entity": "deal",
+      "status": "UNKNOWN",
+      "funnel_stage": "UNKNOWN",
+      "value": 10.001,
+      "currency": "BRL"
+    },
+    {
+      "id": "deal-partial-2",
+      "entity": "deal",
+      "stage_name": "mystery-board-column",
+      "probability": 0.4
+    },
+    {
+      "id": "not-a-record"
+    },
+    {
+      "id": "deal-lost-1",
+      "entity": "deal",
+      "status": "lost",
+      "funnel_stage": "oportunidades",
+      "value": 999,
+      "currency": "BRL"
+    }
+  ]
+}
