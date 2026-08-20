@@ -6,10 +6,7 @@ export type FreshnessStatus = "fresh" | "stale" | "absent" | "inconsistent";
 
 export type EntityKind = "customer" | "charge" | "subscription" | "pix" | "receivable";
 
-/**
- * Charge lifecycle after the founder rule: CONFIRMED is paid, not received,
- * and is never labeled receita/revenue.
- */
+/** Mapped by mapChargeLifecycle; CONFIRMED is paid, never received. */
 export type ChargeLifecycle =
   | "pending"
   | "paid"

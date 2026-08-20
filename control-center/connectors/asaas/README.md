@@ -20,7 +20,8 @@ operational commercial/CRM authority. Asaas is a provider of payment state.
 - Production host: `https://api.asaas.com`
 - Paths are under `/v3/...`. Auth header is `access_token`. `User-Agent` is
   required (`ConfengeControlCenter-AsaasConnector/1.0`).
-- GET bodies are empty (Asaas returns 403 otherwise).
+- GET bodies are empty (Asaas returns 403 otherwise). Live `DefaultFetchTransport`
+  uses `redirect: "error"` so `access_token` is never replayed to a `Location`.
 - Money is stored as **integer cents + `BRL`**. Provider `value` is reais.
 - Dates are stored as **UTC ISO-8601**. Date-only Asaas fields are midnight UTC
   of that calendar date. Presentation in `America/Sao_Paulo` is a UI concern.

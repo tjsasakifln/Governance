@@ -80,6 +80,30 @@ describe("parseAsaasConfig fail-closed", () => {
     );
   });
 
+  it("rejects sandbox env when the production key slot is set even with a generic key", () => {
+    assert.throws(
+      () =>
+        parseAsaasConfig({
+          ASAAS_ENVIRONMENT: "sandbox",
+          ASAAS_API_KEY: "generic",
+          ASAAS_API_KEY_PRODUCTION: "prod-slot-key",
+        }),
+      AsaasConfigError,
+    );
+  });
+
+  it("rejects production env when the sandbox key slot is set even with a generic key", () => {
+    assert.throws(
+      () =>
+        parseAsaasConfig({
+          ASAAS_ENVIRONMENT: "production",
+          ASAAS_API_KEY: "generic",
+          ASAAS_API_KEY_SANDBOX: "sandbox-slot-key",
+        }),
+      AsaasConfigError,
+    );
+  });
+
   it("binds sandbox to the sandbox host", () => {
     const cfg = parseAsaasConfig({
       ASAAS_ENVIRONMENT: "sandbox",

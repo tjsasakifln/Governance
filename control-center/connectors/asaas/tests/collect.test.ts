@@ -33,6 +33,7 @@ function config(key = FIXTURE_KEY) {
 async function collectFromFixtures(options?: {
   key?: string;
   statusOverrides?: Record<string, number>;
+  bodyOverrides?: Record<string, unknown>;
   now?: Date;
 }): Promise<{
   snapshot: FinanceSnapshot;
@@ -41,7 +42,10 @@ async function collectFromFixtures(options?: {
 }> {
   const logs: Record<string, unknown>[] = [];
   const recording = new RecordingTransport(
-    createFixtureTransport({ statusOverrides: options?.statusOverrides }),
+    createFixtureTransport({
+      statusOverrides: options?.statusOverrides,
+      bodyOverrides: options?.bodyOverrides,
+    }),
   );
   const snapshot = await collectFinanceSnapshot({
     config: config(options?.key ?? FIXTURE_KEY),
@@ -260,11 +264,55 @@ describe("collectFinanceSnapshot from fixtures", () => {
   });
 
   it("does not copy customer PII into the snapshot", async () => {
-    const { snapshot } = await collectFromFixtures();
-    const blob = JSON.stringify(snapshot.entities.customers);
-    assert.doesNotMatch(blob, /email/i);
-    assert.doesNotMatch(blob, /cpf/i);
-    assert.doesNotMatch(blob, /phone/i);
+    const page = loadFixtureJson("customers") as {
+      data: Array<Record<string, unknown>>;
+    };
+    const poisoned = {
+      ...page,
+      data: page.data.map((row, index) =>
+        index === 0
+          ? {
+              ...row,
+              name: "PII Name Must Drop",
+              email: "pii-should-not-leak@example.invalid",
+              cpfCnpj: "00000000000",
+              mobilePhone: "48999999999",
+            }
+          : row,
+      ),
+    };
+    const { snapshot } = await collectFromFixtures({
+      bodyOverrides: { "/v3/customers": poisoned },
+    });
+    const blob = JSON.stringify(snapshot);
+    assert.ok(snapshot.entities.customers.some((c) => c.provider_id === "cus_fixtureAlfa"));
+    assert.ok(
+      snapshot.entities.customers.some((c) => c.external_reference === "cfg:customer:alfa"),
+    );
+    assert.doesNotMatch(blob, /PII Name Must Drop/);
+    assert.doesNotMatch(blob, /pii-should-not-leak@example\.invalid/);
+    assert.doesNotMatch(blob, /00000000000/);
+    assert.doesNotMatch(blob, /48999999999/);
+  });
+
+  it("records unparseable charge rows as inconsistency instead of silent drop", async () => {
+    const page = loadFixtureJson("payments") as { data: unknown[] };
+    const { snapshot } = await collectFromFixtures({
+      bodyOverrides: {
+        "/v3/payments": { ...page, data: [...page.data, { object: "payment" }] },
+      },
+    });
+    assert.ok(
+      snapshot.observations.some(
+        (o) => o.code === "list_row_unparseable" && o.kind === "inconsistency",
+      ),
+    );
+    assert.equal(snapshot.freshness_status, "inconsistent");
+    assert.equal(
+      snapshot.entities.charges.filter((c) => c.provider_id === "pay_fixtureConfirmed01")
+        .length,
+      1,
+    );
   });
 
   it("exposes the pure normalizer as a shipped entry", () => {

@@ -116,4 +116,21 @@ describe("GET-only Asaas HTTP client", () => {
     );
     assert.equal(fetchCalls, 0);
   });
+
+  it("refuses to follow redirects so access_token is not replayed", async () => {
+    let redirect: RequestRedirect | undefined;
+    const transport = new DefaultFetchTransport(async (_url, init) => {
+      redirect = init?.redirect;
+      return new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    await transport.request({
+      method: "GET",
+      url: "https://api-sandbox.asaas.com/v3/finance/balance",
+      headers: { access_token: "fixture-local-key-do-not-send" },
+    });
+    assert.equal(redirect, "error");
+  });
 });

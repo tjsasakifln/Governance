@@ -42,6 +42,7 @@ export class DefaultFetchTransport implements HttpTransport {
     const res = await this.fetchImpl(req.url, {
       method: "GET",
       headers: req.headers,
+      redirect: "error",
     });
     const bodyText = await res.text();
     const headers: Record<string, string> = {};

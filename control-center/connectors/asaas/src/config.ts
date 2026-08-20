@@ -22,10 +22,7 @@ function looksLikeUrl(value: string): boolean {
   return /:\/\//.test(value) || /asaas\.com/i.test(value);
 }
 
-/**
- * Fail-closed sandbox XOR production. Unidentified environment, mixed
- * sandbox/prod URL+key slots, or missing API key refuse to run.
- */
+/** Opposite env key slots stay mixed even when ASAAS_API_KEY is also set. */
 export function parseAsaasConfig(
   env: Record<string, string | undefined>,
 ): AsaasConfig {
@@ -69,14 +66,14 @@ export function parseAsaasConfig(
       "mixed sandbox and production API key slots; refuse to choose",
     );
   }
-  if (environment === "sandbox" && productionKey !== "" && sandboxKey === "" && genericKey === "") {
+  if (environment === "sandbox" && productionKey !== "") {
     throw new AsaasConfigError(
-      "sandbox environment with production-shaped API key slot only",
+      "sandbox environment with production API key slot set",
     );
   }
-  if (environment === "production" && sandboxKey !== "" && productionKey === "" && genericKey === "") {
+  if (environment === "production" && sandboxKey !== "") {
     throw new AsaasConfigError(
-      "production environment with sandbox-shaped API key slot only",
+      "production environment with sandbox API key slot set",
     );
   }
 

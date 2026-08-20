@@ -25,12 +25,18 @@ import type {
 const PAGE_LIMIT = 100;
 const PAGE_GUARD = 1000;
 
+interface ListResult<T> {
+  items: T[];
+  dropped: number;
+}
+
 async function listAll<T>(
   client: GetOnlyAsaasClient,
   path: string,
   parseItem: (raw: unknown) => T | null,
-): Promise<T[]> {
+): Promise<ListResult<T>> {
   const items: T[] = [];
+  let dropped = 0;
   let offset = 0;
   let pages = 0;
   for (;;) {
@@ -41,6 +47,8 @@ async function listAll<T>(
       const parsed = parseItem(row);
       if (parsed) {
         items.push(parsed);
+      } else {
+        dropped += 1;
       }
     }
     if (!page.hasMore) {
@@ -51,7 +59,7 @@ async function listAll<T>(
       throw new Error(`asaas.list.pagination_guard:${path}`);
     }
   }
-  return items;
+  return { items, dropped };
 }
 
 async function optionalGet<T>(
@@ -92,22 +100,18 @@ export async function collectFinanceSnapshot(
     baseUrl: options.config.baseUrl,
   });
 
-  const customers: ParsedCustomer[] = await listAll(
-    client,
-    "/v3/customers",
-    parseCustomer,
-  );
-  const charges: ParsedCharge[] = await listAll(client, "/v3/payments", parseCharge);
-  const subscriptions: ParsedSubscription[] = await listAll(
+  const customersResult = await listAll(client, "/v3/customers", parseCustomer);
+  const chargesResult = await listAll(client, "/v3/payments", parseCharge);
+  const subscriptionsResult = await listAll(
     client,
     "/v3/subscriptions",
     parseSubscription,
   );
-  const pix: ParsedPixTransaction[] = await listAll(
-    client,
-    "/v3/pix/transactions",
-    parsePixTransaction,
-  );
+  const pixResult = await listAll(client, "/v3/pix/transactions", parsePixTransaction);
+  const customers: ParsedCustomer[] = customersResult.items;
+  const charges: ParsedCharge[] = chargesResult.items;
+  const subscriptions: ParsedSubscription[] = subscriptionsResult.items;
+  const pix: ParsedPixTransaction[] = pixResult.items;
 
   const balanceResult = await optionalGet(client, "/v3/finance/balance", parseBalance);
   const receivablesResult = await optionalGetList(client, "/v3/financialTransactions", parseReceivable);
@@ -147,6 +151,17 @@ export async function collectFinanceSnapshot(
     });
   }
 
+  noteDroppedRows(snapshot, observedAt, [
+    { path: "/v3/customers", dropped: customersResult.dropped },
+    { path: "/v3/payments", dropped: chargesResult.dropped },
+    { path: "/v3/subscriptions", dropped: subscriptionsResult.dropped },
+    { path: "/v3/pix/transactions", dropped: pixResult.dropped },
+    {
+      path: "/v3/financialTransactions",
+      dropped: receivablesResult.items ? receivablesResult.dropped ?? 0 : 0,
+    },
+  ]);
+
   logger.info("asaas.collect.done", {
     environment: options.config.environment,
     charges: snapshot.entities.charges.length,
@@ -165,14 +180,48 @@ async function optionalGetList<T>(
   client: GetOnlyAsaasClient,
   path: string,
   parseItem: (raw: unknown) => T | null,
-): Promise<{ items?: T[]; omitted?: { reason: string; httpStatus?: number } }> {
+): Promise<{
+  items?: T[];
+  dropped?: number;
+  omitted?: { reason: string; httpStatus?: number };
+}> {
   try {
-    const items = await listAll(client, path, parseItem);
-    return { items };
+    const listed = await listAll(client, path, parseItem);
+    return { items: listed.items, dropped: listed.dropped };
   } catch (err) {
     if (err instanceof AsaasHttpError && (err.status === 401 || err.status === 403)) {
       return { omitted: { reason: `http_${err.status}`, httpStatus: err.status } };
     }
     throw err;
+  }
+}
+
+function noteDroppedRows(
+  snapshot: FinanceSnapshot,
+  observedAt: string,
+  rows: Array<{ path: string; dropped: number }>,
+): void {
+  for (const row of rows) {
+    if (row.dropped <= 0) {
+      continue;
+    }
+    snapshot.observations.push({
+      kind: "inconsistency",
+      code: "list_row_unparseable",
+      message: `${row.dropped} ${row.path} row(s) omitted; not counted in buckets`,
+      provider_ids: [],
+      provenance: {
+        source: `asaas${row.path}`,
+        observed_at: observedAt,
+        freshness_status: "inconsistent",
+        confidence: 0.4,
+      },
+    });
+    snapshot.freshness_status = "inconsistent";
+    snapshot.provenance = {
+      ...snapshot.provenance,
+      freshness_status: "inconsistent",
+      confidence: 0.6,
+    };
   }
 }
