@@ -1,33 +1,46 @@
-import { createPncpMetricsAdapter } from "./adapter.js";
-import { classifyPncpFreshness } from "./classify.js";
-import { loadThresholdsFromEnv } from "./config.js";
-import { projectPncpHealth } from "./project.js";
+import { createPncpContractAdapter } from "./adapter.js";
+import { mapUpstreamStatus } from "./map.js";
+import { parsePncpContract } from "./parse.js";
+import { projectFailure, projectSuccess } from "./project.js";
 import type {
   AdapterConfig,
-  FreshnessThresholds,
+  EvaluationContext,
   PncpFreshnessEvaluation,
 } from "./types.js";
 
 /**
- * Shipped evaluation path: adapter → parse/normalize → classify → project.
+ * Pure parse → map → project. I/O stays in the adapter.
+ * extra-cli UNKNOWN stays UNKNOWN; transport/parser/version failure is ERROR.
+ */
+export function evaluatePncpContractPayload(
+  payload: unknown,
+  ctx: EvaluationContext,
+): PncpFreshnessEvaluation {
+  const parsed = parsePncpContract(payload);
+  if (!parsed.ok) {
+    return projectFailure(ctx, parsed.error, {
+      contract_version: parsed.contract_version,
+    });
+  }
+  const mapping = mapUpstreamStatus(parsed.contract.status);
+  return projectSuccess(parsed.contract, mapping, ctx);
+}
+
+/**
+ * Shipped evaluation path: READ-ONLY adapter → parse → map → project.
  */
 export async function evaluatePncpFreshness(
   config: AdapterConfig,
-  thresholds: FreshnessThresholds = loadThresholdsFromEnv(),
 ): Promise<PncpFreshnessEvaluation> {
-  const adapter = createPncpMetricsAdapter(config);
-  const { snapshot, now } = await adapter.read();
-  const classification = classifyPncpFreshness(snapshot, thresholds, now);
-  const { serviceHealth, sourceObservation } = projectPncpHealth(
-    snapshot,
-    classification,
-    thresholds,
-  );
-  return {
-    snapshot,
-    classification,
-    serviceHealth,
-    sourceObservation,
-    thresholds,
+  const adapter = createPncpContractAdapter(config);
+  const read = await adapter.read();
+  const ctx: EvaluationContext = {
+    adapterKind: read.kind,
+    locator: read.locator,
+    collectedAt: read.observedAt,
   };
+  if (!read.ok) {
+    return projectFailure(ctx, read.error);
+  }
+  return evaluatePncpContractPayload(read.payload, ctx);
 }

@@ -1,108 +1,26 @@
+import { z } from "zod";
 import {
-  PNCP_SOURCE_ID,
-  SCHEMA_VERSION,
-  type CredentialStatus,
-  type MetricsSourceKind,
-  type PncpMetricsSnapshot,
+  CONTRACT_VERSION,
+  UPSTREAM_STATUSES,
+  type ErrorObject,
+  type ParseResult,
+  type PncpContractV1,
+  type UpstreamStatus,
 } from "./types.js";
 
-const CREDENTIAL_ERROR_CODES = new Set([
-  "credential_unavailable",
-  "unauthorized",
-  "forbidden",
-  "auth_failed",
-  "401",
-  "403",
-]);
+const UTC_Z =
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z$/;
 
-function firstDefined(
-  record: Record<string, unknown>,
-  keys: string[],
-): unknown {
-  for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(record, key)) {
-      const value = record[key];
-      if (value !== undefined) {
-        return value;
-      }
-    }
-  }
-  return undefined;
-}
+const SECRET_KEY =
+  /secret|token|password|authorization|api[_-]?key|cookie|credential|private[_-]?key|dsn/i;
 
-export function parseInstant(value: unknown): string | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) {
-      return null;
-    }
-    return value.toISOString();
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const ms = value < 1e12 ? value * 1000 : value;
-    const date = new Date(ms);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-    return date.toISOString();
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (
-      trimmed === "" ||
-      trimmed.toLowerCase() === "never" ||
-      trimmed.toLowerCase() === "null"
-    ) {
-      return null;
-    }
-    const date = new Date(trimmed);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-    return date.toISOString();
-  }
-  return null;
-}
-
-export function parseCount(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.trunc(value);
-  }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return Math.trunc(parsed);
-    }
-  }
-  return null;
-}
-
-export function isCredentialErrorCode(code: string | null): boolean {
-  if (!code) {
-    return false;
-  }
-  return CREDENTIAL_ERROR_CODES.has(code.trim().toLowerCase());
-}
-
-function parseCredentialStatus(value: unknown, errorCode: string | null): CredentialStatus {
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "unavailable" || normalized === "missing") {
-      return "unavailable";
-    }
-    if (normalized === "available" || normalized === "ok") {
-      return "available";
-    }
-  }
-  if (isCredentialErrorCode(errorCode)) {
-    return "unavailable";
-  }
-  return "unknown";
+function fail(
+  code: string,
+  message: string,
+  contract_version: string | null = null,
+): ParseResult {
+  const error: ErrorObject = { code, message };
+  return { ok: false, error, contract_version };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -112,186 +30,209 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
-/**
- * Pull a PNCP metrics record from API, DB-view, extra-cli freshness-gate, or
- * Control Center health-artifact envelopes. Does not classify.
- */
-export function extractMetricsRecord(payload: unknown): Record<string, unknown> {
-  const root = asRecord(payload);
-  if (!root) {
-    return {};
-  }
-
-  const nestedMetrics = asRecord(root.metrics);
-  if (nestedMetrics) {
-    return nestedMetrics;
-  }
-
-  const critical = root.critical_sources;
-  if (Array.isArray(critical)) {
-    const pncpRow = critical.find((row) => {
-      const rec = asRecord(row);
-      if (!rec) {
-        return false;
-      }
-      const source = String(rec.source ?? rec.source_name ?? rec.data_source ?? "")
-        .trim()
-        .toLowerCase();
-      return source === "pncp" || source === "pncp_raw_bids" || source === "";
-    });
-    const rec = asRecord(pncpRow) ?? asRecord(critical[0]);
-    if (rec) {
-      return rec;
-    }
-  }
-
-  return root;
-}
-
-export function artifactEvaluatedAt(payload: unknown): string | null {
-  const root = asRecord(payload);
-  if (!root) {
+export function toUtcZ(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
     return null;
   }
-  return parseInstant(firstDefined(root, ["evaluated_at", "evaluatedAt", "generated_at", "now"]));
-}
-
-function computeLagSeconds(
-  explicit: number | null,
-  dataTimestamp: string | null,
-  now: Date,
-): number | null {
-  if (explicit !== null) {
-    return explicit < 0 ? 0 : explicit;
-  }
-  if (!dataTimestamp) {
+  if (typeof value !== "string") {
     return null;
   }
-  const parsed = Date.parse(dataTimestamp);
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  if (UTC_Z.test(trimmed)) {
+    return trimmed;
+  }
+  const parsed = Date.parse(trimmed);
   if (Number.isNaN(parsed)) {
     return null;
   }
-  return Math.max(0, Math.floor((now.getTime() - parsed) / 1000));
+  return new Date(parsed).toISOString();
 }
 
-function coreFieldsPresent(snapshot: {
-  last_item_observed_at: string | null;
-  last_success_at: string | null;
-  source_max_timestamp: string | null;
-  recent_window_count: number | null;
-  consecutive_errors: number | null;
-}): boolean {
-  const hasDataTs = Boolean(snapshot.last_item_observed_at || snapshot.source_max_timestamp);
-  return (
-    hasDataTs &&
-    snapshot.last_success_at !== null &&
-    snapshot.recent_window_count !== null &&
-    snapshot.consecutive_errors !== null
-  );
+function optionalUtc(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  return toUtcZ(value);
 }
 
-export interface ParseContext {
-  sourceKind: MetricsSourceKind;
-  now: Date;
-  readError?: string | null;
-  rawSource?: string | null;
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
 }
 
-export function parseMetricsPayload(
-  payload: unknown,
-  context: ParseContext,
-): PncpMetricsSnapshot {
-  const record = extractMetricsRecord(payload);
-  const errorCodeRaw = firstDefined(record, ["error_code", "errorCode", "failure_code"]);
-  const errorCode =
-    typeof errorCodeRaw === "string" && errorCodeRaw.trim() !== ""
-      ? errorCodeRaw.trim()
-      : errorCodeRaw === null || errorCodeRaw === undefined
-        ? null
-        : String(errorCodeRaw);
+function optionalInt(value: unknown): number | null {
+  const n = optionalNumber(value);
+  if (n === null) {
+    return null;
+  }
+  return Math.trunc(n);
+}
 
-  const lastItem = parseInstant(
-    firstDefined(record, [
-      "last_item_observed_at",
-      "lastItemObservedAt",
-      "last_ingested_at",
-      "lastIngestedAt",
-    ]),
-  );
-  const lastSuccess = parseInstant(
-    firstDefined(record, ["last_success_at", "lastSuccessAt"]),
-  );
-  const sourceMax = parseInstant(
-    firstDefined(record, [
-      "source_max_timestamp",
-      "sourceMaxTimestamp",
-      "latest_business_date",
-      "latestBusinessDate",
-      "max_timestamp",
-    ]),
-  );
-  const heartbeat = parseInstant(
-    firstDefined(record, [
-      "collector_heartbeat_at",
-      "collectorHeartbeatAt",
-      "heartbeat_at",
-    ]),
-  );
-  const recentWindow = parseCount(
-    firstDefined(record, [
-      "recent_window_count",
-      "recentWindowCount",
-      "recent_records",
-      "recentRecords",
-    ]),
-  );
-  const consecutive = parseCount(
-    firstDefined(record, [
-      "consecutive_errors",
-      "consecutiveErrors",
-      "consecutive_failures",
-    ]),
-  );
-  const explicitLag = parseCount(
-    firstDefined(record, ["lag_seconds", "lagSeconds", "lag"]),
-  );
-  const credentialStatus = parseCredentialStatus(
-    firstDefined(record, ["credential_status", "credentialStatus"]),
-    errorCode,
-  );
-  const rawSourceValue = firstDefined(record, ["source", "source_name", "raw_source"]);
-  const rawSource =
-    typeof rawSourceValue === "string" && rawSourceValue.trim() !== ""
-      ? rawSourceValue.trim()
-      : context.rawSource ?? null;
+function optionalString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  return null;
+}
 
-  const dataTs = sourceMax ?? lastItem;
-  const lag = computeLagSeconds(explicitLag, dataTs, context.now);
+function optionalObject(value: unknown): Record<string, unknown> | null {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  return stripSecretKeys(record);
+}
 
-  const snapshot: PncpMetricsSnapshot = {
-    schema_version: SCHEMA_VERSION,
-    source: PNCP_SOURCE_ID,
-    source_kind: context.sourceKind,
-    raw_source: rawSource,
-    observed_at: context.now.toISOString(),
-    last_item_observed_at: lastItem,
-    last_success_at: lastSuccess,
-    lag_seconds: lag,
-    recent_window_count: recentWindow,
-    consecutive_errors: consecutive,
-    source_max_timestamp: sourceMax,
-    collector_heartbeat_at: heartbeat,
-    credential_status: credentialStatus,
-    error_code: errorCode,
-    read_error: context.readError ?? null,
-    raw_complete: false,
+export function stripSecretKeys(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (SECRET_KEY.test(key)) {
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+const ReasonCodesSchema = z.array(z.string());
+const UpstreamStatusSchema = z.enum(UPSTREAM_STATUSES);
+
+function readContractVersion(record: Record<string, unknown>): {
+  version: string | null;
+  kind: "ok" | "missing" | "unknown";
+} {
+  const raw = record.contract_version;
+  if (raw === undefined || raw === null || raw === "") {
+    return { version: null, kind: "missing" };
+  }
+  if (typeof raw !== "string") {
+    return { version: String(raw), kind: "unknown" };
+  }
+  const version = raw.trim();
+  if (version === CONTRACT_VERSION) {
+    return { version, kind: "ok" };
+  }
+  return { version, kind: "unknown" };
+}
+
+/**
+ * Versioned parser of extra-cli PNCP_CONTRACT_FRESHNESS/1.0.
+ * Unknown/unsupported contract_version and malformed payloads fail closed.
+ * Does not classify lag, windows, or errors.
+ */
+export function parsePncpContract(payload: unknown): ParseResult {
+  const record = asRecord(payload);
+  if (!record) {
+    return fail("MALFORMED_PAYLOAD", "payload is not a JSON object");
+  }
+
+  const versionInfo = readContractVersion(record);
+  if (versionInfo.kind === "missing") {
+    return fail("MALFORMED_PAYLOAD", "missing contract_version", null);
+  }
+  if (versionInfo.kind === "unknown") {
+    return fail(
+      "UNKNOWN_CONTRACT_VERSION",
+      `unsupported contract_version ${versionInfo.version ?? "<unreadable>"}`,
+      versionInfo.version,
+    );
+  }
+
+  const statusRaw = record.status;
+  const statusParsed = UpstreamStatusSchema.safeParse(statusRaw);
+  if (!statusParsed.success) {
+    return fail(
+      "MALFORMED_PAYLOAD",
+      "status must be FRESH|DEGRADED|STALE|UNKNOWN",
+      CONTRACT_VERSION,
+    );
+  }
+
+  const reasonsParsed = ReasonCodesSchema.safeParse(record.reason_codes);
+  if (!reasonsParsed.success) {
+    return fail(
+      "MALFORMED_PAYLOAD",
+      "reason_codes must be an array of strings",
+      CONTRACT_VERSION,
+    );
+  }
+
+  const asOf = toUtcZ(record.as_of);
+  if (!asOf) {
+    return fail(
+      "MALFORMED_PAYLOAD",
+      "as_of is missing or not a parseable UTC timestamp",
+      CONTRACT_VERSION,
+    );
+  }
+
+  const contract: PncpContractV1 = {
+    contract_version: CONTRACT_VERSION,
+    status: statusParsed.data,
+    reason_codes: [...reasonsParsed.data],
+    as_of: asOf,
+    deployed_sha: optionalString(record.deployed_sha),
+    policy_version: optionalString(record.policy_version),
+    current_lag_hours: optionalNumber(record.current_lag_hours),
+    lag_p50_hours: optionalNumber(record.lag_p50_hours),
+    lag_p95_hours: optionalNumber(record.lag_p95_hours),
+    lag_p99_hours: optionalNumber(record.lag_p99_hours),
+    lag_sample_n: optionalInt(record.lag_sample_n),
+    source_publication_or_update_at: optionalUtc(
+      record.source_publication_or_update_at,
+    ),
+    first_observed_at: optionalUtc(record.first_observed_at),
+    persisted_at: optionalUtc(record.persisted_at),
+    last_run_at: optionalUtc(record.last_run_at),
+    next_run_at: optionalUtc(record.next_run_at),
+    latest_successful_closed_window: optionalString(
+      record.latest_successful_closed_window,
+    ),
+    oldest_unresolved_gap: optionalString(record.oldest_unresolved_gap),
+    unresolved_window_count: optionalInt(record.unresolved_window_count),
+    source_window: record.source_window ?? null,
+    slo: optionalObject(record.slo),
+    timer: optionalObject(record.timer),
+    health_exit: optionalInt(record.health_exit),
+    campaign_verdict_hint: optionalString(record.campaign_verdict_hint),
   };
-  snapshot.raw_complete = coreFieldsPresent(snapshot) && snapshot.read_error === null;
-  return snapshot;
+
+  return { ok: true, contract };
 }
 
-export function emptySnapshot(
-  context: ParseContext,
-): PncpMetricsSnapshot {
-  return parseMetricsPayload({}, context);
+export function parsePncpContractText(text: string): ParseResult {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text) as unknown;
+  } catch {
+    return fail("INVALID_JSON", "payload is not valid JSON");
+  }
+  return parsePncpContract(payload);
+}
+
+export function isUpstreamStatus(value: unknown): value is UpstreamStatus {
+  return (
+    typeof value === "string" &&
+    (UPSTREAM_STATUSES as readonly string[]).includes(value)
+  );
 }

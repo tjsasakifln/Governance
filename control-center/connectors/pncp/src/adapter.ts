@@ -1,119 +1,134 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { z } from "zod";
-import { logEvent } from "./log.js";
 import {
-  artifactEvaluatedAt,
-  emptySnapshot,
-  parseMetricsPayload,
-} from "./parse.js";
+  commandArgvIsForbidden,
+  defaultReadOnlyCommandArgv,
+} from "./config.js";
+import { logEvent } from "./log.js";
 import type {
   AdapterConfig,
-  MetricsSourceKind,
-  PncpMetricsSnapshot,
+  AdapterKind,
+  AdapterReadResult,
+  CommandResult,
+  ErrorObject,
 } from "./types.js";
 
+const execFileAsync = promisify(execFile);
+
 const AdapterConfigSchema = z.object({
-  kind: z.enum(["http_api", "db_view", "health_artifact"]),
-  artifactPath: z.string().min(1).optional(),
+  kind: z.enum(["file", "http", "command"]),
+  filePath: z.string().min(1).optional(),
   httpUrl: z.string().url().optional(),
   fetchImpl: z.custom<typeof fetch>().optional(),
-  dbRow: z.record(z.unknown()).optional(),
-  queryView: z.custom<AdapterConfig["queryView"]>().optional(),
-  now: z.date().optional(),
   httpTimeoutMs: z.number().int().positive().optional(),
+  commandArgv: z.array(z.string()).optional(),
+  commandRunner: z.custom<AdapterConfig["commandRunner"]>().optional(),
+  now: z.date().optional(),
 });
 
-export interface AdapterReadResult {
-  snapshot: PncpMetricsSnapshot;
-  now: Date;
-  payload: unknown;
+function stripLocator(locator: string): string {
+  if (!locator.startsWith("http://") && !locator.startsWith("https://")) {
+    return locator;
+  }
+  try {
+    const parsed = new URL(locator);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return locator;
+  }
 }
 
-function resolveNow(config: AdapterConfig, payload: unknown): Date {
-  if (config.now) {
-    return config.now;
-  }
-  const fromArtifact = artifactEvaluatedAt(payload);
-  if (fromArtifact) {
-    return new Date(fromArtifact);
-  }
-  return new Date();
+function err(code: string, message: string): ErrorObject {
+  return { code, message };
 }
 
-function snapshotWithError(
-  kind: MetricsSourceKind,
-  now: Date,
-  readError: string,
-  errorCode?: string | null,
-): PncpMetricsSnapshot {
-  const snapshot = emptySnapshot({ sourceKind: kind, now, readError });
-  if (errorCode) {
-    snapshot.error_code = errorCode;
-    if (errorCode === "credential_unavailable") {
-      snapshot.credential_status = "unavailable";
-    }
-  }
-  return snapshot;
+function fail(
+  kind: AdapterKind,
+  locator: string,
+  observedAt: Date,
+  error: ErrorObject,
+): AdapterReadResult {
+  logEvent("error", "pncp_contract_read_failed", {
+    kind,
+    locator: stripLocator(locator),
+    code: error.code,
+  });
+  return { ok: false, kind, error, locator: stripLocator(locator), observedAt };
 }
 
-async function readHealthArtifact(config: AdapterConfig): Promise<AdapterReadResult> {
-  const path = config.artifactPath;
-  const kind: MetricsSourceKind = "health_artifact";
+function success(
+  kind: AdapterKind,
+  locator: string,
+  observedAt: Date,
+  payload: unknown,
+  rawText: string,
+): AdapterReadResult {
+  return {
+    ok: true,
+    kind,
+    payload,
+    rawText,
+    locator: stripLocator(locator),
+    observedAt,
+  };
+}
+
+function parseJsonText(
+  kind: AdapterKind,
+  locator: string,
+  observedAt: Date,
+  rawText: string,
+): AdapterReadResult {
+  try {
+    const payload: unknown = JSON.parse(rawText);
+    return success(kind, locator, observedAt, payload, rawText);
+  } catch {
+    return fail(
+      kind,
+      locator,
+      observedAt,
+      err("INVALID_JSON", "payload is not valid JSON"),
+    );
+  }
+}
+
+async function readFileAdapter(config: AdapterConfig): Promise<AdapterReadResult> {
+  const kind: AdapterKind = "file";
+  const path = config.filePath;
+  const now = config.now ?? new Date();
   if (!path) {
-    const now = config.now ?? new Date();
-    logEvent("error", "pncp_metrics_unconfigured", { kind });
-    return {
-      snapshot: snapshotWithError(kind, now, "metrics_source_unconfigured"),
+    return fail(
+      kind,
+      "file:",
       now,
-      payload: null,
-    };
+      err("SOURCE_UNCONFIGURED", "file adapter requires filePath"),
+    );
   }
   try {
     const raw = await readFile(path, "utf8");
-    let payload: unknown;
-    try {
-      payload = JSON.parse(raw) as unknown;
-    } catch {
-      const now = config.now ?? new Date();
-      logEvent("error", "pncp_metrics_invalid_json", { kind });
-      return {
-        snapshot: snapshotWithError(kind, now, "invalid_json"),
-        now,
-        payload: null,
-      };
-    }
-    const now = resolveNow(config, payload);
-    return {
-      snapshot: parseMetricsPayload(payload, { sourceKind: kind, now }),
-      now,
-      payload,
-    };
-  } catch (err) {
-    const now = config.now ?? new Date();
+    return parseJsonText(kind, path, now, raw);
+  } catch (cause) {
     const code =
-      err && typeof err === "object" && "code" in err && err.code === "ENOENT"
-        ? "metrics_artifact_missing"
-        : "metrics_unreadable";
-    logEvent("error", "pncp_metrics_read_failed", { kind, code });
-    return {
-      snapshot: snapshotWithError(kind, now, code),
-      now,
-      payload: null,
-    };
+      cause && typeof cause === "object" && "code" in cause && cause.code === "ENOENT"
+        ? "ARTIFACT_MISSING"
+        : "ARTIFACT_UNREADABLE";
+    return fail(kind, path, now, err(code, "contract file could not be read"));
   }
 }
 
-async function readHttpApi(config: AdapterConfig): Promise<AdapterReadResult> {
-  const kind: MetricsSourceKind = "http_api";
+async function readHttpAdapter(config: AdapterConfig): Promise<AdapterReadResult> {
+  const kind: AdapterKind = "http";
   const url = config.httpUrl;
+  const now = config.now ?? new Date();
   if (!url) {
-    const now = config.now ?? new Date();
-    logEvent("error", "pncp_metrics_unconfigured", { kind });
-    return {
-      snapshot: snapshotWithError(kind, now, "metrics_source_unconfigured"),
+    return fail(
+      kind,
+      "http:",
       now,
-      payload: null,
-    };
+      err("SOURCE_UNCONFIGURED", "http adapter requires httpUrl"),
+    );
   }
   const fetchImpl = config.fetchImpl ?? fetch;
   const timeoutMs = config.httpTimeoutMs ?? 5000;
@@ -124,88 +139,125 @@ async function readHttpApi(config: AdapterConfig): Promise<AdapterReadResult> {
       signal: AbortSignal.timeout(timeoutMs),
       headers: { accept: "application/json" },
     });
-    if (response.status === 401 || response.status === 403) {
-      const now = config.now ?? new Date();
-      logEvent("error", "pncp_metrics_credential_unavailable", {
-        kind,
-        http_status: response.status,
-      });
-      return {
-        snapshot: snapshotWithError(
-          kind,
-          now,
-          "credential_unavailable",
-          "credential_unavailable",
-        ),
-        now,
-        payload: null,
-      };
-    }
     if (!response.ok) {
-      const now = config.now ?? new Date();
-      logEvent("error", "pncp_metrics_http_error", {
+      return fail(
         kind,
-        http_status: response.status,
-      });
-      return {
-        snapshot: snapshotWithError(kind, now, "metrics_source_unreachable"),
+        url,
         now,
-        payload: null,
-      };
+        err("HTTP_ERROR", `GET returned HTTP ${response.status}`),
+      );
     }
-    const payload: unknown = await response.json();
-    const now = resolveNow(config, payload);
-    return {
-      snapshot: parseMetricsPayload(payload, { sourceKind: kind, now }),
-      now,
-      payload,
-    };
+    const rawText = await response.text();
+    return parseJsonText(kind, url, now, rawText);
   } catch {
-    const now = config.now ?? new Date();
-    logEvent("error", "pncp_metrics_source_unreachable", { kind, url });
-    return {
-      snapshot: snapshotWithError(kind, now, "metrics_source_unreachable"),
+    return fail(
+      kind,
+      url,
       now,
-      payload: null,
-    };
+      err("TRANSPORT_FAILURE", "http GET failed"),
+    );
   }
 }
 
-async function readDbView(config: AdapterConfig): Promise<AdapterReadResult> {
-  const kind: MetricsSourceKind = "db_view";
+export async function defaultCommandRunner(
+  argv: string[],
+): Promise<CommandResult> {
+  if (argv.length === 0) {
+    return { stdout: "", stderr: "empty argv", exitCode: 1 };
+  }
+  const file = argv[0];
+  if (!file) {
+    return { stdout: "", stderr: "empty argv", exitCode: 1 };
+  }
+  const args = argv.slice(1);
   try {
-    let row: Record<string, unknown> | null | undefined = config.dbRow;
-    if (!row && config.queryView) {
-      row = await config.queryView();
-    }
-    if (!row) {
-      const now = config.now ?? new Date();
-      logEvent("error", "pncp_metrics_unconfigured", { kind });
-      return {
-        snapshot: snapshotWithError(kind, now, "metrics_source_unconfigured"),
-        now,
-        payload: null,
-      };
-    }
-    const now = resolveNow(config, row);
+    const { stdout, stderr } = await execFileAsync(file, args, {
+      timeout: 15_000,
+      maxBuffer: 2_000_000,
+      windowsHide: true,
+    });
     return {
-      snapshot: parseMetricsPayload(row, { sourceKind: kind, now }),
-      now,
-      payload: row,
+      stdout: typeof stdout === "string" ? stdout : "",
+      stderr: typeof stderr === "string" ? stderr : "",
+      exitCode: 0,
     };
-  } catch {
-    const now = config.now ?? new Date();
-    logEvent("error", "pncp_metrics_db_unreadable", { kind });
+  } catch (cause) {
+    const e = cause as {
+      code?: number | string;
+      stdout?: string;
+      stderr?: string;
+    };
+    const exitCode = typeof e.code === "number" ? e.code : 1;
     return {
-      snapshot: snapshotWithError(kind, now, "metrics_unreadable"),
-      now,
-      payload: null,
+      stdout: typeof e.stdout === "string" ? e.stdout : "",
+      stderr: typeof e.stderr === "string" ? e.stderr : "",
+      exitCode,
     };
   }
 }
 
-/** Read-only adapter. Never backfills, recrawls, or writes to extra-cli. */
-export function createPncpMetricsAdapter(config: AdapterConfig): {
+async function readCommandAdapter(
+  config: AdapterConfig,
+): Promise<AdapterReadResult> {
+  const kind: AdapterKind = "command";
+  const now = config.now ?? new Date();
+  const argv =
+    config.commandArgv ??
+    (config.filePath ? defaultReadOnlyCommandArgv(config.filePath) : null);
+  if (!argv || argv.length === 0) {
+    return fail(
+      kind,
+      "command:",
+      now,
+      err(
+        "SOURCE_UNCONFIGURED",
+        "command adapter requires commandArgv or filePath snapshot",
+      ),
+    );
+  }
+  if (commandArgvIsForbidden(argv)) {
+    return fail(
+      kind,
+      argv[0] ?? "command:",
+      now,
+      err(
+        "FORBIDDEN_LIVE_COLLECTION",
+        "command adapter refuses --live / ingest; read-only --from-snapshot --json only",
+      ),
+    );
+  }
+  const runner = config.commandRunner ?? defaultCommandRunner;
+  try {
+    const result = await runner(argv);
+    if (result.exitCode !== 0) {
+      return fail(
+        kind,
+        argv[0] ?? "command:",
+        now,
+        err("COMMAND_FAILED", `command exited ${result.exitCode}`),
+      );
+    }
+    if (typeof result.stdout !== "string" || result.stdout.trim() === "") {
+      return fail(
+        kind,
+        argv[0] ?? "command:",
+        now,
+        err("COMMAND_FAILED", "command stdout is empty or unreadable"),
+      );
+    }
+    return parseJsonText(kind, argv[0] ?? "command:", now, result.stdout);
+  } catch {
+    return fail(
+      kind,
+      argv[0] ?? "command:",
+      now,
+      err("TRANSPORT_FAILURE", "command runner failed"),
+    );
+  }
+}
+
+/** Read-only adapter. Never backfills, recrawls, writes extra-cli, or mutates Asaas. */
+export function createPncpContractAdapter(config: AdapterConfig): {
   read: () => Promise<AdapterReadResult>;
 } {
   const parsed = AdapterConfigSchema.safeParse(config);
@@ -213,16 +265,12 @@ export function createPncpMetricsAdapter(config: AdapterConfig): {
     return {
       async read(): Promise<AdapterReadResult> {
         const now = config.now ?? new Date();
-        logEvent("error", "pncp_metrics_invalid_config", { kind: config.kind });
-        return {
-          snapshot: snapshotWithError(
-            config.kind,
-            now,
-            "metrics_source_unconfigured",
-          ),
+        return fail(
+          config.kind,
+          "config:",
           now,
-          payload: null,
-        };
+          err("SOURCE_UNCONFIGURED", "invalid adapter config"),
+        );
       },
     };
   }
@@ -230,24 +278,21 @@ export function createPncpMetricsAdapter(config: AdapterConfig): {
   return {
     async read(): Promise<AdapterReadResult> {
       switch (resolved.kind) {
-        case "health_artifact":
-          return readHealthArtifact(resolved);
-        case "http_api":
-          return readHttpApi(resolved);
-        case "db_view":
-          return readDbView(resolved);
+        case "file":
+          return readFileAdapter(resolved);
+        case "http":
+          return readHttpAdapter(resolved);
+        case "command":
+          return readCommandAdapter(resolved);
         default: {
           const neverKind: never = resolved.kind;
           const now = resolved.now ?? new Date();
-          return {
-            snapshot: snapshotWithError(
-              "health_artifact",
-              now,
-              `unsupported_kind:${String(neverKind)}`,
-            ),
+          return fail(
+            "file",
+            "config:",
             now,
-            payload: null,
-          };
+            err("SOURCE_UNCONFIGURED", `unsupported kind ${String(neverKind)}`),
+          );
         }
       }
     },

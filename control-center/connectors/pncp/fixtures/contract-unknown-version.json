@@ -1,0 +1,9 @@
+{
+  "contract_version": "PNCP_CONTRACT_FRESHNESS/9.9",
+  "status": "FRESH",
+  "reason_codes": [],
+  "as_of": "2026-08-20T12:00:00Z",
+  "deployed_sha": "9c5e7d47f99902d9d97cf479aefbba8cd391a14d",
+  "policy_version": "pncp-contracts.timer/*-*-* 00,04,08,12,16,20:00:00 America/Sao_Paulo",
+  "current_lag_hours": 0.5
+}

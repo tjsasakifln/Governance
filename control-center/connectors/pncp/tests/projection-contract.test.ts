@@ -1,90 +1,99 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-  PNCP_HEALTHY_LABEL,
-  SCHEMA_VERSION,
+  CONTRACT_VERSION,
+  PNCP_SCOPE,
+  PNCP_SERVICE_HEALTH_ID,
+  PNCP_SERVICE_NAME,
+  PNCP_SOURCE_OBSERVATION_ID,
+  SERVICE_HEALTH_SCHEMA,
+  SOURCE_OBSERVATION_SCHEMA,
   evaluatePncpFreshness,
 } from "../src/index.js";
 import { evaluateFixture } from "./helpers.js";
 
-const SERVICE_HEALTH_KEYS = [
-  "schema_version",
-  "source",
-  "observed_at",
-  "freshness_status",
-  "confidence",
-  "service",
-  "healthy",
-  "label",
-  "reasons",
-  "evidence",
-  "collector_alive",
-  "collector_stalled",
-] as const;
-
-const SOURCE_OBSERVATION_KEYS = [
-  "schema_version",
-  "source",
-  "observed_at",
-  "freshness_status",
-  "confidence",
-  "last_item_observed_at",
-  "last_success_at",
-  "lag_seconds",
-  "recent_window_count",
-  "consecutive_errors",
-  "source_max_timestamp",
-  "evidence",
-] as const;
-
-describe("ServiceHealth + SourceObservation contracts", () => {
-  test("every named fixture carries provenance fields", async () => {
+describe("canonical ServiceHealth + SourceObservation projection", () => {
+  test("successful 1.0 evaluation carries required provenance on both outputs", async () => {
     const files = [
-      "pipeline-vivo.json",
-      "pipeline-morto.json",
-      "source-silenciosa.json",
-      "credencial-indisponivel.json",
-    ];
+      "contract-fresh.json",
+      "contract-degraded.json",
+      "contract-stale.json",
+      "contract-unknown.json",
+    ] as const;
     for (const file of files) {
       const result = await evaluateFixture(file);
-      for (const key of SERVICE_HEALTH_KEYS) {
-        assert.ok(key in result.serviceHealth, `missing ServiceHealth.${key} in ${file}`);
-      }
-      for (const key of SOURCE_OBSERVATION_KEYS) {
-        assert.ok(
-          key in result.sourceObservation,
-          `missing SourceObservation.${key} in ${file}`,
-        );
-      }
-      assert.equal(result.serviceHealth.schema_version, SCHEMA_VERSION);
-      assert.equal(result.serviceHealth.source, "pncp");
-      assert.ok(result.serviceHealth.observed_at);
-      assert.ok(result.serviceHealth.freshness_status);
-      if (result.serviceHealth.healthy) {
-        assert.equal(result.serviceHealth.freshness_status, "FRESH");
-        assert.equal(result.serviceHealth.label, PNCP_HEALTHY_LABEL);
-        assert.ok(result.sourceObservation.observed_at);
-        assert.ok(result.serviceHealth.evidence.source_max_timestamp);
-      } else {
-        assert.notEqual(result.serviceHealth.label, PNCP_HEALTHY_LABEL);
-        assert.notEqual(result.serviceHealth.freshness_status, "FRESH");
-      }
+      const { serviceHealth, sourceObservation } = result;
+
+      assert.equal(serviceHealth.schema_version, SERVICE_HEALTH_SCHEMA);
+      assert.equal(serviceHealth.id, PNCP_SERVICE_HEALTH_ID);
+      assert.equal(serviceHealth.scope, PNCP_SCOPE);
+      assert.equal(serviceHealth.service_name, PNCP_SERVICE_NAME);
+      assert.ok(serviceHealth.checked_at);
+
+      const provenance = serviceHealth.provenance;
+      assert.ok(provenance.source.system);
+      assert.ok(provenance.source.kind);
+      assert.ok(provenance.source.locator);
+      assert.ok(provenance.observed_at);
+      assert.ok(
+        ["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(
+          provenance.freshness_status,
+        ),
+      );
+      assert.equal(typeof provenance.confidence, "number");
+      assert.ok(provenance.confidence >= 0 && provenance.confidence <= 1);
+
+      assert.equal(
+        sourceObservation.schema_version,
+        SOURCE_OBSERVATION_SCHEMA,
+      );
+      assert.equal(sourceObservation.id, PNCP_SOURCE_OBSERVATION_ID);
+      assert.equal(sourceObservation.scope, PNCP_SCOPE);
+      assert.deepEqual(sourceObservation.provenance, provenance);
+      assert.ok(sourceObservation.collected_at);
+      assert.ok(sourceObservation.idempotency_key);
+      assert.equal(sourceObservation.payload_schema_ref, CONTRACT_VERSION);
+      assert.equal(
+        sourceObservation.payload.contract_version,
+        CONTRACT_VERSION,
+      );
+      assert.ok(Array.isArray(sourceObservation.payload.reason_codes));
+      assert.ok("as_of" in sourceObservation.payload);
+      assert.ok("deployed_sha" in sourceObservation.payload);
+      assert.ok("policy_version" in sourceObservation.payload);
+      assert.equal(sourceObservation.provenance.freshness_status, result.freshness_status);
     }
   });
 
-  test("healthy label is unrepresentable from an incomplete snapshot", async () => {
+  test("ERROR projection includes error on SourceObservation and never FRESH", async () => {
     const result = await evaluatePncpFreshness({
-      kind: "db_view",
+      kind: "file",
       now: new Date("2026-08-20T12:00:00.000Z"),
-      dbRow: {
-        last_success_at: "2026-08-20T11:59:00.000Z",
-        consecutive_errors: 0,
-      },
     });
-    assert.equal(result.serviceHealth.healthy, false);
-    assert.notEqual(result.serviceHealth.label, PNCP_HEALTHY_LABEL);
-    assert.notEqual(result.serviceHealth.freshness_status, "FRESH");
-    const serialized = JSON.stringify(result.serviceHealth);
-    assert.equal(serialized.includes(PNCP_HEALTHY_LABEL), false);
+    assert.equal(result.freshness_status, "ERROR");
+    assert.equal(result.serviceHealth.provenance.freshness_status, "ERROR");
+    assert.equal(result.serviceHealth.status, "down");
+    assert.ok(result.sourceObservation.error);
+    assert.equal(typeof result.sourceObservation.error?.code, "string");
+    assert.equal(typeof result.sourceObservation.error?.message, "string");
+    assert.equal(result.serviceHealth.provenance.confidence, 0);
+  });
+
+  test("DEGRADED projection stores upstream_status and reason_codes in payload", async () => {
+    const result = await evaluateFixture("contract-degraded.json");
+    assert.equal(result.sourceObservation.payload.upstream_status, "DEGRADED");
+    assert.deepEqual(result.sourceObservation.payload.reason_codes, [
+      "LOCK_BUSY_NO_CLOSE",
+      "LAG_ABOVE_OPERATIONAL_TARGET",
+    ]);
+    assert.equal(
+      result.sourceObservation.payload.as_of,
+      "2026-08-20T12:00:00Z",
+    );
+    assert.equal(
+      result.serviceHealth.provenance.freshness_status,
+      "STALE",
+    );
+    assert.equal(result.serviceHealth.status, "degraded");
   });
 });

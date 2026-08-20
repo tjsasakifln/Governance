@@ -1,141 +1,205 @@
 /**
- * Local Control Center contracts for PNCP freshness.
- * Sibling workstreams may later converge on these shapes; this path does not
- * import extra-cli or other repos.
+ * Control Center adapter of extra-cli PNCP_CONTRACT_FRESHNESS/1.0.
+ * Canonical ServiceHealth / SourceObservation shapes are emitted here
+ * (sibling branch cc/01-architecture-contracts is not imported).
  */
 
-export const PNCP_SOURCE_ID = "pncp" as const;
-export const SCHEMA_VERSION = "control-center.pncp.freshness/1.0" as const;
+export const CONTRACT_VERSION = "PNCP_CONTRACT_FRESHNESS/1.0" as const;
 
-/** Portuguese healthy label. Emitted only when FRESH with timestamp + evidence. */
-export const PNCP_HEALTHY_LABEL = "PNCP saudável" as const;
+export const SERVICE_HEALTH_SCHEMA =
+  "control-center.service-health.v1" as const;
+export const SOURCE_OBSERVATION_SCHEMA =
+  "control-center.source-observation.v1" as const;
 
-export type FreshnessStatus = "FRESH" | "STALE" | "ERROR" | "UNKNOWN";
+export const PNCP_SCOPE = "infrastructure" as const;
+export const PNCP_SERVICE_NAME = "pncp-contracts" as const;
+export const PNCP_SERVICE_HEALTH_ID = "cc:service-health:pncp-contracts" as const;
+export const PNCP_SOURCE_OBSERVATION_ID =
+  "cc:source-observation:pncp-contracts" as const;
 
-export type MetricsSourceKind = "http_api" | "db_view" | "health_artifact";
+export const EXTRA_CLI_SYSTEM = "extra-cli" as const;
+export const EXTRA_CLI_SOURCE_KIND = "pncp-contract-freshness" as const;
 
-export type CredentialStatus = "available" | "unavailable" | "unknown";
+/** extra-cli contract statuses. Control Center does not invent others. */
+export const UPSTREAM_STATUSES = [
+  "FRESH",
+  "DEGRADED",
+  "STALE",
+  "UNKNOWN",
+] as const;
+export type UpstreamStatus = (typeof UPSTREAM_STATUSES)[number];
 
-export interface FreshnessThresholds {
-  lastSuccessSlaHours: number;
-  dataSlaHours: number;
-  recentWindowHours: number;
-  minRecentWindowCount: number;
-  consecutiveErrorThreshold: number;
-  collectorAliveMaxAgeHours: number;
-  deadPipelineMaxAgeHours: number;
+/** Canonical Control Center freshness. Mapping never promotes. */
+export const FRESHNESS_STATUSES = [
+  "FRESH",
+  "STALE",
+  "UNKNOWN",
+  "ERROR",
+] as const;
+export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
+
+export const HEALTH_STATUSES = [
+  "healthy",
+  "degraded",
+  "down",
+  "unknown",
+] as const;
+export type HealthStatus = (typeof HEALTH_STATUSES)[number];
+
+export const ADAPTER_KINDS = ["file", "http", "command"] as const;
+export type AdapterKind = (typeof ADAPTER_KINDS)[number];
+
+export interface SourceRef {
+  system: string;
+  kind: string;
+  locator: string;
+  label?: string;
 }
 
-export interface PncpMetricsSnapshot {
-  schema_version: typeof SCHEMA_VERSION;
-  source: typeof PNCP_SOURCE_ID;
-  source_kind: MetricsSourceKind;
-  raw_source: string | null;
-  /** Evaluation clock (UTC ISO). Always set by the adapter. */
+export interface Provenance {
+  source: SourceRef;
   observed_at: string;
-  last_item_observed_at: string | null;
-  last_success_at: string | null;
-  lag_seconds: number | null;
-  recent_window_count: number | null;
-  consecutive_errors: number | null;
-  source_max_timestamp: string | null;
-  collector_heartbeat_at: string | null;
-  credential_status: CredentialStatus;
-  error_code: string | null;
-  /** Non-secret adapter/read failure code; never a token or DSN. */
-  read_error: string | null;
-  raw_complete: boolean;
-}
-
-export interface FreshnessEvidence {
-  last_item_observed_at: string | null;
-  last_success_at: string | null;
-  source_max_timestamp: string | null;
-  recent_window_count: number | null;
-  consecutive_errors: number | null;
-  lag_seconds: number | null;
-  collector_heartbeat_at: string | null;
-  recent_window_hours: number;
-  last_success_sla_hours: number;
-  data_sla_hours: number;
-}
-
-export interface Classification {
-  status: FreshnessStatus;
-  reasons: string[];
-  collector_alive: boolean;
-  collector_stalled: boolean;
+  freshness_status: FreshnessStatus;
   confidence: number;
-  evidence_present: boolean;
-  timestamp_present: boolean;
+  freshness_window_seconds?: number;
+}
+
+export interface ErrorObject {
+  code: string;
+  message: string;
+}
+
+export interface ServiceHealthCheck {
+  name: string;
+  status: HealthStatus;
+  detail?: string;
 }
 
 export interface ServiceHealth {
-  schema_version: typeof SCHEMA_VERSION;
-  source: typeof PNCP_SOURCE_ID;
-  observed_at: string;
-  freshness_status: FreshnessStatus;
-  confidence: number;
-  service: typeof PNCP_SOURCE_ID;
-  /** True only for FRESH with timestamp and freshness evidence. */
-  healthy: boolean;
-  /**
-   * Display label. Equals PNCP_HEALTHY_LABEL only when `healthy` is true.
-   * Dashboards must not invent a healthy PNCP label from any other payload.
-   */
-  label: string;
-  reasons: string[];
-  evidence: FreshnessEvidence;
-  collector_alive: boolean;
-  collector_stalled: boolean;
+  schema_version: typeof SERVICE_HEALTH_SCHEMA;
+  id: typeof PNCP_SERVICE_HEALTH_ID;
+  scope: typeof PNCP_SCOPE;
+  service_name: typeof PNCP_SERVICE_NAME;
+  status: HealthStatus;
+  provenance: Provenance;
+  checked_at: string;
+  latency_ms?: number;
+  message?: string;
+  checks?: ServiceHealthCheck[];
 }
 
 export interface SourceObservation {
-  schema_version: typeof SCHEMA_VERSION;
-  source: typeof PNCP_SOURCE_ID;
-  /** Data timestamp (source max or last item). Null when unknown — never FRESH. */
-  observed_at: string | null;
+  schema_version: typeof SOURCE_OBSERVATION_SCHEMA;
+  id: typeof PNCP_SOURCE_OBSERVATION_ID;
+  scope: typeof PNCP_SCOPE;
+  provenance: Provenance;
+  collected_at: string;
+  idempotency_key: string;
+  payload: Record<string, unknown>;
+  payload_schema_ref?: string;
+  error?: ErrorObject;
+}
+
+export interface PncpContractV1 {
+  contract_version: typeof CONTRACT_VERSION;
+  status: UpstreamStatus;
+  reason_codes: string[];
+  as_of: string;
+  deployed_sha: string | null;
+  policy_version: string | null;
+  current_lag_hours: number | null;
+  lag_p50_hours: number | null;
+  lag_p95_hours: number | null;
+  lag_p99_hours: number | null;
+  lag_sample_n: number | null;
+  source_publication_or_update_at: string | null;
+  first_observed_at: string | null;
+  persisted_at: string | null;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  latest_successful_closed_window: string | null;
+  oldest_unresolved_gap: string | null;
+  unresolved_window_count: number | null;
+  source_window: unknown;
+  slo: Record<string, unknown> | null;
+  timer: Record<string, unknown> | null;
+  health_exit: number | null;
+  campaign_verdict_hint: string | null;
+}
+
+export interface StatusMapping {
+  upstream_status: UpstreamStatus;
   freshness_status: FreshnessStatus;
-  confidence: number;
-  last_item_observed_at: string | null;
-  last_success_at: string | null;
-  lag_seconds: number | null;
-  recent_window_count: number | null;
-  consecutive_errors: number | null;
-  source_max_timestamp: string | null;
-  evidence: FreshnessEvidence;
+}
+
+export interface ParseSuccess {
+  ok: true;
+  contract: PncpContractV1;
+}
+
+export interface ParseFailure {
+  ok: false;
+  error: ErrorObject;
+  contract_version: string | null;
+}
+
+export type ParseResult = ParseSuccess | ParseFailure;
+
+export interface CommandResult {
+  stdout: string;
+  stderr?: string;
+  exitCode: number;
+}
+
+export type CommandRunner = (argv: string[]) => Promise<CommandResult>;
+
+export interface AdapterConfig {
+  kind: AdapterKind;
+  filePath?: string;
+  httpUrl?: string;
+  fetchImpl?: typeof fetch;
+  httpTimeoutMs?: number;
+  commandArgv?: string[];
+  commandRunner?: CommandRunner;
+  now?: Date;
+}
+
+export type AdapterReadResult =
+  | {
+      ok: true;
+      kind: AdapterKind;
+      payload: unknown;
+      rawText: string;
+      locator: string;
+      observedAt: Date;
+    }
+  | {
+      ok: false;
+      kind: AdapterKind;
+      error: ErrorObject;
+      locator: string;
+      observedAt: Date;
+    };
+
+export interface EvaluationContext {
+  adapterKind: AdapterKind;
+  locator: string;
+  collectedAt: Date;
 }
 
 export interface PncpFreshnessEvaluation {
-  snapshot: PncpMetricsSnapshot;
-  classification: Classification;
+  freshness_status: FreshnessStatus;
+  upstream_status: UpstreamStatus | null;
+  contract_version: string | null;
+  reason_codes: string[];
+  as_of: string | null;
+  deployed_sha: string | null;
+  policy_version: string | null;
+  mapping: StatusMapping | null;
+  parse_error: ErrorObject | null;
+  adapter_kind: AdapterKind;
+  locator: string;
+  contract: PncpContractV1 | null;
   serviceHealth: ServiceHealth;
   sourceObservation: SourceObservation;
-  thresholds: FreshnessThresholds;
 }
-
-export type DbViewQuery = () => Promise<Record<string, unknown> | null>;
-
-export interface AdapterConfig {
-  kind: MetricsSourceKind;
-  artifactPath?: string;
-  httpUrl?: string;
-  /**
-   * Optional injected fetch for tests. Production uses global fetch.
-   * Must not log request headers (they may contain credentials).
-   */
-  fetchImpl?: typeof fetch;
-  /** Injected view row or query callback — no live extra-cli/pg driver here. */
-  dbRow?: Record<string, unknown>;
-  queryView?: DbViewQuery;
-  /** Override evaluation clock (UTC). Artifact `evaluated_at` is used when unset. */
-  now?: Date;
-  httpTimeoutMs?: number;
-}
-
-export const STATUS_LABELS: Record<FreshnessStatus, string> = {
-  FRESH: PNCP_HEALTHY_LABEL,
-  STALE: "PNCP desatualizado",
-  ERROR: "PNCP com erro",
-  UNKNOWN: "PNCP sem evidência de freshness",
-};

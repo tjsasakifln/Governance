@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Read-only PNCP ingest/read-model freshness adapter for Confenge Control Center",
+  "description": "Read-only Control Center adapter of extra-cli PNCP_CONTRACT_FRESHNESS/1.0",
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
