@@ -1,0 +1,22 @@
+{
+  "authority_id": "CFG-OFFER-AUTHORITY-v1",
+  "catalog_id": "CFG-OFFER-CATALOG-v1",
+  "catalog_authority": "governance",
+  "known_offers": [
+    { "offer_id": "CFG-DIAG-EXP-v1", "offer_version": "v1" },
+    { "offer_id": "CFG-DIRB2G-FLEX-v1", "offer_version": "v1" },
+    { "offer_id": "CFG-DIRB2G-180-v1", "offer_version": "v1" },
+    { "offer_id": "CFG-DIRB2G-365-v1", "offer_version": "v1" }
+  ],
+  "not_an_offer": [
+    {
+      "kind": "extra_historical",
+      "exception_id": "CFG-EXC-EXTRA-HISTORICAL-v1",
+      "amount_cents": 1000000,
+      "currency": "BRL"
+    }
+  ],
+  "observed_at": "2026-08-17T00:00:00Z",
+  "freshness_status": "FRESH",
+  "confidence": 1
+}
