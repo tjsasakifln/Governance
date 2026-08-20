@@ -8,6 +8,9 @@ import type { MergedSignal } from "./merge.js";
  * would otherwise fill the list by count.
  */
 export function isKillRule(signal: MergedSignal, config: ScoringConfig): boolean {
+  if (signal.item_kind === "dados_stale") {
+    return false;
+  }
   if (!config.kill_rule.categories.includes(signal.category)) {
     return false;
   }

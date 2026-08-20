@@ -58,6 +58,8 @@ export function synthesizeDadosStale(
     related_ids: [original.id, ...original.source_ids],
     source_ids: [original.id, ...original.source_ids],
     merge_count: 1,
+    item_kind: "dados_stale",
+    source_freshness_status: original.provenance.freshness_status,
     recommended_action: `Atualizar dados da fonte ${original.provenance.source.system}:${original.provenance.source.kind} (${original.provenance.source.locator}).`,
   };
   return stale;

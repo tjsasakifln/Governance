@@ -122,6 +122,16 @@ function asCandidate(item: RankedItem): ScoredCandidate {
 function assertExplanationsConsistent(items: RankedItem[]): void {
   for (const item of items) {
     assert.equal(scoreMilliFromBreakdown(item.score_breakdown), item.score_milli);
+    if (item.item_kind === "dados_stale") {
+      assert.equal(item.forced_by_kill_rule, false);
+      assert.equal(item.score_breakdown.kill_rule_applied, false);
+      assert.notEqual(item.score_breakdown.source_freshness_status, "FRESH");
+      assert.ok(
+        item.reason.includes(`freshness original ${item.score_breakdown.source_freshness_status}`),
+        item.reason,
+      );
+      assert.equal(item.reason.includes("freshness original FRESH"), false);
+    }
   }
   for (let i = 0; i < items.length - 1; i += 1) {
     const a = items[i];

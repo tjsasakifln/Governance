@@ -139,6 +139,8 @@ export interface ScoreBreakdown {
   kill_rule_applied: boolean;
   merge_count: number;
   freshness_demoted: boolean;
+  /** Underlying observation freshness. For `dados_stale` this is the source signal, not the synthetic FRESH envelope. */
+  source_freshness_status: FreshnessStatus;
 }
 
 export interface ScoredCandidate {

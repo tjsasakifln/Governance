@@ -19,7 +19,18 @@ import { parseRankRequest } from "./validate.js";
 
 function toCandidate(merged: MergedSignal, config: ScoringConfig): ScoredCandidate {
   const forced = isKillRule(merged, config);
-  const breakdown = buildBreakdown(merged, config, forced);
+  const breakdown = buildBreakdown(
+    {
+      category: merged.category,
+      impact: merged.impact,
+      urgency: merged.urgency,
+      provenance: merged.provenance,
+      merge_count: merged.merge_count,
+      source_freshness_status: merged.source_freshness_status,
+    },
+    config,
+    forced,
+  );
   const candidate: ScoredCandidate = {
     id: merged.id,
     title: merged.title,
@@ -31,7 +42,7 @@ function toCandidate(merged: MergedSignal, config: ScoringConfig): ScoredCandida
     urgency: merged.urgency,
     severity: merged.severity,
     status: merged.status,
-    item_kind: merged.id.includes(":dados-stale-") ? "dados_stale" : "work",
+    item_kind: merged.item_kind,
     correlation_key: merged.correlation_key,
     evidence_refs: merged.evidence_refs,
     provenance: merged.provenance,

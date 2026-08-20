@@ -16,7 +16,7 @@ export function buildReason(item: ScoredCandidate, horizon: PriorityHorizon): st
   const parts: string[] = [];
   if (item.item_kind === "dados_stale") {
     parts.push(
-      `Dados stale: freshness original ${b.freshness_status} reduz prioridade do sinal-fonte; este item pede atualização da evidência.`,
+      `Dados stale: freshness original ${b.source_freshness_status} reduz prioridade do sinal-fonte; este item pede atualização da evidência.`,
     );
   }
   if (item.forced_by_kill_rule) {

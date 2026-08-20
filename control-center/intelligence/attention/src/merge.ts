@@ -1,9 +1,12 @@
-import { FRESHNESS_RANK, SEVERITY_RANK } from "./taxonomy.js";
+import { FRESHNESS_RANK, SEVERITY_RANK, type FreshnessStatus, type ItemKind } from "./taxonomy.js";
 import type { AttentionSignal, EvidenceRef, Provenance, SourceRef } from "./types.js";
 
 export interface MergedSignal extends AttentionSignal {
   source_ids: string[];
   merge_count: number;
+  item_kind: ItemKind;
+  /** Freshness of the underlying observation. For `dados_stale` this is the source signal, not the synthetic FRESH envelope. */
+  source_freshness_status: FreshnessStatus;
 }
 
 function evidenceKey(ref: EvidenceRef): string {
@@ -133,6 +136,8 @@ function mergeOne(items: AttentionSignal[]): MergedSignal {
     related_ids: mergeRelated(items),
     source_ids: ids,
     merge_count: items.length,
+    item_kind: "work",
+    source_freshness_status: provenance.freshness_status,
   };
   if (canonical.recommended_action !== undefined) {
     merged.recommended_action = canonical.recommended_action;

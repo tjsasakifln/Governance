@@ -38,6 +38,7 @@ export function buildBreakdown(
     urgency: number;
     provenance: { freshness_status: ScoreBreakdown["freshness_status"]; confidence: number };
     merge_count: number;
+    source_freshness_status: ScoreBreakdown["source_freshness_status"];
   },
   config: ScoringConfig,
   forced_by_kill_rule: boolean,
@@ -70,6 +71,7 @@ export function buildBreakdown(
     kill_rule_applied: forced_by_kill_rule,
     merge_count: candidate.merge_count,
     freshness_demoted,
+    source_freshness_status: candidate.source_freshness_status,
   };
   breakdown.score_milli = scoreMilliFromBreakdown(breakdown);
   breakdown.score = breakdown.score_milli / SCORE_SCALE;

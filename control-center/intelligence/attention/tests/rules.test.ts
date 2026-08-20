@@ -247,7 +247,89 @@ test("stale freshness demotes the original and yields a dados stale item", () =>
   );
   assert.ok(dados, "expected an explicit dados stale item");
   assert.ok(dados.title.startsWith("Dados stale:"));
-  assert.ok(dados.reason.toLowerCase().includes("stale"));
+  assert.equal(dados.score_breakdown.freshness_status, "FRESH");
+  assert.equal(dados.score_breakdown.source_freshness_status, "STALE");
+  assert.ok(
+    dados.reason.includes("freshness original STALE"),
+    `dados_stale reason must cite the source observation, got: ${dados.reason}`,
+  );
+  assert.equal(dados.reason.includes("freshness original FRESH"), false);
+});
+
+test("dados_stale reason cites ERROR source freshness, not the synthetic FRESH envelope", () => {
+  const out = rankFromUnknown(
+    request({
+      signals: [
+        makeSignal({
+          id: "cc:attention-signal:error-book",
+          category: "receita",
+          domain: "finance",
+          impact: 70,
+          urgency: 40,
+          freshness_status: "ERROR",
+        }),
+      ],
+    }),
+  );
+  const dados = [...out.attention_now, ...out.today].find((i) => i.item_kind === "dados_stale");
+  assert.ok(dados);
+  assert.equal(dados.score_breakdown.source_freshness_status, "ERROR");
+  assert.ok(dados.reason.includes("freshness original ERROR"));
+  assert.equal(dados.reason.includes("freshness original FRESH"), false);
+});
+
+test("stale critical risk keeps kill-rule on the original; dados_stale twin does not outrank it", () => {
+  const incident = makeSignal({
+    id: "cc:attention-signal:stale-outage",
+    category: "risco_operacional",
+    domain: "infrastructure",
+    impact: 90,
+    urgency: 95,
+    severity: "critical",
+    freshness_status: "STALE",
+    confidence: 0.99,
+  });
+  const out = rankFromUnknown(request({ signals: [incident] }));
+  const original = out.attention_now.find((i) => i.id === incident.id);
+  const dados = out.attention_now.find((i) => i.item_kind === "dados_stale");
+  assert.ok(original, "original incident missing from ATENÇÃO AGORA");
+  assert.ok(dados, "dados stale twin missing from ATENÇÃO AGORA");
+  assert.equal(original.forced_by_kill_rule, true);
+  assert.equal(original.score_breakdown.kill_rule_applied, true);
+  assert.equal(dados.forced_by_kill_rule, false);
+  assert.equal(dados.score_breakdown.kill_rule_applied, false);
+  const originalIdx = out.attention_now.findIndex((i) => i.id === incident.id);
+  const dadosIdx = out.attention_now.findIndex((i) => i.item_kind === "dados_stale");
+  assert.ok(originalIdx >= 0 && dadosIdx >= 0);
+  assert.ok(
+    originalIdx < dadosIdx,
+    `dados_stale ranked above the incident: now=${out.attention_now.map((i) => i.id).join(",")}`,
+  );
+  assert.equal(out.attention_now[0]?.id, incident.id);
+  assert.equal(dados.score_breakdown.source_freshness_status, "STALE");
+  assert.ok(dados.reason.includes("freshness original STALE"));
+});
+
+test("stale critical blocker keeps kill-rule on the original work item", () => {
+  const blocker = makeSignal({
+    id: "cc:attention-signal:stale-blocker",
+    category: "blocker",
+    domain: "engineering",
+    impact: 80,
+    urgency: 80,
+    severity: "critical",
+    freshness_status: "STALE",
+  });
+  const out = rankFromUnknown(request({ signals: [blocker] }));
+  const original = out.attention_now.find((i) => i.id === blocker.id);
+  const dados = out.attention_now.find((i) => i.item_kind === "dados_stale");
+  assert.ok(original && dados);
+  assert.equal(original.forced_by_kill_rule, true);
+  assert.equal(dados.forced_by_kill_rule, false);
+  assert.ok(
+    (out.attention_now.findIndex((i) => i.id === blocker.id) ?? 99) <
+      (out.attention_now.findIndex((i) => i.item_kind === "dados_stale") ?? -1),
+  );
 });
 
 test("founder override pins a target and records actor, time, target, previous ranking", () => {
