@@ -1,0 +1,28 @@
+{
+  "name": "@confenge/control-center-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Confenge Control Center MCP server: scoped agent context and session reports.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "confenge-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}
