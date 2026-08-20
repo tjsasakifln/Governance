@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#121418" />
+    <meta
+      name="description"
+      content="Confenge Control Center — registrar memória estratégica estruturada. Sem chat. Sem mutações financeiras."
+    />
+    <!-- Opaque mock handles only. Not a password. Override before any non-mock deploy. -->
+    <meta name="cc-founder-actor-id" content="human:founder" />
+    <meta name="cc-actor-id" content="human:founder" />
+    <meta name="cc-actor-role" content="founder" />
+    <meta name="cc-use-mock-identity" content="1" />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="icon" href="./public/favicon.svg" type="image/svg+xml" />
+    <title>Memória estratégica — Control Center</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      Este registrador precisa de JavaScript. No diretório
+      <code>control-center/apps/directives-ui</code> execute
+      <code>npm install && npm start</code>.
+    </noscript>
+    <script>
+      (function () {
+        if (typeof location === "undefined") return;
+        if (location.protocol === "file:") {
+          var note = document.createElement("p");
+          note.className = "file-hint";
+          note.setAttribute("role", "note");
+          note.textContent =
+            "file: exige npm run build (dist/app.js). Prefira npm start em http://127.0.0.1:4177/";
+          document.body.insertBefore(note, document.body.firstChild);
+        }
+        window.addEventListener("DOMContentLoaded", function () {
+          var app = document.getElementById("app");
+          if (!app) return;
+          window.setTimeout(function () {
+            if (app.getAttribute("data-ready") === "1" || app.querySelector("[data-ready='1']")) return;
+            if (app.innerHTML.trim().length > 0) return;
+            app.innerHTML =
+              '<main class="file-protocol" role="alert">' +
+              "<h1>Bundle ausente</h1>" +
+              "<p>Gere <code>dist/app.js</code> com <code>npm run build</code> ou sirva via <code>npm start</code>.</p>" +
+              "</main>";
+          }, 50);
+        });
+      })();
+    </script>
+    <script src="./dist/app.js"></script>
+  </body>
+</html>
