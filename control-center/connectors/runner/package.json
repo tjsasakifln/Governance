@@ -14,16 +14,19 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "start": "tsx src/server.ts",
     "run": "tsx src/cli.ts"
   },
   "dependencies": {
-    "@confenge/control-center-contracts": "*"
+    "@confenge/control-center-contracts": "*",
+    "@confenge/control-center-persistence": "*",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

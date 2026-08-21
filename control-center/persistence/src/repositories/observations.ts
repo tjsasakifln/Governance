@@ -1,10 +1,16 @@
 import type { PoolClient } from 'pg';
+import { NotFoundError } from '../errors.js';
 import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
 import { moneyColumns, sourceColumns, toUtcIso } from '../money.js';
 import { mapObservation, type ObservationRow } from '../rows.js';
 import type { RecordObservationInput, SourceObservation } from '../types.js';
-import { parseInput, recordObservationInputSchema, scopeQuerySchema } from '../validation.js';
+import {
+  parseInput,
+  publicIdQuerySchema,
+  recordObservationInputSchema,
+  scopeQuerySchema,
+} from '../validation.js';
 import { insertAuditEvent } from './audit.js';
 
 const OBSERVATION_COLUMNS = `
@@ -132,4 +138,100 @@ export async function countObservationsByIdempotencyKey(tx: PoolClient, idempote
   );
   const row = result.rows[0] as { n: number };
   return row.n;
+}
+
+export async function getObservation(tx: PoolClient, id: string): Promise<SourceObservation> {
+  const parsed = parseInput(publicIdQuerySchema, { id }, 'getObservation');
+  const result = await tx.query(
+    `SELECT ${OBSERVATION_COLUMNS} FROM control_center.source_observations WHERE id = $1`,
+    [parsed.id],
+  );
+  if (result.rowCount !== 1) {
+    throw new NotFoundError(`source observation ${parsed.id} not found`);
+  }
+  const observation = mapObservation(result.rows[0] as ObservationRow);
+  const latest = await tx.query<{ id: string }>(
+    `SELECT id
+     FROM control_center.source_observations
+     WHERE source_system = $1 AND source_kind = $2 AND source_locator = $3
+       AND scope = $4 AND observation_kind = $5
+     ORDER BY observed_at DESC, created_at DESC, id DESC
+     LIMIT 1`,
+    [
+      observation.source.system,
+      observation.source.kind,
+      observation.source.locator,
+      observation.scope,
+      observation.observationKind,
+    ],
+  );
+  if (latest.rows[0]?.id && latest.rows[0].id !== observation.id) {
+    return { ...observation, freshnessStatus: 'STALE' };
+  }
+  return observation;
+}
+
+export async function listLatestSourceObservations(tx: PoolClient): Promise<
+  Array<{
+    observationId: string;
+    scope: string;
+    observationType: string;
+    sourceSystem: string;
+    sourceKind: string;
+    sourceLocator: string;
+    observedAt: Date;
+    freshnessStatus: string;
+    confidence: number;
+    payloadJson: Record<string, unknown>;
+  }>
+> {
+  const result = await tx.query(
+    `SELECT observation_id, scope, observation_type, source_system, source_kind, source_locator,
+            observed_at, freshness_status, confidence, payload_json
+     FROM control_center.v_latest_source_observations
+     ORDER BY source_system, source_kind, source_locator, scope, observation_type`,
+  );
+  return result.rows.map((row) => {
+    const record = row as {
+      observation_id: string;
+      scope: string;
+      observation_type: string;
+      source_system: string;
+      source_kind: string;
+      source_locator: string;
+      observed_at: Date;
+      freshness_status: string;
+      confidence: string | number;
+      payload_json: unknown;
+    };
+    return {
+      observationId: record.observation_id,
+      scope: record.scope,
+      observationType: record.observation_type,
+      sourceSystem: record.source_system,
+      sourceKind: record.source_kind,
+      sourceLocator: record.source_locator,
+      observedAt: record.observed_at,
+      freshnessStatus: record.freshness_status,
+      confidence: Number(record.confidence),
+      payloadJson:
+        record.payload_json && typeof record.payload_json === 'object' && !Array.isArray(record.payload_json)
+          ? (record.payload_json as Record<string, unknown>)
+          : {},
+    };
+  });
+}
+
+export function canonicalObservationIdempotencyKey(input: {
+  source: { system: string; kind: string; locator: string };
+  observationKind: string;
+  observedAt: Date;
+}): string {
+  return [
+    input.source.system,
+    input.source.kind,
+    input.source.locator,
+    input.observationKind,
+    input.observedAt.toISOString(),
+  ].join(':');
 }

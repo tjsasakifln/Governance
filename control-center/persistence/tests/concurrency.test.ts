@@ -16,7 +16,7 @@ after(async () => {
 });
 
 test('concurrent collector observations with the same idempotency key insert exactly one row', async () => {
-  const key = 'synthetic-warmbly:open-exceptions:concurrent-1';
+  const key = `synthetic-warmbly:open-exceptions:concurrent-${Date.now()}`;
   const input = {
     scope: 'commercial',
     observationKind: 'open-exceptions',
@@ -41,7 +41,7 @@ test('concurrent collector observations with the same idempotency key insert exa
 });
 
 test('concurrent collector runs with the same idempotency key insert exactly one row', async () => {
-  const key = 'synthetic-warmbly-readonly:concurrent-run-1';
+  const key = `synthetic-warmbly-readonly:concurrent-run-${Date.now()}`;
   const input = {
     collectorName: 'synthetic-warmbly-readonly',
     idempotencyKey: key,

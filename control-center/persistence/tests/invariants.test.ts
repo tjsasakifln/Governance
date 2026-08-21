@@ -214,7 +214,7 @@ test('aggregated rows reject missing source, observed_at, and freshness_status',
 });
 
 test('money fields round-trip as integer cents plus currency', async () => {
-  const snapshot = await ctx.persistence.recordSnapshot({
+  const recorded = await ctx.persistence.recordSnapshot({
     scope: 'commercial',
     snapshotKind: 'exceptions-brief',
     payload: { items: 3 },
@@ -224,6 +224,7 @@ test('money fields round-trip as integer cents plus currency', async () => {
     freshnessStatus: 'FRESH',
     confidence: 0.5,
   });
+  const snapshot = recorded.snapshot;
   assert.equal(snapshot.money?.amountCents, 150075);
   assert.equal(snapshot.money?.currency, 'BRL');
   assert.equal(Number.isInteger(snapshot.money?.amountCents), true);

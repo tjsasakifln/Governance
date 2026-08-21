@@ -3,9 +3,12 @@ import { withTransaction } from './db.js';
 import {
   appliedMigrations,
   listNamedObjects,
+  listViewColumns,
   migrateDown,
   migrateUp,
 } from './migrate.js';
+import { applyRetention } from './retention.js';
+import { expectedMigrationsPresent, pingStore } from './ready.js';
 import {
   listAgentActivitiesByScope,
   listAllAgentActivities,
@@ -18,6 +21,7 @@ import {
   countCollectorRunsByIdempotencyKey,
   finishCollectorRun,
   listCollectorRunsByScope,
+  listLatestCollectorRuns,
   startCollectorRun,
 } from './repositories/collector-runs.js';
 import {
@@ -30,8 +34,21 @@ import {
   listRevisionsByScope,
   supersedeDirective,
 } from './repositories/directives.js';
-import { countObservationsByIdempotencyKey, listObservationsByScope, recordObservation } from './repositories/observations.js';
-import { listSnapshotsByScope, recordSnapshot } from './repositories/snapshots.js';
+import {
+  countObservationsByIdempotencyKey,
+  getObservation,
+  listLatestSourceObservations,
+  listObservationsByScope,
+  recordObservation,
+} from './repositories/observations.js';
+import {
+  countSnapshotsByIdempotencyKey,
+  getSnapshot,
+  listLatestOperationalSnapshots,
+  listSnapshotsByScope,
+  recordSnapshot,
+  reviseSnapshot,
+} from './repositories/snapshots.js';
 import type {
   AppendAuditEventInput,
   CreateAttentionItemInput,
@@ -40,6 +57,8 @@ import type {
   RecordAgentActivityInput,
   RecordObservationInput,
   RecordSnapshotInput,
+  RetentionPolicyInput,
+  ReviseSnapshotInput,
   StartAgentSessionInput,
   StartCollectorRunInput,
   SupersedeDirectiveInput,
@@ -60,8 +79,24 @@ export class Persistence {
     return appliedMigrations(this.pool);
   }
 
-  async listNamedObjects(): Promise<{ tables: string[]; materializedViews: string[] }> {
+  async listNamedObjects(): Promise<{ tables: string[]; materializedViews: string[]; views: string[] }> {
     return listNamedObjects(this.pool);
+  }
+
+  async listViewColumns(viewName: string): Promise<string[]> {
+    return listViewColumns(this.pool, viewName);
+  }
+
+  async expectedMigrationsPresent(): Promise<boolean> {
+    return expectedMigrationsPresent(this.pool);
+  }
+
+  async pingStore(): Promise<void> {
+    return pingStore(this.pool);
+  }
+
+  async applyRetention(policy: RetentionPolicyInput) {
+    return applyRetention(this.pool, policy);
   }
 
   async createDirective(input: CreateDirectiveInput) {
@@ -100,8 +135,16 @@ export class Persistence {
     return withTransaction(this.pool, (tx) => recordObservation(tx, input));
   }
 
+  async getObservation(id: string) {
+    return withTransaction(this.pool, (tx) => getObservation(tx, id));
+  }
+
   async listObservationsByScope(scope: string) {
     return withTransaction(this.pool, (tx) => listObservationsByScope(tx, scope));
+  }
+
+  async listLatestSourceObservations() {
+    return withTransaction(this.pool, (tx) => listLatestSourceObservations(tx));
   }
 
   async countObservationsByIdempotencyKey(idempotencyKey: string) {
@@ -120,6 +163,10 @@ export class Persistence {
     return withTransaction(this.pool, (tx) => listCollectorRunsByScope(tx, scope));
   }
 
+  async listLatestCollectorRuns() {
+    return withTransaction(this.pool, (tx) => listLatestCollectorRuns(tx));
+  }
+
   async countCollectorRunsByIdempotencyKey(idempotencyKey: string) {
     return withTransaction(this.pool, (tx) => countCollectorRunsByIdempotencyKey(tx, idempotencyKey));
   }
@@ -128,8 +175,24 @@ export class Persistence {
     return withTransaction(this.pool, (tx) => recordSnapshot(tx, input));
   }
 
+  async reviseSnapshot(input: ReviseSnapshotInput) {
+    return withTransaction(this.pool, (tx) => reviseSnapshot(tx, input));
+  }
+
+  async getSnapshot(id: string) {
+    return withTransaction(this.pool, (tx) => getSnapshot(tx, id));
+  }
+
   async listSnapshotsByScope(scope: string) {
     return withTransaction(this.pool, (tx) => listSnapshotsByScope(tx, scope));
+  }
+
+  async listLatestOperationalSnapshots() {
+    return withTransaction(this.pool, (tx) => listLatestOperationalSnapshots(tx));
+  }
+
+  async countSnapshotsByIdempotencyKey(idempotencyKey: string) {
+    return withTransaction(this.pool, (tx) => countSnapshotsByIdempotencyKey(tx, idempotencyKey));
   }
 
   async createAttentionItem(input: CreateAttentionItemInput) {

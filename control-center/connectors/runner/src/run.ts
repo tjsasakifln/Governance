@@ -184,11 +184,19 @@ const RUNNERS: Record<CollectorName, (env: NodeJS.ProcessEnv, now: Date) => Prom
   infra: runInfra,
 };
 
+export type CollectFn = (ctx: {
+  env: NodeJS.ProcessEnv;
+  now: Date;
+  signal?: AbortSignal;
+}) => Promise<CollectorEnvelope>;
+
 export async function runCollectors(options: {
   names?: readonly CollectorName[];
   env?: NodeJS.ProcessEnv;
   now?: Date;
   log?: (line: string) => void;
+  collectFns?: Partial<Record<CollectorName, CollectFn>>;
+  signal?: AbortSignal;
 }): Promise<RunCollectorsResult> {
   const now = options.now ?? new Date();
   const env = options.env ?? process.env;
@@ -204,7 +212,16 @@ export async function runCollectors(options: {
   );
   for (const name of names) {
     const started = Date.now();
-    const result = await RUNNERS[name](env, now);
+    if (options.signal?.aborted) {
+      collectors.push(
+        envelope(name, "ERROR", now, { ok: false }, { code: "timeout", message: "collector timed out" }),
+      );
+      continue;
+    }
+    const injected = options.collectFns?.[name];
+    const result = injected
+      ? await injected({ env, now, signal: options.signal })
+      : await RUNNERS[name](env, now);
     collectors.push(result);
     log(
       JSON.stringify({

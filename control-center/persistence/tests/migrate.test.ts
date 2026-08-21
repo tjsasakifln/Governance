@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import {
+  FROZEN_VIEW_COLUMNS,
   REQUIRED_MATERIALIZED_VIEWS,
   REQUIRED_TABLES,
+  REQUIRED_VIEWS,
+  listViewColumns,
   migrateDown,
   migrateUp,
   seedSynthetic,
@@ -21,13 +24,17 @@ after(async () => {
 
 test('migrate up then down then up recreates named tables and current-state objects', async () => {
   const first = await migrateUp(ctx.pool);
-  assert.deepEqual(first, ['001_init', '002_current_state']);
+  assert.deepEqual(first, ['001_init', '002_current_state', '003_durable_operational_data_plane']);
   const afterFirstUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {
     assert.ok(afterFirstUp.tables.includes(table), `missing table ${table}`);
   }
   for (const view of REQUIRED_MATERIALIZED_VIEWS) {
     assert.ok(afterFirstUp.materializedViews.includes(view), `missing matview ${view}`);
+  }
+  for (const view of REQUIRED_VIEWS) {
+    assert.ok(afterFirstUp.views.includes(view), `missing view ${view}`);
+    assert.deepEqual(await listViewColumns(ctx.pool, view), [...FROZEN_VIEW_COLUMNS[view]]);
   }
 
   const constraints = await ctx.pool.query<{ conname: string; contype: string; rel: string }>(
@@ -74,7 +81,7 @@ test('migrate up then down then up recreates named tables and current-state obje
   assert.equal(statusFn.rows[0]?.ok, true);
 
   const down = await migrateDown(ctx.pool);
-  assert.deepEqual(down, ['002_current_state', '001_init']);
+  assert.deepEqual(down, ['003_durable_operational_data_plane', '002_current_state', '001_init']);
   const afterDown = await ctx.persistence.listNamedObjects();
   assert.deepEqual(afterDown.tables, []);
   assert.deepEqual(afterDown.materializedViews, []);
@@ -84,13 +91,17 @@ test('migrate up then down then up recreates named tables and current-state obje
   assert.equal(gone.rows[0]?.reg, null);
 
   const second = await migrateUp(ctx.pool);
-  assert.deepEqual(second, ['001_init', '002_current_state']);
+  assert.deepEqual(second, ['001_init', '002_current_state', '003_durable_operational_data_plane']);
   const afterSecondUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {
     assert.ok(afterSecondUp.tables.includes(table), `missing table after second up: ${table}`);
   }
   for (const view of REQUIRED_MATERIALIZED_VIEWS) {
     assert.ok(afterSecondUp.materializedViews.includes(view), `missing matview after second up: ${view}`);
+  }
+  for (const view of REQUIRED_VIEWS) {
+    assert.ok(afterSecondUp.views.includes(view), `missing view after second up: ${view}`);
+    assert.deepEqual(await listViewColumns(ctx.pool, view), [...FROZEN_VIEW_COLUMNS[view]]);
   }
 
   await seedSynthetic(ctx.pool);
