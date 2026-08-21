@@ -5,7 +5,7 @@ import {
   asNumber,
   asRecord,
   asString,
-  FixturePort,
+  type QaRuntimePort,
 } from "./adapters.js";
 import { isForbiddenProviderOperation } from "./forbidden.js";
 import type { AttackVerdict, VerdictState } from "./types.js";
@@ -1118,7 +1118,7 @@ export function evaluateAttack(attackId: AttackId, payload: unknown): AttackVerd
   return EVALUATORS[attackId](payload);
 }
 
-export function evaluateAttackViaPort(attackId: AttackId, port: FixturePort): AttackVerdict {
+export function evaluateAttackViaPort(attackId: AttackId, port: QaRuntimePort): AttackVerdict {
   switch (attackId) {
     case "stale data mostrado como saudável":
       return evaluateStaleDataShownAsHealthy(port.loadFreshness(""));

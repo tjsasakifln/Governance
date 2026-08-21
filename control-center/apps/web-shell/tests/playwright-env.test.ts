@@ -21,6 +21,20 @@ test("web-shell e2e fails closed when Playwright launched and the app assertion 
   const source = readFileSync(join(here, "../scripts/e2e.mjs"), "utf8");
   assert.match(source, /isOsLibLauncherFailure/);
   assert.match(source, /production web-shell assertion failed/);
-  assert.match(source, /CONTEXT_SERVICE_FIXTURE/);
+  assert.match(source, /boot-production-context/);
+  assert.doesNotMatch(source, /CONTEXT_SERVICE_FIXTURE/);
   assert.match(source, /CC_CONTEXT_UPSTREAM/);
+});
+
+test("production e2e boot does not use CONTEXT_SERVICE_FIXTURE", () => {
+  const boot = readFileSync(join(here, "../../../scripts/boot-production-context.ts"), "utf8");
+  assert.match(boot, /startIsolatedTestPostgres/);
+  assert.match(boot, /createPostgresStoreFromPool/);
+  assert.doesNotMatch(boot, /CONTEXT_SERVICE_FIXTURE/);
+  const probe = readFileSync(join(here, "../scripts/launch-probe.mjs"), "utf8");
+  assert.match(probe, /360/);
+  assert.match(probe, /390/);
+  assert.match(probe, /430/);
+  assert.match(probe, /desktop/);
+  assert.match(probe, /view_state_driven/);
 });

@@ -3,11 +3,14 @@
  * Hostile QA gate entry. Local files only. Never calls Asaas, Warmbly, GitHub,
  * or any provider mutation (cobrança, checkout, refund, cancelamento, send).
  */
+import { readFileSync } from "node:fs";
 import {
   runAdversarialCorpus,
   runControlCorpus,
   runExplicitChecksCorpus,
 } from "./corpus.js";
+import { runLiveGate } from "./live-gate.js";
+import type { LiveSnapshot } from "./live-port.js";
 import type { GateReport } from "./types.js";
 
 export type CorpusArg =
@@ -15,7 +18,8 @@ export type CorpusArg =
   | "controls"
   | "all-pass"
   | "unknown-check"
-  | "missing-check";
+  | "missing-check"
+  | "live";
 
 export function parseCorpus(argv: string[]): CorpusArg {
   const idx = argv.indexOf("--corpus");
@@ -28,16 +32,41 @@ export function parseCorpus(argv: string[]): CorpusArg {
     value === "controls" ||
     value === "all-pass" ||
     value === "unknown-check" ||
-    value === "missing-check"
+    value === "missing-check" ||
+    value === "live"
   ) {
     return value;
   }
   throw new Error(
-    "unknown --corpus; use adversarial | controls | all-pass | unknown-check | missing-check",
+    "unknown --corpus; use adversarial | controls | all-pass | unknown-check | missing-check | live",
   );
 }
 
-export function runGate(corpus: CorpusArg): GateReport {
+export function snapshotPathFromArgv(argv: string[]): string | undefined {
+  const idx = argv.indexOf("--snapshot");
+  if (idx === -1) {
+    return process.env.CC_QA_LIVE_SNAPSHOT;
+  }
+  const value = argv[idx + 1];
+  if (!value || value.startsWith("--")) {
+    return process.env.CC_QA_LIVE_SNAPSHOT;
+  }
+  return value;
+}
+
+export function loadLiveSnapshotFile(absPath: string): LiveSnapshot {
+  const parsed = JSON.parse(readFileSync(absPath, "utf8")) as unknown;
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`live snapshot is not an object: ${absPath}`);
+  }
+  const rec = parsed as Record<string, unknown>;
+  if (typeof rec.as_of !== "string" || rec.as_of.length === 0) {
+    throw new Error("live snapshot missing as_of");
+  }
+  return rec as unknown as LiveSnapshot;
+}
+
+export function runGate(corpus: CorpusArg, argv: string[] = []): GateReport {
   switch (corpus) {
     case "adversarial":
       return runAdversarialCorpus();
@@ -47,6 +76,13 @@ export function runGate(corpus: CorpusArg): GateReport {
     case "unknown-check":
     case "missing-check":
       return runExplicitChecksCorpus(corpus);
+    case "live": {
+      const path = snapshotPathFromArgv(argv);
+      if (!path) {
+        throw new Error("live corpus requires --snapshot <file> or CC_QA_LIVE_SNAPSHOT");
+      }
+      return runLiveGate(loadLiveSnapshotFile(path));
+    }
     default: {
       const _never: never = corpus;
       throw new Error(`unhandled corpus ${_never}`);
@@ -68,11 +104,13 @@ function main(argv: string[]): void {
       [
         "cc-qa-gate — Control Center adversarial QA gate",
         "",
-        "Usage: tsx src/cli.ts [--corpus adversarial|controls|all-pass|unknown-check|missing-check]",
+        "Usage: tsx src/cli.ts [--corpus adversarial|controls|all-pass|unknown-check|missing-check|live]",
+        "       tsx src/cli.ts --corpus live --snapshot <live-snapshot.json>",
         "",
         "Default corpus is adversarial (hostile). READY_FOR_INTERNAL_PRODUCTION is",
         "granted only when every named attack check is explicitly pass.",
-        "No provider APIs are called.",
+        "The live corpus evaluates a snapshot collected from Postgres/MCP/HTTP.",
+        "No provider mutations are performed.",
         "",
       ].join("\n"),
     );
@@ -80,7 +118,7 @@ function main(argv: string[]): void {
     return;
   }
   const corpus = parseCorpus(argv);
-  const report = runGate(corpus);
+  const report = runGate(corpus, argv);
   process.stdout.write(formatReport(report));
   process.exitCode = exitCodeFor(report);
 }

@@ -54,6 +54,26 @@ const labels = [
   "Agentes",
 ];
 
+const destinations = [
+  "hoje",
+  "comercial",
+  "clientes",
+  "financeiro",
+  "engenharia",
+  "infra",
+  "memoria",
+  "agentes",
+];
+
+const viewports = [
+  { name: "360", width: 360, height: 800 },
+  { name: "390", width: 390, height: 844 },
+  { name: "430", width: 430, height: 932 },
+  { name: "desktop", width: 1280, height: 800 },
+];
+
+const viewStates = ["loading", "error", "stale", "empty"];
+
 const cachedChrome = join(
   homedir(),
   ".cache/ms-playwright/chromium-1234/chrome-linux64/chrome",
@@ -74,6 +94,18 @@ const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 page.on("crash", () => errors.push("page crashed"));
 
+async function assertFilled(page, minChars = 80) {
+  const box = await page.locator("#root").boundingBox();
+  if (!box || box.width < 300 || box.height < 240) {
+    throw new Error(`render surface too small: ${JSON.stringify(box)}`);
+  }
+  const filled = await page.locator("#root").evaluate((el) => el.innerText.length);
+  if (filled < minChars) {
+    throw new Error(`render surface not substantially filled: ${filled} chars`);
+  }
+  return { box, filled };
+}
+
 try {
   const response = await page.goto(baseUrl, { waitUntil: "networkidle" });
   const status = response?.status() ?? 0;
@@ -91,16 +123,9 @@ try {
   }
   await page.waitForSelector(".attention");
   await page.waitForSelector(".priority");
-  const box = await page.locator("#root").boundingBox();
-  if (!box || box.width < 300 || box.height < 400) {
-    throw new Error(`render surface too small: ${JSON.stringify(box)}`);
-  }
-  const filled = await page.locator("#root").evaluate((el) => el.innerText.length);
-  if (filled < 80) {
-    throw new Error(`render surface not substantially filled: ${filled} chars`);
-  }
-  console.log(`surface=${Math.round(box.width)}x${Math.round(box.height)}`);
-  console.log(`filled_chars=${filled}`);
+  const filled = await assertFilled(page);
+  console.log(`surface=${Math.round(filled.box.width)}x${Math.round(filled.box.height)}`);
+  console.log(`filled_chars=${filled.filled}`);
 
   for (const label of labels) {
     const nav = page.locator("nav[aria-label='Áreas do Control Center'] a", { hasText: label });
@@ -141,6 +166,41 @@ try {
   const heading = await page.locator("main h1").innerText();
   if (heading !== "Comercial") throw new Error(`heading ${heading}`);
   console.log(`nav_changed_to=${after}`);
+
+  for (const id of destinations) {
+    await page.goto(`${baseUrl}#/${id}`, { waitUntil: "networkidle" });
+    await page.waitForSelector(`[data-destination="${id}"]`);
+    const current = await page.locator("[data-destination]").getAttribute("data-destination");
+    if (current !== id) throw new Error(`destination ${id} rendered ${current}`);
+    const destFilled = await assertFilled(page, 40);
+    console.log(`dest=${id} filled_chars=${destFilled.filled}`);
+  }
+
+  for (const vp of viewports) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
+    await page.waitForSelector('[data-destination="hoje"]');
+    const vpFilled = await assertFilled(page, 40);
+    if (vpFilled.box.width < Math.min(300, vp.width - 24)) {
+      throw new Error(`viewport ${vp.name} width ${vpFilled.box.width} too small for ${vp.width}`);
+    }
+    const shot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}$1`);
+    await page.screenshot({ path: shot, fullPage: true });
+    console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)}`);
+  }
+
+  for (const kind of viewStates) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${baseUrl}#/hoje?view=${kind}`, { waitUntil: "networkidle" });
+    await page.waitForSelector('[data-destination="hoje"]');
+    const kindState = await page.locator("[data-destination]").getAttribute("data-view-state");
+    if (kindState !== kind) {
+      throw new Error(`view ${kind} rendered data-view-state=${kindState}`);
+    }
+    const banner = await page.locator(".banner").count();
+    if (banner < 1) throw new Error(`view ${kind} did not show a banner`);
+    console.log(`view_state_driven=${kind} banner=${banner}`);
+  }
 
   if (errors.length > 0) {
     throw new Error(`page errors: ${errors.join(" | ")}`);

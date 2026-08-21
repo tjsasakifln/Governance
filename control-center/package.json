@@ -39,6 +39,7 @@
     "build": "npm run build --workspaces --if-present",
     "test:integration": "node scripts/integration.mjs",
     "test:e2e": "node scripts/e2e.mjs",
-    "qa": "npm run gate --workspace=@confenge/control-center-qa"
+    "qa": "npm run gate --workspace=@confenge/control-center-qa",
+    "qa:live": "npx tsx tests/convergence/live-runtime/run-gate.ts"
   }
 }

@@ -65,7 +65,7 @@ if (built.status !== 0) {
 const distHtml = join(app, "dist/index.html");
 writeFileSync(distHtml, patchIdentity(readFileSync(distHtml, "utf8")));
 
-const context = spawn("npx", ["tsx", "services/context/src/server.ts"], {
+const context = spawn("npx", ["tsx", "scripts/boot-production-context.ts"], {
   cwd: ccRoot,
   env: {
     ...process.env,
@@ -73,7 +73,6 @@ const context = spawn("npx", ["tsx", "services/context/src/server.ts"], {
     PORT: "8799",
     NODE_ENV: "test",
     CONTROL_CENTER_FOUNDER_ACTOR_ID: "founder-local",
-    CONTEXT_SERVICE_FIXTURE: "representative",
   },
   stdio: "ignore",
 });
@@ -92,7 +91,7 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
 
 let exitCode = 1;
 try {
-  await waitHttp("http://127.0.0.1:8799/healthz", 15_000);
+  await waitHttp("http://127.0.0.1:8799/healthz", 45_000);
   await waitHttp("http://127.0.0.1:4173/healthz", 15_000);
   const proxied = await fetch("http://127.0.0.1:4173/v1/context?scope=company", {
     headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },

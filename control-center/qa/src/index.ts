@@ -40,6 +40,10 @@ export {
   loadMergeChecklistJson,
   FixturePort,
 } from "./adapters.js";
+export type { QaRuntimePort } from "./adapters.js";
+export { LiveRuntimePort, emptyLiveSnapshot, payloadForAttack } from "./live-port.js";
+export type { LiveSnapshot } from "./live-port.js";
+export { runLiveGate } from "./live-gate.js";
 export type {
   AttackVerdict,
   CheckInput,

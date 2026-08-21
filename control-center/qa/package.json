@@ -11,10 +11,11 @@
     "cc-qa-gate": "./src/cli.ts"
   },
   "scripts": {
-    "test": "tsx --test tests/contract.test.ts",
+    "test": "tsx --test tests/contract.test.ts tests/live-gate.test.ts",
     "typecheck": "tsc --noEmit",
     "gate": "tsx src/cli.ts --corpus adversarial",
-    "gate:all-pass": "tsx src/cli.ts --corpus all-pass"
+    "gate:all-pass": "tsx src/cli.ts --corpus all-pass",
+    "gate:live": "tsx src/cli.ts --corpus live"
   },
   "engines": {
     "node": ">=20"

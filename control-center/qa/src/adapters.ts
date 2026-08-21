@@ -6,12 +6,12 @@ import type { CheckInput, ExplicitChecksFile, QaFixture, VerdictState } from "./
 import { isAttackId } from "./attacks.js";
 
 /**
- * Adapter contracts for later convergence.
+ * Adapter contracts.
  *
- * This package ships a fixture-backed adapter only. Sibling Control Center
- * workstreams (persistence, context-service, MCP, collectors) are NOT imported.
- * A future campaign implements these ports against PostgreSQL / MCP without
- * rewriting evaluators or contract tests.
+ * This package does not import sibling Control Center workstreams. FixturePort
+ * loads JSON. LiveRuntimePort loads the same evaluator shapes from a snapshot
+ * collected against real Postgres / MCP / production HTTP by the convergence
+ * harness. Evaluators stay I/O-agnostic.
  *
  * ObservationPort.loadFreshness(asOf) → records with provenance + presentation
  * FinancePort.loadLedger() → integer cents lines keyed by source_payment_id
@@ -73,6 +73,23 @@ export interface AuthPort {
 export interface ProvenancePort {
   loadAggregates(): unknown;
 }
+
+/**
+ * Combined port surface. FixturePort and LiveRuntimePort both implement this
+ * so evaluators stay I/O-agnostic.
+ */
+export type QaRuntimePort = ObservationPort &
+  FinancePort &
+  DirectivePort &
+  ScopePort &
+  CollectorPort &
+  ToolPort &
+  LeakPort &
+  ClockPort &
+  HealthPort &
+  SessionPort &
+  AuthPort &
+  ProvenancePort;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -193,8 +210,8 @@ export function loadMergeChecklistJson(): unknown {
 }
 
 /**
- * FixturePort — the only adapter implementation in this campaign.
- * Later services replace `payload` with live rows of the same shapes.
+ * FixturePort — JSON payloads of the evaluator shapes. LiveRuntimePort loads
+ * the same shapes from an integrated-runtime snapshot.
  */
 export class FixturePort
   implements

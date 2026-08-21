@@ -2,7 +2,13 @@ import type { AttackId } from "./attacks.js";
 
 export type VerdictState = "pass" | "fail" | "UNKNOWN";
 
-export type CaseKind = "adversarial" | "control" | "all-pass" | "unknown-check" | "missing-check";
+export type CaseKind =
+  | "adversarial"
+  | "control"
+  | "all-pass"
+  | "unknown-check"
+  | "missing-check"
+  | "live";
 
 export interface AttackVerdict {
   attack_id: AttackId;
@@ -77,7 +83,7 @@ export interface GateReportAttack {
 
 export interface GateReport {
   schema_version: "control-center.qa-gate-report.v1";
-  corpus: "adversarial" | "controls" | "all-pass" | "unknown-check" | "missing-check";
+  corpus: "adversarial" | "controls" | "all-pass" | "unknown-check" | "missing-check" | "live";
   hostile: boolean;
   as_of: string;
   READY_FOR_INTERNAL_PRODUCTION: boolean;
