@@ -81,6 +81,7 @@ export interface AdapterWriteResult {
 export interface ControlCenterReadAdapter {
   readonly mode: "mock" | "http";
   readonly actions: readonly AdapterAction[];
+  lastOperatorResult?: AdapterWriteResult;
   readOperator(): ActorRef;
   readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
   readAttention(): AttentionItem[] | Promise<AttentionItem[]>;
@@ -89,6 +90,13 @@ export interface ControlCenterReadAdapter {
     kind: WriteShortcutKind,
     draft: { title: string; body: string },
   ): AdapterWriteResult | Promise<AdapterWriteResult>;
+  operatorAction?(input: {
+    action_type: string;
+    target_canonical_id: string;
+    target_source_id: string;
+    note: string;
+    idempotency_key?: string;
+  }): AdapterWriteResult | Promise<AdapterWriteResult>;
 }
 
 export function adapterAllows(action: string): action is AdapterAction {

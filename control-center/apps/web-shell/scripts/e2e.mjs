@@ -2,7 +2,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isOsLibLauncherFailure } from "../src/playwright-env.ts";
 
@@ -113,7 +113,11 @@ try {
   process.stdout.write(
     `context_risks=${ctxBody.risks.length} context_priorities=${ctxBody.priorities.length}\n`,
   );
-  const screenshot = join(mkdtempSync(join(tmpdir(), "cc-web-")), "web-shell.png");
+  const shotDir = process.env.CC_SCREENSHOT_DIR
+    ? process.env.CC_SCREENSHOT_DIR
+    : mkdtempSync(join(tmpdir(), "cc-web-"));
+  mkdirSync(shotDir, { recursive: true });
+  const screenshot = join(shotDir, "web-shell.png");
   const probe = await tryPlaywright("http://127.0.0.1:4173/", screenshot);
   if (probe.ok) {
     process.stdout.write(`screenshot=${screenshot}\n`);

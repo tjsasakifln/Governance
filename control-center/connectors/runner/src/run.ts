@@ -76,14 +76,18 @@ async function runGithub(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEn
     logSink: () => undefined,
   });
   if (!parsed.ok) {
+    const blocked =
+      parsed.code === "missing_credentials" ||
+      parsed.code === "missing_installation_token" ||
+      /token|credential|secret/i.test(parsed.message);
     const failed = failedCollect({
       now,
       allowlist: [],
-      code: "missing_credentials",
+      code: blocked || parsed.code === "invalid_config" ? "missing_credentials" : "invalid_config",
       message: parsed.message,
     });
-    return envelope("github", "ERROR", now, failed, {
-      code: parsed.code,
+    return envelope("github", blocked ? "UNKNOWN" : "ERROR", now, failed, {
+      code: blocked ? "BLOCKED_BY_SECRET" : parsed.code === "invalid_config" ? "NOT_CONFIGURED" : parsed.code,
       message: parsed.message,
     });
   }
@@ -97,10 +101,10 @@ async function runWarmbly(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorE
   if (!baseUrl || !token) {
     return envelope(
       "warmbly",
-      "ERROR",
+      "UNKNOWN",
       now,
-      { ok: false },
-      { code: "missing_credentials", message: "WARMBLY_BASE_URL and WARMBLY_TOKEN are required" },
+      { ok: false, availability: "BLOCKED_BY_SECRET" },
+      { code: "BLOCKED_BY_SECRET", message: "WARMBLY_BASE_URL and WARMBLY_TOKEN are required" },
     );
   }
   try {
@@ -126,7 +130,14 @@ async function runAsaas(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEnv
     return envelope("asaas", canonical(String(snapshot.freshness_status)), now, snapshot);
   } catch (err) {
     const message = err instanceof Error ? err.message : "asaas collect failed";
-    return envelope("asaas", "ERROR", now, { ok: false }, { code: "missing_credentials", message });
+    const blocked = /credential|api key|ASAAS/i.test(message);
+    return envelope(
+      "asaas",
+      blocked ? "UNKNOWN" : "ERROR",
+      now,
+      { ok: false, availability: blocked ? "BLOCKED_BY_SECRET" : "UPSTREAM_ERROR" },
+      { code: blocked ? "BLOCKED_BY_SECRET" : "UPSTREAM_ERROR", message },
+    );
   }
 }
 
@@ -137,7 +148,13 @@ async function runPncp(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEnve
     return envelope("pncp", canonical(String(evaluation.freshness_status)), now, evaluation);
   } catch (err) {
     const message = err instanceof Error ? err.message : "pncp collect failed";
-    return envelope("pncp", "ERROR", now, { ok: false }, { code: "unconfigured", message });
+    return envelope(
+      "pncp",
+      "UNKNOWN",
+      now,
+      { ok: false, availability: "NOT_CONFIGURED" },
+      { code: "NOT_CONFIGURED", message },
+    );
   }
 }
 
@@ -148,8 +165,8 @@ async function runInfra(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEnv
       "infra",
       "UNKNOWN",
       now,
-      { ok: false },
-      { code: "missing_credentials", message: "CC_INFRA_ALLOWLIST is not configured" },
+      { ok: false, availability: "NOT_CONFIGURED" },
+      { code: "NOT_CONFIGURED", message: "CC_INFRA_ALLOWLIST is not configured" },
     );
   }
   try {

@@ -29,6 +29,10 @@ export const GET_EXACT = new Set<string>([
   "/v1/confenge/accounts",
   "/v1/confenge/working-overview",
   "/v1/confenge/dispatch/status",
+  "/v1/confenge/intel/scoreboard",
+  "/v1/confenge/intel/executive",
+  "/v1/confenge/intel/exceptions",
+  "/v1/confenge/intel/organic-scoreboard",
 ]);
 
 export const POST_READ_EXACT = new Set<string>([

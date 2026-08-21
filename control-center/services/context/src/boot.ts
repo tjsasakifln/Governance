@@ -7,15 +7,22 @@ import { REPRESENTATIVE_NOW, REPRESENTATIVE_REPO_DOMAINS, seedRepresentative } f
 import { parseRepoDomainMap, type RepoDomainMap } from "./scope.ts";
 import { createContextService, type ContextService } from "./service.ts";
 import { createOperationalPortFromEnv } from "./operational/from-env.ts";
+import {
+  createMemoryOperatorActionService,
+  createPostgresOperatorActionService,
+  type OperatorActionService,
+} from "./operational/actions.ts";
 import { createOperationalService, type OperationalService } from "./operational/service.ts";
 import { createStoreFromEnv, createStoreFromEnvAsync } from "./store/from-env.ts";
 import type { PersistencePort } from "./store/adapter.ts";
+import type { PostgresStore } from "./store/postgres.ts";
 import { sanitizeActorId } from "./sanitize.ts";
 import type { ActorRef, Scope } from "./types.ts";
 
 export interface BootResult {
   service: ContextService;
   operational: OperationalService;
+  operatorActions: OperatorActionService;
   founderActorId: string;
   defaultScope: Scope;
   fixture: string;
@@ -73,7 +80,11 @@ function assembleBoot(
     founderActorId,
     repoDomains,
   });
-  return { service, operational, founderActorId, defaultScope, fixture, storeName, repoDomains };
+  const operatorActions =
+    storeName === "postgres"
+      ? createPostgresOperatorActionService((store as PostgresStore).persistence, founderActorId)
+      : createMemoryOperatorActionService(founderActorId);
+  return { service, operational, operatorActions, founderActorId, defaultScope, fixture, storeName, repoDomains };
 }
 
 export function bootFromEnv(

@@ -119,6 +119,14 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
   };
   if (Object.keys(funnel).length > 0) {
     out.funnel = funnel;
+  } else {
+    const counts = asRecord(payload.counts);
+    const derived: Record<string, unknown> = {};
+    if (typeof counts.inbound_now === "number") derived.new_leads = counts.inbound_now;
+    if (typeof counts.deals_open === "number") derived.opportunities = counts.deals_open;
+    if (Object.keys(derived).length > 0) {
+      out.funnel = derived;
+    }
   }
   const nominal = payload.pipeline_nominal;
   if (nominal !== undefined) {
@@ -149,18 +157,47 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
       out[key] = payload[key];
     }
   }
+  const counts = asRecord(payload.counts);
+  if (out.pipeline_open_count === undefined && typeof counts.deals_open === "number") {
+    out.pipeline_open_count = counts.deals_open;
+  }
+  if (out.inbound_unread_count === undefined && typeof counts.inbox_unread === "number") {
+    out.inbound_unread_count = counts.inbox_unread;
+  }
+  if (out.stalled_count === undefined && typeof counts.deals_stalled === "number") {
+    out.stalled_count = counts.deals_stalled;
+  }
+  if (out.missing_next_action_count === undefined && typeof counts.tasks_overdue === "number") {
+    out.missing_next_action_count = counts.tasks_overdue;
+  }
+  if (payload.operations && typeof payload.operations === "object") {
+    out.operations = payload.operations;
+  }
+  if (typeof payload.availability === "string") {
+    out.availability = payload.availability;
+  }
+  if (typeof payload.configured === "boolean") {
+    out.configured = payload.configured;
+  }
   return out;
 }
 
 function mapFinance(payload: Record<string, unknown>, seed: ProvenanceSeed, id: string): Record<string, unknown> {
   const stages = financeStages(payload, seed);
-  return {
+  const out: Record<string, unknown> = {
     schema_version: "control-center.finance-snapshot.v1",
     id,
     read_model_only: true,
     provider_mutations: "forbidden",
     ...stages,
   };
+  if (payload.operations && typeof payload.operations === "object") {
+    out.operations = payload.operations;
+  }
+  if (typeof payload.availability === "string") {
+    out.availability = payload.availability;
+  }
+  return out;
 }
 
 function mapClients(payload: Record<string, unknown>, id: string): Record<string, unknown> {
@@ -168,10 +205,13 @@ function mapClients(payload: Record<string, unknown>, id: string): Record<string
     schema_version: "control-center.clients-snapshot.v1",
     id,
   };
-  for (const key of ["client_slug", "display_name", "lifecycle", "at_risk_client_count", "open_blocker_count"]) {
+  for (const key of ["client_slug", "display_name", "lifecycle", "at_risk_client_count", "open_blocker_count", "clients"]) {
     if (payload[key] !== undefined) {
       out[key] = payload[key];
     }
+  }
+  if (typeof payload.availability === "string") {
+    out.availability = payload.availability;
   }
   return out;
 }
@@ -181,10 +221,24 @@ function mapEngineering(payload: Record<string, unknown>, id: string): Record<st
     schema_version: "control-center.engineering-snapshot.v1",
     id,
   };
-  for (const key of ["open_pr_count", "failing_check_count", "open_incident_count", "repo_scopes"]) {
+  for (const key of [
+    "open_pr_count",
+    "failing_check_count",
+    "open_incident_count",
+    "repo_scopes",
+    "repos",
+    "allowlist",
+    "repository",
+    "default_branch",
+    "ci",
+    "recommended_allowlist",
+  ]) {
     if (payload[key] !== undefined) {
       out[key] = payload[key];
     }
+  }
+  if (typeof payload.availability === "string") {
+    out.availability = payload.availability;
   }
   return out;
 }
@@ -206,6 +260,11 @@ function mapInfraLike(
   }
   if (status !== undefined) {
     out.status = status;
+  }
+  for (const key of ["services", "partial_outage", "availability", "evidence", "contract_version", "last_update_at", "ingestion_succeeded", "coverage_window", "usable_for_commercial_intelligence_now", "scheduled_job"]) {
+    if (payload[key] !== undefined) {
+      out[key] = payload[key];
+    }
   }
   return out;
 }

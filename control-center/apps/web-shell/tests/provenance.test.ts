@@ -34,9 +34,11 @@ test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation 
 });
 
 test("finance money formats integer cents plus currency", () => {
-  const formatted = formatMoney(FINANCE_SNAPSHOT.receivables_overdue);
-  assert.equal(FINANCE_SNAPSHOT.receivables_overdue.amount_cents, 1500000);
-  assert.equal(FINANCE_SNAPSHOT.receivables_overdue.currency, "BRL");
+  const overdue = FINANCE_SNAPSHOT.receivables_overdue;
+  assert.ok(overdue);
+  const formatted = formatMoney(overdue);
+  assert.equal(overdue.amount_cents, 1500000);
+  assert.equal(overdue.currency, "BRL");
   assert.equal(formatted, "BRL 15.000,00");
   assert.equal(formatMoney({ amount_cents: 0, currency: "BRL" }), "BRL 0,00");
   assert.equal(formatMoney({ amount_cents: -250, currency: "USD" }), "-USD 2,50");

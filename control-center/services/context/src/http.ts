@@ -5,6 +5,7 @@ import { invalid, isServiceError, payloadTooLarge } from "./errors.ts";
 import type { Logger } from "./log.ts";
 import { assertJsonSize } from "./sanitize.ts";
 import { parseScope } from "./scope.ts";
+import type { OperatorActionService } from "./operational/actions.ts";
 import type { OperationalService } from "./operational/service.ts";
 import type { ContextService } from "./service.ts";
 import { LIMITS, type ActorRef, type Scope } from "./types.ts";
@@ -13,6 +14,7 @@ export interface HttpDeps {
   service: ContextService;
   logger: Logger;
   operational?: OperationalService;
+  operatorActions?: OperatorActionService;
 }
 
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -192,6 +194,20 @@ async function handle(
     }
     if (method === "GET" && url.pathname === "/v1/audit") {
       send(res, 200, { items: deps.service.listAudit(actor) });
+      return;
+    }
+    if (method === "POST" && url.pathname === "/v1/operator-actions") {
+      if (!deps.operatorActions) {
+        throw invalid("operator action port is not configured");
+      }
+      send(res, 201, await deps.operatorActions.submit(actor, await readBody(req)));
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/operator-actions") {
+      if (!deps.operatorActions) {
+        throw invalid("operator action port is not configured");
+      }
+      send(res, 200, { items: await deps.operatorActions.list(actor, queryScope(url)) });
       return;
     }
     if (method === "POST" && url.pathname === "/v1/directives") {

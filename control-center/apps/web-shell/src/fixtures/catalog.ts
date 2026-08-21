@@ -388,6 +388,11 @@ export const CLIENT_FIXTURES: ClientStatus[] = [
     blockers: ["fatura vencida"],
     next_action: "Revisar no Warmbly; não cobrar daqui",
     evidence: "asaas/receivables/open",
+    sources: {
+      warmbly: "FRESH",
+      asaas: "UNKNOWN",
+      governance: "UNKNOWN",
+    },
   },
   {
     schema_version: "control-center.client-status.v1",
@@ -848,6 +853,13 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       headline: "Saúde observada. Freshness e confiança são eixos distintos.",
       attention: attentionByScope((item) => item.scope === "infrastructure"),
       priorities: [],
+      health: HEALTH_FIXTURES,
+    }),
+    crescimento: pageFor("crescimento", {
+      headline: "Inbound e visibilidade. Sem atribuição inventada entre sistemas.",
+      attention: attentionByScope((item) => item.scope === "inbound"),
+      priorities: [],
+      commercial: COMMERCIAL_SNAPSHOT,
       health: HEALTH_FIXTURES,
     }),
     memoria: pageFor("memoria", {

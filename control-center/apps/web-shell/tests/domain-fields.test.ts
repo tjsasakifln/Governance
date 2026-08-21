@@ -42,6 +42,10 @@ test("Clientes page surfaces saúde, compromissos, owner, due date, entregáveis
     assert.match(root.innerHTML, /Blockers/);
     assert.match(root.innerHTML, /Próxima ação/);
     assert.match(root.innerHTML, /Evidência/);
+    assert.match(root.innerHTML, /data-client-source="warmbly"/);
+    assert.match(root.innerHTML, /data-client-source="asaas"/);
+    assert.match(root.innerHTML, /data-client-source="governance"/);
+    assert.match(root.innerHTML, /data-client-source="asaas"[^>]*data-absent="true"/);
   } finally {
     handle.unmount();
   }

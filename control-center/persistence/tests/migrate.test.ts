@@ -24,7 +24,12 @@ after(async () => {
 
 test('migrate up then down then up recreates named tables and current-state objects', async () => {
   const first = await migrateUp(ctx.pool);
-  assert.deepEqual(first, ['001_init', '002_current_state', '003_durable_operational_data_plane']);
+  assert.deepEqual(first, [
+    '001_init',
+    '002_current_state',
+    '003_durable_operational_data_plane',
+    '004_operator_actions',
+  ]);
   const afterFirstUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {
     assert.ok(afterFirstUp.tables.includes(table), `missing table ${table}`);
@@ -81,7 +86,12 @@ test('migrate up then down then up recreates named tables and current-state obje
   assert.equal(statusFn.rows[0]?.ok, true);
 
   const down = await migrateDown(ctx.pool);
-  assert.deepEqual(down, ['003_durable_operational_data_plane', '002_current_state', '001_init']);
+  assert.deepEqual(down, [
+    '004_operator_actions',
+    '003_durable_operational_data_plane',
+    '002_current_state',
+    '001_init',
+  ]);
   const afterDown = await ctx.persistence.listNamedObjects();
   assert.deepEqual(afterDown.tables, []);
   assert.deepEqual(afterDown.materializedViews, []);
@@ -91,7 +101,12 @@ test('migrate up then down then up recreates named tables and current-state obje
   assert.equal(gone.rows[0]?.reg, null);
 
   const second = await migrateUp(ctx.pool);
-  assert.deepEqual(second, ['001_init', '002_current_state', '003_durable_operational_data_plane']);
+  assert.deepEqual(second, [
+    '001_init',
+    '002_current_state',
+    '003_durable_operational_data_plane',
+    '004_operator_actions',
+  ]);
   const afterSecondUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {
     assert.ok(afterSecondUp.tables.includes(table), `missing table after second up: ${table}`);

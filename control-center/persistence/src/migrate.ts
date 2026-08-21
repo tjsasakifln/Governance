@@ -16,6 +16,11 @@ export const MIGRATIONS = [
     up: 'sql/migrations/003_durable_operational_data_plane.up.sql',
     down: 'sql/migrations/003_durable_operational_data_plane.down.sql',
   },
+  {
+    id: '004_operator_actions',
+    up: 'sql/migrations/004_operator_actions.up.sql',
+    down: 'sql/migrations/004_operator_actions.down.sql',
+  },
 ] as const;
 
 export const REQUIRED_TABLES = [
@@ -36,6 +41,7 @@ export const REQUIRED_TABLES = [
   'current_source_observations',
   'collector_run_revisions',
   'operational_snapshot_revisions',
+  'operator_actions',
 ] as const;
 
 export const REQUIRED_MATERIALIZED_VIEWS = ['mv_open_attention'] as const;

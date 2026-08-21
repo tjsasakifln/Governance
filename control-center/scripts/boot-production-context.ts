@@ -8,6 +8,7 @@ import { startIsolatedTestPostgres } from "../persistence/tests/helpers/postgres
 import { createPersistence } from "../persistence/src/index.js";
 import {
   createContextService,
+  createMemoryOperatorActionService,
   createOperationalService,
   createPostgresOperationalPortFromPool,
   createPostgresStoreFromPool,
@@ -53,7 +54,14 @@ const operational = createOperationalService({
   repoDomains,
 });
 
-const server = createServer(createRequestListener({ service, operational, logger: silentLogger }));
+const server = createServer(
+  createRequestListener({
+    service,
+    operational,
+    operatorActions: createMemoryOperatorActionService(founderActorId),
+    logger: silentLogger,
+  }),
+);
 server.listen(port, host, () => {
   process.stdout.write(
     `${JSON.stringify({ ok: true, service: "control-center-context", store: "postgres", host, port })}\n`,

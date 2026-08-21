@@ -26,6 +26,7 @@ const DOMAIN_BY_DESTINATION: Record<Exclude<DestinationId, "hoje" | "memoria" | 
   financeiro: "finance",
   engenharia: "engineering",
   infra: "infrastructure",
+  crescimento: "commercial",
 };
 
 function q(path: string, params: Record<string, string>): string {
@@ -48,6 +49,11 @@ export function readPathsFor(id: DestinationId): readonly string[] {
       return [q("/v1/context", { scope })];
     case "agentes":
       return [q("/v1/agent-activities", { scope })];
+    case "crescimento":
+      return [
+        q("/v1/domains/commercial", { scope: "commercial" }),
+        q("/v1/domains/pncp", { scope: "inbound" }),
+      ];
     default:
       return [q(`/v1/domains/${DOMAIN_BY_DESTINATION[id]}`, { scope })];
   }

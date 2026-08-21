@@ -1,0 +1,27 @@
+{
+  "campaign": "CONFENGE-CONTROL-CENTER-OPERATIONAL-COMPLETION-01",
+  "base_sha": "c5c7a3010fe8278df4fb18ca07a7d37215c33a22",
+  "executed_code_sha": "80e75e6faa0d37a4c6632d72552ddbd574ede455",
+  "head_sha": "80e75e6faa0d37a4c6632d72552ddbd574ede455",
+  "final_rc_sha_pending_docs": true,
+  "deployed_sha_observed": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "warmbly_main_sha": "c8128f1e9baf8f67d97021530c7d0cbcbc707612",
+  "warmbly_deployed_sha": "13e7a082b7614ada39f994989e23398d85595400",
+  "extra_cli_main_sha": "a58781da9846deed1a65856914e593b3621a9646",
+  "extra_cli_deployed_sha": "a58781da9846deed1a65856914e593b3621a9646",
+  "governance_pr": 44,
+  "governance_pr_url": "https://github.com/tjsasakifln/Governance/pull/44",
+  "governance_pr_8_touched": false,
+  "production_mutated": false,
+  "companion_prs": [],
+  "real_money_mutation_approved": false,
+  "warmbly_auto_send_enabled": false,
+  "client_360_full_multi_source": false,
+  "mobile_first_proven_360_390_430": true,
+  "ci": {
+    "control_center": "https://github.com/tjsasakifln/Governance/actions/runs/32536832554",
+    "control_center_image_scan": "https://github.com/tjsasakifln/Governance/actions/runs/32536832557",
+    "commercial_authority": "https://github.com/tjsasakifln/Governance/actions/runs/32536832562",
+    "e2e_screenshot_artifact_id": 9465703704
+  }
+}

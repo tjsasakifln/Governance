@@ -28,6 +28,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font);
@@ -64,8 +65,9 @@ a {
 
 .shell {
   min-height: 100dvh;
+  height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
     "top"
     "main"
@@ -107,6 +109,66 @@ a {
   border-top: 1px solid var(--line);
 }
 
+.subnav {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 0.85rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: 0.15rem 0 0.7rem;
+}
+
+.subnav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.subnav a[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.operator-form {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.operator-form textarea,
+.operator-form button {
+  min-height: 44px;
+  font: inherit;
+}
+
+.operator-form button {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+}
+
+.cards {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .nav a {
   flex: 0 0 auto;
   min-height: 44px;
@@ -130,6 +192,9 @@ a {
 
 main {
   grid-area: main;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 0.9rem 0.9rem 1.4rem;
   max-width: 52rem;
 }
@@ -193,6 +258,10 @@ main {
 
 .banner.error {
   border-color: var(--crit);
+}
+
+.banner.ok {
+  border-color: var(--ok, var(--low));
 }
 
 .banner.stale {

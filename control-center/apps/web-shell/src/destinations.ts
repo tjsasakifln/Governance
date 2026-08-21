@@ -5,6 +5,7 @@ export const DESTINATION_IDS = [
   "financeiro",
   "engenharia",
   "infra",
+  "crescimento",
   "memoria",
   "agentes",
 ] as const;
@@ -20,7 +21,7 @@ export interface DestinationDef {
 }
 
 /**
- * Chrome registry. Labels are the eight product destinations.
+ * Chrome registry. Labels are the product destinations including growth/inbound.
  * There is no chat destination. Navigation is hash-based so the
  * mock shell stays backend-free.
  */
@@ -37,7 +38,7 @@ export const DESTINATIONS: readonly DestinationDef[] = [
     label: "Comercial",
     path: "#/comercial",
     scope: "commercial",
-    description: "Recorte comercial somente leitura. Autoridade operacional permanece no Warmbly.",
+    description: "Operação comercial: funil, coortes, atividade, pipeline e exceções. Autoridade operacional permanece no Warmbly.",
   },
   {
     id: "clientes",
@@ -57,8 +58,8 @@ export const DESTINATIONS: readonly DestinationDef[] = [
     id: "engenharia",
     label: "Engenharia",
     path: "#/engenharia",
-    scope: "repo:tjsasakifln/Governance",
-    description: "Sinais de engenharia por repositório. Sem absorver PRs de outros workstreams.",
+    scope: "company",
+    description: "Engenharia multi-repo: Governance, warmbly, extra-cli, web-cfg. Sem escrita GitHub neste cockpit.",
   },
   {
     id: "infra",
@@ -66,6 +67,13 @@ export const DESTINATIONS: readonly DestinationDef[] = [
     path: "#/infra",
     scope: "infrastructure",
     description: "Saúde de serviços e freshness das últimas coletas.",
+  },
+  {
+    id: "crescimento",
+    label: "Crescimento",
+    path: "#/crescimento",
+    scope: "inbound",
+    description: "Inbound e visibilidade: scoreboard Warmbly + freshness PNCP. Sem atribuição inventada.",
   },
   {
     id: "memoria",
@@ -110,24 +118,48 @@ export function hasChatDestination(): boolean {
   );
 }
 
+export const COMMERCIAL_SURFACES = ["visao", "cohorts", "atividade", "pipeline", "excecoes"] as const;
+export type CommercialSurface = (typeof COMMERCIAL_SURFACES)[number];
+
 export interface ParsedLocation {
   destination: DestinationId;
   view: string | null;
+  surface: string | null;
+  resource: string | null;
 }
 
 export function parseHash(hash: string): ParsedLocation {
   const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
   const [pathPart, queryPart] = stripped.split("?");
-  const path = (pathPart ?? "").replace(/^\/+/, "");
-  const destination = isDestinationId(path) ? path : "hoje";
+  const segments = (pathPart ?? "").replace(/^\/+/, "").split("/").filter(Boolean);
+  const head = segments[0] ?? "";
+  const destination = isDestinationId(head) ? head : "hoje";
   const params = new URLSearchParams(queryPart ?? "");
   const view = params.get("view");
-  return { destination, view };
+  let surface: string | null = params.get("surface");
+  let resource: string | null = params.get("client") ?? params.get("resource");
+  if (destination === "comercial" && segments[1] && (COMMERCIAL_SURFACES as readonly string[]).includes(segments[1])) {
+    surface = segments[1];
+  }
+  if (destination === "clientes" && segments[1]) {
+    resource = segments[1];
+  }
+  return { destination, view, surface, resource };
 }
 
-export function hashFor(destination: DestinationId, view?: string | null): string {
-  if (view && view.length > 0) {
-    return `#/${destination}?view=${encodeURIComponent(view)}`;
+export function hashFor(destination: DestinationId, view?: string | null, extra?: { surface?: string; resource?: string }): string {
+  const parts = [`#/${destination}`];
+  if (extra?.surface) {
+    parts[0] = `#/${destination}/${extra.surface}`;
   }
-  return `#/${destination}`;
+  if (extra?.resource && destination === "clientes") {
+    parts[0] = `#/${destination}/${extra.resource}`;
+  }
+  const params = new URLSearchParams();
+  if (view && view.length > 0) {
+    params.set("view", view);
+  }
+  const query = params.toString();
+  const path = parts[0] ?? `#/${destination}`;
+  return query ? `${path}?${query}` : path;
 }

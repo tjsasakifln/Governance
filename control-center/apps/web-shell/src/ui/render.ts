@@ -1,4 +1,4 @@
-import type { DestinationPage } from "../adapters/contract";
+import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -17,6 +17,7 @@ import {
   commercialBlock,
   engineeringBlock,
   financeBlock,
+  growthFunnelBlock,
   healthCard,
   memoriaGroups,
 } from "./domains";
@@ -28,6 +29,9 @@ export interface ShellModel {
   view: ViewState<DestinationPage>;
   mockScenario: string;
   adapterMode?: "mock" | "http";
+  surface?: string | null;
+  resource?: string | null;
+  operatorResult?: AdapterWriteResult;
 }
 
 function attentionCard(item: AttentionItem): string {
@@ -87,6 +91,13 @@ function viewBanner(view: ViewState<DestinationPage>): string {
   return "";
 }
 
+function operatorBanner(result: AdapterWriteResult | undefined): string {
+  if (!result) return "";
+  const cls = result.ok ? "ok" : "error";
+  const role = result.ok ? "status" : "alert";
+  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}"><p>${escapeHtml(result.message)}</p></div>`;
+}
+
 function hojeBody(page: DestinationPage): string {
   const view =
     page.hoje ??
@@ -105,7 +116,7 @@ function hojeBody(page: DestinationPage): string {
   return renderHoje(view);
 }
 
-function pageBody(page: DestinationPage, destination: DestinationId): string {
+function pageBody(page: DestinationPage, destination: DestinationId, surface?: string | null, resource?: string | null): string {
   if (destination === "hoje") {
     return hojeBody(page);
   }
@@ -122,11 +133,15 @@ function pageBody(page: DestinationPage, destination: DestinationId): string {
     return "";
   }
   const extras = [
-    page.commercial ? commercialBlock(page.commercial) : "",
+    destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
+    page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
     page.clients && page.clients.length > 0
-      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${page.clients.map(clientCard).join("")}</div></section>`
+      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${page.clients
+          .filter((item) => !resource || item.client_slug === resource)
+          .map(clientCard)
+          .join("")}</div></section>`
       : "",
     page.health && page.health.length > 0
       ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2><div class="stack">${page.health.map(healthCard).join("")}</div></section>`
@@ -179,12 +194,12 @@ export function renderShell(model: ShellModel): string {
 
   const body =
     page && (model.view.kind === "ready" || model.view.kind === "stale")
-      ? pageBody(page, model.destination)
+      ? pageBody(page, model.destination, model.surface, model.resource)
       : "";
 
   return `
     <a class="skip-link" href="#conteudo">Saltar para o conteúdo</a>
-    <div class="shell" data-destination="${escapeHtml(model.destination)}" data-view-state="${escapeHtml(model.viewKind)}" data-productive-origin="${escapeHtml(PRODUCTIVE_URL)}" data-auth-origin="${escapeHtml(AUTH_URL)}">
+    <div class="shell" data-destination="${escapeHtml(model.destination)}" data-surface="${escapeHtml(model.surface ?? "")}" data-resource="${escapeHtml(model.resource ?? "")}" data-view-state="${escapeHtml(model.viewKind)}" data-productive-origin="${escapeHtml(PRODUCTIVE_URL)}" data-auth-origin="${escapeHtml(AUTH_URL)}">
       <header class="topbar">
         <p class="brand">Control Center</p>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
@@ -199,6 +214,7 @@ export function renderShell(model: ShellModel): string {
         </header>
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}
+        ${operatorBanner(model.operatorResult)}
         ${body}
       </main>
     </div>

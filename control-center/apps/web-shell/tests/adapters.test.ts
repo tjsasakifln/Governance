@@ -71,9 +71,10 @@ test("finance page money is integer cents plus currency and mutations stay forbi
   assert.ok(finance);
   assert.equal(finance.read_model_only, true);
   assert.equal(finance.provider_mutations, "forbidden");
+  assert.ok(finance.receivables_open);
   assert.equal(Number.isInteger(finance.receivables_open.amount_cents), true);
   assert.equal(finance.receivables_open.currency, "BRL");
-  assert.equal(finance.receivables_overdue.amount_cents, 1500000);
+  assert.equal(finance.receivables_overdue?.amount_cents, 1500000);
 });
 
 test("fixture catalog covers every freshness status", () => {

@@ -210,6 +210,34 @@ export function collectFromWarmblyPayload(
     "/v1/confenge/inbound",
     "GET",
   );
+  mark(
+    "confenge_intel_scoreboard",
+    payload.confenge_intel_scoreboard !== undefined,
+    fail("GET", "/v1/confenge/intel/scoreboard"),
+    "/v1/confenge/intel/scoreboard",
+    "GET",
+  );
+  mark(
+    "confenge_intel_executive",
+    payload.confenge_intel_executive !== undefined,
+    fail("GET", "/v1/confenge/intel/executive"),
+    "/v1/confenge/intel/executive",
+    "GET",
+  );
+  mark(
+    "confenge_intel_exceptions",
+    payload.confenge_intel_exceptions !== undefined,
+    fail("GET", "/v1/confenge/intel/exceptions"),
+    "/v1/confenge/intel/exceptions",
+    "GET",
+  );
+  mark(
+    "confenge_intel_organic_scoreboard",
+    payload.confenge_intel_organic_scoreboard !== undefined,
+    fail("GET", "/v1/confenge/intel/organic-scoreboard"),
+    "/v1/confenge/intel/organic-scoreboard",
+    "GET",
+  );
 
   // Always record the known GET /leads gap (Warmbly does not expose it).
   observations.push(
@@ -306,6 +334,65 @@ export function collectFromWarmblyPayload(
   if (dealValue) {
     snapshot.deal_value_open = dealValue;
   }
+
+  snapshot.operations = {
+    authority: "warmbly",
+    this_document: "read_model",
+    cap: 50,
+    deals: deals.slice(0, 50).map((d) => ({
+      id: d.id,
+      name: d.name,
+      status: d.status,
+      value: d.value,
+      currency: d.currency,
+      stage_id: d.stage_id,
+      stage_name: d.stage?.name,
+      contact_id: d.contact_id ?? null,
+      account_id: d.account_id ?? null,
+      lead_id: d.lead_id ?? null,
+      created_at: d.created_at,
+      updated_at: d.updated_at,
+      won_at: d.won_at,
+      lost_at: d.lost_at,
+      expected_close_date: d.expected_close_date,
+      campaign_id: d.campaign_id,
+    })),
+    tasks: tasks.slice(0, 50).map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      due_date: t.due_date,
+      priority: t.priority,
+      deal_id: t.deal_id,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+    })),
+    contacts: contacts.slice(0, 50).map((c) => ({
+      id: c.id,
+      company: c.company,
+      first_name: c.first_name,
+      last_name: c.last_name,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      last_activity_at: c.campaign_lead?.last_activity_at,
+      status: c.campaign_lead?.status,
+      account_id: c.account_id ?? null,
+      lead_id: c.lead_id ?? null,
+    })),
+    inbound: inbound.slice(0, 50).map((row) => ({
+      lead_id: row.lead_id,
+      company: row.company,
+      person: row.person,
+      status: row.status,
+      why_now: row.why_now,
+      recommended_action: row.recommended_action,
+    })),
+    intel_scoreboard: payload.confenge_intel_scoreboard ?? null,
+    intel_executive: payload.confenge_intel_executive ?? null,
+    intel_exceptions: payload.confenge_intel_exceptions ?? null,
+    intel_organic_scoreboard: payload.confenge_intel_organic_scoreboard ?? null,
+    confenge_status: payload.confenge_status ?? null,
+  };
 
   // Pipelines are read for stage names on stalled deals only — never copied
   // onto the snapshot as a replica board.

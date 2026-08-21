@@ -11,7 +11,8 @@ export type ErrorCode =
   | "proposal_not_found"
   | "kind_immutable"
   | "conflict"
-  | "store_misconfigured";
+  | "store_misconfigured"
+  | "operator_action_forbidden";
 
 export class ServiceError extends Error {
   readonly code: ErrorCode;

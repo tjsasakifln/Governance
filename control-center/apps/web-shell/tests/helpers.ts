@@ -86,11 +86,34 @@ export function operationalRouter(): (url: string) => unknown {
     if (path.endsWith("/v1/attention")) return { items: [attention] };
     if (path.endsWith("/v1/operational-snapshots")) return snapshot;
     if (path.endsWith("/v1/agent-activities")) return { items: [activity] };
-    if (path.endsWith("/v1/domains/commercial")) return commercial;
+    if (path.endsWith("/v1/domains/commercial")) {
+      const scope = new URLSearchParams((url.split("?")[1] ?? "").replace(/#.*$/, "")).get("scope");
+      if (scope && scope !== "commercial") {
+        return {
+          schema_version: "control-center.commercial-snapshot.v1",
+          id: "cc:commercial-snapshot:empty-wrong-scope",
+          scope,
+          generated_at: "2026-08-20T17:40:00Z",
+          provenance: {
+            source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+            observed_at: "2026-08-20T17:39:00Z",
+            freshness_status: "UNKNOWN",
+            confidence: 0,
+          },
+          authority: {
+            catalog_authority: "governance",
+            commercial_runtime: "warmbly",
+            this_document: "read_model",
+          },
+        };
+      }
+      return commercial;
+    }
     if (path.endsWith("/v1/domains/clients")) return { items: [client] };
     if (path.endsWith("/v1/domains/finance")) return finance;
     if (path.endsWith("/v1/domains/engineering")) return engineering;
     if (path.endsWith("/v1/domains/infrastructure")) return { items: [health] };
+    if (path.endsWith("/v1/domains/pncp")) return health;
     if (path.endsWith("/v1/context")) return context;
     if (path.endsWith("/v1/directives")) return { ok: true };
     return undefined;

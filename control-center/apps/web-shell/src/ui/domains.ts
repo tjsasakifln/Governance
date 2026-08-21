@@ -16,6 +16,16 @@ function fact(label: string, value: string, extra = ""): string {
   return `<div${extra}><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`;
 }
 
+function optionalCount(label: string, value: number | undefined): string {
+  return typeof value === "number"
+    ? fact(label, String(value))
+    : fact(label, "ausente", ` data-absent="true"`);
+}
+
+function optionalMoney(label: string, money: { amount_cents: number; currency: string } | undefined): string {
+  return money ? moneyFact(label, money) : fact(label, "ausente", ` data-absent="true"`);
+}
+
 function moneyFact(label: string, money: { amount_cents: number; currency: string }): string {
   return `
     <div class="money" data-amount-cents="${money.amount_cents}" data-currency="${escapeHtml(money.currency)}">
@@ -30,7 +40,159 @@ function listFact(label: string, items: string[] | undefined): string {
   return fact(label, escapeHtml(items.join(", ")));
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot): string {
+function operationsOf(snapshot: CommercialSnapshot | undefined): Record<string, unknown> {
+  return snapshot?.operations && typeof snapshot.operations === "object" ? snapshot.operations : {};
+}
+
+export const GROWTH_FUNNEL_HOPS = [
+  "search_visibility",
+  "click_session",
+  "cta",
+  "inbound_event",
+  "lead",
+  "qualified_lead",
+  "opportunity",
+  "commercial_proposal",
+  "client_revenue",
+] as const;
+
+const GROWTH_HOP_LABELS: Record<(typeof GROWTH_FUNNEL_HOPS)[number], string> = {
+  search_visibility: "Visibilidade de busca",
+  click_session: "Clique/sessão",
+  cta: "CTA",
+  inbound_event: "Evento inbound",
+  lead: "Lead",
+  qualified_lead: "Lead qualificado",
+  opportunity: "Oportunidade",
+  commercial_proposal: "Proposta comercial",
+  client_revenue: "Cliente/receita",
+};
+
+function hopStatusFor(hop: string, row: Record<string, unknown> | undefined): string {
+  if (row && typeof row.status === "string" && row.status.length > 0) return row.status;
+  if (hop === "search_visibility" || hop === "click_session") return "BLOCKED";
+  return "UNKNOWN";
+}
+
+export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): string {
+  const ops = operationsOf(snapshot);
+  const growth = ops.growth && typeof ops.growth === "object" ? (ops.growth as Record<string, unknown>) : {};
+  const fromContract = Array.isArray(growth.funnel_contract)
+    ? growth.funnel_contract.map(String).filter((hop) => hop.length > 0)
+    : [];
+  const hops = fromContract.length > 0 ? fromContract : [...GROWTH_FUNNEL_HOPS];
+  const scoreboard = growth.scoreboard && typeof growth.scoreboard === "object" ? (growth.scoreboard as Record<string, unknown>) : {};
+  const stages = Array.isArray(scoreboard.stages) ? scoreboard.stages : [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const item of stages) {
+    const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const id = String(row.id ?? row.stage ?? "");
+    if (id) byId.set(id, row);
+  }
+  const attribution =
+    growth.attribution && typeof growth.attribution === "object" ? (growth.attribution as Record<string, unknown>) : {};
+  const note = String(
+    attribution.note ??
+      "Hops without a durable ID stay UNKNOWN/BLOCKED. No cross-system join is invented. GSC/URL-index hops stay BLOCKED without ingest.",
+  );
+  const organic =
+    growth.organic_scoreboard && typeof growth.organic_scoreboard === "object"
+      ? (growth.organic_scoreboard as Record<string, unknown>)
+      : {};
+  const organicConfigured = organic.configured === true;
+  const organicWindows = Array.isArray(organic.windows) ? organic.windows : [];
+  const organicBlock = organicConfigured
+    ? `<article class="card" data-organic-scoreboard="true">
+        <h3>Organic scoreboard (Warmbly)</h3>
+        <p>${escapeHtml(String(organic.note ?? "Warmbly-owned organic/growth intelligence."))}</p>
+        <p>schema=${escapeHtml(String(organic.schema ?? "ausente"))} real_empty=${escapeHtml(String(organic.real_empty ?? "—"))}</p>
+        <div class="stack">${
+          organicWindows.length === 0
+            ? `<p class="banner empty">Organic scoreboard presente e vazio.</p>`
+            : organicWindows
+                .slice(0, 4)
+                .map((item) => {
+                  const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+                  const slices = Array.isArray(row.by_source)
+                    ? row.by_source
+                    : Array.isArray(row.slices)
+                      ? row.slices
+                      : [];
+                  const first = slices[0] && typeof slices[0] === "object" ? (slices[0] as Record<string, unknown>) : {};
+                  const layers = Array.isArray(first.layers) ? first.layers : [];
+                  return `<article class="card" data-organic-window="${escapeHtml(String(row.id ?? ""))}">
+                    <h4>Janela ${escapeHtml(String(row.id ?? "—"))}</h4>
+                    <ul>${layers
+                      .map((layer) => {
+                        const ly = layer && typeof layer === "object" ? (layer as Record<string, unknown>) : {};
+                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}">${escapeHtml(String(ly.id ?? "layer"))}: ${escapeHtml(String(ly.status ?? "UNKNOWN"))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
+                      })
+                      .join("")}</ul>
+                  </article>`;
+                })
+                .join("")
+        }</div>
+      </article>`
+    : `<p class="banner empty" data-organic-scoreboard="false">Organic scoreboard Warmbly ausente nesta observação (${escapeHtml(String(organic.availability ?? "NO_DATA"))}).</p>`;
+  return `
+    <section class="stack domain-crescimento" aria-labelledby="crescimento-funil" data-domain="growth">
+      <h2 id="crescimento-funil">Funil de crescimento</h2>
+      <p class="constraint">${escapeHtml(note)}</p>
+      ${organicBlock}
+      <ol class="growth-hops">
+        ${hops
+          .map((hop) => {
+            const row = byId.get(hop);
+            const status = hopStatusFor(hop, row);
+            const absent = !row;
+            const detail = row && row.observation ? String(row.observation) : absent ? "hop ausente nesta observação" : "";
+            const label =
+              hop in GROWTH_HOP_LABELS ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]] : hop;
+            return `<li class="card" data-growth-hop="${escapeHtml(hop)}" data-hop-status="${escapeHtml(status)}"${absent ? ` data-absent="true"` : ""}>
+              <h3>${escapeHtml(label)}</h3>
+              <p>${escapeHtml(status)}${detail ? ` · ${escapeHtml(detail)}` : ""}</p>
+            </li>`;
+          })
+          .join("")}
+      </ol>
+    </section>
+  `;
+}
+
+function metricRate(value: unknown): string {
+  const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!rec) return "—";
+  if (rec.availability === "JOIN_UNPROVEN" || rec.omitted_reason === "durable_contact_to_deal_join_unavailable") {
+    const den = typeof rec.denominator === "number" ? rec.denominator : "—";
+    return `join não comprovado (denominador ${den})`;
+  }
+  const num = rec.numerator;
+  const den = rec.denominator;
+  if (typeof num !== "number" || typeof den !== "number") return "—";
+  if (den === 0) return `${num}/${den} (sem denominador)`;
+  const pct = rec.ratio === null || rec.ratio === undefined ? "—" : `${Math.round(Number(rec.ratio) * 1000) / 10}%`;
+  const tiny = rec.tiny_denominator === true ? " · amostra pequena, não é evidência estatística" : "";
+  return `${pct} (${num}/${den})${tiny}`;
+}
+
+export function commercialSubnav(surface: string | null): string {
+  const items = [
+    ["visao", "Visão"],
+    ["cohorts", "Coortes"],
+    ["atividade", "Atividade"],
+    ["pipeline", "Pipeline"],
+    ["excecoes", "Exceções"],
+  ] as const;
+  const current = surface && surface.length > 0 ? surface : "visao";
+  return `<nav class="subnav" aria-label="Superfícies comerciais">${items
+    .map(
+      ([id, label]) =>
+        `<a href="#/comercial/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${label}</a>`,
+    )
+    .join("")}</nav>`;
+}
+
+export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -52,16 +214,17 @@ export function commercialBlock(snapshot: CommercialSnapshot): string {
         escapeHtml(snapshot.offer_version_drift.detail ?? String(snapshot.offer_version_drift.count)),
       )
     : "";
-  return `
+  const current = surface && surface.length > 0 ? surface : "visao";
+  const recorte = `
     <section class="compact domain-comercial" aria-labelledby="comercial-recorte" data-domain="commercial">
       <h2 id="comercial-recorte">Recorte comercial (somente leitura)</h2>
       <p class="authority">Autoridade do catálogo: ${escapeHtml(snapshot.authority.catalog_authority)}. Runtime comercial: ${escapeHtml(snapshot.authority.commercial_runtime)}. Este documento: ${escapeHtml(snapshot.authority.this_document)}.</p>
       <dl class="facts">
-        ${funnel ? fact("Novos leads", String(funnel.new_leads)) : ""}
-        ${funnel ? fact("Qualificados", String(funnel.qualified)) : ""}
-        ${funnel ? fact("Oportunidades", String(funnel.opportunities)) : ""}
-        ${funnel ? fact("Propostas", String(funnel.proposals)) : ""}
-        ${funnel ? fact("Clientes", String(funnel.clients)) : ""}
+        ${optionalCount("Novos leads", funnel?.new_leads)}
+        ${optionalCount("Qualificados", funnel?.qualified)}
+        ${optionalCount("Oportunidades", funnel?.opportunities)}
+        ${optionalCount("Propostas", funnel?.proposals)}
+        ${optionalCount("Clientes", funnel?.clients)}
         ${snapshot.pipeline_nominal ? moneyFact("Pipeline nominal", snapshot.pipeline_nominal) : ""}
         ${weighted}
         ${typeof snapshot.aging_count === "number" ? fact("Aging", String(snapshot.aging_count)) : ""}
@@ -69,13 +232,138 @@ export function commercialBlock(snapshot: CommercialSnapshot): string {
         ${typeof snapshot.stalled_count === "number" ? fact("Stalled stage", String(snapshot.stalled_count)) : ""}
         ${drift}
         ${extra}
-        <div><dt>Pipeline aberto</dt><dd>${snapshot.pipeline_open_count}</dd></div>
-        <div><dt>Inbound sem leitura</dt><dd>${snapshot.inbound_unread_count}</dd></div>
-        <div><dt>Clientes em risco</dt><dd>${snapshot.at_risk_client_count}</dd></div>
+        ${optionalCount("Pipeline aberto", snapshot.pipeline_open_count)}
+        ${optionalCount("Inbound sem leitura", snapshot.inbound_unread_count)}
+        ${optionalCount("Clientes em risco", snapshot.at_risk_client_count)}
       </dl>
       ${provenanceBlock(snapshot.provenance)}
-    </section>
+    </section>`;
+  return `
+    ${commercialSubnav(current)}
+    ${current === "visao" ? recorte : ""}
+    ${commercialOps(snapshot, current)}
   `;
+}
+
+function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+  const ops = operationsOf(snapshot);
+  const current = surface && surface.length > 0 ? surface : "visao";
+  const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
+  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
+  const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
+  const activity = Array.isArray(ops.activity) ? ops.activity : [];
+  const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
+  const exceptions = Array.isArray(ops.exceptions) ? ops.exceptions : [];
+  const availability = snapshot.availability ?? "UNKNOWN";
+  let body = "";
+  if (current === "cohorts") {
+    const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];
+    const inbound = cohorts.inbound_truth && typeof cohorts.inbound_truth === "object" ? (cohorts.inbound_truth as Record<string, unknown>) : {};
+    body = `
+      <section class="stack" aria-labelledby="cohorts-title">
+        <h2 id="cohorts-title">Coortes</h2>
+        <p class="constraint">${escapeHtml(String(cohorts.mixing_rule ?? "Coortes de aquisição e métricas de período são rotuladas em separado."))}</p>
+        <div class="cards">${acquisition
+          .map((item) => {
+            const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}">
+              <h3>Janela ${escapeHtml(String(row.window))} · ${escapeHtml(String(row.kind))}</h3>
+              <p>${escapeHtml(String(row.anchor_label ?? row.anchor_event ?? ""))}</p>
+              <dl class="facts">
+                ${fact("População", String(row.population ?? "—"))}
+                ${fact("Contactados", String(row.contacted ?? "—"))}
+                ${fact("Reply rate", metricRate(row.reply_rate))}
+                ${fact("Qualified-reply rate", metricRate(row.qualified_reply_rate))}
+                ${fact("Opportunity conversion", metricRate(row.opportunity_conversion))}
+                ${fact("Win conversion", metricRate(row.win_conversion))}
+              </dl>
+            </article>`;
+          })
+          .join("")}</div>
+        <article class="card">
+          <h3>Inbound truth (Warmbly)</h3>
+          <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
+          <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
+        </article>
+      </section>`;
+  } else if (current === "atividade") {
+    body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
+      activity.length === 0
+        ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
+        : activity
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              return `<article class="card">
+                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
+                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+                <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
+                <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
+                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+                  <button type="submit">Validar atividade</button>
+                </form>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else if (current === "pipeline") {
+    body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
+      pipeline.length === 0
+        ? `<p class="banner empty">Sem negócios observados. Ausência não é zero.</p>`
+        : pipeline
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              const value = row.value && typeof row.value === "object" ? (row.value as { amount_cents?: number; currency?: string }) : null;
+              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
+                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
+                <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
+                ${value && typeof value.amount_cents === "number" ? `<p class="money">${escapeHtml(formatMoney({ amount_cents: value.amount_cents, currency: value.currency ?? "BRL" }))}</p>` : ""}
+                <dl class="facts">
+                  ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
+                  ${fact("Idade (s)", String(row.age_seconds ?? "—"))}
+                </dl>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else if (current === "excecoes") {
+    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2>
+      <p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>
+      <div class="stack">${
+      exceptions.length === 0
+        ? `<p class="banner empty">Nenhuma exceção observada.</p>`
+        : exceptions
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              return `<article class="card">
+                <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
+                <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+                <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
+                <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
+                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
+                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
+                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+                  <button type="submit">Reconhecer no Control Center</button>
+                </form>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else {
+    body = `<section aria-labelledby="comercial-ops-title">
+      <h2 id="comercial-ops-title">Operação agora</h2>
+      <dl class="facts">
+        ${fact("Disponibilidade da origem", escapeHtml(String(availability)))}
+        ${fact("Auto-send", auto.enabled === true ? "OBSERVADO LIGADO — Control Center não liga envio" : "desligado")}
+        ${fact("Exceções", String(overview.exceptions ?? "—"))}
+        ${fact("Overdue", String(overview.overdue_work ?? "—"))}
+        ${fact("Inbound a tratar", String(overview.inbound_requiring_attention ?? "—"))}
+        ${fact("Oportunidades a agir", String(overview.opportunities_requiring_action ?? "—"))}
+      </dl>
+    </section>`;
+  }
+  return body;
 }
 
 export function financeBlock(snapshot: FinanceSnapshot): string {
@@ -92,18 +380,18 @@ export function financeBlock(snapshot: FinanceSnapshot): string {
       <h2 id="financeiro-recorte">Recorte financeiro (somente leitura)</h2>
       <p class="constraint" role="note">Mutações de provedor: ${escapeHtml(snapshot.provider_mutations)}. read_model_only=${String(snapshot.read_model_only)}. Sem cobrança, checkout, refund, cancelamento ou escrita Asaas neste cockpit.</p>
       <dl class="facts">
-        ${snapshot.contracted ? moneyFact("Contratado", snapshot.contracted) : ""}
-        ${snapshot.billed ? moneyFact("Faturado", snapshot.billed) : ""}
-        ${snapshot.paid ? moneyFact("Pago", snapshot.paid) : ""}
-        ${snapshot.effectively_received ? moneyFact("Efetivamente recebido", snapshot.effectively_received) : ""}
-        ${moneyFact("Vencido", snapshot.overdue ?? snapshot.receivables_overdue)}
-        ${moneyFact("A receber", snapshot.receivable ?? snapshot.receivables_open)}
-        ${snapshot.refunds ? moneyFact("Refunds", snapshot.refunds) : ""}
-        ${snapshot.chargebacks ? moneyFact("Chargebacks", snapshot.chargebacks) : ""}
+        ${snapshot.contracted ? moneyFact("Contratado", snapshot.contracted) : fact("Contratado", "ausente", ` data-absent="true"`)}
+        ${snapshot.billed ? moneyFact("Faturado", snapshot.billed) : fact("Faturado", "ausente", ` data-absent="true"`)}
+        ${snapshot.paid ? moneyFact("Pago", snapshot.paid) : fact("Pago", "ausente", ` data-absent="true"`)}
+        ${snapshot.effectively_received ? moneyFact("Efetivamente recebido", snapshot.effectively_received) : fact("Efetivamente recebido", "ausente", ` data-absent="true"`)}
+        ${optionalMoney("Vencido", snapshot.overdue ?? snapshot.receivables_overdue)}
+        ${optionalMoney("A receber", snapshot.receivable ?? snapshot.receivables_open)}
+        ${snapshot.refunds ? moneyFact("Refunds", snapshot.refunds) : fact("Refunds", "ausente", ` data-absent="true"`)}
+        ${snapshot.chargebacks ? moneyFact("Chargebacks", snapshot.chargebacks) : fact("Chargebacks", "ausente", ` data-absent="true"`)}
         ${mrr}
         ${runway}
-        ${moneyFact("Recebíveis abertos", snapshot.receivables_open)}
-        ${moneyFact("Recebíveis em atraso", snapshot.receivables_overdue)}
+        ${optionalMoney("Recebíveis abertos", snapshot.receivables_open)}
+        ${optionalMoney("Recebíveis em atraso", snapshot.receivables_overdue)}
       </dl>
       ${provenanceBlock(snapshot.provenance)}
     </section>
@@ -133,10 +421,40 @@ export function engineeringBlock(snapshot: EngineeringSnapshot): string {
         ${hypo}
         <div><dt>Checks falhando</dt><dd>${snapshot.failing_check_count}</dd></div>
         <div><dt>Incidentes abertos</dt><dd>${snapshot.open_incident_count}</dd></div>
+        ${listFact("Allowlist", snapshot.allowlist)}
       </dl>
+      ${
+        snapshot.repos && snapshot.repos.length > 0
+          ? `<div class="stack">${snapshot.repos
+              .map((repo) => {
+                const name = String(repo.repository ?? repo.full_name ?? "repo");
+                return `<article class="card">
+                  <h3>${escapeHtml(name)}</h3>
+                  <dl class="facts">
+                    ${fact("PRs abertos", String(repo.open_pr_count ?? "—"))}
+                    ${fact("Draft/ready", `${repo.draft_pr_count ?? "—"} / ${repo.ready_pr_count ?? "—"}`)}
+                    ${fact("CI falhando", String(repo.failing_check_count ?? "—"))}
+                    ${fact("Última atividade", String(repo.last_activity_at ?? "—"))}
+                  </dl>
+                  <p><a href="https://github.com/${escapeHtml(name)}" rel="noreferrer">Abrir no GitHub</a></p>
+                </article>`;
+              })
+              .join("")}</div>`
+          : ""
+      }
       ${provenanceBlock(snapshot.provenance)}
     </section>
   `;
+}
+
+function sourcePresence(label: string, key: string, value: string | undefined): string {
+  const status = value && value.length > 0 ? value : "UNKNOWN";
+  const absent =
+    status === "UNKNOWN" ||
+    status === "NO_DATA" ||
+    status === "NOT_CONFIGURED" ||
+    status === "BLOCKED_BY_SECRET";
+  return fact(label, escapeHtml(status), ` data-client-source="${escapeHtml(key)}"${absent ? ` data-absent="true"` : ""}`);
 }
 
 export function clientCard(item: ClientStatus): string {
@@ -146,6 +464,7 @@ export function clientCard(item: ClientStatus): string {
   const due = item.due_date
     ? `<time datetime="${escapeHtml(item.due_date)}">${escapeHtml(formatLocal(item.due_date))}</time>`
     : "";
+  const sources = item.sources ?? {};
   return `
     <article class="card client" data-lifecycle="${escapeHtml(item.lifecycle)}" data-id="${escapeHtml(item.id)}">
       <header>
@@ -164,6 +483,9 @@ export function clientCard(item: ClientStatus): string {
         ${listFact("Blockers", item.blockers)}
         ${item.next_action ? fact("Próxima ação", escapeHtml(item.next_action)) : ""}
         ${item.evidence ? fact("Evidência", escapeHtml(item.evidence)) : ""}
+        ${sourcePresence("Warmbly", "warmbly", sources.warmbly)}
+        ${sourcePresence("Asaas", "asaas", sources.asaas)}
+        ${sourcePresence("Governance", "governance", sources.governance)}
       </dl>
       ${provenanceBlock(item.provenance)}
     </article>

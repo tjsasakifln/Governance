@@ -185,6 +185,11 @@ export interface ClientStatus {
   blockers?: string[];
   next_action?: string;
   evidence?: string;
+  sources?: {
+    warmbly?: string;
+    asaas?: string;
+    governance?: string;
+  };
 }
 
 export interface CommercialAuthorityStamp {
@@ -194,11 +199,11 @@ export interface CommercialAuthorityStamp {
 }
 
 export interface CommercialFunnel {
-  new_leads: number;
-  qualified: number;
-  opportunities: number;
-  proposals: number;
-  clients: number;
+  new_leads?: number;
+  qualified?: number;
+  opportunities?: number;
+  proposals?: number;
+  clients?: number;
 }
 
 export interface WeightedPipeline extends Money {
@@ -223,9 +228,9 @@ export interface CommercialSnapshot {
   generated_at: UtcDateTime;
   provenance: Provenance;
   authority: CommercialAuthorityStamp;
-  pipeline_open_count: number;
-  inbound_unread_count: number;
-  at_risk_client_count: number;
+  pipeline_open_count?: number;
+  inbound_unread_count?: number;
+  at_risk_client_count?: number;
   attention_item_ids?: ResourceId[];
   offer_pin?: {
     catalog_authority: "governance";
@@ -240,6 +245,8 @@ export interface CommercialSnapshot {
   missing_next_action_count?: number;
   extra_historical?: ExtraHistorical;
   offer_version_drift?: OfferVersionDrift;
+  availability?: string;
+  operations?: Record<string, unknown>;
 }
 
 export interface EvidencedCashIn extends Money {
@@ -277,8 +284,8 @@ export interface FinanceSnapshot {
   receivable?: Money;
   refunds?: Money;
   chargebacks?: Money;
-  receivables_open: Money;
-  receivables_overdue: Money;
+  receivables_open?: Money;
+  receivables_overdue?: Money;
   cash_in?: EvidencedCashIn;
   mrr?: ApplicableMrr;
   runway?: ReliableRunway;
@@ -306,6 +313,8 @@ export interface EngineeringSnapshot {
   blockers?: string[];
   last_evidence?: string;
   active_work_without_evidence?: { remains: "hypothesis"; detail?: string };
+  repos?: Array<Record<string, unknown>>;
+  allowlist?: string[];
 }
 
 export interface ServiceHealthCheck {
