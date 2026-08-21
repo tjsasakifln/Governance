@@ -33,7 +33,8 @@ export const COLLECT_ROUTES: CollectRoute[] = [
     required: false,
   },
   { key: "contacts", method: "POST", path: "/v1/contacts/search", body: {}, required: true },
-  { key: "campaigns", method: "GET", path: "/v1/campaigns?limit=100", required: true },
+  // List is currently 500 on production Warmbly; campaigns-overview is the working read.
+  { key: "campaigns", method: "GET", path: "/v1/campaigns?limit=100", required: false },
   { key: "campaigns_overview", method: "GET", path: "/v1/campaigns-overview", required: false },
   { key: "unibox_overview", method: "GET", path: "/v1/unibox/overview", required: false },
   { key: "confenge_status", method: "GET", path: "/v1/confenge/status", required: false },

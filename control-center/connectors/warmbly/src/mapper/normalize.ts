@@ -17,6 +17,7 @@ import {
   type WarmblyPayload,
   type WarmblyTask,
 } from "../contracts/warmbly-payload.ts";
+import { COLLECT_ROUTES } from "../collector/routes.ts";
 import {
   attentionFromCampaigns,
   attentionFromConfenge,
@@ -31,6 +32,26 @@ import {
 } from "./attention.ts";
 import { provenance, rollupFreshness } from "./freshness.ts";
 import { majorUnitsToCents, sumOpenDealValue } from "./money.ts";
+
+const OPERATIONS_CAP = 50;
+
+function isRequiredPath(method: string, path: string): boolean {
+  const clean = path.split("?")[0] ?? path;
+  return COLLECT_ROUTES.some(
+    (route) =>
+      route.required &&
+      route.method === method &&
+      (route.path.split("?")[0] ?? route.path) === clean,
+  );
+}
+
+function unknownList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value !== null && typeof value === "object" && Array.isArray((value as { data?: unknown }).data)) {
+    return (value as { data: unknown[] }).data;
+  }
+  return [];
+}
 
 export type NormalizeOptions = {
   now?: Date;
@@ -82,8 +103,9 @@ export function collectFromWarmblyPayload(
     httpMethod: string,
   ): FreshnessStatus => {
     if (failure) {
+      const required = isRequiredPath(httpMethod, httpPath);
       const status: FreshnessStatus =
-        failure.status >= 500 ? "ERROR" : failure.status === 404 ? "UNKNOWN" : "ERROR";
+        failure.status === 404 || !required ? "UNKNOWN" : "ERROR";
       freshnessBySurface.push(status);
       observations.push(
         observation(surface, now, status, {
@@ -298,6 +320,8 @@ export function collectFromWarmblyPayload(
     uniqueContracts.set(c.id, c);
   }
 
+  const intelExceptions = unknownList(payload.confenge_intel_exceptions);
+
   const snapshot: CommercialSnapshot = {
     schema: COMMERCIAL_SNAPSHOT_SCHEMA,
     source: SNAPSHOT_SOURCE,
@@ -338,8 +362,8 @@ export function collectFromWarmblyPayload(
   snapshot.operations = {
     authority: "warmbly",
     this_document: "read_model",
-    cap: 50,
-    deals: deals.slice(0, 50).map((d) => ({
+    cap: OPERATIONS_CAP,
+    deals: deals.slice(0, OPERATIONS_CAP).map((d) => ({
       id: d.id,
       name: d.name,
       status: d.status,
@@ -357,7 +381,7 @@ export function collectFromWarmblyPayload(
       expected_close_date: d.expected_close_date,
       campaign_id: d.campaign_id,
     })),
-    tasks: tasks.slice(0, 50).map((t) => ({
+    tasks: tasks.slice(0, OPERATIONS_CAP).map((t) => ({
       id: t.id,
       title: t.title,
       status: t.status,
@@ -367,7 +391,7 @@ export function collectFromWarmblyPayload(
       created_at: t.created_at,
       updated_at: t.updated_at,
     })),
-    contacts: contacts.slice(0, 50).map((c) => ({
+    contacts: contacts.slice(0, OPERATIONS_CAP).map((c) => ({
       id: c.id,
       company: c.company,
       first_name: c.first_name,
@@ -379,7 +403,7 @@ export function collectFromWarmblyPayload(
       account_id: c.account_id ?? null,
       lead_id: c.lead_id ?? null,
     })),
-    inbound: inbound.slice(0, 50).map((row) => ({
+    inbound: inbound.slice(0, OPERATIONS_CAP).map((row) => ({
       lead_id: row.lead_id,
       company: row.company,
       person: row.person,
@@ -389,7 +413,8 @@ export function collectFromWarmblyPayload(
     })),
     intel_scoreboard: payload.confenge_intel_scoreboard ?? null,
     intel_executive: payload.confenge_intel_executive ?? null,
-    intel_exceptions: payload.confenge_intel_exceptions ?? null,
+    intel_exceptions: intelExceptions.slice(0, OPERATIONS_CAP),
+    intel_exceptions_total: intelExceptions.length,
     intel_organic_scoreboard: payload.confenge_intel_organic_scoreboard ?? null,
     confenge_status: payload.confenge_status ?? null,
   };

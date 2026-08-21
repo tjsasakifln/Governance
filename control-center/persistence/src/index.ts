@@ -24,6 +24,7 @@ export { expectedMigrationsPresent, pingStore, EXPECTED_MIGRATION_IDS } from './
 export {
   assertSanitizedJson,
   isSecretOrPiiKey,
+  MAX_JSON_BYTES,
   sanitizeErrorCode,
   sanitizeErrorMessage,
   stripSecretOrPiiKeys,

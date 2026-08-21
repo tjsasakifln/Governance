@@ -3,7 +3,7 @@ import { ValidationError } from './errors.js';
 const SECRET_OR_PII_KEY =
   /(^|[_-])(password|passwd|secret|token|authorization|auth|api[_-]?key|private[_-]?key|cookie|session[_-]?id|ssn|cpf|cnpj|email|phone|telefone|credit[_-]?card|card[_-]?number|access[_-]?token|refresh[_-]?token)s?$/i;
 
-const MAX_JSON_BYTES = 512 * 1024;
+export const MAX_JSON_BYTES = 512 * 1024;
 
 export function isSecretOrPiiKey(key: string): boolean {
   const normalized = key.trim();

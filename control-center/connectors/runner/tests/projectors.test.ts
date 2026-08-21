@@ -176,6 +176,42 @@ test("reply_rate denominator is contacted count and is never substituted with po
   assert.notEqual(open.reply_rate.denominator, open.population);
 });
 
+test("intel exceptions above LIST_CAP stay capped and keep an honest total", () => {
+  const intelExceptions = Array.from({ length: 60 }, (_, i) => ({
+    id: `ex-intel-${i}`,
+    code: "orphan_chain",
+    reason: `lead without deal ${i}`,
+    next_action: "review",
+    status: "open",
+  }));
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: { intel_exceptions: intelExceptions },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    overview: { exceptions: number; exceptions_shown: number };
+    exceptions: unknown[];
+    intel: { exceptions: unknown[]; exceptions_total: number; exceptions_capped: boolean };
+  };
+  assert.equal(ops.overview.exceptions, 60);
+  assert.equal(ops.overview.exceptions_shown, 50);
+  assert.equal(ops.exceptions.length, 50);
+  assert.equal(ops.intel.exceptions.length, 50);
+  assert.equal(ops.intel.exceptions_total, 60);
+  assert.equal(ops.intel.exceptions_capped, true);
+  const serialized = JSON.stringify(commercial.payload);
+  assert.ok(serialized.length < 512 * 1024, `commercial snapshot is ${serialized.length} bytes`);
+});
+
 test("intel exceptions feed Commercial Exceptions and organic scoreboard feeds Crescimento", () => {
   const projected = projectCollector({
     collector: "warmbly",

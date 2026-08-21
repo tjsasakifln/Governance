@@ -159,7 +159,9 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
   const intelExceptions = asArray(
     nested.intel_exceptions ?? payload.intel_exceptions ?? payload.confenge_intel_exceptions,
   );
-  const exceptions = capList(mergeExceptions(intelExceptions, attention, observedAt));
+  const mergedExceptions = mergeExceptions(intelExceptions, attention, observedAt);
+  const exceptionsTotal = mergedExceptions.length;
+  const exceptions = capList(mergedExceptions);
 
   const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
   const autoSend =
@@ -192,7 +194,8 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
     },
     auto_send: autoSend,
     overview: {
-      exceptions: exceptions.length,
+      exceptions: exceptionsTotal,
+      exceptions_shown: exceptions.length,
       overdue_work: integerOrUndefined(asRecord(payload.counts)?.tasks_overdue),
       inbound_requiring_attention: integerOrUndefined(asRecord(payload.counts)?.inbound_now),
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
@@ -204,7 +207,9 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
     intel: {
       scoreboard: scoreboardPresent(scoreboard) ? scoreboard : null,
       executive: asRecord(executive) ? stripIdentity(asRecord(executive) as Record<string, unknown>) : null,
-      exceptions: intelExceptionsPresent ? intelExceptions : null,
+      exceptions: intelExceptionsPresent ? capList(intelExceptions) : null,
+      exceptions_total: intelExceptionsPresent ? intelExceptions.length : 0,
+      exceptions_capped: intelExceptionsPresent && intelExceptions.length > LIST_CAP,
       organic_scoreboard: organicPresent(organic) ? organic : null,
     },
     growth: growthFromIntel(scoreboard, executive, organic, observedAt),
