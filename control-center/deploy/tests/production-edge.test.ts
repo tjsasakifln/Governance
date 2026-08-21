@@ -140,6 +140,12 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
     assert.match(probe, /node-http-probe\.mjs/, `${name} healthcheck`);
     assert.doesNotMatch(probe, /wget|curl|npx/, `${name} healthcheck`);
   }
+  const web = doc.services.web;
+  assert.ok(isRecord(web));
+  const webEnv = isRecord(web.environment) ? web.environment : {};
+  assert.equal(String(webEnv.CC_ACTOR_KIND ?? ""), "human");
+  assert.match(String(webEnv.CC_ACTOR_ID ?? ""), /CONTROL_CENTER_FOUNDER_ACTOR_ID/);
+  assert.doesNotMatch(String(webEnv.CC_ACTOR_ID ?? ""), /human:operator/);
 });
 
 test("Warmbly collector override adds only an external network and no datastore volumes", () => {
@@ -294,4 +300,7 @@ test("docker compose config of the production-edge overlay interpolates loopback
   assert.match(result.stdout, /redis:7-alpine/);
   assert.match(result.stdout, /authelia/);
   assert.match(result.stdout, /internal: true/);
+  assert.match(result.stdout, /CC_ACTOR_KIND: human/);
+  assert.match(result.stdout, /interpolation-only-founder/);
+  assert.doesNotMatch(result.stdout, /human:operator/);
 });
