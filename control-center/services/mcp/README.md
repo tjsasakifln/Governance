@@ -56,16 +56,23 @@ Logs are structured JSON on **stderr**. Authorization values, tokens, and secret
 
 ## MCP surface
 
-Tools (exact names):
+Tools (canonical dotted names, plus undotted compatibility aliases that call the
+same implementation / validation / audit path and add no capability):
 
-- `confenge.get_company_state`
-- `confenge.get_context` (`scope` required)
-- `confenge.get_active_directives` (`scope` required)
-- `confenge.get_priorities`
-- `confenge.get_client_context` (`client` required)
-- `confenge.get_decisions` (`since` optional, ISO-8601 UTC)
-- `confenge.report_session_result`
-- `confenge.report_blocker`
+| Canonical | Compatibility alias |
+| --- | --- |
+| `confenge.get_company_state` | `get_company_state` |
+| `confenge.get_context` (`scope` required) | `get_context` |
+| `confenge.get_active_directives` (`scope` required) | `get_active_directives` |
+| `confenge.get_priorities` | `get_priorities` |
+| `confenge.get_client_context` (`client` required) | `get_client_context` |
+| `confenge.get_decisions` (`since` optional, ISO-8601 UTC) | `get_decisions` |
+| `confenge.report_session_result` | `report_session_result` |
+| `confenge.report_blocker` | `report_blocker` |
+
+Grok 1.0.5 qualifies tools as `<server>__<tool>` and ignores extra-dot names.
+Native client configs live in `control-center/docs/agents/` and use the undotted
+aliases. MCP stays on loopback / VPN; `mcp.confenge.com.br` is not created.
 
 Resources:
 
@@ -111,7 +118,7 @@ This campaign does **not** HTTP-call a future Context service. The stub is the i
 A later campaign should:
 
 1. Implement `ContextApiPort` against the real Control Center Context API / PostgreSQL read model (owned by other workstreams). Inject it in `src/index.ts` instead of `createStubContextApi()`.
-2. Keep these eight tool names, resource URIs, and prompt names stable.
+2. Keep these eight canonical tool names, their undotted compatibility aliases, resource URIs, and prompt names stable.
 3. Continue injecting `CONFENGE_MCP_AUTH_TOKEN` from secret storage; do not add identity/password hardcoding.
 4. Keep financial/provider mutation out of this process. Collectors and Asaas stay elsewhere.
 5. Preserve fail-closed auth, rate limits, structured errors, and correlation ids.

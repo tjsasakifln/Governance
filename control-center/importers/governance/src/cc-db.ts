@@ -35,7 +35,7 @@ export function createControlCenterPersistPort(
         await persistCandidate(persistence, candidate);
         inserted += 1;
       }
-      return { inserted, skipped };
+      return { inserted, skipped, target: "control-center-db" };
     },
   };
 }

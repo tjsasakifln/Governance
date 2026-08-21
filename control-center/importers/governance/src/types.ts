@@ -140,6 +140,7 @@ export type ImportResult = {
   candidates: MemoryCandidate[];
   unclassifiable: UnclassifiableItem[];
   stats: ImportStats;
+  persist?: PersistOutcome;
 };
 
 export type VirtualSourceFile = {
@@ -159,6 +160,7 @@ export type GitMetadataProvider = {
 export type PersistOutcome = {
   inserted: number;
   skipped: number;
+  target?: "control-center-db";
 };
 
 /**

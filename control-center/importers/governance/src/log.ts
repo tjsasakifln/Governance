@@ -1,3 +1,5 @@
+import { redactSecretShapes } from "./secrets.js";
+
 const REDACT_KEYS = new Set([
   "authorization",
   "token",
@@ -66,7 +68,7 @@ export function redactValue(value: unknown): unknown {
 }
 
 export function redactString(value: string): string {
-  let next = value;
+  let next = redactSecretShapes(value);
   for (const pattern of SECRET_PATTERNS) {
     next = next.replace(pattern, "[redacted]");
   }

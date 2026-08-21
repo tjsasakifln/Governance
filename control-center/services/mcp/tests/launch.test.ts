@@ -15,9 +15,9 @@ const tsxCli = path.join(tsxRoot, "dist/cli.mjs");
 const entry = path.join(root, "src/index.ts");
 
 describe("real entry point against fixtures", () => {
-  it("completes preflight → get_context → report_session_result over stdio twice", async () => {
-    const first = await runLaunchFlow("launch-1");
-    const second = await runLaunchFlow("launch-2");
+  it("completes preflight → undotted get_context → report_session_result over stdio twice", async () => {
+    const first = await runLaunchFlow("launch-1", { includeBlocker: false });
+    const second = await runLaunchFlow("launch-2", { includeBlocker: true });
     assert.equal(first.contextMarker, MARKERS.commercial);
     assert.equal(second.contextMarker, MARKERS.commercial);
     assert.equal(first.reportAccepted, true);
@@ -25,6 +25,9 @@ describe("real entry point against fixtures", () => {
     assert.equal(first.protocolVersion, second.protocolVersion);
     assert.deepEqual(first.capabilities, second.capabilities);
     assert.equal(first.scope, second.scope);
+    assert.equal(first.invokedContextTool, "get_context");
+    assert.equal(second.invokedContextTool, "get_context");
+    assert.equal(second.blockerAccepted, true);
     process.stdout.write(`${JSON.stringify({ event: "launch-flow-consistent", first, second })}\n`);
   });
 });
@@ -36,9 +39,14 @@ interface LaunchSummary {
   contextMarker: string;
   reportAccepted: boolean;
   reportId: string;
+  invokedContextTool: string;
+  blockerAccepted: boolean | null;
 }
 
-async function runLaunchFlow(label: string): Promise<LaunchSummary> {
+async function runLaunchFlow(
+  label: string,
+  options: { includeBlocker: boolean },
+): Promise<LaunchSummary> {
   const child = spawn(process.execPath, [tsxCli, entry], {
     cwd: root,
     env: {
@@ -116,7 +124,7 @@ async function runLaunchFlow(label: string): Promise<LaunchSummary> {
       id: 4,
       method: "tools/call",
       params: {
-        name: "confenge.get_context",
+        name: "get_context",
         arguments: { scope: "ops.commercial" },
         _meta: { authorization: `Bearer ${TEST_TOKEN}` },
       },
@@ -131,13 +139,18 @@ async function runLaunchFlow(label: string): Promise<LaunchSummary> {
     const encoded = JSON.stringify(contextPayload.data);
     assert.match(encoded, new RegExp(MARKERS.commercial));
     assert.doesNotMatch(encoded, new RegExp(MARKERS.companyDump));
+    assert.doesNotMatch(encoded, new RegExp(MARKERS.finance));
+    assert.equal(contextPayload.invoked_name, "get_context");
+    assert.equal(contextPayload.canonical_name, "confenge.get_context");
+    const records = contextPayload.data["records"];
+    assert.ok(Array.isArray(records) && records.length > 0);
 
     const reportReply = await client.request({
       jsonrpc: "2.0",
       id: 5,
       method: "tools/call",
       params: {
-        name: "confenge.report_session_result",
+        name: "report_session_result",
         arguments: {
           session_id: `launch-${label}`,
           scope: "ops.commercial",
@@ -151,6 +164,32 @@ async function runLaunchFlow(label: string): Promise<LaunchSummary> {
     assert.equal(reportPayload.isError, false);
     assert.ok(isRecord(reportPayload.data));
     assert.equal(reportPayload.data["accepted"], true);
+    assert.equal(reportPayload.canonical_name, "confenge.report_session_result");
+
+    let blockerAccepted: boolean | null = null;
+    if (options.includeBlocker) {
+      const blockerReply = await client.request({
+        jsonrpc: "2.0",
+        id: 6,
+        method: "tools/call",
+        params: {
+          name: "report_blocker",
+          arguments: {
+            scope: "ops.commercial",
+            summary: "Launch blocker proof; no decision mutation.",
+            severity: "medium",
+            blocking: true,
+          },
+          _meta: { authorization: `Bearer ${TEST_TOKEN}` },
+        },
+      });
+      const blockerPayload = toolPayload(blockerReply);
+      assert.equal(blockerPayload.isError, false);
+      assert.ok(isRecord(blockerPayload.data));
+      assert.equal(blockerPayload.data["accepted"], true);
+      assert.equal(blockerPayload.canonical_name, "confenge.report_blocker");
+      blockerAccepted = blockerPayload.data["accepted"] === true;
+    }
 
     const stderr = stderrChunks.join("");
     assert.doesNotMatch(stderr, new RegExp(TEST_TOKEN));
@@ -163,6 +202,8 @@ async function runLaunchFlow(label: string): Promise<LaunchSummary> {
       contextMarker: MARKERS.commercial,
       reportAccepted: reportPayload.data["accepted"] === true,
       reportId: String(reportPayload.data["id"]),
+      invokedContextTool: String(contextPayload.invoked_name ?? "get_context"),
+      blockerAccepted,
     };
   } catch (err) {
     const extra = stderrChunks.join("");

@@ -1,0 +1,18 @@
+# Official Codex MCP client config ([mcp_servers.*]).
+# Copy into ~/.codex/config.toml. Expand CONFENGE_MCP_AUTH_TOKEN from the
+# environment. Never commit a live token.
+#
+# Prefer the undotted aliases (get_context, report_session_result, report_blocker).
+# Loopback / VPN only. Do not point this at mcp.confenge.com.br.
+#
+# If Codex is not authenticated, the honest state is NOT_TESTED_CLIENT_MISSING.
+# After `codex login`, re-run:
+#   codex mcp list
+# then a session that calls get_context, report_session_result, report_blocker.
+
+[mcp_servers.confenge]
+command = "npx"
+args = ["tsx", "control-center/services/mcp/src/index.ts"]
+env = { CONFENGE_MCP_AUTH_TOKEN = "${CONFENGE_MCP_AUTH_TOKEN}" }
+startup_timeout_sec = 60
+enabled = true

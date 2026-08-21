@@ -20,7 +20,7 @@ export function recordingPersistPort(sink: ImportResult[]): PersistPort {
   return {
     async persistCandidates(result: ImportResult): Promise<PersistOutcome> {
       sink.push(result);
-      return { inserted: result.candidates.length, skipped: 0 };
+      return { inserted: result.candidates.length, skipped: 0, target: "control-center-db" };
     },
   };
 }

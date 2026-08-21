@@ -12,7 +12,7 @@ import {
   type RequestExtras,
 } from "./security.js";
 import { createStubContextApi } from "./stub-adapter.js";
-import type { ContextApiPort } from "./types.js";
+import { canonicalToolName, type ContextApiPort } from "./types.js";
 
 export const PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] as const;
 export const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
@@ -252,13 +252,24 @@ export function createMcpRuntime(options: McpRuntimeOptions = {}): McpRuntime {
       throw new McpAppError(ERROR_CODES.INVALID_PARAMS, "tool name is required", correlationId);
     }
     const args = isRecord(params) ? params["arguments"] : undefined;
+    const canonical = canonicalToolName(name) ?? name;
 
-    logger.info("mcp.tools_call", { tool: name, correlation_id: correlationId });
+    logger.info("mcp.tools_call", {
+      tool: name,
+      canonical_tool: canonical,
+      correlation_id: correlationId,
+    });
     const payload = await executeTool(context, name, args, correlationId);
+    const envelope = {
+      correlation_id: correlationId,
+      data: payload,
+      invoked_name: name,
+      canonical_name: canonical,
+    };
     return {
-      content: [{ type: "text", text: JSON.stringify({ correlation_id: correlationId, data: payload }) }],
+      content: [{ type: "text", text: JSON.stringify(envelope) }],
       isError: false,
-      structuredContent: { correlation_id: correlationId, data: payload },
+      structuredContent: envelope,
     };
   }
 

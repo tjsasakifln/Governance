@@ -100,6 +100,8 @@ export function toolPayload(reply: Record<string, unknown>): {
   correlation_id: string;
   data: unknown;
   isError: boolean;
+  invoked_name?: string;
+  canonical_name?: string;
 } {
   if (reply["error"]) {
     throw new Error(`expected tool result, got error: ${JSON.stringify(reply["error"])}`);
@@ -118,6 +120,8 @@ export function toolPayload(reply: Record<string, unknown>): {
     correlation_id: parsed["correlation_id"] as string,
     data: parsed["data"],
     isError,
+    invoked_name: typeof parsed["invoked_name"] === "string" ? parsed["invoked_name"] : undefined,
+    canonical_name: typeof parsed["canonical_name"] === "string" ? parsed["canonical_name"] : undefined,
   };
 }
 

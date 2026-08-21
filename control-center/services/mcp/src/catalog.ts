@@ -4,8 +4,11 @@ import { UnknownClientError, UnknownScopeError } from "./stub-adapter.js";
 import {
   PROMPT_NAMES,
   RESOURCE_URIS,
-  TOOL_NAMES,
+  TOOL_ALIAS_TO_CANONICAL,
+  canonicalToolName,
   type ContextApiPort,
+  type ToolAliasName,
+  type ToolName,
 } from "./types.js";
 import {
   asBlocker,
@@ -23,9 +26,13 @@ import {
 import { assertNoAuthoritativeMutation } from "./security.js";
 
 export interface ToolDefinition {
-  name: (typeof TOOL_NAMES)[number];
+  name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  _meta?: {
+    compatibility_alias?: boolean;
+    canonical_name?: ToolName;
+  };
 }
 
 export interface ResourceDefinition {
@@ -41,7 +48,7 @@ export interface PromptDefinition {
   arguments: Array<{ name: string; description: string; required: boolean }>;
 }
 
-export const toolDefinitions: ToolDefinition[] = [
+const CANONICAL_TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "confenge.get_company_state",
     description:
@@ -51,13 +58,13 @@ export const toolDefinitions: ToolDefinition[] = [
   {
     name: "confenge.get_context",
     description:
-      "Scoped operational context. Requires `scope`. Does not return other scopes or the whole-company dump.",
+      "Scoped operational context. Requires `scope`. Does not return other scopes or the whole-company dump. Company-scoped records inherit into a more specific scope.",
     inputSchema: jsonSchema(getContextArgsSchema),
   },
   {
     name: "confenge.get_active_directives",
     description:
-      "Active human directives for a single `scope` (kind, status, effective window, audit). Requires `scope`.",
+      "Active human directives for a single `scope` (kind, status, effective window, audit). Requires `scope`. Company-scoped directives inherit into a more specific scope.",
     inputSchema: jsonSchema(getActiveDirectivesArgsSchema),
   },
   {
@@ -87,6 +94,29 @@ export const toolDefinitions: ToolDefinition[] = [
       "Record a blocker encountered during a session. Cannot create or alter decisions, constraints, or authoritative directives.",
     inputSchema: jsonSchema(reportBlockerArgsSchema),
   },
+];
+
+const CANONICAL_TO_ALIAS: Record<ToolName, ToolAliasName> = Object.fromEntries(
+  Object.entries(TOOL_ALIAS_TO_CANONICAL).map(([alias, canonical]) => [canonical, alias]),
+) as Record<ToolName, ToolAliasName>;
+
+const ALIAS_TOOL_DEFINITIONS: ToolDefinition[] = CANONICAL_TOOL_DEFINITIONS.map((tool) => {
+  const canonical = tool.name as ToolName;
+  const alias = CANONICAL_TO_ALIAS[canonical];
+  return {
+    name: alias,
+    description: `${tool.description} Compatibility alias of \`${canonical}\` (same implementation, validation, and audit; no extra capability). Prefer this undotted name on Grok 1.0.5, which ignores extra-dot qualified names.`,
+    inputSchema: tool.inputSchema,
+    _meta: {
+      compatibility_alias: true,
+      canonical_name: canonical,
+    },
+  };
+});
+
+export const toolDefinitions: ToolDefinition[] = [
+  ...CANONICAL_TOOL_DEFINITIONS,
+  ...ALIAS_TOOL_DEFINITIONS,
 ];
 
 export const resourceDefinitions: ResourceDefinition[] = [
@@ -141,9 +171,13 @@ export async function executeTool(
   args: unknown,
   correlationId: string,
 ): Promise<unknown> {
-  assertNoAuthoritativeMutation(name, args, correlationId);
+  const canonical = canonicalToolName(name);
+  assertNoAuthoritativeMutation(canonical ?? name, args, correlationId);
+  if (canonical === undefined) {
+    throw new McpAppError(ERROR_CODES.UNKNOWN_TOOL, `unknown tool: ${name}`, correlationId);
+  }
 
-  switch (name) {
+  switch (canonical) {
     case "confenge.get_company_state":
       parseArgs(emptyArgsSchema, args, correlationId);
       return context.getCompanyState();

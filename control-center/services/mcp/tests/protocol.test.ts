@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { MARKERS } from "../src/fixtures.js";
-import { PROMPT_NAMES, RESOURCE_URIS, TOOL_NAMES } from "../src/types.js";
+import {
+  PROMPT_NAMES,
+  RESOURCE_URIS,
+  TOOL_ALIAS_NAMES,
+  TOOL_NAMES,
+  isCompatibilityAlias,
+} from "../src/types.js";
 import {
   assertProvenance,
   authMeta,
@@ -51,7 +57,25 @@ describe("MCP protocol", () => {
       assert.equal(typeof tool["name"], "string");
       return tool["name"] as string;
     });
-    assert.deepEqual(names, [...TOOL_NAMES]);
+    assert.deepEqual(names.slice(0, TOOL_NAMES.length), [...TOOL_NAMES]);
+    for (const canonical of TOOL_NAMES) {
+      assert.ok(names.includes(canonical), `missing canonical ${canonical}`);
+    }
+    for (const alias of TOOL_ALIAS_NAMES) {
+      assert.ok(names.includes(alias), `missing alias ${alias}`);
+    }
+    assert.equal(names.length, TOOL_NAMES.length + TOOL_ALIAS_NAMES.length);
+    for (const tool of tools) {
+      assert.ok(isRecord(tool));
+      const name = String(tool["name"]);
+      if (isCompatibilityAlias(name)) {
+        const meta = tool["_meta"];
+        assert.ok(isRecord(meta), `${name} must carry compatibility-alias metadata`);
+        assert.equal(meta["compatibility_alias"], true);
+        assert.equal(typeof meta["canonical_name"], "string");
+        assert.ok(String(meta["canonical_name"]).startsWith("confenge."));
+      }
+    }
     for (const banned of [
       "confenge.create_directive",
       "confenge.charge",
@@ -163,11 +187,18 @@ describe("MCP protocol", () => {
     assert.doesNotMatch(encoded, new RegExp(MARKERS.beta));
     const records = payload.data["records"];
     assert.ok(Array.isArray(records) && records.length > 0);
+    const scopes = new Set<string>();
     for (const record of records) {
       assertProvenance(record, "get_context.record");
       assert.ok(isRecord(record));
-      assert.equal(record["scope"], "ops.commercial");
+      const scope = String(record["scope"]);
+      scopes.add(scope);
+      assert.ok(
+        scope === "ops.commercial" || scope === "company",
+        `unexpected scope ${scope} in commercial context`,
+      );
     }
+    assert.ok(scopes.has("ops.commercial"));
   });
 
   it("scopes active directives and client context", async () => {
@@ -191,7 +222,12 @@ describe("MCP protocol", () => {
     for (const row of directives) {
       assert.ok(isRecord(row));
       assertProvenance(row, "directive");
-      assert.equal(row["scope"], "ops.commercial");
+      const scope = String(row["scope"]);
+      assert.ok(
+        scope === "ops.commercial" || scope === "company",
+        `unexpected directive scope ${scope}`,
+      );
+      assert.notEqual(scope, "ops.finance");
       assert.equal(row["status"], "active");
       assert.equal(typeof row["effective_from"], "string");
       assert.equal(typeof row["created_by"], "string");
