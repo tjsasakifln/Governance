@@ -121,6 +121,10 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   assert.ok(isRecord(postgres));
   assert.ok(serviceNetworks(postgres).includes("cc_internal"));
   assert.ok(!serviceNetworks(postgres).includes("cc_edge"));
+  const pgNets = isRecord(postgres.networks) ? postgres.networks : {};
+  const pgInternal = isRecord(pgNets.cc_internal) ? pgNets.cc_internal : {};
+  const aliases = Array.isArray(pgInternal.aliases) ? pgInternal.aliases : [];
+  assert.ok(aliases.includes("cc-postgres"));
   assert.match(text, /POSTGRES_DB: control_center/);
   assert.match(text, /init-authelia\.sh/);
   const authelia = doc.services.authelia;

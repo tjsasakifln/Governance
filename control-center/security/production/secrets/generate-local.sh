@@ -114,7 +114,7 @@ if is_placeholder "$OPERATOR_HASH" || [[ ! "$OPERATOR_HASH" == \$6\$* ]]; then
   refuse "operator password hash was not produced"
 fi
 
-DATABASE_URL="postgres://control_center:${POSTGRES_PASSWORD}@postgres:5432/control_center"
+DATABASE_URL="postgres://control_center:${POSTGRES_PASSWORD}@cc-postgres:5432/control_center"
 
 write_secret "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
 write_secret "CONTROL_CENTER_DATABASE_URL" "$DATABASE_URL"

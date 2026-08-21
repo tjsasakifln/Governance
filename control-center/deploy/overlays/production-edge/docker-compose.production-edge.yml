@@ -64,7 +64,9 @@ services:
       - ../../docker/postgres/init-control-center.sql:/docker-entrypoint-initdb.d/001-control-center.sql:ro
       - ./postgres/init-authelia.sh:/docker-entrypoint-initdb.d/002-authelia.sh:ro
     networks:
-      cc_internal: {}
+      cc_internal:
+        aliases:
+          - cc-postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U control_center -d control_center"]
       interval: 10s
