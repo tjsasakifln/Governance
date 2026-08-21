@@ -1,7 +1,7 @@
 {
   "campaign": "CONFENGE-CONTROL-CENTER-OPERATIONAL-COMPLETION-01",
   "base_sha": "c5c7a3010fe8278df4fb18ca07a7d37215c33a22",
-  "head_sha": "5ee70e9ade60e0d4be731b62d7734485de533e1b",
+  "head_sha": "9ce52ca4cf8fdf2efac3027a7d1c25f6685e7b42",
   "deployed_sha_observed": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
   "governance_pr": 44,
   "governance_pr_url": "https://github.com/tjsasakifln/Governance/pull/44",
