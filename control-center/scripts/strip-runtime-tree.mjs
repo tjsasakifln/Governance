@@ -31,7 +31,20 @@ const DROP_PACKAGES = [
   "@esbuild",
   "embedded-postgres",
   "@embedded-postgres",
+  "rollup",
+  "postcss",
+  "source-map-js",
+  "undici-types",
+  "@rollup",
+  "@vitejs",
+  "playwright",
+  "@playwright",
+  "lightningcss",
 ];
+
+const keepConfenge = new Set(
+  process.argv.slice(3).filter((name) => name.startsWith("@confenge/")).map((name) => name.slice("@confenge/".length)),
+);
 
 function rm(path) {
   rmSync(path, { recursive: true, force: true });
@@ -120,9 +133,29 @@ function scrubNodeModules(nm) {
           dropPackage(nm, pkg);
         }
       }
-      if (entry.name === "@esbuild" || entry.name === "@types" || entry.name === "@embedded-postgres") {
+      if (
+        entry.name === "@esbuild" ||
+        entry.name === "@types" ||
+        entry.name === "@embedded-postgres" ||
+        entry.name === "@rollup" ||
+        entry.name === "@vitejs" ||
+        entry.name === "@playwright"
+      ) {
         rm(scope);
         continue;
+      }
+      if (entry.name === "@confenge" && keepConfenge.size > 0) {
+        let children;
+        try {
+          children = readdirSync(scope, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        for (const child of children) {
+          if (!keepConfenge.has(child.name)) {
+            rm(join(scope, child.name));
+          }
+        }
       }
       scrubNodeModules(scope);
     }

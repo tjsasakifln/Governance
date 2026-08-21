@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -127,6 +129,36 @@ test("Node images are a single major (Node 22) with pinned builder compile and n
   assert.doesNotMatch(context, /src\/server\.ts/);
   assert.doesNotMatch(mcp, /src\/index\.ts/);
   assert.doesNotMatch(collector, /src\/server\.ts/);
+});
+
+test("Node runtime images prune to production deps and drop leftover workspace/dev packages", () => {
+  const forbidden = ["rollup", "postcss", "source-map-js", "undici-types"];
+  const strip = read("scripts/strip-runtime-tree.mjs");
+  for (const pkg of forbidden) {
+    assert.match(strip, new RegExp(`"${pkg}"`));
+  }
+  const nodeRuntime = [
+    "services/context/Dockerfile",
+    "services/mcp/Dockerfile",
+    "connectors/runner/Dockerfile",
+    "deploy/docker/ops.Dockerfile",
+  ];
+  for (const rel of nodeRuntime) {
+    const text = read(rel);
+    assert.match(text, /npm prune --omit=dev --ignore-scripts/, `${rel} must prune devDependencies`);
+  }
+  for (const rel of [
+    "services/context/Dockerfile",
+    "services/mcp/Dockerfile",
+    "connectors/runner/Dockerfile",
+  ]) {
+    const text = read(rel);
+    for (const pkg of forbidden) {
+      assert.match(text, new RegExp(`test ! -d /src/node_modules/${pkg}`), `${rel} must assert ${pkg} is absent`);
+    }
+    assert.match(text, /@confenge\/control-center-web-shell/);
+    assert.match(text, /@confenge\/control-center-qa/);
+  }
 });
 
 test("ops install uses --ignore-scripts and compiled node entry, no startup npm install", () => {
@@ -282,4 +314,45 @@ test("SBOM/image-scan workflow covers every image, CycloneDX and SPDX, and does 
   assert.match(wf, /image-scan-gate/);
   assert.doesNotMatch(wf, /rm\s+-rf.*trivy/i);
   assert.doesNotMatch(wf, /git add.*sbom/i);
+});
+
+test("strip-runtime-tree drops leftover workspace and toolchain packages while keeping the runtime graph", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cc-strip-"));
+  try {
+    const nm = join(dir, "node_modules");
+    for (const pkg of [
+      "rollup",
+      "postcss",
+      "source-map-js",
+      "undici-types",
+      "pg",
+      join("@confenge", "control-center-contracts"),
+      join("@confenge", "control-center-web-shell"),
+      join("@confenge", "control-center-qa"),
+    ]) {
+      mkdirSync(join(nm, pkg), { recursive: true });
+      writeFileSync(join(nm, pkg, "package.json"), "{}\n");
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(root, "scripts/strip-runtime-tree.mjs"),
+        dir,
+        "@confenge/control-center-contracts",
+        "@confenge/control-center-context",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(existsSync(join(nm, "rollup")), false);
+    assert.equal(existsSync(join(nm, "postcss")), false);
+    assert.equal(existsSync(join(nm, "source-map-js")), false);
+    assert.equal(existsSync(join(nm, "undici-types")), false);
+    assert.equal(existsSync(join(nm, "@confenge", "control-center-web-shell")), false);
+    assert.equal(existsSync(join(nm, "@confenge", "control-center-qa")), false);
+    assert.equal(existsSync(join(nm, "@confenge", "control-center-contracts")), true);
+    assert.equal(existsSync(join(nm, "pg")), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

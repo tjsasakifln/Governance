@@ -24,4 +24,13 @@ Never retag to `latest`. Bump by resolving a concrete tag, then commit the new d
 
 ## CVE exceptions
 
-`cve-exceptions.json` is the only allow list. Each row needs owner, expiry (`YYYY-MM-DD`), evidence, reachability, mitigation, and whether a fix exists. An expired row fails CI. Reachable HIGH with a fix cannot be excepted. The scanner is never removed to “zero” findings.
+`cve-exceptions.json` is the only allow list. Each row needs owner, expiry (`YYYY-MM-DD`), evidence, reachability, mitigation, a **concrete image prefix** (never `image: "*"`), and whether a **product-available** fix exists. An expired row fails CI.
+
+Judgment is reachability + mitigation + available product fix, not raw count:
+
+- Debian/Alpine leftovers unused by the process (perl, zlib, libcurl) may be `reachable: false` **per image**.
+- Productive Caddy (`usr/bin/caddy` on 2.11.4-alpine) and Authelia (`app/authelia`) process findings are `reachable: true`. If Trivy points at a Go toolchain rebuild the vendor has not shipped, `fix_available` is false and the next action is consume the next product tag. A reachable HIGH with a product-available fix cannot be excepted — bump the pin instead.
+- `github.com/caddyserver/caddy/v2` product CVEs are **not** excepted on the productive 2.11 pin (2.11.4 already contains those fixes). Overlay `caddy:2.9-alpine` is scan-only (Goal 06 examples; not deployed) and is scoped to that image prefix.
+- Secret findings fail unless the Trivy `Target` is under `qa/fixtures/attacks/` or the match contains `SYNTHETICNOTREAL`. Live prefixes (`sk_test_`, `whsec_`) and unrelated paths that merely contain `fixture` are **not** skipped.
+
+The scanner is never removed to “zero” findings.

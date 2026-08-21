@@ -8,9 +8,19 @@ COPY . .
 RUN npm ci --ignore-scripts
 RUN node scripts/build-runtime-packages.mjs context
 RUN node scripts/rewrite-runtime-exports.mjs /src
+RUN npm prune --omit=dev --ignore-scripts
 RUN node scripts/strip-runtime-tree.mjs /src \
+  @confenge/control-center-contracts \
+  @confenge/control-center-persistence \
+  @confenge/control-center-context \
   && test ! -e /src/node_modules/tsx \
   && test ! -e /src/node_modules/esbuild \
+  && test ! -d /src/node_modules/rollup \
+  && test ! -d /src/node_modules/postcss \
+  && test ! -d /src/node_modules/source-map-js \
+  && test ! -d /src/node_modules/undici-types \
+  && test ! -d /src/node_modules/@confenge/control-center-web-shell \
+  && test ! -d /src/node_modules/@confenge/control-center-qa \
   && test -z "$(find /src -name '*.map' -not -path '*/node_modules/*' | head -1)"
 
 FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
