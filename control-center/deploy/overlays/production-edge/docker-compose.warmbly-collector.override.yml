@@ -7,7 +7,8 @@
 services:
   collector:
     networks:
-      cc_edge: {}
+      cc_edge:
+        ipv4_address: 10.89.0.7
       cc_internal: {}
       warmbly_net: {}
 

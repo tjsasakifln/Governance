@@ -222,7 +222,8 @@ services:
       CONTROL_CENTER_CONTEXT_URL: "http://context:8080"
       CONFENGE_MCP_AUTH_TOKEN: "${CONFENGE_MCP_AUTH_TOKEN}"
     networks:
-      - cc_edge
+      cc_edge:
+        ipv4_address: 10.89.0.6
     healthcheck:
       test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
@@ -245,7 +246,8 @@ services:
       NODE_ENV: production
       CONTROL_CENTER_DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:?CONTROL_CENTER_DATABASE_URL must be set from a secret store}"
     networks:
-      cc_edge: {}
+      cc_edge:
+        ipv4_address: 10.89.0.7
       cc_internal: {}
     healthcheck:
       test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]

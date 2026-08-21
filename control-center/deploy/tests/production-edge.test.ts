@@ -95,6 +95,18 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   const collectorNets = serviceNetworks(collector);
   assert.ok(collectorNets.includes("cc_edge"));
   assert.ok(collectorNets.includes("cc_internal"));
+  const mcp = doc.services.mcp;
+  assert.ok(isRecord(mcp));
+  const mcpNets = isRecord(mcp.networks) ? mcp.networks : {};
+  const collectorEdge = isRecord(collector.networks) ? collector.networks : {};
+  const mcpIp = isRecord(mcpNets.cc_edge) ? String(mcpNets.cc_edge.ipv4_address ?? "") : "";
+  const collectorIp = isRecord(collectorEdge.cc_edge)
+    ? String(collectorEdge.cc_edge.ipv4_address ?? "")
+    : "";
+  assert.equal(mcpIp, "10.89.0.6");
+  assert.equal(collectorIp, "10.89.0.7");
+  assert.notEqual(mcpIp, "10.89.0.2");
+  assert.notEqual(collectorIp, "10.89.0.2");
   assert.equal(collector.ports, undefined);
   assert.equal(collector.volumes, undefined);
   const collectorEnv = isRecord(collector.environment) ? collector.environment : {};

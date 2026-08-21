@@ -139,6 +139,8 @@ test("hardened images keep #34 attention and #37 persistence on the production p
 
   assert.match(collector, /COPY --from=builder --chown=node:node \/src\/persistence \.\/persistence/);
   assert.match(collector, /@confenge\/control-center-persistence/);
+  const bundle = read("scripts/bundle-collector.mjs");
+  assert.match(bundle, /--packages=external/);
   assert.match(buildSets, /collector:[\s\S]*control-center-persistence[\s\S]*control-center-collector/);
   assert.match(collector, /HEALTHCHECK[\s\S]*node-http-probe\.mjs/);
   assert.doesNotMatch(collector, /HEALTHCHECK[\s\S]*(?:wget|curl)/);

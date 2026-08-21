@@ -18,6 +18,7 @@ const args = [
   "--bundle",
   "--platform=node",
   "--format=esm",
+  "--packages=external",
   `--outfile=${outfile}`,
   "--legal-comments=none",
 ];
