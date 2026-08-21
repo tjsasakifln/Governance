@@ -1,0 +1,16 @@
+# Isolated high-port rehearsal overlay. NEVER used as production apply.
+# Always invoke with: --project-name cc-edge-rehearsal
+# Publishes Caddy only on 127.0.0.1:28080 / 127.0.0.1:28443.
+# Does not bind host 80/443. Does not touch Warmbly, DNS, certbot, or nginx.
+
+services:
+  caddy:
+    ports:
+      - target: 18080
+        published: "28080"
+        protocol: tcp
+        host_ip: "127.0.0.1"
+      - target: 18443
+        published: "28443"
+        protocol: tcp
+        host_ip: "127.0.0.1"

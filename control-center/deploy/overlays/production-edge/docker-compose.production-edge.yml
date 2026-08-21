@@ -1,0 +1,397 @@
+# Confenge Control Center — production-edge overlay.
+# Project name: confenge-control-center (do NOT `up` this project in this campaign).
+# Isolated rehearsal MUST use `--project-name cc-edge-rehearsal` and high host ports.
+#
+# Hop: host nginx :443 -> 127.0.0.1:18080 Caddy -> Authelia forward_auth -> apps.
+# Caddy is compose-only. No host 80/443. No Caddy ACME. No 0.0.0.0 publish.
+# Datastores (postgres, redis, nats) are unpublished on network internal:true.
+# Collector may join Warmbly only via docker-compose.warmbly-collector.override.yml.
+# Secrets via files/env. This file does not apply itself to production.
+
+name: confenge-control-center
+
+x-logging: &cc-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-base: &app-base
+  restart: unless-stopped
+  logging: *cc-logging
+  mem_limit: 512m
+  cpus: 0.75
+  deploy:
+    resources:
+      limits:
+        cpus: "0.75"
+        memory: 512M
+      reservations:
+        cpus: "0.10"
+        memory: 64M
+  expose:
+    - "8080"
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 1g
+    cpus: 1.0
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    environment:
+      POSTGRES_USER: control_center
+      POSTGRES_DB: control_center
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      AUTHELIA_POSTGRES_PASSWORD: "${AUTHELIA_POSTGRES_PASSWORD}"
+      TZ: UTC
+      PGTZ: UTC
+    secrets:
+      - postgres_password
+      - authelia_postgres_password
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+      - ../../docker/postgres/init-control-center.sql:/docker-entrypoint-initdb.d/001-control-center.sql:ro
+      - ./postgres/init-authelia.sh:/docker-entrypoint-initdb.d/002-authelia.sh:ro
+    networks:
+      cc_internal: {}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U control_center -d control_center"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - timezone=UTC
+      - -c
+      - log_timezone=UTC
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 128m
+    cpus: 0.25
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 16M
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--protected-mode", "no"]
+    networks:
+      cc_internal: {}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 128m
+    cpus: 0.25
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 16M
+    command: ["--jetstream"]
+    networks:
+      cc_internal: {}
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  authelia:
+    image: authelia/authelia:4.39
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 256m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    expose:
+      - "9091"
+    environment:
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_jwt
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/authelia_postgres_password
+    secrets:
+      - authelia_jwt
+      - authelia_session
+      - authelia_storage
+      - authelia_postgres_password
+    volumes:
+      - ../../../security/production/authelia/configuration.yml:/config/configuration.yml:ro
+      - ${CC_SECRET_DIR}/users.yml:/config/users.yml:ro
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.3
+      cc_internal: {}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9091/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  context:
+    <<: *app-base
+    build:
+      context: ../../..
+      dockerfile: services/context/Dockerfile
+    image: confenge-control-center-context:local
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      NODE_ENV: production
+      DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:?CONTROL_CENTER_DATABASE_URL must be set from a secret store}"
+      CONTROL_CENTER_FOUNDER_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
+      CONTROL_CENTER_ENV: production
+      CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.4
+      cc_internal: {}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp:
+    <<: *app-base
+    build:
+      context: ../../..
+      dockerfile: services/mcp/Dockerfile
+    image: confenge-control-center-mcp:local
+    environment:
+      HOST: 0.0.0.0
+      CONFENGE_MCP_HTTP_HOST: 0.0.0.0
+      CONFENGE_MCP_HTTP_PORT: "8080"
+      NODE_ENV: production
+      CONTROL_CENTER_CONTEXT_URL: "http://context:8080"
+      CONFENGE_MCP_AUTH_TOKEN: "${CONFENGE_MCP_AUTH_TOKEN}"
+    networks:
+      - cc_edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 12s
+    depends_on:
+      context:
+        condition: service_healthy
+
+  collector:
+    <<: *app-base
+    build:
+      context: ../../..
+      dockerfile: connectors/runner/Dockerfile
+    image: confenge-control-center-collector:local
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      NODE_ENV: production
+    networks:
+      - cc_edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 12s
+    depends_on:
+      context:
+        condition: service_healthy
+
+  web:
+    <<: *app-base
+    build:
+      context: ../../..
+      dockerfile: apps/web-shell/Dockerfile
+    image: confenge-control-center-web:local
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.5
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 8s
+    depends_on:
+      context:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 128m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    environment:
+      CONFENGE_MCP_AUTH_TOKEN: "${CONFENGE_MCP_AUTH_TOKEN}"
+      CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - cc_caddy_data:/data
+      - cc_caddy_config:/config
+    ports:
+      - target: 18080
+        published: "18080"
+        protocol: tcp
+        host_ip: "127.0.0.1"
+      - target: 18443
+        published: "18443"
+        protocol: tcp
+        host_ip: "127.0.0.1"
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.2
+    depends_on:
+      authelia:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:18080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  backup-ops:
+    profiles: ["ops"]
+    build:
+      context: ../..
+      dockerfile: docker/ops.Dockerfile
+    image: confenge-control-center-ops:local
+    restart: "no"
+    logging: *cc-logging
+    mem_limit: 256m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    environment:
+      CONTROL_CENTER_BACKUP_KEY: "${CONTROL_CENTER_BACKUP_KEY:?CONTROL_CENTER_BACKUP_KEY must be set from a secret store}"
+      CONTROL_CENTER_BACKUP_DIR: /backups
+      CONTROL_CENTER_BACKUP_RETAIN_DAYS: "${CONTROL_CENTER_BACKUP_RETAIN_DAYS:-14}"
+      CONTROL_CENTER_BACKUP_RETAIN_MIN: "${CONTROL_CENTER_BACKUP_RETAIN_MIN:-3}"
+      CONTROL_CENTER_DISK_MIN_BYTES: "${CONTROL_CENTER_DISK_MIN_BYTES:-1073741824}"
+      CONTROL_CENTER_DISK_PATH: /backups
+      CONTROL_CENTER_DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:?CONTROL_CENTER_DATABASE_URL must be set from a secret store}"
+    volumes:
+      - cc_backup_data:/backups
+    networks:
+      - cc_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  cc_postgres_data:
+    name: confenge-cc-postgres-edge
+  cc_caddy_data:
+    name: confenge-cc-caddy-data-edge
+  cc_caddy_config:
+    name: confenge-cc-caddy-config-edge
+  cc_backup_data:
+    name: confenge-cc-backups-edge
+
+networks:
+  cc_edge:
+    name: confenge-cc-edge
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
+  cc_internal:
+    name: confenge-cc-internal
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.89.1.0/24
+
+secrets:
+  postgres_password:
+    file: ${CC_SECRET_DIR}/POSTGRES_PASSWORD
+  authelia_jwt:
+    file: ${CC_SECRET_DIR}/authelia_jwt
+  authelia_session:
+    file: ${CC_SECRET_DIR}/authelia_session
+  authelia_storage:
+    file: ${CC_SECRET_DIR}/authelia_storage
+  authelia_postgres_password:
+    file: ${CC_SECRET_DIR}/authelia_postgres_password
