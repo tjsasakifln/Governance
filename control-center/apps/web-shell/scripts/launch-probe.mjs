@@ -191,8 +191,15 @@ try {
 
   for (const kind of viewStates) {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${baseUrl}#/hoje?view=${kind}`, { waitUntil: "networkidle" });
-    await page.waitForSelector('[data-destination="hoje"]');
+    await page.evaluate((hash) => {
+      window.location.hash = hash;
+    }, `#/hoje?view=${kind}`);
+    await page.waitForFunction(
+      (expected) =>
+        document.querySelector('[data-destination="hoje"]')?.getAttribute("data-view-state") ===
+        expected,
+      kind,
+    );
     const kindState = await page.locator("[data-destination]").getAttribute("data-view-state");
     if (kindState !== kind) {
       throw new Error(`view ${kind} rendered data-view-state=${kindState}`);

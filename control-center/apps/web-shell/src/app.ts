@@ -106,13 +106,29 @@ export function paintShell(
     getScenario?(): MockScenario;
   },
   hash: string,
+  generation = 0,
+  isCurrent: (generation: number) => boolean = () => true,
 ): void {
   const parsed = parseHash(hash || "#/hoje");
   const override = parseViewKind(parsed.view);
   adapter.setScenario?.(scenarioFromView(override));
+  if (override === "loading") {
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
+  } else if (override === "error") {
+    applyPaint(root, adapter, parsed, override, {
+      ok: false,
+      loading: false,
+      error: { code: "VIEW_ERROR", message: "Falha ao montar o recorte." },
+    });
+  } else if (override === "empty") {
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
+  }
   const result = adapter.readDestination(parsed.destination);
   if (isPromise(result)) {
-    void result.then((resolved) => applyPaint(root, adapter, parsed, override, resolved));
+    void result.then((resolved) => {
+      if (!isCurrent(generation)) return;
+      applyPaint(root, adapter, parsed, override, resolved);
+    });
     return;
   }
   applyPaint(root, adapter, parsed, override, result);
@@ -126,8 +142,11 @@ export function mount(
   } = createMockAdapter(),
   runtime: ShellRuntime = browserRuntime(),
 ): { unmount: () => void } {
+  let generation = 0;
   const paint = (): void => {
-    void paintShell(root, adapter, runtime.getHash());
+    generation += 1;
+    const current = generation;
+    paintShell(root, adapter, runtime.getHash(), current, (g) => g === generation);
   };
   const stop = runtime.onHashChange(paint);
   if (!runtime.getHash()) {

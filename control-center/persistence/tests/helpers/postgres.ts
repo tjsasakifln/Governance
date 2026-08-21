@@ -53,7 +53,11 @@ export async function startIsolatedTestPostgres(): Promise<TestPostgres> {
       connectionString: 'postgres://redacted/isolated',
       stop: async () => {
         await pool.end();
-        await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+        try {
+          await admin.query(`DROP DATABASE IF EXISTS ${name}`);
+        } catch {
+          // leftover isolated catalogs are discarded with the CI job
+        }
         await admin.end();
       },
     };
