@@ -25,6 +25,48 @@ function randomPort(): number {
   return 22000 + Math.floor(Math.random() * 12000);
 }
 
+function connectionStringForDatabase(base: string, database: string): string {
+  const http = new URL(base.replace(/^postgres(?:ql)?:\/\//, 'http://'));
+  http.pathname = `/${database}`;
+  return `postgres://${http.username}:${http.password}@${http.host}${http.pathname}`;
+}
+
+/**
+ * Shared CONTROL_CENTER_TEST_DATABASE_URL (CI service Postgres) is one catalog.
+ * Tests that assert global row counts need an isolated database.
+ */
+export async function startIsolatedTestPostgres(): Promise<TestPostgres> {
+  const fromEnv = process.env.CONTROL_CENTER_TEST_DATABASE_URL;
+  if (!fromEnv) {
+    return startTestPostgres();
+  }
+  const admin = createPool(fromEnv);
+  const name = `cc_iso_${randomBytes(6).toString('hex')}`;
+  try {
+    await admin.query(`CREATE DATABASE ${name}`);
+    const connectionString = connectionStringForDatabase(fromEnv, name);
+    const pool = createPool(connectionString);
+    await pool.query('SELECT 1');
+    return {
+      pool,
+      persistence: createPersistence(pool),
+      connectionString: 'postgres://redacted/isolated',
+      stop: async () => {
+        await pool.end();
+        await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+        await admin.end();
+      },
+    };
+  } catch (error) {
+    try {
+      await admin.end();
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
+}
+
 export async function startTestPostgres(): Promise<TestPostgres> {
   const fromEnv = process.env.CONTROL_CENTER_TEST_DATABASE_URL;
   if (fromEnv) {

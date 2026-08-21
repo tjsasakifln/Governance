@@ -76,9 +76,11 @@ jobs:
       - name: Install Playwright OS deps including libnspr4
         run: |
           sudo apt-get update
-          sudo apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2
+          sudo apt-get install -y libnspr4
           npx --yes playwright@1.55.0 install-deps chromium
           npx --yes playwright@1.55.0 install chromium
+          dpkg -l libnspr4
+          ldconfig -p | grep -E 'libnspr4'
       - name: End-to-end
         working-directory: control-center
         run: npm run test:e2e

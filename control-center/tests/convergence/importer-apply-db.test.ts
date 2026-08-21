@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createPersistence } from "@confenge/control-center-persistence";
-import { startTestPostgres } from "../../persistence/tests/helpers/postgres.ts";
+import { startIsolatedTestPostgres } from "../../persistence/tests/helpers/postgres.ts";
 import { createControlCenterPersistPort } from "../../importers/governance/src/cc-db.ts";
 import { runCli } from "../../importers/governance/src/cli.ts";
 import { importGovernance } from "../../importers/governance/src/import.ts";
@@ -17,7 +17,7 @@ const NOW = new Date("2026-08-20T12:00:00.000Z");
 const SHA = "a".repeat(40);
 
 test("dry-run writes zero Control Center DB rows", async () => {
-  const pg = await startTestPostgres();
+  const pg = await startIsolatedTestPostgres();
   try {
     const persistence = createPersistence(pg.pool);
     await persistence.migrateUp();
@@ -40,7 +40,7 @@ test("dry-run writes zero Control Center DB rows", async () => {
 });
 
 test("opt-in apply twice is idempotent and writes only the Control Center database", async () => {
-  const pg = await startTestPostgres();
+  const pg = await startIsolatedTestPostgres();
   try {
     const persistence = createPersistence(pg.pool);
     const persist = createControlCenterPersistPort(

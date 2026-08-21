@@ -38,6 +38,13 @@ test("runtime Dockerfiles are real images, not the deploy stub", () => {
   assert.match(compose, /apps\/web-shell\/Dockerfile/);
 });
 
+test("CI installs Playwright OS deps including libnspr4 without Ubuntu 22 libasound2", () => {
+  const workflow = readFileSync(join(root, "../.github/workflows/control-center.yml"), "utf8");
+  assert.match(workflow, /libnspr4/);
+  assert.match(workflow, /playwright@1\.55\.0 install-deps chromium/);
+  assert.doesNotMatch(workflow, /libasound2(?:\s|$)/);
+});
+
 test("web-shell Vite aliases exact-match contract subpaths, not index.ts prefix", () => {
   const vite = readFileSync(join(root, "apps/web-shell/vite.config.ts"), "utf8");
   assert.match(vite, /find:\s*\/\^@confenge\\\/control-center-contracts\\\/taxonomy\$\//);

@@ -62,7 +62,13 @@ const launchOptions = { headless: true, args: ["--no-sandbox", "--disable-dev-sh
 if (existsSync(cachedChrome)) {
   launchOptions.executablePath = cachedChrome;
 }
-const browser = await chromium.launch(launchOptions);
+let browser;
+try {
+  browser = await chromium.launch(launchOptions);
+} catch (err) {
+  console.error(String(err));
+  process.exit(1);
+}
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
