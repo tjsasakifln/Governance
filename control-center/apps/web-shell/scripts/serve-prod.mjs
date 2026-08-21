@@ -17,8 +17,39 @@ const TYPES = {
   ".webmanifest": "application/manifest+json",
 };
 
+const contextUpstream = (process.env.CC_CONTEXT_UPSTREAM ?? "").replace(/\/+$/, "");
+
+function copyActorHeaders(req) {
+  const headers = { accept: "application/json" };
+  for (const name of ["x-actor-id", "x-actor-kind", "content-type"]) {
+    const value = req.headers[name];
+    if (typeof value === "string" && value.trim()) {
+      headers[name] = value;
+    }
+  }
+  return headers;
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
+  if (contextUpstream && url.pathname.startsWith("/v1/")) {
+    void fetch(`${contextUpstream}${url.pathname}${url.search}`, {
+      method: req.method,
+      headers: copyActorHeaders(req),
+    })
+      .then(async (upstream) => {
+        const body = Buffer.from(await upstream.arrayBuffer());
+        res.statusCode = upstream.status;
+        res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
+        res.end(body);
+      })
+      .catch(() => {
+        res.statusCode = 502;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ error: "context_upstream_unavailable" }));
+      });
+    return;
+  }
   if (req.method === "GET" && (url.pathname === "/healthz" || url.pathname === "/ready")) {
     res.statusCode = 200;
     res.setHeader("content-type", "application/json; charset=utf-8");

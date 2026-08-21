@@ -20,5 +20,5 @@ if (units.status !== 0) {
   process.exit(units.status ?? 1);
 }
 
-const probe = run("node", ["apps/web-shell/scripts/e2e.mjs"]);
+const probe = run("npx", ["tsx", "apps/web-shell/scripts/e2e.mjs"]);
 process.exit(probe.status === null ? 0 : probe.status);

@@ -166,6 +166,14 @@ test("shipped startServer binds HTTP and serves representative get_context twice
     assert.ok(body.hypotheses.every((d) => d.kind === "hypothesis"));
     assert.ok(body.decisions.every((d) => d.kind === "decision"));
     assert.ok(body.facts.every((d) => d.kind === "fact"));
+    const company = await fetch(`http://${host}:${port}/v1/context?scope=company`, { headers });
+    assert.equal(company.status, 200);
+    const companyBody = (await company.json()) as {
+      risks: Array<{ id: string; kind: string }>;
+      priorities: Array<{ id: string }>;
+    };
+    assert.ok(companyBody.risks.some((d) => d.id === REPRESENTATIVE_IDS.companyRisk && d.kind === "risk"));
+    assert.ok(companyBody.priorities.some((d) => d.id === REPRESENTATIVE_IDS.companyPriority));
     const errorItem = body.active_directives.find((d) => d.id === REPRESENTATIVE_IDS.collectionError);
     assert.equal(errorItem?.freshness_status, "ERROR");
     for (const item of body.active_directives) {

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { classifyRequest } from "../../connectors/warmbly/src/http/allowlist.ts";
 import { mapUpstreamStatus } from "../../connectors/pncp/src/map.ts";
 import { evaluatePncpContractPayload } from "../../connectors/pncp/src/evaluate.ts";
@@ -15,6 +18,18 @@ test("Warmbly allowlist denies PATCH/PUT/DELETE and mutating POST", () => {
   assert.equal(search.allowed, true);
   const get = classifyRequest("GET", "/health");
   assert.equal(get.allowed, true);
+});
+
+test("collector runner production path uses live GitHub/Asaas/infra transports", () => {
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../../connectors/runner/src/run.ts"),
+    "utf8",
+  );
+  assert.match(source, /liveTransport/);
+  assert.match(source, /DefaultFetchTransport/);
+  assert.match(source, /createLivePorts/);
+  assert.doesNotMatch(source, /status:\s*401/);
+  assert.doesNotMatch(source, /not probed/);
 });
 
 test("PNCP maps PNCP_CONTRACT_FRESHNESS/1.0 without a local classifier", () => {

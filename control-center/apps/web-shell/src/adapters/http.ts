@@ -161,14 +161,13 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     const directives = Array.isArray(ctx.active_directives)
       ? ctx.active_directives.map((row) => directiveFrom(asRecord(row) ?? {}))
       : [];
-    const attention = directives
-      .filter((row) => row.kind === "risk")
-      .map((row) =>
-        attentionFrom(
-          { id: row.id, title: row.title, summary: row.body, scope: row.scope, severity: "high" },
-          fallback,
-        ),
-      );
+    const riskRows =
+      Array.isArray(ctx.risks) && ctx.risks.length > 0
+        ? ctx.risks
+        : Array.isArray(ctx.active_directives)
+          ? ctx.active_directives.filter((row) => asRecord(row)?.kind === "risk")
+          : directives.filter((row) => row.kind === "risk");
+    const attention = riskRows.map((row) => attentionFrom(asRecord(row) ?? {}, fallback));
     const priorities = (Array.isArray(ctx.priorities) ? ctx.priorities : [])
       .slice(0, 3)
       .map((row, index) => priorityFrom(asRecord(row) ?? {}, index, fallback));
@@ -187,7 +186,11 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
 
   private async getJson(path: string): Promise<unknown> {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        "x-actor-id": this.operator.id,
+        "x-actor-kind": this.operator.kind,
+      },
     });
     const text = await response.text();
     if (!response.ok) {
@@ -197,10 +200,28 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   }
 }
 
-export function createHttpAdapter(baseUrl: string, fetchImpl?: typeof fetch): HttpControlCenterAdapter {
-  return fetchImpl
-    ? new HttpControlCenterAdapter({ baseUrl, fetchImpl })
-    : new HttpControlCenterAdapter({ baseUrl });
+export function createHttpAdapter(
+  baseUrl: string,
+  fetchImpl?: typeof fetch,
+  operator?: ActorRef,
+): HttpControlCenterAdapter {
+  return new HttpControlCenterAdapter({
+    baseUrl,
+    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(operator ? { operator } : {}),
+  });
+}
+
+export function productionActorFromDocument(
+  doc: { querySelector(selector: string): { getAttribute(name: string): string | null } | null } | undefined =
+    typeof document !== "undefined" ? document : undefined,
+): ActorRef | undefined {
+  const id = doc?.querySelector('meta[name="cc-actor-id"]')?.getAttribute("content")?.trim();
+  const kind = doc?.querySelector('meta[name="cc-actor-kind"]')?.getAttribute("content")?.trim();
+  if (!id || (kind !== "human" && kind !== "agent" && kind !== "system")) {
+    return undefined;
+  }
+  return { kind, id };
 }
 
 export function productionContextUrl(): string {
@@ -228,5 +249,5 @@ export function createProductionAdapter(): ControlCenterReadAdapter {
     return createMockAdapter();
   }
   const base = productionContextUrl() || "";
-  return createHttpAdapter(base);
+  return createHttpAdapter(base, undefined, productionActorFromDocument());
 }

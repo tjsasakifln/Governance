@@ -83,7 +83,12 @@ jobs:
           ldconfig -p | grep -E 'libnspr4'
       - name: End-to-end
         working-directory: control-center
-        run: npm run test:e2e
+        run: |
+          set -o pipefail
+          npm run test:e2e | tee /tmp/cc-e2e.log
+          grep -E "context_risks=[1-9]" /tmp/cc-e2e.log
+          grep -E "nav_changed_to=comercial" /tmp/cc-e2e.log
+          grep -E "launch-probe ok" /tmp/cc-e2e.log
 
   docker:
     runs-on: ubuntu-latest

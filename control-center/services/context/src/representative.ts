@@ -62,6 +62,7 @@ export const REPRESENTATIVE_IDS = {
   siblingClientFact: "cc:directive:client-other-fact",
   clientsDomain: "cc:directive:clients-domain",
   collectionError: "cc:directive:collection-error",
+  companyRisk: "cc:directive:company-risk",
 } as const;
 
 const FOUNDER = { kind: "human" as const, id: "founder-local" };
@@ -75,6 +76,19 @@ export function representativeRecords(): DirectiveRecord[] {
       kind: "priority",
       title: "Close Diagnostico limited production",
       body: "The three things that matter now start with Diagnostico limited production readiness.",
+      scope: "company",
+      status: "active",
+      expires_at: null,
+      supersedes: null,
+      created_by: FOUNDER,
+    }),
+    rec({
+      id: REPRESENTATIVE_IDS.companyRisk,
+      revision_id: "cc:directive-revision:company-risk-1",
+      version: 1,
+      kind: "risk",
+      title: "Diagnostico limited production is still open",
+      body: "The Diagnostico limited-production exception remains open and must stay visible on Hoje.",
       scope: "company",
       status: "active",
       expires_at: null,

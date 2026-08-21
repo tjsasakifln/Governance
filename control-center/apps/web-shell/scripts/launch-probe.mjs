@@ -83,6 +83,8 @@ try {
   }
 
   await page.waitForSelector('[data-destination="hoje"]');
+  await page.waitForSelector(".attention");
+  await page.waitForSelector(".priority");
   const box = await page.locator("#root").boundingBox();
   if (!box || box.width < 300 || box.height < 400) {
     throw new Error(`render surface too small: ${JSON.stringify(box)}`);

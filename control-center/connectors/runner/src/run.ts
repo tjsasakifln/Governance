@@ -1,9 +1,9 @@
 import { FRESHNESS_STATUSES, type FreshnessStatus } from "@confenge/control-center-contracts";
-import { failedCollect, parseCollectConfig, collect as collectGithub } from "../../github/src/index.ts";
+import { failedCollect, parseCollectConfig, collect as collectGithub, liveTransport } from "../../github/src/index.ts";
 import { collect as collectWarmbly } from "../../warmbly/src/index.ts";
-import { collectFinanceSnapshot, parseAsaasConfig } from "../../asaas/src/index.ts";
+import { collectFinanceSnapshot, DefaultFetchTransport, parseAsaasConfig } from "../../asaas/src/index.ts";
 import { evaluatePncpFreshness, loadAdapterConfigFromEnv } from "../../pncp/src/index.ts";
-import { collect as collectInfra } from "../../infrastructure/src/index.ts";
+import { collect as collectInfra, createLivePorts } from "../../infrastructure/src/index.ts";
 
 export const COLLECTOR_NAMES = ["github", "warmbly", "asaas", "pncp", "infra"] as const;
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];
@@ -71,11 +71,7 @@ async function runGithub(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEn
   const parsed = parseCollectConfig({
     env,
     repos: env.GITHUB_REPOS,
-    transport: async () => ({
-      status: 401,
-      headers: {},
-      body: "",
-    }),
+    transport: liveTransport,
     now: () => now,
     logSink: () => undefined,
   });
@@ -125,9 +121,7 @@ async function runAsaas(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEnv
     const snapshot = await collectFinanceSnapshot({
       config,
       now,
-      transport: {
-        request: async () => ({ status: 401, headers: {}, bodyText: "{}" }),
-      },
+      transport: new DefaultFetchTransport(),
     });
     return envelope("asaas", canonical(String(snapshot.freshness_status)), now, snapshot);
   } catch (err) {
@@ -167,13 +161,10 @@ async function runInfra(env: NodeJS.ProcessEnv, now: Date): Promise<CollectorEnv
     }
     const result = await collectInfra({
       allowlist,
-      ports: {
+      ports: createLivePorts({
         now: () => now,
-        reachHost: async () => ({ ok: false, error: "not probed" }),
-        httpGet: async () => ({ status: 0, error: "not probed" }),
-        readTls: async () => ({ not_after: "1970-01-01T00:00:00.000Z", error: "not probed" }),
-        readAgent: async () => null,
-      },
+        agentBaseUrl: env.CONTROL_CENTER_INFRA_AGENT_URL,
+      }),
     });
     const freshness = result.observations[0]?.freshness_status
       ? canonical(String(result.observations[0].freshness_status))

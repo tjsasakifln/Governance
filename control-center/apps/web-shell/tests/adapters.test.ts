@@ -93,9 +93,12 @@ test("fixture catalog covers every freshness status", () => {
 });
 
 test("production HTTP adapter is not mock and maps context provenance", async () => {
-  const fetchImpl = (async (input: RequestInfo | URL) => {
+  const seenHeaders: string[] = [];
+  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     assert.match(url, /\/v1\/context/);
+    const headers = new Headers(init?.headers);
+    seenHeaders.push(`${headers.get("x-actor-id")}:${headers.get("x-actor-kind")}`);
     return new Response(
       JSON.stringify({
         scope: "company",
@@ -134,11 +137,15 @@ test("production HTTP adapter is not mock and maps context provenance", async ()
       { status: 200, headers: { "content-type": "application/json" } },
     );
   }) as typeof fetch;
-  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl);
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+    kind: "human",
+    id: "founder-local",
+  });
   assert.equal(adapter.mode, "http");
   const page = await adapter.readDestination("hoje");
   assert.equal(page.ok, true);
   if (!page.ok || page.loading) throw new Error("expected http page");
   assert.equal(page.page.attention.length > 0, true);
   assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(page.page.attention[0]?.provenance.freshness_status ?? ""));
+  assert.equal(seenHeaders.includes("founder-local:human"), true);
 });

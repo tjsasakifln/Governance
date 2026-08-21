@@ -43,6 +43,9 @@ test("CI installs Playwright OS deps including libnspr4 without Ubuntu 22 libaso
   assert.match(workflow, /libnspr4/);
   assert.match(workflow, /playwright@1\.55\.0 install-deps chromium/);
   assert.doesNotMatch(workflow, /libasound2(?:\s|$)/);
+  assert.match(workflow, /context_risks=\[1-9\]/);
+  assert.match(workflow, /nav_changed_to=comercial/);
+  assert.match(workflow, /launch-probe ok/);
 });
 
 test("web-shell Vite aliases exact-match contract subpaths, not index.ts prefix", () => {
