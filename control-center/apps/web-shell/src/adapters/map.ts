@@ -122,7 +122,7 @@ export function priorityFrom(
     scope: str(row.scope, "company"),
     rank: typeof row.rank === "number" ? row.rank : index + 1,
     title: str(row.title, "Prioridade"),
-    rationale: str(row.rationale, str(row.body)),
+    rationale: str(row.rationale, str(row.reason, str(row.body))),
     provenance: prov,
     generated_at: str(row.generated_at, prov.observed_at),
     horizon: (row.horizon as PriorityRecommendation["horizon"]) ?? "today",
@@ -586,6 +586,7 @@ export function mapHojePayloads(input: {
     ].map((row) => attentionFrom(asRecord(row) ?? {}, input.fallback)),
   );
   const priorities = [
+    ...asArray(today.today),
     ...asArray(today.recommended_actions),
     ...asArray(today.priorities),
     ...asArray(snapshot.top_priorities),

@@ -171,3 +171,45 @@ test("HTTP Hoje compose uses injected frozen-path payloads, not /v1/context", as
   assert.match(calls.join("\n"), /\/v1\/operational-snapshots/);
   assert.match(calls.join("\n"), /\/v1\/agent-activities/);
 });
+
+test("operational GET /v1/today.today paints .priority from ranked items, not recommended_actions", async () => {
+  const router = (url: string) => {
+    const path = url.split("?")[0] ?? url;
+    if (path.endsWith("/v1/today")) {
+      return {
+        schema_version: "control-center.operational-envelope.v1",
+        scope: "company",
+        generated_at: "2026-08-20T12:00:00.000Z",
+        freshness_status: "STALE",
+        confidence: 0.4,
+        today: [
+          {
+            id: "cc:attention-item:open-incident",
+            rank: 1,
+            title: "Fechar o incidente aberto",
+            reason: "Kill-rule from an open incident.",
+            scope: "company",
+            horizon: "today",
+            provenance: {
+              source: { system: "github", kind: "repo-read", locator: "engineering/company" },
+              observed_at: "2026-08-20T11:30:00.000Z",
+              freshness_status: "STALE",
+              confidence: 0.4,
+            },
+          },
+        ],
+      };
+    }
+    if (path.endsWith("/v1/attention")) return { items: [] };
+    if (path.endsWith("/v1/operational-snapshots")) return { snapshots: {} };
+    if (path.endsWith("/v1/agent-activities")) return { items: [] };
+    return undefined;
+  };
+  const { adapter } = httpAdapterFor(router);
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/hoje");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.match(root.innerHTML, /class="card priority"/);
+  assert.match(root.innerHTML, /Fechar o incidente aberto/);
+  assert.doesNotMatch(root.innerHTML, /Nenhuma ação recomendada/);
+});

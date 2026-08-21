@@ -76,7 +76,7 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   assert.doesNotMatch(text, /published: "443"/);
   assert.match(text, /image:\s+redis:7-alpine@sha256:[0-9a-f]{64}/);
   assert.match(text, /image:\s+authelia\/authelia:4.39@sha256:[0-9a-f]{64}/);
-  assert.match(text, /image:\s+nats:2-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(text, /image:\s+nats:2\.12\.1-alpine@sha256:[0-9a-f]{64}/);
   assert.match(text, /image:\s+postgres:16-alpine@sha256:[0-9a-f]{64}/);
   assert.match(text, /image:\s+caddy:2\.9-alpine@sha256:[0-9a-f]{64}/);
   assert.doesNotMatch(text, /image:\s+\S+:latest(?:\s|$)/);
