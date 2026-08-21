@@ -48,6 +48,25 @@ export type PriorityHorizon = (typeof PRIORITY_HORIZONS)[number];
 export const AGENT_SESSION_STATUSES = ["open", "closed", "denied"] as const;
 export type AgentSessionStatus = (typeof AGENT_SESSION_STATUSES)[number];
 
+export const AGENT_ACTIVITY_STATUSES = [
+  "running",
+  "done",
+  "partial",
+  "blocked",
+  "failed",
+] as const;
+export type AgentActivityStatus = (typeof AGENT_ACTIVITY_STATUSES)[number];
+
+export const AGENT_ACTIVITY_PRESENTATION_STATUSES = [
+  "RUNNING",
+  "DONE",
+  "PARTIAL",
+  "BLOCKED",
+  "FAILED",
+  "UNKNOWN",
+] as const;
+export type AgentActivityPresentationStatus = (typeof AGENT_ACTIVITY_PRESENTATION_STATUSES)[number];
+
 export const CLIENT_LIFECYCLES = [
   "lead",
   "active",
@@ -158,12 +177,43 @@ export interface ClientStatus {
   attention_item_ids?: ResourceId[];
   open_receivables?: Money;
   notes?: string;
+  health?: string;
+  commitments?: string[];
+  owner?: string;
+  due_date?: UtcDateTime;
+  deliverables?: string[];
+  blockers?: string[];
+  next_action?: string;
+  evidence?: string;
 }
 
 export interface CommercialAuthorityStamp {
   catalog_authority: "governance";
   commercial_runtime: "warmbly";
   this_document: "read_model";
+}
+
+export interface CommercialFunnel {
+  new_leads: number;
+  qualified: number;
+  opportunities: number;
+  proposals: number;
+  clients: number;
+}
+
+export interface WeightedPipeline extends Money {
+  probability_reliable: true;
+}
+
+export interface ExtraHistorical {
+  treated_as_public_offer: false;
+  label?: string;
+  note?: string;
+}
+
+export interface OfferVersionDrift {
+  count: number;
+  detail?: string;
 }
 
 export interface CommercialSnapshot {
@@ -177,6 +227,38 @@ export interface CommercialSnapshot {
   inbound_unread_count: number;
   at_risk_client_count: number;
   attention_item_ids?: ResourceId[];
+  offer_pin?: {
+    catalog_authority: "governance";
+    catalog_id: string;
+    known_offer_ids?: string[];
+  };
+  funnel?: CommercialFunnel;
+  pipeline_nominal?: Money;
+  pipeline_weighted?: WeightedPipeline;
+  aging_count?: number;
+  stalled_count?: number;
+  missing_next_action_count?: number;
+  extra_historical?: ExtraHistorical;
+  offer_version_drift?: OfferVersionDrift;
+}
+
+export interface EvidencedCashIn extends Money {
+  evidenced: true;
+  source: SourceRef;
+  window?: { from: UtcDateTime; to: UtcDateTime };
+}
+
+export interface ApplicableMrr extends Money {
+  applicable: true;
+  basis: "recurring_monthly";
+}
+
+export interface ReliableRunway {
+  months: number;
+  cash_balance: Money;
+  monthly_expense: Money;
+  cash_reliable: true;
+  expense_reliable: true;
 }
 
 export interface FinanceSnapshot {
@@ -187,8 +269,19 @@ export interface FinanceSnapshot {
   provenance: Provenance;
   read_model_only: true;
   provider_mutations: "forbidden";
+  contracted?: Money;
+  billed?: Money;
+  paid?: Money;
+  effectively_received?: Money;
+  overdue?: Money;
+  receivable?: Money;
+  refunds?: Money;
+  chargebacks?: Money;
   receivables_open: Money;
   receivables_overdue: Money;
+  cash_in?: EvidencedCashIn;
+  mrr?: ApplicableMrr;
+  runway?: ReliableRunway;
   attention_item_ids?: ResourceId[];
 }
 
@@ -203,6 +296,16 @@ export interface EngineeringSnapshot {
   open_incident_count: number;
   repo_scopes?: Scope[];
   attention_item_ids?: ResourceId[];
+  repository?: string;
+  default_branch?: string;
+  prs?: Array<{ id?: string; title?: string; status?: string }>;
+  ci?: { status?: string; detail?: string };
+  p0_count?: number;
+  p1_count?: number;
+  aging?: { count?: number; oldest_days?: number };
+  blockers?: string[];
+  last_evidence?: string;
+  active_work_without_evidence?: { remains: "hypothesis"; detail?: string };
 }
 
 export interface ServiceHealthCheck {
@@ -222,4 +325,35 @@ export interface ServiceHealth {
   latency_ms?: number;
   message?: string;
   checks?: ServiceHealthCheck[];
+  http?: { status?: string; detail?: string };
+  tls?: { status?: string; detail?: string };
+  docker?: { status?: string; detail?: string };
+  backup?: { status?: string; detail?: string };
+  disk?: { used_pct?: number; detail?: string };
+  memory?: { used_pct?: number; detail?: string };
+  pncp_freshness?: { freshness_status: FreshnessStatus; observed_at?: UtcDateTime; detail?: string };
+  partial_outage?: boolean;
+}
+
+export interface AgentActivity {
+  schema_version: "control-center.agent-activity.v1";
+  id: ResourceId;
+  agent_id: string;
+  provider?: string;
+  session_id?: ResourceId;
+  scope: Scope;
+  repo?: string;
+  status: string;
+  presentation_status: AgentActivityPresentationStatus;
+  started_at: UtcDateTime;
+  finished_at: UtcDateTime | null;
+  goal: string;
+  campaign?: string | null;
+  summary: string;
+  provenance: Provenance;
+  actor?: ActorRef;
+  evidence_refs?: string[];
+  residual_work?: string[];
+  blockers?: string[];
+  related_ids?: ResourceId[];
 }

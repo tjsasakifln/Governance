@@ -1,5 +1,6 @@
-import { createMockAdapter } from "./adapters/mock";
+import type { ControlCenterReadAdapter } from "./adapters/contract";
 import { createProductionAdapter } from "./adapters/http";
+import { createMockAdapter } from "./adapters/mock";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
 
@@ -20,6 +21,7 @@ export interface ShellGlobals {
 export interface ShellWindow {
   location: { protocol: string };
   __CONFENGE_CONTROL_CENTER__?: ShellGlobals;
+  __CC_TEST_ADAPTER__?: ControlCenterReadAdapter;
 }
 
 export function installShellGlobals(win: ShellWindow): ShellGlobals {
@@ -59,7 +61,12 @@ export function applyFileProtocolGuard(
 
 export function startBrowser(
   win: ShellWindow | undefined = globalThis.window as unknown as ShellWindow | undefined,
-  doc: { getElementById(id: string): MountableRoot | null } | undefined = globalThis.document,
+  doc:
+    | ({
+        getElementById(id: string): MountableRoot | null;
+        querySelector?(selector: string): { getAttribute(name: string): string | null } | null;
+      } & AdapterDocument)
+    | undefined = globalThis.document,
 ): void {
   if (win == null || doc == null) {
     return;
@@ -72,10 +79,31 @@ export function startBrowser(
   if (applyFileProtocolGuard(win.location, root)) {
     return;
   }
-  const adapter =
-    typeof document !== "undefined" &&
-    document.querySelector('meta[name="cc-use-mock"]')?.getAttribute("content") === "1"
-      ? createMockAdapter()
-      : createProductionAdapter();
-  mount(root, adapter);
+  mount(root, resolveBrowserAdapter(win, doc));
+}
+
+export interface AdapterDocument {
+  querySelector?(selector: string): { getAttribute(name: string): string | null } | null;
+}
+
+export interface AdapterWindow {
+  __CC_TEST_ADAPTER__?: ControlCenterReadAdapter;
+}
+
+/**
+ * Mock is selected only by explicit injection (window.__CC_TEST_ADAPTER__ or
+ * meta cc-use-mock=1). Production boot constructs HttpControlCenterAdapter.
+ */
+export function resolveBrowserAdapter(
+  win: AdapterWindow | undefined,
+  doc: AdapterDocument | undefined,
+): ControlCenterReadAdapter {
+  if (win?.__CC_TEST_ADAPTER__) {
+    return win.__CC_TEST_ADAPTER__;
+  }
+  const mockMeta = doc?.querySelector?.('meta[name="cc-use-mock"]')?.getAttribute("content") === "1";
+  if (mockMeta) {
+    return createMockAdapter();
+  }
+  return createProductionAdapter();
 }

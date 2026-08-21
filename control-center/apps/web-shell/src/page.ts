@@ -14,10 +14,26 @@ export function collectProvenance(page: DestinationPage): Provenance[] {
   if (page.health) {
     for (const row of page.health) items.push(row.provenance);
   }
+  if (page.activities) {
+    for (const row of page.activities) items.push(row.provenance);
+  }
+  if (page.hoje) {
+    for (const section of page.hoje.sections) {
+      for (const row of section.rows) {
+        items.push({
+          source: row.source,
+          observed_at: row.observed_at,
+          freshness_status: row.freshness_status,
+          confidence: row.confidence ?? 0,
+        });
+      }
+    }
+  }
   return items;
 }
 
 export function pageIsEmpty(page: DestinationPage): boolean {
+  const hojeRows = page.hoje?.sections.reduce((sum, section) => sum + section.rows.length, 0) ?? 0;
   return (
     page.attention.length === 0 &&
     page.priorities.length === 0 &&
@@ -27,7 +43,9 @@ export function pageIsEmpty(page: DestinationPage): boolean {
     (page.clients?.length ?? 0) === 0 &&
     (page.health?.length ?? 0) === 0 &&
     (page.directives?.length ?? 0) === 0 &&
-    (page.sessions?.length ?? 0) === 0
+    (page.sessions?.length ?? 0) === 0 &&
+    (page.activities?.length ?? 0) === 0 &&
+    hojeRows === 0
   );
 }
 

@@ -6,6 +6,7 @@ export {
   isForbiddenAdapterAction,
   type AdapterAction,
   type AdapterReadResult,
+  type AdapterWriteResult,
   type ControlCenterReadAdapter,
   type DestinationPage,
   type ForbiddenAdapterAction,
@@ -16,4 +17,16 @@ export {
   createHttpAdapter,
   createProductionAdapter,
   productionActorFromDocument,
+  productionContextUrl,
 } from "./http";
+export {
+  AUTHORIZED_WRITE_PATH,
+  WRITE_SHORTCUT_DIRECTIVE_KIND,
+  WRITE_SHORTCUT_KINDS,
+  WRITE_SHORTCUT_LABELS,
+  destinationUsesContext,
+  isAuthorizedWritePath,
+  isContextPath,
+  readPathsFor,
+  type WriteShortcutKind,
+} from "./paths";

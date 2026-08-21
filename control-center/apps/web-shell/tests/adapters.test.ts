@@ -93,50 +93,73 @@ test("fixture catalog covers every freshness status", () => {
   }
 });
 
-test("production HTTP adapter is not mock and maps context provenance", async () => {
+test("production HTTP adapter is not mock and maps frozen-path provenance", async () => {
   const seenHeaders: string[] = [];
+  const seenUrls: string[] = [];
   const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    assert.match(url, /\/v1\/context/);
+    seenUrls.push(url);
     const headers = new Headers(init?.headers);
     seenHeaders.push(`${headers.get("x-actor-id")}:${headers.get("x-actor-kind")}`);
-    return new Response(
-      JSON.stringify({
-        scope: "company",
-        active_directives: [
-          {
-            id: "cc:directive:01",
-            kind: "risk",
-            title: "Collector credentials missing",
-            body: "GitHub token absent",
-            scope: "company",
-            status: "active",
-            source: { system: "control-center", kind: "context", locator: "company" },
-            observed_at: "2026-08-20T12:00:00.000Z",
-            freshness_status: "ERROR",
-            confidence: 0,
-          },
-        ],
-        priorities: [
-          {
-            id: "cc:directive:02",
-            kind: "priority",
-            title: "Wire production adapters",
-            body: "HTTP not mock",
-            scope: "company",
-            observed_at: "2026-08-20T12:00:00.000Z",
-            freshness_status: "FRESH",
-            confidence: 1,
-            source: { system: "control-center", kind: "context", locator: "company" },
-          },
-        ],
-        source: { system: "control-center", kind: "context", locator: "company" },
-        observed_at: "2026-08-20T12:00:00.000Z",
-        freshness_status: "ERROR",
-        confidence: 0,
-      }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
+    const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+    if (path === "/v1/today") {
+      return new Response(
+        JSON.stringify({
+          generated_at: "2026-08-20T12:00:00.000Z",
+          headline: "HTTP not mock",
+          recommended_actions: [
+            {
+              id: "cc:priority-recommendation:01",
+              rank: 1,
+              title: "Wire production adapters",
+              rationale: "HTTP not mock",
+              scope: "company",
+              observed_at: "2026-08-20T12:00:00.000Z",
+              freshness_status: "FRESH",
+              confidence: 1,
+              source: { system: "control-center", kind: "today", locator: "company" },
+            },
+          ],
+          incidents: [
+            {
+              id: "cc:attention-item:01",
+              kind: "risk",
+              title: "Collector credentials missing",
+              summary: "GitHub token absent",
+              scope: "company",
+              status: "open",
+              severity: "high",
+              homepage_eligible: true,
+              detected_at: "2026-08-20T12:00:00.000Z",
+              source: { system: "control-center", kind: "attention", locator: "company" },
+              observed_at: "2026-08-20T12:00:00.000Z",
+              freshness_status: "ERROR",
+              confidence: 0,
+            },
+          ],
+          clients: [],
+          commercial: null,
+          finance: null,
+          engineering: null,
+          infra: [],
+          agent_activity: [],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    if (path === "/v1/attention" || path === "/v1/agent-activities") {
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (path === "/v1/operational-snapshots") {
+      return new Response(JSON.stringify({ attention_items: [], top_priorities: [], health: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "not_found" }), { status: 404 });
   }) as typeof fetch;
   const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
     kind: "human",
@@ -149,6 +172,8 @@ test("production HTTP adapter is not mock and maps context provenance", async ()
   assert.equal(page.page.attention.length > 0, true);
   assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(page.page.attention[0]?.provenance.freshness_status ?? ""));
   assert.equal(seenHeaders.includes("founder-local:human"), true);
+  assert.equal(seenUrls.some((url) => url.includes("/v1/today")), true);
+  assert.equal(seenUrls.some((url) => url.includes("/v1/context")), false);
 });
 
 test("async HTTP destination read paints loading before the promise settles", () => {
