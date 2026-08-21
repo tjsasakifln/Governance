@@ -309,6 +309,7 @@ def test_catalog_extra_and_real_money_untouched():
     offer = next(item for item in catalog["offers"] if item["offer_code"] == "CFG-DIAG-EXP-v1")
     assert offer["amount_cents"] == 800000
     assert offer["billing_mode"] == "ONE_TIME"
+    assert offer["offer_id"] == "CFG-DIAG-EXP-v1"
     gates = v.load_json(ROOT / "commercial" / "gates" / "production-gates.v1.json")
     assert gates["real_money_mutation_approved"] is False
     extra = v.load_json(ROOT / "commercial" / "exceptions" / "extra-historical.v1.json")
@@ -317,10 +318,35 @@ def test_catalog_extra_and_real_money_untouched():
     assert extra["exceptions"][0]["is_public_offer"] is False
     authority = v.load_json(ROOT / "commercial" / "authority" / "authority-manifest.v1.json")
     assert all("partners" not in (item.get("path") or "") for item in authority["artifacts"])
+    mapping = v.load_json(ROOT / "commercial" / "providers" / "asaas-mapping.v1.json")
+    diag_row = next(item for item in mapping["mappings"] if item["offer_id"] == "CFG-DIAG-EXP-v1")
+    assert diag_row["offer_id"] == "CFG-DIAG-EXP-v1"
+    commercial = auth.validate_package(ROOT)
+    assert commercial["real_money_mutation_approved"] is False
     for _, text in v.iter_package_texts(PKG):
         assert "HISTORICAL_LIGHTHOUSE" not in text
         assert "CFG-EXC-EXTRA" not in text
         assert "1000000 cents/month" not in text
+
+
+def test_workflow_union_runs_partner_and_post_main_modules():
+    workflow = (ROOT / ".github" / "workflows" / "commercial-authority.yml").read_text(encoding="utf-8")
+    assert "python scripts/validate_partner_program.py" in workflow
+    assert "python scripts/validate_commercial_authority.py" in workflow
+    pytest_line = next(
+        line.strip()
+        for line in workflow.splitlines()
+        if "python -m pytest" in line
+    )
+    for module in (
+        "tests/test_commercial_authority.py",
+        "tests/test_offer_convergence.py",
+        "tests/test_commercial_mainline.py",
+        "tests/test_legal_provisional.py",
+        "tests/test_legal_founder_approved.py",
+        "tests/test_partner_program.py",
+    ):
+        assert module in pytest_line, module
 
 
 def test_prior_legal_and_commercial_hashes_unchanged():
