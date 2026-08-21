@@ -5,7 +5,7 @@
   "RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
   "DEPLOYED_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
   "PRE_RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
-  "origin_main_sha": "b57ff508f865375825c0e104a46f10c05dea719e",
+  "origin_main_sha": "55e9100f20c5878ecf03d4ede8d6f67a42f9946f",
   "main_includes_founder_actor_pr": 41,
   "deployed_runtime_note": "Host checkout remains freeze SHA 3d5e21c. Founder actor env is live via /etc/confenge/control-center/docker-compose.web-actor.yml (equivalent to PR #41 compose wiring). Docs-only evidence commit does not change DEPLOYED_SHA.",
   "main_matched_expected": true,
@@ -17,7 +17,10 @@
     "host": "v2202607385716487230",
     "public_ip": "159.195.18.88",
     "hop": "nginx:443 -> 127.0.0.1:18080 Caddy -> Authelia forward_auth -> web/context",
-    "caddy_loopback": ["127.0.0.1:18080", "127.0.0.1:18443"],
+    "caddy_loopback": [
+      "127.0.0.1:18080",
+      "127.0.0.1:18443"
+    ],
     "nginx_owns_80_443": true,
     "mcp_exposure": "PRIVATE",
     "postgres_alias": "cc-postgres",
@@ -29,13 +32,31 @@
     }
   },
   "dns": {
-    "ops.confenge.com.br": { "type": "A", "content": "159.195.18.88", "proxied": false, "ttl": 300 },
-    "auth.ops.confenge.com.br": { "type": "A", "content": "159.195.18.88", "proxied": false, "ttl": 300 },
+    "ops.confenge.com.br": {
+      "type": "A",
+      "content": "159.195.18.88",
+      "proxied": false,
+      "ttl": 300
+    },
+    "auth.ops.confenge.com.br": {
+      "type": "A",
+      "content": "159.195.18.88",
+      "proxied": false,
+      "ttl": 300
+    },
     "mcp.confenge.com.br": "absent"
   },
   "tls": {
-    "ops": { "issuer": "Let's Encrypt", "not_before": "2026-08-21T14:28:51Z", "not_after": "2026-11-19T14:28:50Z" },
-    "auth": { "issuer": "Let's Encrypt", "not_before": "2026-08-21T14:28:58Z", "not_after": "2026-11-19T14:28:57Z" }
+    "ops": {
+      "issuer": "Let's Encrypt",
+      "not_before": "2026-08-21T14:28:51Z",
+      "not_after": "2026-11-19T14:28:50Z"
+    },
+    "auth": {
+      "issuer": "Let's Encrypt",
+      "not_before": "2026-08-21T14:28:58Z",
+      "not_after": "2026-11-19T14:28:57Z"
+    }
   },
   "auth": {
     "authelia_enforced": true,
@@ -43,17 +64,33 @@
     "mfa": "ENFORCED",
     "totp_configurations": 1,
     "webauthn_credentials": 1,
-    "totp_history_count": 2,
+    "totp_history_count": 4,
     "authentication_logs": {
-      "count": 4,
-      "success_true": 2,
-      "success_false": 2,
-      "by_type": { "1FA/true": 1, "1FA/false": 2, "TOTP/true": 1 },
-      "last_success_at": "2026-08-21T18:44:06.2086Z"
+      "1FA/true": 3,
+      "TOTP/true": 3,
+      "1FA/false": 2,
+      "note": "Includes recertify logins. MFA not disabled."
     },
     "operator_enabled": true,
     "bootstrap_operator_password_path": "/root/.confenge/control-center/bootstrap-operator-password",
-    "mfa_disabled": false
+    "mfa_disabled": false,
+    "authelia_session_after_totp": {
+      "firstfactor": "OK",
+      "totp_factor": "OK",
+      "session_cookie": "authelia_session",
+      "ops_get": {
+        "http": 200,
+        "content_type": "text/html; charset=utf-8",
+        "has_cc_actor_meta": true,
+        "redirects_to_authelia": false,
+        "human_operator": false
+      },
+      "html_actor": {
+        "kind": "human",
+        "id_hex32": true,
+        "matches_founder_secret": true
+      }
+    }
   },
   "founder_actor": {
     "CC_ACTOR_KIND": "human",
@@ -63,29 +100,65 @@
     "web_html_meta_kind": "human",
     "web_html_hex32_matches_founder": true,
     "context_today_http": 200,
-    "context_today_keys": ["confidence", "freshness_status", "generated_at", "schema_version", "scope", "today"],
+    "context_today_keys": [
+      "confidence",
+      "freshness_status",
+      "generated_at",
+      "schema_version",
+      "scope",
+      "today"
+    ],
     "host_overlay": "/etc/confenge/control-center/docker-compose.web-actor.yml",
     "governance_pr": 41
   },
-  "migrations": ["001_init", "002_current_state", "003_durable_operational_data_plane"],
+  "migrations": [
+    "001_init",
+    "002_current_state",
+    "003_durable_operational_data_plane"
+  ],
   "governance_bootstrap": {
     "dry_run_candidates": 74,
     "unclassifiable": 0,
     "apply_1_inserted": 74,
     "apply_2_inserted": 0,
     "apply_2_skipped": 74,
-    "kinds": { "decision": 1, "fact": 28, "hypothesis": 45 }
+    "kinds": {
+      "decision": 1,
+      "fact": 28,
+      "hypothesis": 45
+    }
   },
   "collectors": {
-    "github": { "status": "DONE", "freshness_status": "FRESH" },
-    "infra": { "status": "UNKNOWN", "freshness_status": "UNKNOWN", "error_code": "missing_credentials" },
-    "pncp": { "status": "DONE", "freshness_status": "ERROR" },
-    "warmbly": { "status": "FAILED", "freshness_status": "ERROR", "error_code": "missing_credentials" },
-    "asaas": { "status": "FAILED", "freshness_status": "ERROR", "error_code": "missing_credentials" }
+    "github": {
+      "status": "DONE",
+      "freshness_status": "FRESH"
+    },
+    "infra": {
+      "status": "UNKNOWN",
+      "freshness_status": "UNKNOWN",
+      "error_code": "missing_credentials"
+    },
+    "pncp": {
+      "status": "DONE",
+      "freshness_status": "ERROR"
+    },
+    "warmbly": {
+      "status": "FAILED",
+      "freshness_status": "ERROR",
+      "error_code": "missing_credentials"
+    },
+    "asaas": {
+      "status": "FAILED",
+      "freshness_status": "ERROR",
+      "error_code": "missing_credentials"
+    }
   },
   "agent_activity_smoke_ids": [
     "cc:agent-activity:01M0JM0KQ7JW4968NY860TTEM3",
-    "cc:agent-activity:01M0JKZWN4JVSWX81NG13V6T0E"
+    "cc:agent-activity:01M0JKZWN4JVSWX81NG13V6T0E",
+    "cc:agent-activity:0bba9bf3-05f3-4c39-929c-e9f558398c20",
+    "cc:agent-activity:9436ee08-194e-409d-b8c6-34d8dc7f2fd8",
+    "cc:agent-activity:7d35a574-6743-4efa-ac50-30db841692fa"
   ],
   "directive_smoke_ids": [
     "cc:directive:4a71ccc4-43b7-4279-a5a7-7e82da2da726",
@@ -165,5 +238,170 @@
     "INFRA_ALLOWLIST=UNKNOWN",
     "PNCP_FRESHNESS=ERROR (extra-cli timers failed; shown honestly)",
     "CODEX_MCP=NOT_TESTED_CLIENT_MISSING"
-  ]
+  ],
+  "apply_probes": {
+    "ss_lntp_twice": true,
+    "nginx_owns_80_443": true,
+    "caddy_loopback_18080": true,
+    "caddy_loopback_18443": true,
+    "caddy_healthz_1": {
+      "http": 200,
+      "body": {
+        "status": "ok"
+      },
+      "note": "Caddy public_health stub; not context /ready"
+    },
+    "caddy_healthz_2": {
+      "http": 200,
+      "body": {
+        "status": "ok"
+      }
+    },
+    "caddy_ready_public": {
+      "http": 404,
+      "note": "deny_ready_mcp on ops Host"
+    },
+    "context_healthz_1": {
+      "ok": true,
+      "service": "control-center-context"
+    },
+    "context_healthz_2": {
+      "ok": true,
+      "service": "control-center-context"
+    },
+    "context_ready_1": {
+      "ready": true,
+      "service": "control-center-context"
+    },
+    "context_ready_2": {
+      "ready": true,
+      "service": "control-center-context"
+    },
+    "nginx_t": "ok"
+  },
+  "image_ids": [
+    {
+      "name": "confenge-control-center-web-1",
+      "image": "confenge-control-center-web:local",
+      "image_id": "sha256:7af4b3d1543880cc13b50b9a64de24a3f48f354e2936052b5719db482802678d",
+      "id": "3a7b2d7db6be90c27b2d"
+    },
+    {
+      "name": "confenge-control-center-collector-1",
+      "image": "confenge-control-center-collector:local",
+      "image_id": "sha256:3551f0be933d3c067008254d6eb802d840604740dc70a8e0c0087147fdc1d911",
+      "id": "c890ed03022057f617d0"
+    },
+    {
+      "name": "confenge-control-center-mcp-1",
+      "image": "confenge-control-center-mcp:local",
+      "image_id": "sha256:1ee1c7235ebda8638ea856b5304fa9531ffc23d00ba95cca2a534cd57eab92b6",
+      "id": "35ec8b4090f7e20c7300"
+    },
+    {
+      "name": "confenge-control-center-context-1",
+      "image": "confenge-control-center-context:local",
+      "image_id": "sha256:68ce858c2471c3d4ee62872eb61c74c6172505076ec410057b9a5eb714ceea0e",
+      "id": "75780766f5ef2268085f"
+    },
+    {
+      "name": "confenge-control-center-postgres-1",
+      "image": "postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+      "image_id": "sha256:75f5a96988cdf694a215073c3e9c001b706b371e2f94df3967f2efdec2787f6b",
+      "id": "e402e4e471bfa2a42e0c"
+    },
+    {
+      "name": "confenge-control-center-caddy-1",
+      "image": "caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0",
+      "image_id": "sha256:51f0c496a59a692cbf86a9973f1ecdc68ac444c1b97ac0b87e0ea90f0597fe69",
+      "id": "3b483a6035d12db464e4"
+    },
+    {
+      "name": "confenge-control-center-authelia-1",
+      "image": "authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b",
+      "image_id": "sha256:4a87c7d1276f351a9d2b2139a676bb9aba16692825c858523c9c002744d0aa59",
+      "id": "20f1b32db4b79a99c492"
+    },
+    {
+      "name": "confenge-control-center-nats-1",
+      "image": "nats:2.12.6-alpine@sha256:1cfc36e2e5e638243d8c722f72c954cd0ec4b15ee82fadbc718ce12e2b3c1652",
+      "image_id": "sha256:f6289e36de6a653c3a6fdf4c209ab5af57ddc1e4df304025e5b0319578c5de58",
+      "id": "5d21a61cf8ad1249a0af"
+    },
+    {
+      "name": "confenge-control-center-redis-1",
+      "image": "redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+      "image_id": "sha256:5509c0097c6064aa8a3b1df58f1d950e67090fffa6678ae8f3f1dc2385f12deb",
+      "id": "00628e6b6ceb32a21420"
+    }
+  ],
+  "rollback_point": {
+    "deployed_sha": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+    "project": "confenge-control-center",
+    "compose_files": [
+      "control-center/deploy/overlays/production-edge/docker-compose.production-edge.yml",
+      "control-center/deploy/overlays/production-edge/docker-compose.warmbly-collector.override.yml",
+      "/etc/confenge/control-center/docker-compose.collector-env.yml",
+      "/etc/confenge/control-center/docker-compose.web-actor.yml"
+    ],
+    "volumes_preserved": true,
+    "do_not_restore_over_production": true,
+    "encrypted_backup": "/var/backups/confenge-control-center/encrypted/cc-pg-2026-08-21T16-51-50-379Z.dump.enc",
+    "nginx_backup_inventory": "netcup-before + host /etc/nginx backup taken pre-apply",
+    "warmbly_untouched": true,
+    "image_ids_file": "apply/image-ids.json"
+  },
+  "v1_authed_hop": {
+    "path": "https://ops.confenge.com.br/v1/* after Authelia session cookie + cockpit actor headers from HTML meta",
+    "twice": true,
+    "none_404": true,
+    "freshness_not_flipped_to_fresh": true,
+    "endpoints_http_200": [
+      "/v1/operational-snapshots?scope=company",
+      "/v1/domains/commercial?scope=company",
+      "/v1/domains/finance?scope=company",
+      "/v1/domains/clients?scope=company",
+      "/v1/domains/engineering?scope=company",
+      "/v1/domains/infrastructure?scope=company",
+      "/v1/domains/pncp?scope=company",
+      "/v1/attention?scope=company&horizon=today",
+      "/v1/today?scope=company",
+      "/v1/source-observations?scope=company",
+      "/v1/agent-activities",
+      "/v1/context?scope=company",
+      "/v1/context?scope=repo:Governance",
+      "/v1/active-directives?scope=company",
+      "/v1/priorities",
+      "/v1/decisions"
+    ],
+    "http_context_repo_governance": {
+      "scope": "repo:Governance",
+      "keys_include": [
+        "facts",
+        "decisions",
+        "hypotheses",
+        "directives",
+        "constraints",
+        "priorities"
+      ],
+      "hypothesis_separate": true,
+      "freshness_status": "FRESH"
+    }
+  },
+  "mcp": {
+    "unauth_initialize_http": 200,
+    "initialize_http": 200,
+    "get_context_company_scope": "company",
+    "get_context_repo_governance_scope": "repo:Governance",
+    "get_context_repo_sibling_scope": "repo:web-cfg",
+    "no_sibling_leakage": true,
+    "report_session_result_http": 200,
+    "agent_activity_ids": [
+      "cc:agent-activity:01M0JM0KQ7JW4968NY860TTEM3",
+      "cc:agent-activity:01M0JKZWN4JVSWX81NG13V6T0E",
+      "cc:agent-activity:0bba9bf3-05f3-4c39-929c-e9f558398c20",
+      "cc:agent-activity:9436ee08-194e-409d-b8c6-34d8dc7f2fd8",
+      "cc:agent-activity:7d35a574-6743-4efa-ac50-30db841692fa"
+    ]
+  }
 }

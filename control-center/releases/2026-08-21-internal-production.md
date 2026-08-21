@@ -30,8 +30,10 @@ nginx `:443` → `127.0.0.1:18080` Caddy → Authelia `forward_auth` → web/con
 - Unauthenticated `https://ops.confenge.com.br/` → 302 to Authelia.
 - `https://auth.ops.confenge.com.br/` 200, TLS Let's Encrypt through 2026-11-19.
 - Operators require 2FA. Enrolled: `totp_configurations=1`, `webauthn_credentials=1`.
-- Authentication logs (counts only): `1FA/false=2`, `1FA/true=1`, `TOTP/true=1`. Last success `2026-08-21T18:44:06Z`.
-- Founder actor: `CC_ACTOR_KIND=human`, 32-hex id matching `CONTROL_CENTER_FOUNDER_ACTOR_ID`, not `human:operator`. HTML meta matches. `GET /v1/today?scope=company` HTTP 200 as founder.
+- Authentication logs (counts only): `1FA/false=2`, `1FA/true=3`, `TOTP/true=3`. `totp_history=4`.
+- Authelia session after 1FA+TOTP: cookie `authelia_session`. `GET https://ops.confenge.com.br/` HTTP **200** `text/html` with `cc-actor-*` meta (kind `human`, 32-hex founder id, not `human:operator`). Does not redirect to Authelia.
+- Required `/v1/*` replayed **twice** on that hop (nginx → Caddy → Authelia cookie + cockpit actor headers). All HTTP 200, none 404. Freshness ERROR/UNKNOWN left honest.
+- `GET /v1/context?scope=repo:Governance` returns separate `facts` / `decisions` / `hypotheses` arrays, `scope=repo:Governance`.
 - `OPS_HOST_AUTHENTICATED_AND_HEALTHY=true`. MFA was not disabled.
 - Recover bootstrap password only from `/root/.confenge/control-center/bootstrap-operator-password` (mode 0600). Never git/logs.
 
@@ -41,7 +43,7 @@ nginx `:443` → `127.0.0.1:18080` Caddy → Authelia `forward_auth` → web/con
 - Governance bootstrap: 74 candidates, 0 unclassifiable; apply-1 inserted 74; apply-2 inserted 0 / skipped 74.
 - Required `/v1/*` endpoints 200 with `scope=company` (attention also needs `horizon=today`). None 404.
 - Directive smoke ids created; agent POST decision → 403 `agent_mutation_forbidden`.
-- MCP `report_session_result` / `report_blocker` → AgentActivity ids listed in the JSON companion.
+- MCP `get_context` scopes: `company`, `repo:Governance` (no web-cfg), `repo:web-cfg` (no Governance leakage). `report_session_result` / `report_blocker` → AgentActivity ids in the JSON companion.
 
 Collectors (honest):
 
@@ -73,6 +75,12 @@ Activated after `OPS_HOST_AUTHENTICATED_AND_HEALTHY=true`. web-cfg PR #218 merge
 - `x-robots-tag: noindex, nofollow`. `robots.txt` disallows `/intranet`. Sitemap count for intranet = 0.
 - Splat: `/intranet/hoje` → 302 `https://ops.confenge.com.br/hoje`.
 - Follow: intranet 302 → ops 302 Authelia → auth.ops 200.
+
+## Images / rollback
+
+Image IDs (sha256) for web/context/mcp/collector/postgres/caddy/authelia/nats/redis are in the JSON companion. Rollback point: redeploy freeze SHA `3d5e21c` with the production-edge compose files listed there; keep volumes; do not restore the drill backup over production; do not touch Warmbly.
+
+Loopback: `ss -lntp` twice shows nginx on `:80`/`:443` and Caddy `127.0.0.1:18080`. Caddy `/healthz` is the public stub `{"status":"ok"}` (twice). Context `/ready` is `{"ready":true,"service":"control-center-context"}` twice. Public `/ready` on ops is 404 (`deny_ready_mcp`).
 
 ## Residuals
 
