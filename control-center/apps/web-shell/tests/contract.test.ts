@@ -33,8 +33,8 @@ test("mounted Hoje HTML is an attention cockpit without chat or mutation control
   const handle = mount(root, createMockAdapter(), runtime);
   try {
     assert.match(root.innerHTML, /data-destination="hoje"/);
-    assert.match(root.innerHTML, /As 3 coisas mais importantes agora/);
-    assert.match(root.innerHTML, />Exceções</);
+    assert.match(root.innerHTML, /Se eu só puder fazer 3 coisas hoje\./);
+    assert.match(root.innerHTML, /Incidentes, blockers e riscos\./);
     assert.match(root.innerHTML, /aria-label="Áreas do Control Center"/);
     for (const label of [
       "Hoje",
@@ -54,7 +54,7 @@ test("mounted Hoje HTML is an attention cockpit without chat or mutation control
     assert.ok(root.innerHTML.includes("data-severity="));
     assert.equal(hasChatComposer(root.innerHTML), false);
     assert.equal(hasMutationControls(root.innerHTML), false);
-    assert.doesNotMatch(root.innerHTML, /<textarea/i);
+    assert.match(root.innerHTML, /data-shortcut-form="decision"/);
     assert.doesNotMatch(root.innerHTML, /type="password"/i);
   } finally {
     handle.unmount();

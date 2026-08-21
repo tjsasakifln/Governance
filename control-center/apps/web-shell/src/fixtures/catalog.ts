@@ -2,8 +2,10 @@ import type { DestinationId } from "../destinations";
 import { DESTINATIONS, getDestination } from "../destinations";
 import { selectHomepageAttention, selectHomepagePriorities } from "../homepage";
 import type { DestinationPage } from "../adapters/contract";
+import { composeHoje } from "../hoje-compose";
 import type {
   ActorRef,
+  AgentActivity,
   AgentSession,
   AttentionItem,
   ClientStatus,
@@ -267,9 +269,36 @@ export const COMMERCIAL_SNAPSHOT: CommercialSnapshot = {
     commercial_runtime: "warmbly",
     this_document: "read_model",
   },
+  offer_pin: {
+    catalog_authority: "governance",
+    catalog_id: "CFG-OFFER-CATALOG-v1",
+    known_offer_ids: ["CFG-DIAG-EXP-v1", "CFG-DIRB2G-FLEX-v1"],
+  },
+  funnel: {
+    new_leads: 6,
+    qualified: 4,
+    opportunities: 3,
+    proposals: 2,
+    clients: 1,
+  },
+  pipeline_nominal: { amount_cents: 4800000, currency: "BRL" },
+  pipeline_weighted: {
+    amount_cents: 2100000,
+    currency: "BRL",
+    probability_reliable: true,
+  },
+  aging_count: 1,
+  stalled_count: 1,
+  missing_next_action_count: 2,
   pipeline_open_count: 4,
   inbound_unread_count: 3,
   at_risk_client_count: 1,
+  extra_historical: {
+    treated_as_public_offer: false,
+    label: "Extra histórica",
+    note: "Nunca tratada como oferta pública.",
+  },
+  offer_version_drift: { count: 1, detail: "proposta com versão de catálogo defasada" },
   attention_item_ids: ["cc:attention-item:01K3CC-INBOUND-UNREAD"],
 };
 
@@ -288,6 +317,14 @@ export const FINANCE_SNAPSHOT: FinanceSnapshot = {
   ),
   read_model_only: true,
   provider_mutations: "forbidden",
+  contracted: { amount_cents: 5000000, currency: "BRL" },
+  billed: { amount_cents: 4000000, currency: "BRL" },
+  paid: { amount_cents: 2500000, currency: "BRL" },
+  effectively_received: { amount_cents: 2300000, currency: "BRL" },
+  overdue: { amount_cents: 1500000, currency: "BRL" },
+  receivable: { amount_cents: 2500000, currency: "BRL" },
+  refunds: { amount_cents: 100000, currency: "BRL" },
+  chargebacks: { amount_cents: 100000, currency: "BRL" },
   receivables_open: { amount_cents: 2500000, currency: "BRL" },
   receivables_overdue: { amount_cents: 1500000, currency: "BRL" },
   attention_item_ids: ["cc:attention-item:01K3CC-OVERDUE-INVOICE"],
@@ -310,6 +347,17 @@ export const ENGINEERING_SNAPSHOT: EngineeringSnapshot = {
   failing_check_count: 1,
   open_incident_count: 0,
   repo_scopes: ["repo:tjsasakifln/Governance"],
+  repository: "tjsasakifln/Governance",
+  default_branch: "main",
+  p0_count: 0,
+  p1_count: 1,
+  aging: { count: 1, oldest_days: 4 },
+  blockers: ["CI vermelho no default"],
+  last_evidence: "check suite 2026-08-20T17:54:00Z",
+  active_work_without_evidence: {
+    remains: "hypothesis",
+    detail: "Trabalho ativo sem evidência permanece hipótese.",
+  },
   attention_item_ids: ["cc:attention-item:01K3CC-FAILING-CHECK"],
 };
 
@@ -332,6 +380,14 @@ export const CLIENT_FIXTURES: ClientStatus[] = [
     open_receivables: { amount_cents: 1500000, currency: "BRL" },
     attention_item_ids: ["cc:attention-item:01K3CC-OVERDUE-INVOICE"],
     notes: "Recebível em atraso. Origem Warmbly/Asaas; sem cobrança daqui.",
+    health: "churn_risk",
+    commitments: ["Diagnóstico v1.1"],
+    owner: "founder",
+    due_date: "2026-08-22T15:00:00Z",
+    deliverables: ["relatório Diagnóstico"],
+    blockers: ["fatura vencida"],
+    next_action: "Revisar no Warmbly; não cobrar daqui",
+    evidence: "asaas/receivables/open",
   },
   {
     schema_version: "control-center.client-status.v1",
@@ -388,6 +444,14 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
     checked_at: "2026-08-20T17:12:00Z",
     message: "Última sonda falhou. Sem chute de saúde.",
     checks: [{ name: "ready", status: "unknown", detail: "probe error" }],
+    http: { status: "unknown", detail: "probe error" },
+    tls: { status: "unknown" },
+    docker: { status: "unknown" },
+    backup: { status: "unknown" },
+    disk: { used_pct: 91, detail: "91%" },
+    memory: { used_pct: 82, detail: "82%" },
+    pncp_freshness: { freshness_status: "ERROR", observed_at: "2026-08-20T17:12:00Z" },
+    partial_outage: true,
   },
   {
     schema_version: "control-center.service-health.v1",
@@ -594,6 +658,78 @@ export const DIRECTIVE_FIXTURES: Directive[] = [
   },
 ];
 
+export const AGENT_ACTIVITY_FIXTURES: AgentActivity[] = [
+  {
+    schema_version: "control-center.agent-activity.v1",
+    id: "cc:agent-activity:01K3CC-LEDGER-RUNNING",
+    agent_id: "agent:cc-context",
+    provider: "grok",
+    scope: "finance",
+    repo: "tjsasakifln/Governance",
+    status: "running",
+    presentation_status: "RUNNING",
+    started_at: "2026-08-20T17:50:00Z",
+    finished_at: null,
+    goal: "Preparar briefing de recebíveis",
+    campaign: "CONFENGE-CC-LIVE-FOUNDER-COCKPIT-01",
+    summary: "RUNNING defasado: ainda em execução. Não promover a DONE.",
+    provenance: provenance(
+      "collector",
+      "report",
+      "agent-activity/running",
+      "2026-08-20T16:00:00Z",
+      "STALE",
+      0.5,
+    ),
+    evidence_refs: [],
+    residual_work: ["confirmar evidência de settlement"],
+    blockers: ["snapshot financeiro STALE"],
+  },
+  {
+    schema_version: "control-center.agent-activity.v1",
+    id: "cc:agent-activity:01K3CC-LEDGER-PARTIAL",
+    agent_id: "agent:cc-context",
+    provider: "grok",
+    scope: "finance",
+    status: "partial",
+    presentation_status: "PARTIAL",
+    started_at: "2026-08-20T17:50:00Z",
+    finished_at: "2026-08-20T18:10:00Z",
+    goal: "Prepare a scoped finance briefing for overdue receivables.",
+    summary: "Read finance snapshot; leftover: confirm settlement evidence.",
+    provenance: provenance(
+      "collector",
+      "report",
+      "agent-activity/01K3CC-LEDGER-PARTIAL",
+      "2026-08-20T18:10:00Z",
+      "FRESH",
+      0.9,
+    ),
+    evidence_refs: ["cc:finance-snapshot:01K3CC-RO-RECEIVABLES"],
+    residual_work: ["Confirm settlement evidence for invoice overdue more than 30 days"],
+  },
+  {
+    schema_version: "control-center.agent-activity.v1",
+    id: "cc:agent-activity:01K3CC-LEDGER-UNKNOWN",
+    agent_id: "agent:cc-context",
+    scope: "company",
+    status: "not-a-status",
+    presentation_status: "UNKNOWN",
+    started_at: "2026-08-20T17:00:00Z",
+    finished_at: null,
+    goal: "status não reconhecido",
+    summary: "Status ausente no enum v1; apresentado como UNKNOWN.",
+    provenance: provenance(
+      "collector",
+      "report",
+      "agent-activity/unknown",
+      "2026-08-20T17:00:00Z",
+      "UNKNOWN",
+      0.2,
+    ),
+  },
+];
+
 export const AGENT_SESSION_FIXTURES: AgentSession[] = [
   {
     schema_version: "control-center.agent-session.v1",
@@ -662,6 +798,24 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       headline: "O que exige atenção agora. Não é chat e não é parede de KPIs.",
       attention: hojeAttention,
       priorities: hojePriorities,
+      commercial: COMMERCIAL_SNAPSHOT,
+      finance: FINANCE_SNAPSHOT,
+      engineering: ENGINEERING_SNAPSHOT,
+      clients: CLIENT_FIXTURES,
+      health: HEALTH_FIXTURES,
+      activities: AGENT_ACTIVITY_FIXTURES,
+      hoje: composeHoje({
+        generated_at: GENERATED_AT,
+        headline: "O que exige atenção agora. Não é chat e não é parede de KPIs.",
+        priorities: hojePriorities,
+        incidents: hojeAttention,
+        clients: CLIENT_FIXTURES,
+        commercial: COMMERCIAL_SNAPSHOT,
+        finance: FINANCE_SNAPSHOT,
+        engineering: ENGINEERING_SNAPSHOT,
+        infra: HEALTH_FIXTURES,
+        activities: AGENT_ACTIVITY_FIXTURES,
+      }),
     }),
     comercial: pageFor("comercial", {
       headline: "Recorte comercial somente leitura. Origem Warmbly; catálogo canônico em Governance.",
@@ -707,6 +861,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       attention: [],
       priorities: [],
       sessions: AGENT_SESSION_FIXTURES,
+      activities: AGENT_ACTIVITY_FIXTURES,
     }),
   };
 }
@@ -752,6 +907,26 @@ export function stalePages(): Record<DestinationId, DestinationPage> {
     if (page.clients) {
       page.clients = page.clients.map((item) => ({ ...item, provenance: stamp(item.provenance) }));
     }
+    if (page.activities) {
+      page.activities = page.activities.map((item) => ({
+        ...item,
+        provenance: stamp(item.provenance),
+        presentation_status:
+          item.presentation_status === "RUNNING" ? "RUNNING" : item.presentation_status,
+      }));
+    }
+    page.hoje = composeHoje({
+      generated_at: page.generated_at,
+      headline: page.headline,
+      priorities: page.priorities,
+      incidents: page.attention,
+      clients: page.clients ?? [],
+      commercial: page.commercial ?? null,
+      finance: page.finance ?? null,
+      engineering: page.engineering ?? null,
+      infra: page.health ?? [],
+      activities: page.activities ?? [],
+    });
   }
   return pages;
 }

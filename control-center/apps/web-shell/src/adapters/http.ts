@@ -1,105 +1,37 @@
 import type { DestinationId } from "../destinations";
 import { getDestination } from "../destinations";
-import type {
-  ActorRef,
-  AttentionItem,
-  Directive,
-  PriorityRecommendation,
-  Provenance,
-} from "../types";
+import type { ActorRef, AttentionItem, PriorityRecommendation, Provenance } from "../types";
 import {
   ADAPTER_ACTIONS,
   type AdapterAction,
   type AdapterReadResult,
+  type AdapterWriteResult,
   type ControlCenterReadAdapter,
   type DestinationPage,
 } from "./contract";
-import { createMockAdapter } from "./mock";
-
-function scopeFor(id: DestinationId): string {
-  return getDestination(id).scope;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return null;
-}
-
-function provenanceOf(row: Record<string, unknown>, fallback: Provenance): Provenance {
-  const source = asRecord(row.source);
-  const freshness = row.freshness_status;
-  return {
-    source: source
-      ? {
-          system: String(source.system ?? "control-center"),
-          kind: String(source.kind ?? "context"),
-          locator: String(source.locator ?? "http"),
-        }
-      : fallback.source,
-    observed_at: String(row.observed_at ?? fallback.observed_at),
-    freshness_status:
-      freshness === "FRESH" || freshness === "STALE" || freshness === "UNKNOWN" || freshness === "ERROR"
-        ? freshness
-        : fallback.freshness_status,
-    confidence: typeof row.confidence === "number" ? row.confidence : fallback.confidence,
-  };
-}
-
-function attentionFrom(row: Record<string, unknown>, fallback: Provenance): AttentionItem {
-  const prov = provenanceOf(row, fallback);
-  return {
-    schema_version: "control-center.attention-item.v1",
-    id: String(row.id ?? "cc:attention-item:unknown"),
-    scope: String(row.scope ?? "company"),
-    severity: (row.severity as AttentionItem["severity"]) ?? "medium",
-    status: (row.status as AttentionItem["status"]) ?? "open",
-    title: String(row.title ?? "Sem título"),
-    summary: String(row.summary ?? row.body ?? ""),
-    provenance: prov,
-    detected_at: String(row.detected_at ?? prov.observed_at),
-    homepage_eligible: row.homepage_eligible !== false,
-  };
-}
-
-function priorityFrom(row: Record<string, unknown>, index: number, fallback: Provenance): PriorityRecommendation {
-  const prov = provenanceOf(row, fallback);
-  return {
-    schema_version: "control-center.priority-recommendation.v1",
-    id: String(row.id ?? `cc:priority-recommendation:${index}`),
-    scope: String(row.scope ?? "company"),
-    rank: typeof row.rank === "number" ? row.rank : index + 1,
-    title: String(row.title ?? "Prioridade"),
-    rationale: String(row.rationale ?? row.body ?? ""),
-    provenance: prov,
-    generated_at: String(row.generated_at ?? prov.observed_at),
-    horizon: (row.horizon as PriorityRecommendation["horizon"]) ?? "today",
-  };
-}
-
-function directiveFrom(row: Record<string, unknown>): Directive {
-  const created = asRecord(row.created_by);
-  return {
-    schema_version: "control-center.directive.v1",
-    id: String(row.id ?? "cc:directive:unknown"),
-    kind: (row.kind as Directive["kind"]) ?? "fact",
-    scope: String(row.scope ?? "company"),
-    status: (row.status as Directive["status"]) ?? "active",
-    title: String(row.title ?? ""),
-    body: String(row.body ?? ""),
-    effective_from: String(row.effective_from ?? new Date().toISOString()),
-    expires_at: row.expires_at === null || row.expires_at === undefined ? null : String(row.expires_at),
-    supersedes: Array.isArray(row.supersedes) ? (row.supersedes as string[]) : null,
-    created_by: {
-      kind: (created?.kind as ActorRef["kind"]) ?? "human",
-      id: String(created?.id ?? "unknown"),
-    },
-    created_at: String(row.created_at ?? new Date().toISOString()),
-    updated_at: String(row.updated_at ?? new Date().toISOString()),
-    audit: [],
-  };
-}
+import {
+  activityFrom,
+  asRecord,
+  clientFrom,
+  commercialFrom,
+  composePageFromHojeInput,
+  engineeringFrom,
+  fallbackProvenance,
+  financeFrom,
+  healthFrom,
+  itemsOf,
+  mapContextDirectives,
+  mapHojePayloads,
+} from "./map";
+import {
+  AUTHORIZED_WRITE_PATH,
+  WRITE_SHORTCUT_DIRECTIVE_KIND,
+  WRITE_SHORTCUT_KINDS,
+  destinationUsesContext,
+  isAuthorizedWritePath,
+  readPathsFor,
+  type WriteShortcutKind,
+} from "./paths";
 
 export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   readonly mode = "http" as const;
@@ -128,7 +60,10 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         loading: false,
         error: {
           code: "CONTEXT_UNAVAILABLE",
-          message: err instanceof Error ? err.message : "context http failed",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Backend operacional indisponível. Nenhuma origem mock foi usada.",
         },
       };
     }
@@ -146,46 +81,179 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     return result.page.priorities;
   }
 
-  private async loadPage(id: DestinationId): Promise<DestinationPage> {
-    const scope = scopeFor(id);
-    const ctx = asRecord(await this.getJson(`/v1/context?scope=${encodeURIComponent(scope)}`));
-    if (!ctx) {
-      throw new Error("context payload is not an object");
+  async writeShortcut(kind: WriteShortcutKind, draft: { title: string; body: string }): Promise<AdapterWriteResult> {
+    if (!(WRITE_SHORTCUT_KINDS as readonly string[]).includes(kind)) {
+      return { ok: false, path: AUTHORIZED_WRITE_PATH, kind, message: "atalho não autorizado" };
     }
-    const fallback: Provenance = provenanceOf(ctx, {
-      source: { system: "control-center", kind: "context", locator: this.baseUrl },
-      observed_at: new Date().toISOString(),
-      freshness_status: "UNKNOWN",
-      confidence: 0,
+    const title = draft.title.trim();
+    const body = draft.body.trim();
+    if (!title || !body) {
+      return { ok: false, path: AUTHORIZED_WRITE_PATH, kind, message: "título e corpo são obrigatórios" };
+    }
+    const observed_at = new Date().toISOString();
+    const payload = {
+      kind: WRITE_SHORTCUT_DIRECTIVE_KIND[kind],
+      title,
+      body,
+      scope: "company",
+      source: {
+        system: "control-center",
+        kind: "founder-shortcut",
+        locator: "hoje",
+      },
+      observed_at,
+      freshness_status: "FRESH",
+      confidence: 1,
+    };
+    if (!isAuthorizedWritePath(AUTHORIZED_WRITE_PATH)) {
+      return { ok: false, path: AUTHORIZED_WRITE_PATH, kind, message: "write path not authorized" };
+    }
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${AUTHORIZED_WRITE_PATH}`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "x-actor-id": this.operator.id,
+          "x-actor-kind": this.operator.kind,
+        },
+        body: JSON.stringify(payload),
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        return {
+          ok: false,
+          path: AUTHORIZED_WRITE_PATH,
+          kind,
+          message: `gravação recusada (${response.status})`,
+        };
+      }
+      void text;
+      return {
+        ok: true,
+        path: AUTHORIZED_WRITE_PATH,
+        kind,
+        message: "gravado no Context Service",
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        path: AUTHORIZED_WRITE_PATH,
+        kind,
+        message: err instanceof Error ? err.message : "gravação indisponível",
+      };
+    }
+  }
+
+  private async loadPage(id: DestinationId): Promise<DestinationPage> {
+    const fallback = fallbackProvenance(this.baseUrl || "relative", new Date().toISOString());
+    if (id === "hoje") {
+      return this.loadHoje(fallback);
+    }
+    if (id === "memoria") {
+      return this.loadMemoria(fallback);
+    }
+    if (id === "agentes") {
+      return this.loadAgentes(fallback);
+    }
+    return this.loadDomain(id, fallback);
+  }
+
+  private async loadHoje(fallback: Provenance): Promise<DestinationPage> {
+    const paths = readPathsFor("hoje");
+    const [today, attentionNow, attentionToday, snapshot, activities] = await Promise.all(
+      paths.map((path) => this.getJson(path)),
+    );
+    const composeInput = mapHojePayloads({
+      today,
+      attentionNow,
+      attentionToday,
+      snapshot,
+      activities,
+      fallback,
     });
-    const directives = Array.isArray(ctx.active_directives)
-      ? ctx.active_directives.map((row) => directiveFrom(asRecord(row) ?? {}))
-      : [];
-    const riskRows =
-      Array.isArray(ctx.risks) && ctx.risks.length > 0
-        ? ctx.risks
-        : Array.isArray(ctx.active_directives)
-          ? ctx.active_directives.filter((row) => asRecord(row)?.kind === "risk")
-          : directives.filter((row) => row.kind === "risk");
-    const attention = riskRows.map((row) => attentionFrom(asRecord(row) ?? {}, fallback));
-    const priorities = (Array.isArray(ctx.priorities) ? ctx.priorities : [])
-      .slice(0, 3)
-      .map((row, index) => priorityFrom(asRecord(row) ?? {}, index, fallback));
+    return composePageFromHojeInput("hoje", this.readOperator(), composeInput);
+  }
+
+  private async loadMemoria(fallback: Provenance): Promise<DestinationPage> {
+    if (!destinationUsesContext("memoria")) {
+      throw new Error("memoria must use /v1/context");
+    }
+    const [path] = readPathsFor("memoria");
+    const ctx = asRecord(await this.getJson(path!));
+    if (!ctx) throw new Error("context payload is not an object");
+    const dest = getDestination("memoria");
+    const directives = mapContextDirectives(ctx, fallback);
     return {
-      id,
-      label: getDestination(id).label,
-      scope,
-      generated_at: fallback.observed_at,
+      id: "memoria",
+      label: dest.label,
+      scope: dest.scope,
+      generated_at: String(ctx.observed_at ?? fallback.observed_at),
       operator: this.readOperator(),
-      headline: getDestination(id).description,
-      attention,
-      priorities,
+      headline: dest.description,
+      attention: [],
+      priorities: [],
       directives,
     };
   }
 
+  private async loadAgentes(fallback: Provenance): Promise<DestinationPage> {
+    const [path] = readPathsFor("agentes");
+    const payload = await this.getJson(path!);
+    const dest = getDestination("agentes");
+    const activities = itemsOf(payload).map((row) => activityFrom(asRecord(row) ?? {}, fallback));
+    return {
+      id: "agentes",
+      label: dest.label,
+      scope: dest.scope,
+      generated_at: fallback.observed_at,
+      operator: this.readOperator(),
+      headline: dest.description,
+      attention: [],
+      priorities: [],
+      activities,
+    };
+  }
+
+  private async loadDomain(id: DestinationId, fallback: Provenance): Promise<DestinationPage> {
+    const [path] = readPathsFor(id);
+    const payload = await this.getJson(path!);
+    const dest = getDestination(id);
+    const rec = asRecord(payload) ?? {};
+    const inner = asRecord(rec.snapshot) ?? rec;
+    const page: DestinationPage = {
+      id,
+      label: dest.label,
+      scope: dest.scope,
+      generated_at: String(inner.generated_at ?? rec.generated_at ?? fallback.observed_at),
+      operator: this.readOperator(),
+      headline: dest.description,
+      attention: [],
+      priorities: [],
+    };
+    if (id === "comercial") {
+      page.commercial = commercialFrom(inner, fallback);
+    } else if (id === "financeiro") {
+      page.finance = financeFrom(inner, fallback);
+    } else if (id === "engenharia") {
+      page.engineering = engineeringFrom(inner, fallback);
+    } else if (id === "clientes") {
+      const rows = itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.clients);
+      page.clients = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
+        clientFrom(asRecord(row) ?? {}, fallback),
+      );
+    } else if (id === "infra") {
+      const rows = itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.health);
+      page.health = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
+        healthFrom(asRecord(row) ?? {}, fallback),
+      );
+    }
+    return page;
+  }
+
   private async getJson(path: string): Promise<unknown> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const url = `${this.baseUrl}${path}`;
+    const response = await this.fetchImpl(url, {
       headers: {
         accept: "application/json",
         "x-actor-id": this.operator.id,
@@ -194,9 +262,13 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     });
     const text = await response.text();
     if (!response.ok) {
-      throw new Error(`context ${response.status}`);
+      throw new Error(`Backend operacional indisponível (${response.status} ${path}).`);
     }
-    return JSON.parse(text) as unknown;
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new Error(`Backend operacional devolveu JSON inválido em ${path}.`);
+    }
   }
 }
 
@@ -241,13 +313,11 @@ export function productionContextUrl(): string {
   return "";
 }
 
+/**
+ * Production boot always constructs the HTTP adapter.
+ * Mock is never selected here — only via explicit test injection in boot/mount.
+ */
 export function createProductionAdapter(): ControlCenterReadAdapter {
-  const mock =
-    typeof document !== "undefined" &&
-    document.querySelector('meta[name="cc-use-mock"]')?.getAttribute("content") === "1";
-  if (mock) {
-    return createMockAdapter();
-  }
   const base = productionContextUrl() || "";
   return createHttpAdapter(base, undefined, productionActorFromDocument());
 }

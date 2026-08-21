@@ -356,6 +356,113 @@ h2 {
   margin-top: 1rem;
 }
 
+.band {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.band[data-compressed="true"] {
+  padding: 0.45rem 0.55rem;
+  border: 1px dashed var(--line);
+  background: var(--bg-elev);
+}
+
+.band[data-compressed="false"] {
+  padding: 0;
+}
+
+.band[data-compressed="true"] h2 {
+  margin-top: 0.2rem;
+}
+
+.kpi-summary {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+.prov-inline {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+}
+
+.shortcut-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.shortcut-form {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+
+.shortcut-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.shortcut-form input,
+.shortcut-form textarea,
+.shortcut-form button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.55rem;
+  min-height: 44px;
+}
+
+.shortcut-form button {
+  cursor: pointer;
+}
+
+.shortcut-form .hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+[data-tone="green"] .pill-fresh {
+  border-color: var(--ok);
+}
+
+[data-tone="amber"] .pill,
+[data-freshness="STALE"] .pill-stale {
+  border-color: var(--high);
+}
+
+[data-tone="slate"] .pill,
+[data-freshness="UNKNOWN"] .pill-unknown {
+  border-color: var(--low);
+}
+
+[data-tone="red"] .pill,
+[data-freshness="ERROR"] .pill-error {
+  border-color: var(--crit);
+}
+
+[data-freshness="STALE"],
+[data-freshness="UNKNOWN"],
+[data-freshness="ERROR"] {
+  --ok: var(--high);
+}
+
+.health[data-status="unknown"],
+.health[data-status="down"],
+.health[data-status="degraded"],
+.activity[data-status="UNKNOWN"],
+.activity[data-status="FAILED"],
+.activity[data-status="BLOCKED"] {
+  border-left: 3px solid var(--crit);
+}
+
+
+
 .authority,
 .constraint,
 .action,

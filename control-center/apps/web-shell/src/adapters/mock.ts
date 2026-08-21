@@ -10,9 +10,11 @@ import {
   ADAPTER_ACTIONS,
   type AdapterAction,
   type AdapterReadResult,
+  type AdapterWriteResult,
   type ControlCenterReadAdapter,
   type DestinationPage,
 } from "./contract";
+import { AUTHORIZED_WRITE_PATH, type WriteShortcutKind } from "./paths";
 
 export type MockScenario = "default" | "loading" | "error" | "stale" | "empty";
 
@@ -69,6 +71,16 @@ export class MockControlCenterAdapter implements ControlCenterReadAdapter {
 
   readPriorities() {
     return clonePage(defaultPages().hoje).priorities;
+  }
+
+  writeShortcut(kind: WriteShortcutKind, draft: { title: string; body: string }): AdapterWriteResult {
+    void draft;
+    return {
+      ok: false,
+      path: AUTHORIZED_WRITE_PATH,
+      kind,
+      message: "mock adapter does not POST; inject HttpControlCenterAdapter for writes",
+    };
   }
 
   private catalog(): Record<DestinationId, DestinationPage> {

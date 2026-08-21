@@ -14,10 +14,27 @@ export function collectProvenance(page: DestinationPage): Provenance[] {
   if (page.health) {
     for (const row of page.health) items.push(row.provenance);
   }
+  if (page.activities) {
+    for (const row of page.activities) items.push(row.provenance);
+  }
+  if (page.hoje) {
+    for (const section of page.hoje.sections) {
+      for (const row of section.rows) {
+        items.push({
+          source: row.source,
+          observed_at: row.observed_at,
+          freshness_status: row.freshness_status,
+          confidence: row.confidence ?? 0,
+        });
+      }
+    }
+  }
   return items;
 }
 
 export function pageIsEmpty(page: DestinationPage): boolean {
+  if (page.hoje != null && page.hoje.sections.length > 0) return false;
+  if ((page.activities?.length ?? 0) > 0) return false;
   return (
     page.attention.length === 0 &&
     page.priorities.length === 0 &&

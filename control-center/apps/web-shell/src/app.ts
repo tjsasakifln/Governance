@@ -1,5 +1,6 @@
-import { createMockAdapter, type MockScenario } from "./adapters/mock";
+import type { MockScenario } from "./adapters/mock";
 import type { ControlCenterReadAdapter, DestinationPage } from "./adapters/contract";
+import type { WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
 import { pageIsEmpty, pageIsStale } from "./page";
 import { renderShell } from "./ui/render";
@@ -63,6 +64,11 @@ export function createMemoryRuntime(initialHash = "#/hoje"): ShellRuntime {
 
 export interface MountableRoot {
   innerHTML: string;
+  querySelectorAll?(selector: string): ArrayLike<{
+    addEventListener(type: string, listener: (event: Event) => void): void;
+    getAttribute(name: string): string | null;
+    querySelector(selector: string): { value: string } | null;
+  }>;
 }
 
 function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
@@ -97,6 +103,30 @@ function applyPaint(
     mockScenario: adapter.getScenario?.() ?? adapter.mode,
     adapterMode: adapter.mode,
   });
+  bindWriteShortcuts(root, adapter, () => {
+    paintShell(root, adapter, `#/${parsed.destination}`);
+  });
+}
+
+function bindWriteShortcuts(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.writeShortcut || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-shortcut-form]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const kind = form.getAttribute("data-shortcut-form") as WriteShortcutKind | null;
+      if (!kind) return;
+      const title = form.querySelector('[name="title"]')?.value ?? "";
+      const body = form.querySelector('[name="body"]')?.value ?? "";
+      void Promise.resolve(adapter.writeShortcut?.(kind, { title, body })).then(onDone);
+    });
+  }
 }
 
 export function paintShell(
@@ -129,7 +159,7 @@ export function mount(
   adapter: ControlCenterReadAdapter & {
     setScenario?(s: MockScenario): void;
     getScenario?(): MockScenario;
-  } = createMockAdapter(),
+  },
   runtime: ShellRuntime = browserRuntime(),
 ): { unmount: () => void } {
   let generation = 0;

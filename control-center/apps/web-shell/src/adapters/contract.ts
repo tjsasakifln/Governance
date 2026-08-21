@@ -1,6 +1,8 @@
 import type { DestinationId } from "../destinations";
+import type { HojeViewModel } from "../hoje-compose";
 import type {
   ActorRef,
+  AgentActivity,
   AgentSession,
   AttentionItem,
   ClientStatus,
@@ -12,6 +14,7 @@ import type {
   ServiceHealth,
   UtcDateTime,
 } from "../types";
+import type { WriteShortcutKind } from "./paths";
 
 /** The mock/HTTP adapter is read-only. Mutation verbs are not part of the contract. */
 export const ADAPTER_ACTIONS = ["read"] as const;
@@ -49,6 +52,8 @@ export interface DestinationPage {
   health?: ServiceHealth[];
   directives?: Directive[];
   sessions?: AgentSession[];
+  activities?: AgentActivity[];
+  hoje?: HojeViewModel;
 }
 
 export interface AdapterError {
@@ -61,10 +66,17 @@ export type AdapterReadResult =
   | { ok: false; loading: false; error: AdapterError }
   | { ok: true; loading: true; page: null };
 
+export interface AdapterWriteResult {
+  ok: boolean;
+  path: string;
+  kind: WriteShortcutKind;
+  message: string;
+}
+
 /**
- * Read-only Control Center port. Default implementation is in-repo fixtures.
- * A later convergence campaign may swap this for HTTP; MCP stays the agent
- * interface and is not consumed here.
+ * Production default is HTTP. Mock exists only by explicit test injection.
+ * MCP is the agent interface and is not consumed here. Provider mutations
+ * stay forbidden; the only writes are authorized Context Service shortcuts.
  */
 export interface ControlCenterReadAdapter {
   readonly mode: "mock" | "http";
@@ -73,6 +85,10 @@ export interface ControlCenterReadAdapter {
   readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
   readAttention(): AttentionItem[] | Promise<AttentionItem[]>;
   readPriorities(): PriorityRecommendation[] | Promise<PriorityRecommendation[]>;
+  writeShortcut?(
+    kind: WriteShortcutKind,
+    draft: { title: string; body: string },
+  ): AdapterWriteResult | Promise<AdapterWriteResult>;
 }
 
 export function adapterAllows(action: string): action is AdapterAction {

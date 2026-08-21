@@ -1,26 +1,26 @@
 import type { DestinationPage } from "../adapters/contract";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
-import { formatMoney } from "../money";
-import { mapProvenance, type ProvenancePresentation } from "../provenance";
+import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
 import {
   DEFAULT_LOADING_LABEL,
   VIEW_KINDS,
   type ViewKind,
   type ViewState,
 } from "../view-state";
-import type {
-  AgentSession,
-  AttentionItem,
-  ClientStatus,
-  CommercialSnapshot,
-  Directive,
-  EngineeringSnapshot,
-  FinanceSnapshot,
-  PriorityRecommendation,
-  Provenance,
-  ServiceHealth,
-} from "../types";
+import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
+import { composeHoje } from "../hoje-compose";
+import { renderHoje } from "./hoje";
+import {
+  activityCard,
+  clientCard,
+  commercialBlock,
+  engineeringBlock,
+  financeBlock,
+  healthCard,
+  memoriaGroups,
+} from "./domains";
+import { provenanceBlock } from "./provenance";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -30,36 +30,9 @@ export interface ShellModel {
   adapterMode?: "mock" | "http";
 }
 
-function provenanceBlock(provenance: Provenance): string {
-  const p: ProvenancePresentation = mapProvenance(provenance);
-  return `
-    <dl class="prov" data-freshness="${escapeHtml(p.freshnessStatus)}" data-source="${escapeHtml(p.sourceSystem)}">
-      <div>
-        <dt>Origem</dt>
-        <dd>${escapeHtml(p.sourceLabel)}</dd>
-      </div>
-      <div>
-        <dt>Observado</dt>
-        <dd>
-          <time datetime="${escapeHtml(p.observedAtUtc)}">${escapeHtml(p.observedAtLocal)}</time>
-          <span class="sr-only">UTC ${escapeHtml(p.observedAtUtc)}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>Freshness</dt>
-        <dd><span class="pill pill-${escapeHtml(p.freshnessStatus.toLowerCase())}">${escapeHtml(p.freshnessStatus)} · ${escapeHtml(p.freshnessLabel)}</span></dd>
-      </div>
-      <div>
-        <dt>Confiança</dt>
-        <dd>${escapeHtml(p.confidenceLabel)}</dd>
-      </div>
-    </dl>
-  `;
-}
-
 function attentionCard(item: AttentionItem): string {
   return `
-    <article class="card attention" data-severity="${escapeHtml(item.severity)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
+    <article class="card attention" data-severity="${escapeHtml(item.severity)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <header>
         <p class="kicker"><span class="pill">${escapeHtml(item.severity)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
         <h3>${escapeHtml(item.title)}</h3>
@@ -79,111 +52,6 @@ function priorityCard(item: PriorityRecommendation): string {
       <p>${escapeHtml(item.rationale)}</p>
       ${provenanceBlock(item.provenance)}
     </li>
-  `;
-}
-
-function moneyDl(label: string, money: { amount_cents: number; currency: string }): string {
-  return `
-    <div class="money" data-amount-cents="${money.amount_cents}" data-currency="${escapeHtml(money.currency)}">
-      <dt>${escapeHtml(label)}</dt>
-      <dd>${escapeHtml(formatMoney(money))}</dd>
-    </div>
-  `;
-}
-
-function commercialBlock(snapshot: CommercialSnapshot): string {
-  return `
-    <section class="compact" aria-labelledby="comercial-recorte">
-      <h2 id="comercial-recorte">Recorte comercial (somente leitura)</h2>
-      <p class="authority">Autoridade do catálogo: ${escapeHtml(snapshot.authority.catalog_authority)}. Runtime comercial: ${escapeHtml(snapshot.authority.commercial_runtime)}. Este documento: ${escapeHtml(snapshot.authority.this_document)}.</p>
-      <dl class="facts">
-        <div><dt>Pipeline aberto</dt><dd>${snapshot.pipeline_open_count}</dd></div>
-        <div><dt>Inbound sem leitura</dt><dd>${snapshot.inbound_unread_count}</dd></div>
-        <div><dt>Clientes em risco</dt><dd>${snapshot.at_risk_client_count}</dd></div>
-      </dl>
-      ${provenanceBlock(snapshot.provenance)}
-    </section>
-  `;
-}
-
-function financeBlock(snapshot: FinanceSnapshot): string {
-  return `
-    <section class="compact" aria-labelledby="financeiro-recorte">
-      <h2 id="financeiro-recorte">Recorte financeiro (somente leitura)</h2>
-      <p class="constraint" role="note">Mutações de provedor: ${escapeHtml(snapshot.provider_mutations)}. read_model_only=${String(snapshot.read_model_only)}. Sem cobrança, checkout, refund, cancelamento ou escrita Asaas neste cockpit.</p>
-      <dl class="facts">
-        ${moneyDl("Recebíveis abertos", snapshot.receivables_open)}
-        ${moneyDl("Recebíveis em atraso", snapshot.receivables_overdue)}
-      </dl>
-      ${provenanceBlock(snapshot.provenance)}
-    </section>
-  `;
-}
-
-function engineeringBlock(snapshot: EngineeringSnapshot): string {
-  return `
-    <section class="compact" aria-labelledby="engenharia-recorte">
-      <h2 id="engenharia-recorte">Recorte de engenharia</h2>
-      <dl class="facts">
-        <div><dt>PRs abertos</dt><dd>${snapshot.open_pr_count}</dd></div>
-        <div><dt>Checks falhando</dt><dd>${snapshot.failing_check_count}</dd></div>
-        <div><dt>Incidentes abertos</dt><dd>${snapshot.open_incident_count}</dd></div>
-      </dl>
-      ${provenanceBlock(snapshot.provenance)}
-    </section>
-  `;
-}
-
-function clientCard(item: ClientStatus): string {
-  const money = item.open_receivables
-    ? `<p class="money" data-amount-cents="${item.open_receivables.amount_cents}" data-currency="${escapeHtml(item.open_receivables.currency)}">${escapeHtml(formatMoney(item.open_receivables))}</p>`
-    : "";
-  return `
-    <article class="card client" data-lifecycle="${escapeHtml(item.lifecycle)}" data-id="${escapeHtml(item.id)}">
-      <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.lifecycle)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
-        <h3>${escapeHtml(item.display_name)}</h3>
-      </header>
-      ${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}
-      ${money}
-      ${provenanceBlock(item.provenance)}
-    </article>
-  `;
-}
-
-function healthCard(item: ServiceHealth): string {
-  return `
-    <article class="card health" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
-      <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
-        <h3>${escapeHtml(item.service_name)}</h3>
-      </header>
-      ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
-      ${item.latency_ms !== undefined ? `<p>Latência observada: ${item.latency_ms} ms</p>` : ""}
-      ${provenanceBlock(item.provenance)}
-    </article>
-  `;
-}
-
-function directiveCard(item: Directive): string {
-  const expires = item.expires_at ?? "sem expiração";
-  const supersedes = item.supersedes?.join(", ") ?? "nenhuma";
-  const actor = item.created_by.display_name ?? item.created_by.id;
-  return `
-    <article class="card directive" data-kind="${escapeHtml(item.kind)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
-      <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.kind)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
-        <h3>${escapeHtml(item.title)}</h3>
-      </header>
-      <p>${escapeHtml(item.body)}</p>
-      <dl class="facts">
-        <div><dt>Vigente desde</dt><dd><time datetime="${escapeHtml(item.effective_from)}">${escapeHtml(item.effective_from)}</time></dd></div>
-        <div><dt>Expira</dt><dd>${escapeHtml(expires)}</dd></div>
-        <div><dt>Substitui</dt><dd>${escapeHtml(supersedes)}</dd></div>
-        <div><dt>Criado por</dt><dd>${escapeHtml(actor)}</dd></div>
-      </dl>
-      <p class="audit">Auditoria: ${item.audit.length} evento(s).</p>
-    </article>
   `;
 }
 
@@ -219,26 +87,41 @@ function viewBanner(view: ViewState<DestinationPage>): string {
   return "";
 }
 
+function hojeBody(page: DestinationPage): string {
+  const view =
+    page.hoje ??
+    composeHoje({
+      generated_at: page.generated_at,
+      headline: page.headline,
+      priorities: page.priorities,
+      incidents: page.attention,
+      clients: page.clients ?? [],
+      commercial: page.commercial ?? null,
+      finance: page.finance ?? null,
+      engineering: page.engineering ?? null,
+      infra: page.health ?? [],
+      activities: page.activities ?? [],
+    });
+  return renderHoje(view);
+}
+
 function pageBody(page: DestinationPage, destination: DestinationId): string {
-  const priorities =
-    page.priorities.length > 0
-      ? `
-        <section class="priorities" aria-labelledby="prioridades-title">
-          <h2 id="prioridades-title">${destination === "hoje" ? "As 3 coisas mais importantes agora" : "Prioridades deste recorte"}</h2>
-          <ol>${page.priorities.map(priorityCard).join("")}</ol>
-        </section>
-      `
-      : "";
-  const attention =
-    page.attention.length > 0
-      ? `
-        <section class="exceptions" aria-labelledby="excecoes-title">
-          <h2 id="excecoes-title">Exceções</h2>
-          <div class="stack">${page.attention.map(attentionCard).join("")}</div>
-        </section>
-      `
-      : "";
-  const extra = [
+  if (destination === "hoje") {
+    return hojeBody(page);
+  }
+  if (destination === "memoria") {
+    return page.directives && page.directives.length > 0 ? memoriaGroups(page.directives) : "";
+  }
+  if (destination === "agentes") {
+    if (page.activities && page.activities.length > 0) {
+      return `<section aria-labelledby="agentes-title"><h2 id="agentes-title">Atividade recente dos agentes</h2><div class="stack">${page.activities.map(activityCard).join("")}</div></section>`;
+    }
+    if (page.sessions && page.sessions.length > 0) {
+      return `<section aria-labelledby="agentes-title"><h2 id="agentes-title">Sessões</h2><div class="stack">${page.sessions.map(sessionCard).join("")}</div></section>`;
+    }
+    return "";
+  }
+  const extras = [
     page.commercial ? commercialBlock(page.commercial) : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
@@ -248,14 +131,16 @@ function pageBody(page: DestinationPage, destination: DestinationId): string {
     page.health && page.health.length > 0
       ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2><div class="stack">${page.health.map(healthCard).join("")}</div></section>`
       : "",
-    page.directives && page.directives.length > 0
-      ? `<section aria-labelledby="memoria-title"><h2 id="memoria-title">Diretivas</h2><div class="stack">${page.directives.map(directiveCard).join("")}</div></section>`
-      : "",
-    page.sessions && page.sessions.length > 0
-      ? `<section aria-labelledby="agentes-title"><h2 id="agentes-title">Sessões</h2><div class="stack">${page.sessions.map(sessionCard).join("")}</div></section>`
-      : "",
   ].join("");
-  return `${priorities}${attention}${extra}`;
+  const attention =
+    page.attention.length > 0
+      ? `<section class="exceptions" aria-labelledby="excecoes-title"><h2 id="excecoes-title">Exceções</h2><div class="stack">${page.attention.map(attentionCard).join("")}</div></section>`
+      : "";
+  const priorities =
+    page.priorities.length > 0
+      ? `<section class="priorities" aria-labelledby="prioridades-title"><h2 id="prioridades-title">Prioridades deste recorte</h2><ol>${page.priorities.map(priorityCard).join("")}</ol></section>`
+      : "";
+  return `${attention}${priorities}${extras}`;
 }
 
 function mockLab(destination: DestinationId, current: ViewKind): string {
@@ -299,7 +184,7 @@ export function renderShell(model: ShellModel): string {
 
   return `
     <a class="skip-link" href="#conteudo">Saltar para o conteúdo</a>
-    <div class="shell" data-destination="${escapeHtml(model.destination)}" data-view-state="${escapeHtml(model.viewKind)}">
+    <div class="shell" data-destination="${escapeHtml(model.destination)}" data-view-state="${escapeHtml(model.viewKind)}" data-productive-origin="${escapeHtml(PRODUCTIVE_URL)}" data-auth-origin="${escapeHtml(AUTH_URL)}">
       <header class="topbar">
         <p class="brand">Control Center</p>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
@@ -328,4 +213,12 @@ export function hasMutationControls(html: string): boolean {
   return /data-mutate=|data-action="(cobranca|checkout|refund|cancelamento|asaas_write|commercial_send)"/i.test(
     html,
   );
+}
+
+export function hasMcpNav(html: string): boolean {
+  return /data-nav="mcp"|aria-label="[^"]*MCP/i.test(html);
+}
+
+export function hasIntranetPath(html: string): boolean {
+  return /\/intranet/i.test(html);
 }
