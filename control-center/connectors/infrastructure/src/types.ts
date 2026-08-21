@@ -111,6 +111,12 @@ export interface AllowlistTarget {
   readonly display_name: string;
   readonly checks: readonly CheckKind[];
   readonly host?: string;
+  /** TCP connect address (IP or hostname). Independent of TLS/HTTP identity. */
+  readonly connect_host?: string;
+  /** SNI servername for TLS. Independent of connect_host. */
+  readonly tls_server_name?: string;
+  /** HTTP Host header. Independent of connect_host. */
+  readonly http_host?: string;
   readonly port?: number;
   readonly url?: string;
   readonly expect_status?: number;

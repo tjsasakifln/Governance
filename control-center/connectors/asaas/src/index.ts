@@ -60,3 +60,12 @@ export {
   AsaasHttpError,
   AsaasSecretInUrlError,
 } from "./errors.js";
+export { parseCanaryArgs, runAsaasCanary, runCli as runCanaryCli } from "./canary.js";
+export { CAPABILITIES, CANARY_COLLECTORS, buildEnvelope, mapAsaasFreshness } from "./envelope.js";
+export type { Capability, CanaryReport } from "./envelope.js";
+export {
+  ASAAS_REQUIRED_SECRETS,
+  loadAsaasProductionConfig,
+  missingAsaasSecretNames,
+  resolveAsaasProductionConfig,
+} from "./production-config.js";

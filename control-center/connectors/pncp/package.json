@@ -11,10 +11,15 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "cc-connector-canary": "./src/canary.ts"
+  },
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "evaluate": "tsx src/cli.ts"
+    "evaluate": "tsx src/cli.ts",
+    "canary": "tsx src/canary.ts",
+    "cc-connector-canary": "tsx src/canary.ts"
   },
   "dependencies": {
     "zod": "^3.24.4"

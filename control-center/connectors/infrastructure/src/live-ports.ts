@@ -1,7 +1,10 @@
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 import tls from "node:tls";
 import { parseAgentPayload } from "./agent.js";
-import type { ProbePorts } from "./ports.js";
+import { buildHttpRequestOptions, buildTlsConnectOptions } from "./identity.js";
+import type { ConnectionIdentity, ProbePorts } from "./ports.js";
 import type { AgentPayload, HttpSample, ReachabilitySample, TlsSample } from "./types.js";
 
 export interface LivePortOptions {
@@ -28,8 +31,8 @@ export function createLivePorts(options: LivePortOptions = {}): ProbePorts {
   return {
     now: () => (options.now ? options.now() : new Date()),
     reachHost: (host, port, timeoutMs) => tcpReach(host, port, timeoutMs),
-    httpGet: (url, timeoutMs) => httpProbe(url, timeoutMs, fetchImpl),
-    readTls: (host, port, timeoutMs) => tlsProbe(host, port, timeoutMs),
+    httpGet: (url, timeoutMs, identity) => httpProbe(url, timeoutMs, identity),
+    readTls: (host, port, timeoutMs, identity) => tlsProbe(host, port, timeoutMs, identity),
     readAgent: (targetId) => readAgent(targetId, agentBase, fetchImpl),
   };
 }
@@ -50,24 +53,81 @@ function tcpReach(host: string, port: number, timeoutMs: number): Promise<Reacha
   });
 }
 
-async function httpProbe(url: string, timeoutMs: number, fetchImpl: typeof fetch): Promise<HttpSample> {
+function httpProbe(
+  url: string,
+  timeoutMs: number,
+  identity?: ConnectionIdentity,
+): Promise<HttpSample> {
   const started = Date.now();
+  let built: ReturnType<typeof buildHttpRequestOptions>;
   try {
-    const response = await fetchImpl(url, {
-      method: "GET",
-      redirect: "manual",
-      signal: AbortSignal.timeout(timeoutMs),
+    built = buildHttpRequestOptions({
+      url,
+      timeoutMs,
+      ...(identity?.connectHost ? { connectHost: identity.connectHost } : {}),
+      ...(identity?.httpHost ? { httpHost: identity.httpHost } : {}),
+      ...(identity?.tlsServerName ? { tlsServerName: identity.tlsServerName } : {}),
     });
-    return { status: response.status, elapsed_ms: Date.now() - started };
   } catch (err) {
     const message = err instanceof Error ? err.message : "http error";
-    return { status: 0, elapsed_ms: Date.now() - started, error: message };
+    return Promise.resolve({ status: 0, elapsed_ms: Date.now() - started, error: message });
   }
+  const lib = built.protocol === "https:" ? https : http;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (sample: HttpSample): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(sample);
+    };
+    const req = lib.request(
+      {
+        hostname: built.connectHost,
+        port: built.port,
+        method: built.method,
+        path: built.path,
+        headers: {
+          Host: built.headers.Host,
+          Accept: built.headers.Accept,
+          "User-Agent": built.headers["User-Agent"],
+        },
+        timeout: built.timeoutMs,
+        ...(built.protocol === "https:"
+          ? { servername: built.tlsServerName, rejectUnauthorized: built.rejectUnauthorized }
+          : {}),
+      },
+      (res) => {
+        res.resume();
+        finish({ status: res.statusCode ?? 0, elapsed_ms: Date.now() - started });
+      },
+    );
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      finish({ status: 0, elapsed_ms: Date.now() - started, error: "http timeout" });
+    });
+    req.on("error", (err) => {
+      finish({ status: 0, elapsed_ms: Date.now() - started, error: err.message });
+    });
+    req.end();
+  });
 }
 
-function tlsProbe(host: string, port: number, timeoutMs: number): Promise<TlsSample> {
+function tlsProbe(
+  host: string,
+  port: number,
+  timeoutMs: number,
+  identity?: ConnectionIdentity,
+): Promise<TlsSample> {
+  const connectHost = identity?.connectHost ?? host;
+  const tlsOpts = buildTlsConnectOptions({
+    connectHost,
+    port,
+    ...(identity?.tlsServerName ? { tlsServerName: identity.tlsServerName } : {}),
+  });
   return new Promise((resolve) => {
-    const socket = tls.connect({ host, port, servername: host, rejectUnauthorized: false });
+    const socket = tls.connect(tlsOpts);
     const finish = (sample: TlsSample): void => {
       socket.removeAllListeners();
       socket.destroy();

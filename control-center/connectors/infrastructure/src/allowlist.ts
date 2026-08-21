@@ -109,13 +109,18 @@ function parseTarget(raw: unknown, index: number): AllowlistTarget {
   };
 
   if (raw.host !== undefined) {
-    if (typeof raw.host !== "string" || raw.host.trim().length === 0) {
-      throw new AllowlistError(`${path}.host must be a hostname`);
-    }
-    if (raw.host.includes("@") || raw.host.includes("/")) {
-      throw new AllowlistError(`${path}.host must not contain credentials or paths`);
-    }
-    Object.assign(target, { host: raw.host.trim() });
+    Object.assign(target, { host: parseHostField(raw.host, `${path}.host`) });
+  }
+  if (raw.connect_host !== undefined) {
+    Object.assign(target, { connect_host: parseHostField(raw.connect_host, `${path}.connect_host`) });
+  }
+  if (raw.tls_server_name !== undefined) {
+    Object.assign(target, {
+      tls_server_name: parseServerName(raw.tls_server_name, `${path}.tls_server_name`),
+    });
+  }
+  if (raw.http_host !== undefined) {
+    Object.assign(target, { http_host: parseServerName(raw.http_host, `${path}.http_host`) });
   }
   if (raw.port !== undefined) {
     const port = asPositiveInt(raw.port, `${path}.port`);
@@ -151,10 +156,33 @@ function parseTarget(raw: unknown, index: number): AllowlistTarget {
   if (checks.includes("http") && !target.url) {
     throw new AllowlistError(`${path} http check requires url`);
   }
-  if ((checks.includes("reachability") || checks.includes("tls")) && !target.host) {
-    throw new AllowlistError(`${path} reachability/tls checks require host`);
+  if (
+    (checks.includes("reachability") || checks.includes("tls")) &&
+    !target.host &&
+    !target.connect_host
+  ) {
+    throw new AllowlistError(`${path} reachability/tls checks require host or connect_host`);
   }
   return target;
+}
+
+function parseHostField(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AllowlistError(`${path} must be a hostname or IP`);
+  }
+  const host = value.trim();
+  if (host.includes("@") || host.includes("/")) {
+    throw new AllowlistError(`${path} must not contain credentials or paths`);
+  }
+  return host;
+}
+
+function parseServerName(value: unknown, path: string): string {
+  const host = parseHostField(value, path);
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    throw new AllowlistError(`${path} must be a DNS name, not an IP (SNI/Host identity)`);
+  }
+  return host;
 }
 
 export function parseAllowlist(input: unknown): Allowlist {

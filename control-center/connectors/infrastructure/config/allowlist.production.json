@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "collector_id": "infrastructure.netcup",
+  "source": "infrastructure",
+  "default_timeout_ms": 5000,
+  "thresholds": {
+    "stale_after_seconds": 300,
+    "disk_warn_pct": 80,
+    "disk_crit_pct": 90,
+    "mem_warn_pct": 90,
+    "backup_max_age_seconds": 86400,
+    "tls_warn_days": 21,
+    "tls_crit_days": 7
+  },
+  "targets": [
+    {
+      "id": "netcup-vps-tcp",
+      "display_name": "Netcup VPS TCP",
+      "host": "159.195.18.88",
+      "connect_host": "159.195.18.88",
+      "port": 443,
+      "checks": ["reachability"]
+    },
+    {
+      "id": "netcup-api-tls",
+      "display_name": "Confenge API TLS",
+      "host": "159.195.18.88",
+      "connect_host": "159.195.18.88",
+      "tls_server_name": "api.confenge.com.br",
+      "port": 443,
+      "checks": ["tls"]
+    },
+    {
+      "id": "confenge-api-http",
+      "display_name": "Confenge API inbound health",
+      "url": "https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health",
+      "connect_host": "159.195.18.88",
+      "http_host": "api.confenge.com.br",
+      "tls_server_name": "api.confenge.com.br",
+      "expect_status": 200,
+      "checks": ["http"]
+    }
+  ]
+}

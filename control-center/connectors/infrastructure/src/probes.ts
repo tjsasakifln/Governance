@@ -1,5 +1,6 @@
 import { parseAgentPayload } from "./agent.js";
 import { timeoutFor } from "./allowlist.js";
+import { connectHostOf, httpHostOf, identityFor, tlsServerNameOf } from "./identity.js";
 import { toUtcIso } from "./ids.js";
 import type { ProbePorts } from "./ports.js";
 import { withTimeout } from "./timeout.js";
@@ -56,12 +57,13 @@ async function probeReachability(
   now: Date,
   timeoutMs: number,
 ): Promise<ProbeResult> {
-  const host = target.host ?? "";
+  const host = connectHostOf(target);
   const port = target.port ?? 443;
   const outcome = await timed(ports.reachHost(host, port, timeoutMs), timeoutMs);
   if (outcome.status === "timeout") {
     return baseResult(target, "reachability", now, "timeout", `host reachability timed out after ${timeoutMs}ms`, {
       host,
+      connect_host: host,
       port,
       timed_out: true,
     });
@@ -69,6 +71,7 @@ async function probeReachability(
   if (outcome.status === "error") {
     return baseResult(target, "reachability", now, "error", `host reachability error: ${outcome.error}`, {
       host,
+      connect_host: host,
       port,
       error: outcome.error,
     });
@@ -81,10 +84,10 @@ async function probeReachability(
       now,
       "error",
       `host ${host}:${port} unreachable${sample.error ? `: ${sample.error}` : ""}`,
-      { host, port, ok: false, error: sample.error ?? "unreachable" },
+      { host, connect_host: host, port, ok: false, error: sample.error ?? "unreachable" },
     );
   }
-  const payload: Record<string, unknown> = { host, port, ok: true };
+  const payload: Record<string, unknown> = { host, connect_host: host, port, ok: true };
   if (sample.latency_ms !== undefined) {
     payload.latency_ms = sample.latency_ms;
   }
@@ -99,33 +102,42 @@ async function probeHttp(
 ): Promise<ProbeResult> {
   const url = target.url ?? "";
   const expect = target.expect_status ?? 200;
-  const outcome = await timed(ports.httpGet(url, timeoutMs), timeoutMs);
+  const identity = identityFor(target);
+  const httpHost = httpHostOf(target);
+  const tlsServerName = tlsServerNameOf(target);
+  const connectHost = identity.connectHost;
+  const identityFields: Record<string, unknown> = {
+    url,
+    expect_status: expect,
+    http_host: httpHost,
+    tls_server_name: tlsServerName,
+  };
+  if (connectHost) {
+    identityFields.connect_host = connectHost;
+  }
+  const outcome = await timed(ports.httpGet(url, timeoutMs, identity), timeoutMs);
   if (outcome.status === "timeout") {
     return baseResult(target, "http", now, "timeout", `HTTP health timed out after ${timeoutMs}ms`, {
-      url,
+      ...identityFields,
       timed_out: true,
-      expect_status: expect,
     });
   }
   if (outcome.status === "error") {
     return baseResult(target, "http", now, "error", `HTTP health error: ${outcome.error}`, {
-      url,
+      ...identityFields,
       error: outcome.error,
-      expect_status: expect,
     });
   }
   const sample = outcome.value;
   if (sample.error && sample.status === 0) {
     return baseResult(target, "http", now, "error", `HTTP health error: ${sample.error}`, {
-      url,
+      ...identityFields,
       error: sample.error,
-      expect_status: expect,
     });
   }
   const payload: Record<string, unknown> = {
-    url,
+    ...identityFields,
     status: sample.status,
-    expect_status: expect,
   };
   if (sample.elapsed_ms !== undefined) {
     payload.elapsed_ms = sample.elapsed_ms;
@@ -149,34 +161,38 @@ async function probeTls(
   now: Date,
   timeoutMs: number,
 ): Promise<ProbeResult> {
-  const host = target.host ?? "";
+  const host = connectHostOf(target);
   const port = target.port ?? 443;
-  const outcome = await timed(ports.readTls(host, port, timeoutMs), timeoutMs);
+  const identity = identityFor(target);
+  const tlsServerName = tlsServerNameOf(target);
+  const identityFields: Record<string, unknown> = {
+    host,
+    connect_host: host,
+    tls_server_name: tlsServerName,
+    port,
+  };
+  const outcome = await timed(ports.readTls(host, port, timeoutMs, identity), timeoutMs);
   if (outcome.status === "timeout") {
     return baseResult(target, "tls", now, "timeout", `TLS probe timed out after ${timeoutMs}ms`, {
-      host,
-      port,
+      ...identityFields,
       timed_out: true,
     });
   }
   if (outcome.status === "error") {
     return baseResult(target, "tls", now, "error", `TLS probe error: ${outcome.error}`, {
-      host,
-      port,
+      ...identityFields,
       error: outcome.error,
     });
   }
   const sample = outcome.value;
   if (sample.error) {
     return baseResult(target, "tls", now, "error", `TLS probe error: ${sample.error}`, {
-      host,
-      port,
+      ...identityFields,
       error: sample.error,
     });
   }
-  return baseResult(target, "tls", now, "ok", `TLS certificate observed for ${host}`, {
-    host,
-    port,
+  return baseResult(target, "tls", now, "ok", `TLS certificate observed for ${tlsServerName} via ${host}`, {
+    ...identityFields,
     not_after: sample.not_after,
   });
 }

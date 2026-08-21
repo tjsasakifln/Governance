@@ -4,7 +4,16 @@ import { ADAPTER_KINDS } from "./types.js";
 export const EXTRA_CLI_FRESHNESS_SCRIPT =
   "scripts/ops/pncp_contract_freshness.py" as const;
 
-const FORBIDDEN_COMMAND_TOKENS = new Set(["--live", "--ingest", "ingest"]);
+const FORBIDDEN_COMMAND_TOKENS = new Set([
+  "--live",
+  "live",
+  "--ingest",
+  "ingest",
+  "--recrawl",
+  "recrawl",
+  "--backfill",
+  "backfill",
+]);
 
 export const ENV_VAR_DOCS = [
   "PNCP_ADAPTER_KIND=file|http|command",
