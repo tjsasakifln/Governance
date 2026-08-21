@@ -1,0 +1,104 @@
+# Authelia production bundle for the single Control Center operator.
+# Secrets are file/env placeholders. This campaign does not provision live secrets.
+#
+# Cookie policy (emitted by Authelia when authelia_url is https):
+#   domain=ops.confenge.com.br Secure HttpOnly SameSite=Lax
+# remember_me=false; inactivity=30 minutes; expiration=8 hours
+# Self-service reset is disabled. Recovery is out-of-band (see docs/production-edge/RECOVERY.md).
+
+theme: auto
+
+server:
+  address: 'tcp://0.0.0.0:9091/'
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: ForwardAuth
+
+log:
+  level: info
+  format: json
+
+totp:
+  disable: false
+  issuer: confenge-control-center
+  algorithm: SHA1
+  digits: 6
+  period: 30
+  skew: 1
+
+webauthn:
+  disable: false
+  enable_passkey_login: true
+  display_name: Confenge Control Center
+  attestation_conveyance_preference: indirect
+  timeout: 60s
+
+authentication_backend:
+  password_reset:
+    disable: true
+  refresh_interval: 5 minutes
+  file:
+    path: /config/users.yml
+    watch: false
+    password:
+      algorithm: argon2
+      argon2:
+        variant: argon2id
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: 'auth.ops.confenge.com.br'
+      policy: bypass
+    - domain: 'ops.confenge.com.br'
+      policy: two_factor
+      subject:
+        - 'group:operators'
+
+session:
+  # secret injected via AUTHELIA_SESSION_SECRET_FILE / Docker secret authelia_session
+  name: authelia_session
+  same_site: lax
+  expiration: 8 hours
+  inactivity: 30 minutes
+  remember_me: false
+  cookies:
+    - name: authelia_session
+      domain: 'ops.confenge.com.br'
+      authelia_url: 'https://auth.ops.confenge.com.br'
+      same_site: lax
+      expiration: 8 hours
+      inactivity: 30 minutes
+      remember_me: false
+  redis:
+    host: redis
+    port: 6379
+
+regulation:
+  max_retries: 3
+  find_time: 2 minutes
+  ban_time: 15 minutes
+
+storage:
+  # encryption_key injected via AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE
+  postgres:
+    address: 'tcp://postgres:5432'
+    database: authelia
+    schema: public
+    username: authelia
+    # password injected via AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE
+
+notifier:
+  disable_startup_check: true
+  filesystem:
+    filename: /tmp/authelia-notification.txt
+
+identity_validation:
+  reset_password:
+    # jwt_secret injected via AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE

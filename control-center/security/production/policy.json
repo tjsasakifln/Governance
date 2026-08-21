@@ -1,0 +1,41 @@
+{
+  "schema_version": "control-center.security-policy.v1",
+  "idp": "authelia",
+  "proxy": "caddy",
+  "forward_auth": {
+    "uri": "/api/authz/forward-auth",
+    "copy_headers": ["Remote-User", "Remote-Groups", "Remote-Name", "Remote-Email"]
+  },
+  "mfa": {
+    "totp": true,
+    "webauthn": true
+  },
+  "session": {
+    "inactivity": "30 minutes",
+    "expiration": "8 hours",
+    "remember_me": false,
+    "cookie": {
+      "secure": true,
+      "httpOnly": true,
+      "sameSite": "lax"
+    }
+  },
+  "regulation": {
+    "max_retries": 3,
+    "find_time": "2 minutes",
+    "ban_time": "15 minutes"
+  },
+  "cors": {
+    "mode": "deny-by-default",
+    "allow_origins": [],
+    "allow_credentials": false
+  },
+  "csrf_strategy": "same-site-cookie-plus-cors-deny",
+  "trusted_hops": ["10.89.0.0/24", "127.0.0.1/32", "::1/128"],
+  "required_groups": ["operators"],
+  "public_unauthenticated_paths": ["/healthz", "/livez"],
+  "health_body_keys": ["status"],
+  "datastores_internal_only": ["postgres", "redis", "nats"],
+  "secret_injection": ["env", "file"],
+  "tls_termination": "proxy"
+}

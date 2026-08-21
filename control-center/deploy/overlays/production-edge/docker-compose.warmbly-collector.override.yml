@@ -1,0 +1,15 @@
+# OPTIONAL override. Not part of the default production-edge apply.
+# Grants collector access to an external Warmbly Docker network only.
+# Does NOT attach collector to datastore volumes or the internal:true network.
+# Does NOT publish collector. Does NOT share postgres/redis/nats volumes.
+
+services:
+  collector:
+    networks:
+      cc_edge: {}
+      warmbly_net: {}
+
+networks:
+  warmbly_net:
+    external: true
+    name: ${WARMBLY_DOCKER_NETWORK:-warmbly}
