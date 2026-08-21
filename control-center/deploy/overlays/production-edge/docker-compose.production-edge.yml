@@ -272,6 +272,8 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
       CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
+      CC_ACTOR_KIND: human
+      CC_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
     networks:
       cc_edge:
         ipv4_address: 10.89.0.5
