@@ -1,0 +1,32 @@
+{
+  "name": "@confenge/control-center-attention",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic Attention Engine for Confenge Control Center: ATENÇÃO AGORA and today's top 3. No LLM on the v1 path.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cc-attention-rank": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "rank": "tsx src/cli.ts",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

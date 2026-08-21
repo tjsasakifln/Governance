@@ -1,0 +1,24 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "provider mutation acidental",
+  "case_kind": "control",
+  "description": "Only read-only MCP tools; collectors and finance snapshots forbid mutations.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: forbid cc_charge, checkout, refund, cancelamento, Asaas writes, commercial send; collectors stay read_only",
+  "payload": {
+    "operations": [
+      { "name": "cc_get_context", "read_only": true },
+      { "name": "cc_list_attention", "read_only": true }
+    ],
+    "collectors": [
+      { "name": "asaas-finance", "read_only": true }
+    ],
+    "finance_snapshots": [
+      {
+        "id": "cc:finance-snapshot:now",
+        "read_model_only": true,
+        "provider_mutations": "forbidden"
+      }
+    ]
+  }
+}

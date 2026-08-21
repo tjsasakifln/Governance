@@ -1,0 +1,97 @@
+# Authelia example for the single Control Center operator.
+# Secrets are file/env placeholders. This wave does not run Authelia or publish DNS.
+
+theme: auto
+
+server:
+  address: 'tcp://0.0.0.0:9091/'
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: ForwardAuth
+
+log:
+  level: info
+  format: json
+
+totp:
+  disable: false
+  issuer: confenge-control-center
+  algorithm: SHA1
+  digits: 6
+  period: 30
+  skew: 1
+
+webauthn:
+  disable: false
+  enable_passkey_login: true
+  display_name: Confenge Control Center
+  attestation_conveyance_preference: indirect
+  timeout: 60s
+
+authentication_backend:
+  password_reset:
+    disable: true
+  refresh_interval: 5 minutes
+  file:
+    path: /config/users.yml
+    watch: false
+    password:
+      algorithm: argon2
+      argon2:
+        variant: argon2id
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: '${CC_PUBLIC_DOMAIN}'
+      policy: two_factor
+      subject:
+        - 'group:operators'
+
+session:
+  secret: '{{ secret "/run/secrets/authelia_session" }}'
+  name: authelia_session
+  same_site: lax
+  expiration: 8 hours
+  inactivity: 30 minutes
+  remember_me: false
+  cookies:
+    - name: authelia_session
+      domain: '${CC_COOKIE_DOMAIN}'
+      authelia_url: 'https://${CC_AUTH_DOMAIN}'
+      same_site: lax
+      expiration: 8 hours
+      inactivity: 30 minutes
+      remember_me: false
+  redis:
+    host: redis
+    port: 6379
+
+regulation:
+  max_retries: 3
+  find_time: 2 minutes
+  ban_time: 15 minutes
+
+storage:
+  encryption_key: '{{ secret "/run/secrets/authelia_storage" }}'
+  postgres:
+    address: 'tcp://postgres:5432'
+    database: authelia
+    schema: public
+    username: authelia
+    password: '{{ secret "/run/secrets/authelia_postgres_password" }}'
+
+notifier:
+  disable_startup_check: true
+  filesystem:
+    filename: /config/notification.txt
+
+identity_validation:
+  reset_password:
+    jwt_secret: '{{ secret "/run/secrets/authelia_jwt" }}'

@@ -1,0 +1,22 @@
+{
+  "schema_version": "control-center.agent-activity.v1",
+  "id": "cc:agent-session:01K3CC-NOT-ACTIVITY",
+  "agent_id": "agent:cc-context",
+  "scope": "finance",
+  "status": "open",
+  "started_at": "2026-08-20T17:50:00Z",
+  "finished_at": null,
+  "goal": "This document uses AgentSession id type and status; it is not AgentActivity.",
+  "summary": "Invalid mix of session identity into the activity ledger.",
+  "provenance": {
+    "source": {
+      "system": "collector",
+      "kind": "report",
+      "locator": "agent-activity/bad"
+    },
+    "observed_at": "2026-08-20T18:10:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.9
+  },
+  "actor": { "kind": "agent", "id": "agent:cc-context" }
+}

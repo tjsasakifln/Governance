@@ -1,0 +1,20 @@
+{
+  "schema_version": "control-center.priority-recommendation.v1",
+  "id": "cc:priority-recommendation:01K3CC-RANK-ZERO",
+  "scope": "company",
+  "rank": 0,
+  "title": "Invalid rank",
+  "rationale": "rank minimum is 1; homepage uses 1, 2, 3.",
+  "provenance": {
+    "source": {
+      "system": "warmbly",
+      "kind": "inbound-queue",
+      "locator": "inbound/unread"
+    },
+    "observed_at": "2026-08-20T17:45:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.88
+  },
+  "generated_at": "2026-08-20T17:46:00Z",
+  "horizon": "now"
+}

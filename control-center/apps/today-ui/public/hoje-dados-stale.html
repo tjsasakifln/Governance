@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#121418" />
+  <meta name="description" content="Confenge Control Center — HOJE. Cockpit de exceções. Sem chat. Sem mutações financeiras." />
+  <title>HOJE — Control Center</title>
+  <link rel="stylesheet" href="./hoje.css" />
+</head>
+<body>
+  <div id="root">
+
+    <header class="top">
+      <p class="brand">Control Center</p>
+      <h1>HOJE</h1>
+      <p class="headline">Dados presentes, mas não confiáveis. Não tratar como fresco.</p>
+      <p class="as-of"><time datetime="2026-08-20T18:00:00Z">2026-08-20T18:00:00Z</time></p>
+    </header>
+    <main id="hoje" data-fixture="dados-stale" data-charts-emitted="false">
+
+    <section class="band" data-band-id="top3" data-band-label="Top 3 ações recomendadas" data-compressed="false">
+      <h2>Top 3 ações recomendadas</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:priority-recommendation:01K3CC-STALE-REFRESH" data-tone="amber" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">rank-1</span></p>
+        <h3>Reexecutar coletores antes de decidir</h3>
+      </header>
+      <p>Recortes comercial/financeiro/engenharia não estão FRESH.</p>
+
+    <p class="meta" data-freshness="STALE" data-tone="amber" data-source="collector">
+      <span class="src">collector · snapshot-composer</span>
+      <time datetime="2026-08-19T12:00:00Z">19/08/2026, 09:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T12:00:00Z</span>
+      <span class="pill tone-amber" data-tone="amber">STALE · defasado</span>
+      <span class="conf">confiança 0,40</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:priority-recommendation:01K3CC-STALE-ASAAS" data-tone="red" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">rank-2</span></p>
+        <h3>Não agir sobre recebíveis até o recorte Asaas voltar</h3>
+      </header>
+      <p>Coleta financeira em ERROR. Proibido mutar Asaas.</p>
+
+    <p class="meta" data-freshness="ERROR" data-tone="red" data-source="asaas">
+      <span class="src">asaas · receivable-read</span>
+      <time datetime="2026-08-18T09:00:00Z">18/08/2026, 06:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-18T09:00:00Z</span>
+      <span class="pill tone-red" data-tone="red">ERROR · erro de coleta</span>
+      <span class="conf">confiança 0,15</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="incidents" data-band-label="Incidentes/blockers/riscos" data-compressed="false">
+      <h2>Incidentes/blockers/riscos</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:attention-item:01K3CC-STALE-COLLECTOR" data-tone="amber" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">high</span><span class="pill">incident</span></p>
+        <h3>Coletor GitHub sem heartbeat</h3>
+      </header>
+      <p>Última observação há mais de 24h. Status de freshness STALE.</p>
+
+    <p class="meta" data-freshness="STALE" data-tone="amber" data-source="github">
+      <span class="src">github · collector-health</span>
+      <time datetime="2026-08-19T11:00:00Z">19/08/2026, 08:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T11:00:00Z</span>
+      <span class="pill tone-amber" data-tone="amber">STALE · defasado</span>
+      <span class="conf">confiança 0,35</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="clients" data-band-label="Clientes que exigem atenção" data-compressed="false">
+      <h2>Clientes que exigem atenção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:client-status:acme-industria" data-tone="slate" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">unknown</span></p>
+        <h3>Acme Indústria</h3>
+      </header>
+      <p>lifecycle unknown — recorte Warmbly sem freshness</p>
+
+    <p class="meta" data-freshness="UNKNOWN" data-tone="slate" data-source="warmbly">
+      <span class="src">warmbly · client-record</span>
+      <time datetime="2026-08-17T08:00:00Z">17/08/2026, 05:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-17T08:00:00Z</span>
+      <span class="pill tone-slate" data-tone="slate">UNKNOWN · desconhecido</span>
+      <span class="conf">confiança 0,20</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="commercial" data-band-label="Comercial em exceção" data-compressed="false">
+      <h2>Comercial em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:commercial-snapshot:01K3CC-STALE:inbound" data-tone="amber" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">inbound</span></p>
+        <h3>Inbound sem leitura</h3>
+      </header>
+      <p>1 item(ns) no inbound Warmbly (somente leitura)</p>
+
+    <p class="meta" data-freshness="STALE" data-tone="amber" data-source="warmbly">
+      <span class="src">warmbly · crm-read-model</span>
+      <time datetime="2026-08-19T10:00:00Z">19/08/2026, 07:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T10:00:00Z</span>
+      <span class="pill tone-amber" data-tone="amber">STALE · defasado</span>
+      <span class="conf">confiança 0,30</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="finance" data-band-label="Financeiro em exceção" data-compressed="false">
+      <h2>Financeiro em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:finance-snapshot:01K3CC-STALE" data-tone="red" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">snapshot</span></p>
+        <h3>Recorte financeiro defasado</h3>
+      </header>
+      <p>Aberto BRL 2500000¢ · vencido 0¢</p>
+      <p class="money" data-amount-cents="2500000" data-currency="BRL">BRL 25.000,00</p>
+
+    <p class="meta" data-freshness="ERROR" data-tone="red" data-source="asaas">
+      <span class="src">asaas · receivable-read</span>
+      <time datetime="2026-08-18T09:00:00Z">18/08/2026, 06:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-18T09:00:00Z</span>
+      <span class="pill tone-red" data-tone="red">ERROR · erro de coleta</span>
+      <span class="conf">confiança 0,15</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="engineering" data-band-label="Engenharia/infra em exceção" data-compressed="false">
+      <h2>Engenharia/infra em exceção</h2>
+
+      <div class="rows">
+    <article class="row" data-id="cc:engineering-snapshot:01K3CC-STALE" data-tone="slate" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">snapshot</span></p>
+        <h3>Recorte de engenharia defasado</h3>
+      </header>
+      <p>PRs 1 · checks falhando 0 · incidentes 0</p>
+
+    <p class="meta" data-freshness="UNKNOWN" data-tone="slate" data-source="github">
+      <span class="src">github · repo-read</span>
+      <time datetime="2026-08-19T11:00:00Z">19/08/2026, 08:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T11:00:00Z</span>
+      <span class="pill tone-slate" data-tone="slate">UNKNOWN · desconhecido</span>
+      <span class="conf">confiança 0,25</span>
+    </p>
+    </article>
+    <article class="row" data-id="cc:service-health:01K3CC-STALE-CONTEXT" data-tone="slate" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">infra</span></p>
+        <h3>context-service</h3>
+      </header>
+      <p>sem probe recente</p>
+
+    <p class="meta" data-freshness="UNKNOWN" data-tone="slate" data-source="collector">
+      <span class="src">collector · health-probe</span>
+      <time datetime="2026-08-19T11:00:00Z">19/08/2026, 08:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T11:00:00Z</span>
+      <span class="pill tone-slate" data-tone="slate">UNKNOWN · desconhecido</span>
+      <span class="conf">confiança 0,10</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="agents" data-band-label="atividade recente de agentes" data-compressed="false">
+      <h2>atividade recente de agentes</h2>
+
+      <div class="rows">
+    <article class="row" data-id="sess.cc-18-stale-running" data-tone="amber" data-founder-override-visible="false">
+      <header>
+        <p class="kicker"><span class="pill">RUNNING</span></p>
+        <h3>agent:collector · RUNNING</h3>
+      </header>
+      <p>Sessão ainda marcada RUNNING com observação stale.</p>
+
+    <p class="meta" data-freshness="STALE" data-tone="amber" data-source="agent">
+      <span class="src">agent · heartbeat</span>
+      <time datetime="2026-08-19T10:00:00Z">19/08/2026, 07:00 (America/Sao_Paulo)</time>
+      <span class="sr-only">UTC 2026-08-19T10:00:00Z</span>
+      <span class="pill tone-amber" data-tone="amber">STALE · defasado</span>
+      <span class="conf">confiança 0,20</span>
+    </p>
+    </article></div>
+
+    </section>
+    <section class="band" data-band-id="shortcuts" data-band-label="shortcuts para registrar decisão/nota" data-compressed="false">
+      <h2>shortcuts para registrar decisão/nota</h2>
+
+      <div class="shortcuts">
+        <button type="button" class="shortcut" data-shortcut="decision" data-label="Registrar decisão">
+          Registrar decisão
+        </button>
+        <p class="hint">Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda.</p>
+        <button type="button" class="shortcut" data-shortcut="nota" data-label="Registrar nota">
+          Registrar nota
+        </button>
+        <p class="hint">Nota local. Sem POST externo nesta onda.</p>
+        <p id="registrar-feedback" class="feedback" hidden></p>
+      </div>
+    </section>
+    </main>
+  </div>
+  <script type="application/json" id="hoje-view">{"schema_version":"control-center.hoje-view.v1","fixture_name":"dados-stale","generated_at":"2026-08-20T18:00:00Z","headline":"Dados presentes, mas não confiáveis. Não tratar como fresco.","bands":[{"id":"top3","label":"Top 3 ações recomendadas","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:priority-recommendation:01K3CC-STALE-REFRESH","title":"Reexecutar coletores antes de decidir","summary":"Recortes comercial/financeiro/engenharia não estão FRESH.","source":{"system":"collector","kind":"snapshot-composer","locator":"snapshots/company"},"observed_at":"2026-08-19T12:00:00Z","observed_at_local":"19/08/2026, 09:00 (America/Sao_Paulo)","freshness_status":"STALE","freshness_tone":"amber","founder_override_visible":false,"confidence":0.4,"kind":"rank-1"},{"id":"cc:priority-recommendation:01K3CC-STALE-ASAAS","title":"Não agir sobre recebíveis até o recorte Asaas voltar","summary":"Coleta financeira em ERROR. Proibido mutar Asaas.","source":{"system":"asaas","kind":"receivable-read","locator":"finance/receivables"},"observed_at":"2026-08-18T09:00:00Z","observed_at_local":"18/08/2026, 06:00 (America/Sao_Paulo)","freshness_status":"ERROR","freshness_tone":"red","founder_override_visible":false,"confidence":0.15,"kind":"rank-2"}],"shortcuts":[]},{"id":"incidents","label":"Incidentes/blockers/riscos","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:attention-item:01K3CC-STALE-COLLECTOR","title":"Coletor GitHub sem heartbeat","summary":"Última observação há mais de 24h. Status de freshness STALE.","source":{"system":"github","kind":"collector-health","locator":"collectors/github"},"observed_at":"2026-08-19T11:00:00Z","observed_at_local":"19/08/2026, 08:00 (America/Sao_Paulo)","freshness_status":"STALE","freshness_tone":"amber","founder_override_visible":false,"confidence":0.35,"severity":"high","kind":"incident"}],"shortcuts":[]},{"id":"clients","label":"Clientes que exigem atenção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:client-status:acme-industria","title":"Acme Indústria","summary":"lifecycle unknown — recorte Warmbly sem freshness","source":{"system":"warmbly","kind":"client-record","locator":"clients/acme-industria"},"observed_at":"2026-08-17T08:00:00Z","observed_at_local":"17/08/2026, 05:00 (America/Sao_Paulo)","freshness_status":"UNKNOWN","freshness_tone":"slate","founder_override_visible":false,"confidence":0.2,"kind":"unknown"}],"shortcuts":[]},{"id":"commercial","label":"Comercial em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:commercial-snapshot:01K3CC-STALE:inbound","title":"Inbound sem leitura","summary":"1 item(ns) no inbound Warmbly (somente leitura)","source":{"system":"warmbly","kind":"crm-read-model","locator":"commercial/pipeline"},"observed_at":"2026-08-19T10:00:00Z","observed_at_local":"19/08/2026, 07:00 (America/Sao_Paulo)","freshness_status":"STALE","freshness_tone":"amber","founder_override_visible":false,"confidence":0.3,"kind":"inbound"}],"shortcuts":[]},{"id":"finance","label":"Financeiro em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:finance-snapshot:01K3CC-STALE","title":"Recorte financeiro defasado","summary":"Aberto BRL 2500000¢ · vencido 0¢","source":{"system":"asaas","kind":"receivable-read","locator":"finance/receivables"},"observed_at":"2026-08-18T09:00:00Z","observed_at_local":"18/08/2026, 06:00 (America/Sao_Paulo)","freshness_status":"ERROR","freshness_tone":"red","founder_override_visible":false,"confidence":0.15,"money":{"amount_cents":2500000,"currency":"BRL"},"kind":"snapshot"}],"shortcuts":[]},{"id":"engineering","label":"Engenharia/infra em exceção","compressed":false,"compressed_summary":null,"rows":[{"id":"cc:engineering-snapshot:01K3CC-STALE","title":"Recorte de engenharia defasado","summary":"PRs 1 · checks falhando 0 · incidentes 0","source":{"system":"github","kind":"repo-read","locator":"repos/tjsasakifln/Governance"},"observed_at":"2026-08-19T11:00:00Z","observed_at_local":"19/08/2026, 08:00 (America/Sao_Paulo)","freshness_status":"UNKNOWN","freshness_tone":"slate","founder_override_visible":false,"confidence":0.25,"kind":"snapshot"},{"id":"cc:service-health:01K3CC-STALE-CONTEXT","title":"context-service","summary":"sem probe recente","source":{"system":"collector","kind":"health-probe","locator":"health/context-service"},"observed_at":"2026-08-19T11:00:00Z","observed_at_local":"19/08/2026, 08:00 (America/Sao_Paulo)","freshness_status":"UNKNOWN","freshness_tone":"slate","founder_override_visible":false,"confidence":0.1,"kind":"infra"}],"shortcuts":[]},{"id":"agents","label":"atividade recente de agentes","compressed":false,"compressed_summary":null,"rows":[{"id":"sess.cc-18-stale-running","title":"agent:collector · RUNNING","summary":"Sessão ainda marcada RUNNING com observação stale.","source":{"system":"agent","kind":"heartbeat","locator":"sess.cc-18-stale-running"},"observed_at":"2026-08-19T10:00:00Z","observed_at_local":"19/08/2026, 07:00 (America/Sao_Paulo)","freshness_status":"STALE","freshness_tone":"amber","founder_override_visible":false,"confidence":0.2,"kind":"RUNNING"}],"shortcuts":[]},{"id":"shortcuts","label":"shortcuts para registrar decisão/nota","compressed":false,"compressed_summary":null,"rows":[],"shortcuts":[{"kind":"decision","label":"Registrar decisão","hint":"Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda."},{"kind":"nota","label":"Registrar nota","hint":"Nota local. Sem POST externo nesta onda."}]}],"charts_emitted":false}</script>
+  <script src="./hoje.js"></script>
+</body>
+</html>

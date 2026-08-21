@@ -1,0 +1,20 @@
+[
+  {
+    "sha": "abc123def4567890",
+    "commit": {
+      "message": "fix(commercial): fail-close mapping identifiers",
+      "author": { "name": "dev", "date": "2026-08-19T12:00:00Z" },
+      "committer": { "date": "2026-08-19T12:00:00Z" }
+    },
+    "author": { "login": "tjsasakifln" }
+  },
+  {
+    "sha": "fedcba0987654321",
+    "commit": {
+      "message": "feat(commercial): converge offer catalog",
+      "author": { "name": "dev", "date": "2026-08-18T10:00:00Z" },
+      "committer": { "date": "2026-08-18T10:00:00Z" }
+    },
+    "author": { "login": "tjsasakifln" }
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "name": "@confenge/control-center-engineering",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Confenge Control Center — executive engineering read model from GitHub collector snapshots. Not a GitHub clone, chat, or ERP.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "fixtures",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "tsx --test --test-concurrency=1 tests/executive-read-model.test.ts tests/adapter.test.ts",
+    "consumer": "tsx scripts/consumer.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

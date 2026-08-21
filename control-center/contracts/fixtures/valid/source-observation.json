@@ -1,0 +1,22 @@
+{
+  "schema_version": "control-center.source-observation.v1",
+  "id": "cc:source-observation:01K3CC-WARMBLY-INBOUND",
+  "scope": "inbound",
+  "provenance": {
+    "source": {
+      "system": "warmbly",
+      "kind": "inbound-queue",
+      "locator": "inbound/unread"
+    },
+    "observed_at": "2026-08-20T17:45:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 0.91,
+    "freshness_window_seconds": 600
+  },
+  "collected_at": "2026-08-20T17:45:12Z",
+  "idempotency_key": "warmbly:inbound:unread:2026-08-20T17:45:00Z",
+  "payload": {
+    "unread_count": 3,
+    "oldest_unread_at": "2026-08-20T14:02:00Z"
+  }
+}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#121418" />
+  <meta name="description" content="Confenge Control Center — HOJE. Cockpit de exceções. Sem chat. Sem mutações financeiras." />
+  <title>HOJE — Control Center</title>
+  <link rel="stylesheet" href="./hoje.css" />
+</head>
+<body>
+  <div id="root">
+
+    <header class="top">
+      <p class="brand">Control Center</p>
+      <h1>HOJE</h1>
+      <p class="headline">Zero atividade. Não inventar trabalho.</p>
+      <p class="as-of"><time datetime="2026-08-20T18:00:00Z">2026-08-20T18:00:00Z</time></p>
+    </header>
+    <main id="hoje" data-fixture="zero-atividade" data-charts-emitted="false">
+
+    <section class="band band-compressed" data-band-id="top3" data-band-label="Top 3 ações recomendadas" data-compressed="true">
+      <h2>Top 3 ações recomendadas</h2>
+      <p class="ignore">Nenhuma ação recomendada — não inventar trabalho</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="incidents" data-band-label="Incidentes/blockers/riscos" data-compressed="true">
+      <h2>Incidentes/blockers/riscos</h2>
+      <p class="ignore">Nenhum incidente, blocker ou risco aberto — ignorar</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="clients" data-band-label="Clientes que exigem atenção" data-compressed="true">
+      <h2>Clientes que exigem atenção</h2>
+      <p class="ignore">Nenhum cliente exige atenção — ignorar</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="commercial" data-band-label="Comercial em exceção" data-compressed="true">
+      <h2>Comercial em exceção</h2>
+      <p class="ignore">Sem recorte comercial — ignorar</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="finance" data-band-label="Financeiro em exceção" data-compressed="true">
+      <h2>Financeiro em exceção</h2>
+      <p class="ignore">Sem recorte financeiro — ignorar</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="engineering" data-band-label="Engenharia/infra em exceção" data-compressed="true">
+      <h2>Engenharia/infra em exceção</h2>
+      <p class="ignore">Sem recorte de engenharia/infra — ignorar</p>
+
+    </section>
+    <section class="band band-compressed" data-band-id="agents" data-band-label="atividade recente de agentes" data-compressed="true">
+      <h2>atividade recente de agentes</h2>
+      <p class="ignore">Zero atividade de agentes — não inventar trabalho</p>
+
+    </section>
+    <section class="band" data-band-id="shortcuts" data-band-label="shortcuts para registrar decisão/nota" data-compressed="false">
+      <h2>shortcuts para registrar decisão/nota</h2>
+
+      <div class="shortcuts">
+        <button type="button" class="shortcut" data-shortcut="decision" data-label="Registrar decisão">
+          Registrar decisão
+        </button>
+        <p class="hint">Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda.</p>
+        <button type="button" class="shortcut" data-shortcut="nota" data-label="Registrar nota">
+          Registrar nota
+        </button>
+        <p class="hint">Nota local. Sem POST externo nesta onda.</p>
+        <p id="registrar-feedback" class="feedback" hidden></p>
+      </div>
+    </section>
+    </main>
+  </div>
+  <script type="application/json" id="hoje-view">{"schema_version":"control-center.hoje-view.v1","fixture_name":"zero-atividade","generated_at":"2026-08-20T18:00:00Z","headline":"Zero atividade. Não inventar trabalho.","bands":[{"id":"top3","label":"Top 3 ações recomendadas","compressed":true,"compressed_summary":"Nenhuma ação recomendada — não inventar trabalho","rows":[],"shortcuts":[]},{"id":"incidents","label":"Incidentes/blockers/riscos","compressed":true,"compressed_summary":"Nenhum incidente, blocker ou risco aberto — ignorar","rows":[],"shortcuts":[]},{"id":"clients","label":"Clientes que exigem atenção","compressed":true,"compressed_summary":"Nenhum cliente exige atenção — ignorar","rows":[],"shortcuts":[]},{"id":"commercial","label":"Comercial em exceção","compressed":true,"compressed_summary":"Sem recorte comercial — ignorar","rows":[],"shortcuts":[]},{"id":"finance","label":"Financeiro em exceção","compressed":true,"compressed_summary":"Sem recorte financeiro — ignorar","rows":[],"shortcuts":[]},{"id":"engineering","label":"Engenharia/infra em exceção","compressed":true,"compressed_summary":"Sem recorte de engenharia/infra — ignorar","rows":[],"shortcuts":[]},{"id":"agents","label":"atividade recente de agentes","compressed":true,"compressed_summary":"Zero atividade de agentes — não inventar trabalho","rows":[],"shortcuts":[]},{"id":"shortcuts","label":"shortcuts para registrar decisão/nota","compressed":false,"compressed_summary":null,"rows":[],"shortcuts":[{"kind":"decision","label":"Registrar decisão","hint":"Intenção local. Não grava diretiva persistida nem muta Warmbly/Asaas/GitHub nesta onda."},{"kind":"nota","label":"Registrar nota","hint":"Nota local. Sem POST externo nesta onda."}]}],"charts_emitted":false}</script>
+  <script src="./hoje.js"></script>
+</body>
+</html>

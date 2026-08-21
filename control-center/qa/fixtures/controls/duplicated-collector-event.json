@@ -1,0 +1,28 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "duplicated collector event",
+  "case_kind": "control",
+  "description": "Retry with the same idempotency_key is skipped.",
+  "expected_state": "pass",
+  "reject_outcome": "gate fail: duplicate idempotency_key must be skipped, not re-applied",
+  "payload": {
+    "events": [
+      {
+        "id": "cc:collector-run:gh-1",
+        "collector_name": "github",
+        "idempotency_key": "github:repo:Governance:cursor:abc",
+        "status": "succeeded",
+        "applied": true,
+        "read_only": true
+      },
+      {
+        "id": "cc:collector-run:gh-1-retry",
+        "collector_name": "github",
+        "idempotency_key": "github:repo:Governance:cursor:abc",
+        "status": "skipped",
+        "applied": false,
+        "read_only": true
+      }
+    ]
+  }
+}

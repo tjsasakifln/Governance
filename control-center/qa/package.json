@@ -1,0 +1,28 @@
+{
+  "name": "@confenge/control-center-qa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Adversarial QA gate for Confenge Control Center: threat matrix, synthetic attack fixtures, shipped evaluators, fail-closed READY_FOR_INTERNAL_PRODUCTION. No provider mutations.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cc-qa-gate": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/contract.test.ts tests/live-gate.test.ts",
+    "typecheck": "tsc --noEmit",
+    "gate": "tsx src/cli.ts --corpus adversarial",
+    "gate:all-pass": "tsx src/cli.ts --corpus all-pass",
+    "gate:live": "tsx src/cli.ts --corpus live"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

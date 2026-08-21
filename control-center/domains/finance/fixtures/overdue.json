@@ -1,0 +1,65 @@
+{
+  "id": "overdue",
+  "as_of": "2026-08-20T12:00:00Z",
+  "cash_in_window": {
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-08-31T23:59:59Z"
+  },
+  "events": [
+    {
+      "id": "cc:finance-event:od-contract",
+      "idempotency_key": "fixture:overdue:contract",
+      "kind": "contract_signed",
+      "occurred_at": "2026-06-15T10:00:00Z",
+      "amount_cents": 250000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:od-acme",
+      "billing_mode": "RECURRING",
+      "billing_cycle": "MONTHLY",
+      "settlement_proven": false,
+      "offer_code": "CFG-DIRB2G-FLEX-v1",
+      "source": { "system": "asaas", "kind": "subscription", "locator": "sub_od" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.92
+    },
+    {
+      "id": "cc:finance-event:od-invoice",
+      "idempotency_key": "fixture:overdue:invoice",
+      "kind": "invoice_issued",
+      "occurred_at": "2026-06-20T10:00:00Z",
+      "amount_cents": 250000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:od-acme",
+      "billing_mode": "RECURRING",
+      "billing_cycle": "MONTHLY",
+      "settlement_proven": false,
+      "invoice_id": "inv:od-acme",
+      "due_at": "2026-07-01T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_od" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.92
+    },
+    {
+      "id": "cc:finance-event:od-mark",
+      "idempotency_key": "fixture:overdue:mark",
+      "kind": "invoice_overdue",
+      "occurred_at": "2026-07-02T00:00:00Z",
+      "amount_cents": 250000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:od-acme",
+      "billing_mode": "RECURRING",
+      "billing_cycle": "MONTHLY",
+      "settlement_proven": false,
+      "due_at": "2026-07-01T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_od" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.92
+    }
+  ]
+}

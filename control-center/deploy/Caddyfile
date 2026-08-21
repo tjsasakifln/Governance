@@ -1,0 +1,59 @@
+# Confenge Control Center — Caddy 2 integration hook.
+#
+# This wave does NOT bind host :80 or :443. Warmbly keeps the existing host
+# nginx on those ports. Compose publishes Caddy only on 127.0.0.1:18080 and
+# 127.0.0.1:18443.
+#
+# Automatic HTTPS (later convergence campaign):
+# Caddy 2 enables automatic HTTPS (ACME) when a site address is a public
+# hostname served on ports 80/443. Do not switch this file to
+# `{$CONTROL_CENTER_PUBLIC_HOST}` on 80/443 until a dedicated vhost exists
+# and nginx is no longer occupying those ports for this hostname.
+# Until then, keep `tls internal` on the high HTTPS port so `/data` still
+# stores certificates (volume confenge-control-center-caddy-data).
+#
+# MCP and the cockpit UI are not a public internet surface in this wave.
+
+{
+	admin off
+	persist_config off
+}
+
+(cc_handlers) {
+  encode gzip
+  log {
+    output stdout
+    format json
+  }
+
+  handle /healthz {
+    reverse_proxy context:8080
+  }
+
+  handle /ready {
+    reverse_proxy context:8080
+  }
+
+  handle /mcp* {
+    reverse_proxy mcp:8080
+  }
+
+  handle /v1/* {
+    reverse_proxy context:8080
+  }
+
+  handle {
+    reverse_proxy web:8080
+  }
+}
+
+http://:{$CONTROL_CENTER_CADDY_HTTP_PORT:18080} {
+  import cc_handlers
+}
+
+# HTTPS hook with locally issued certs. Replace `tls internal` with Caddy
+# automatic HTTPS in the convergence campaign, not in this wave.
+:{$CONTROL_CENTER_CADDY_HTTPS_PORT:18443} {
+  tls internal
+  import cc_handlers
+}

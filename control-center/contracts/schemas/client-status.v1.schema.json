@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/client-status.v1.schema.json",
+  "title": "ClientStatus v1",
+  "description": "Aggregated per-client operational status. scope MUST equal client:<client_slug>.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "client_slug",
+    "display_name",
+    "lifecycle",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.client-status.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/client_scope"
+    },
+    "client_slug": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/client_slug"
+    },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["lead", "active", "paused", "churn_risk", "churned", "unknown"]
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    },
+    "open_receivables": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "notes": { "type": "string", "minLength": 1, "maxLength": 2000 }
+  }
+}

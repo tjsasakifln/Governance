@@ -1,0 +1,11 @@
+# TEMPLATE. At deploy, mount a secret-produced file over this path.
+# Username is not an access-control secret; the password hash is.
+users:
+  "${CC_OPERATOR_USER}":
+    disabled: false
+    displayname: "${CC_OPERATOR_DISPLAY_NAME}"
+    password: "${CC_OPERATOR_PASSWORD_HASH}"
+    email: "${CC_OPERATOR_EMAIL}"
+    groups:
+      - admins
+      - operators

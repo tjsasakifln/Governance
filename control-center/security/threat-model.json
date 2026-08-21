@@ -1,0 +1,35 @@
+{
+  "schema_version": "control-center.threat-model.v1",
+  "threats": [
+    {
+      "id": "T-SPOOF-HEADERS",
+      "title": "Spoofed identity headers",
+      "summary": "A client talks to the app (or forges X-Forwarded-For) and injects Remote-User / Remote-Groups / Remote-Name / Remote-Email.",
+      "controls": ["C-TRUSTED-HOP", "C-FAIL-CLOSED-IDENTITY", "C-FORWARD-AUTH", "C-COPY-HEADERS"]
+    },
+    {
+      "id": "T-SECRET-URL",
+      "title": "Secret URL as authentication",
+      "summary": "Publishing an unguessable path or a 'hidden' hostname is treated as access control instead of an IdP with MFA.",
+      "controls": ["C-IDP-MFA", "C-NO-SECRET-URL-GATE", "C-FORWARD-AUTH"]
+    },
+    {
+      "id": "T-BRUTE-FORCE",
+      "title": "Brute-force against login",
+      "summary": "Password or TOTP guessing against the Authelia portal.",
+      "controls": ["C-REGULATION", "C-SESSION-TIMEOUT"]
+    },
+    {
+      "id": "T-DATASTORE-EXPOSURE",
+      "title": "PostgreSQL / Redis / NATS public exposure",
+      "summary": "Datastores published on 0.0.0.0 or joined to a public network.",
+      "controls": ["C-INTERNAL-DATASTORES"]
+    },
+    {
+      "id": "T-SECRET-LEAK",
+      "title": "Secret leakage",
+      "summary": "Passwords, hashes, DSNs, or tokens committed, logged, put in URLs, health bodies, or a client bundle.",
+      "controls": ["C-SECRET-INJECTION", "C-MINIMAL-HEALTH", "C-LOG-REDACTION"]
+    }
+  ]
+}

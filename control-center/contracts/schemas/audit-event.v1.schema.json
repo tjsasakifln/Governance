@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/audit-event.v1.schema.json",
+  "title": "AuditEvent v1",
+  "description": "Immutable audit trail entry. detail MUST NOT contain secrets. Structured logs of Control Center MUST follow the same rule.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "at",
+    "actor",
+    "action",
+    "resource_type",
+    "resource_id",
+    "scope",
+    "outcome",
+    "detail"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.audit-event.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "actor": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref"
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9._-]*$"
+    },
+    "resource_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$"
+    },
+    "resource_id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_resource_id"
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        { "type": "null" }
+      ]
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["success", "denied", "error"]
+    },
+    "detail": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/non_secret_property_names"
+      }
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    }
+  }
+}

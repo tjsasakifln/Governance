@@ -1,0 +1,11 @@
+{
+  "schema_version": "synthetic-decision.v1",
+  "kind": "decision",
+  "title": "Synthetic labeled JSON decision record",
+  "body": "This JSON record is explicitly labeled kind=decision for importer tests. It is not a live commercial term and does not copy catalog prices.",
+  "status": "active",
+  "scope": "commercial",
+  "effective_from": "2026-08-20T00:00:00Z",
+  "expires_at": null,
+  "supersedes": null
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@confenge/control-center-warmbly-connector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Warmbly adapter that yields CommercialSnapshot + observations for the Confenge Control Center cockpit.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "warmbly-collect": "./src/cli.ts",
+    "cc-connector-canary": "./src/canary.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "collect": "tsx src/cli.ts",
+    "canary": "tsx src/canary.ts",
+    "cc-connector-canary": "tsx src/canary.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

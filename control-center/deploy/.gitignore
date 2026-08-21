@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+backups/
+overlays/production-edge/secrets/local/
+*.dump
+*.dump.sql
+!fixtures/postgres.dump.sql
+*.enc
+*.enc.meta.json
+coverage/

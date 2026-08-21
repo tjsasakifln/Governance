@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "control-center.pncp.service-health.v1",
+  "title": "ServiceHealth v1 (PNCP adapter emission)",
+  "description": "Canonical Control Center ServiceHealth. Emitted in-path; cc/01-architecture-contracts is not imported.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "service_name",
+    "status",
+    "provenance",
+    "checked_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.service-health.v1" },
+    "id": { "const": "cc:service-health:pncp-contracts" },
+    "scope": { "const": "infrastructure" },
+    "service_name": { "const": "pncp-contracts" },
+    "status": { "enum": ["healthy", "degraded", "down", "unknown"] },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "observed_at", "freshness_status", "confidence"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["system", "kind", "locator"],
+          "properties": {
+            "system": { "type": "string", "minLength": 1 },
+            "kind": { "type": "string", "minLength": 1 },
+            "locator": { "type": "string", "minLength": 1 },
+            "label": { "type": "string" }
+          }
+        },
+        "observed_at": { "type": "string", "minLength": 20 },
+        "freshness_status": {
+          "enum": ["FRESH", "STALE", "UNKNOWN", "ERROR"]
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "freshness_window_seconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "checked_at": { "type": "string", "minLength": 20 },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "message": { "type": "string" },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "type": "string" },
+          "status": { "enum": ["healthy", "degraded", "down", "unknown"] },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

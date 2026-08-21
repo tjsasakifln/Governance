@@ -1,0 +1,34 @@
+{
+  "name": "@confenge/control-center-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reproducible Netcup deploy pack for Confenge Control Center: Compose, Caddy hooks, encrypted backup, retention, disk guard. Does not apply itself to production.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "cc-deploy": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
+    "validate": "tsx src/cli.ts validate",
+    "backup": "tsx src/cli.ts backup",
+    "restore": "tsx src/cli.ts restore",
+    "verify": "tsx src/cli.ts verify",
+    "retain": "tsx src/cli.ts retain",
+    "disk-guard": "tsx src/cli.ts disk-guard",
+    "restore-drill": "tsx src/cli.ts restore-drill",
+    "stub": "tsx src/stub-health-server.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

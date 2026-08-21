@@ -1,0 +1,89 @@
+{
+  "schema": "confenge.control_center.engineering_snapshot.v1",
+  "snapshot_id": "github:engineering_snapshot:confenge/docs",
+  "collected_at": "2026-08-20T12:00:00.000Z",
+  "allowlist": ["confenge/docs"],
+  "source": "github",
+  "observed_at": "2026-08-20T12:00:00.000Z",
+  "freshness_status": "fresh",
+  "confidence": 1,
+  "errors": [],
+  "repos": [
+    {
+      "repo": {
+        "source": "github",
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "fresh",
+        "confidence": 1,
+        "observation_id": "github:repo:confenge%2Fdocs",
+        "owner": "confenge",
+        "name": "docs",
+        "full_name": "confenge/docs",
+        "default_branch": "main",
+        "html_url": "https://github.com/confenge/docs",
+        "pushed_at": "2026-08-19T18:00:00.000Z",
+        "updated_at": "2026-08-19T18:00:00.000Z",
+        "last_activity_at": "2026-08-19T18:00:00.000Z"
+      },
+      "repo_collection": {
+        "ok": true,
+        "freshness_status": "fresh"
+      },
+      "issues_collection": {
+        "ok": true,
+        "freshness_status": "fresh"
+      },
+      "recent_commits": [
+        {
+          "source": "github",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "freshness_status": "fresh",
+          "confidence": 1,
+          "observation_id": "github:commit:confenge%2Fdocs:eee555",
+          "repo": "confenge/docs",
+          "sha": "eee555ffff6666777788889999aaaabbbbcccc",
+          "message": "docs: refresh onboarding",
+          "committed_at": "2026-08-19T18:00:00.000Z",
+          "author_login": "writer"
+        }
+      ],
+      "open_issues": [
+        {
+          "source": "github",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "freshness_status": "fresh",
+          "confidence": 1,
+          "observation_id": "github:issue:confenge%2Fdocs:3",
+          "repo": "confenge/docs",
+          "number": 3,
+          "title": "Typos in glossary",
+          "state": "open",
+          "labels": ["docs", "low"],
+          "priority": "low",
+          "html_url": "https://github.com/confenge/docs/issues/3",
+          "created_at": "2026-08-18T12:00:00.000Z",
+          "updated_at": "2026-08-18T12:00:00.000Z"
+        }
+      ],
+      "open_pull_requests": [],
+      "check_failures": [],
+      "workflow_failures": [],
+      "divergence": {
+        "source": "github",
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "unsupported",
+        "confidence": 0.5,
+        "observation_id": "github:compare:confenge%2Fdocs:none",
+        "repo": "confenge/docs",
+        "base": null,
+        "head": null,
+        "support": "unsupported",
+        "ahead_by": null,
+        "behind_by": null,
+        "status": "unsupported",
+        "reason": "no_compare_target"
+      },
+      "errors": []
+    }
+  ]
+}

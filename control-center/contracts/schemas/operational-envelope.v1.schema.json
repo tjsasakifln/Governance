@@ -1,0 +1,581 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/operational-envelope.v1.schema.json",
+  "title": "OperationalEnvelope v1",
+  "description": "HTTP v1 operational state envelope. Distinct from strategic memory (/v1/context) and from operational-snapshot.v1 (cockpit roll-up resource). Freshness is recency; confidence is trust. ERROR is never rewritten as UNKNOWN. STALE, UNKNOWN, and ERROR never appear healthy. Absence reasons no_data, not_configured, and upstream_error are distinct. Money stages contracted, billed, paid, and effectively_received are not aliases; Asaas CONFIRMED is paid, never effectively received.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scope",
+    "generated_at",
+    "freshness_status",
+    "confidence",
+    "snapshots",
+    "attention_now",
+    "today",
+    "source_observations"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.operational-envelope.v1" },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "freshness_status": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+    },
+    "confidence": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+    },
+    "snapshots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commercial",
+        "finance",
+        "clients",
+        "engineering",
+        "infrastructure",
+        "pncp"
+      ],
+      "properties": {
+        "commercial": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        },
+        "finance": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        },
+        "clients": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        },
+        "engineering": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        },
+        "infrastructure": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        },
+        "pncp": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        }
+      }
+    },
+    "attention_now": {
+      "type": "array",
+      "maxItems": 99,
+      "items": { "$ref": "#/$defs/attention_entry" }
+    },
+    "today": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/attention_entry" }
+    },
+    "source_observations": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "$ref": "#/$defs/observation_entry" }
+    },
+    "audit": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/override_audit" }
+    }
+  },
+  "$defs": {
+    "absence_reason": {
+      "type": "string",
+      "enum": ["no_data", "not_configured", "upstream_error"]
+    },
+    "operational_domain": {
+      "type": "string",
+      "enum": [
+        "commercial",
+        "finance",
+        "clients",
+        "engineering",
+        "infrastructure",
+        "pncp"
+      ]
+    },
+    "evidenced_money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount_cents",
+        "currency",
+        "source",
+        "observed_at",
+        "freshness_status",
+        "confidence"
+      ],
+      "properties": {
+        "amount_cents": { "type": "integer" },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "source": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/source_ref"
+        },
+        "observed_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        }
+      }
+    },
+    "domain_slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "domain",
+        "scope",
+        "source",
+        "observed_at",
+        "freshness_status",
+        "confidence",
+        "presence",
+        "healthy",
+        "snapshot"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.operational-domain.v1" },
+        "domain": { "$ref": "#/$defs/operational_domain" },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "source": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/source_ref"
+        },
+        "observed_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "presence": { "type": "string", "enum": ["present", "absent"] },
+        "absence_reason": { "$ref": "#/$defs/absence_reason" },
+        "healthy": { "type": "boolean" },
+        "snapshot": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/non_secret_property_names"
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "presence": { "const": "absent" } },
+            "required": ["presence"]
+          },
+          "then": {
+            "required": ["absence_reason"],
+            "properties": {
+              "absence_reason": { "$ref": "#/$defs/absence_reason" },
+              "snapshot": { "type": "null" },
+              "healthy": { "const": false }
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": { "freshness_status": { "const": "FRESH" } },
+              "required": ["freshness_status"]
+            }
+          },
+          "then": {
+            "properties": { "healthy": { "const": false } }
+          }
+        }
+      ]
+    },
+    "attention_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rank",
+        "title",
+        "reason",
+        "evidence_refs",
+        "score",
+        "score_milli",
+        "score_breakdown",
+        "category",
+        "domain",
+        "scope",
+        "severity",
+        "status",
+        "item_kind",
+        "provenance",
+        "horizon",
+        "attention_item_ids",
+        "forced_by_kill_rule",
+        "merge_count"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+        },
+        "rank": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "recommended_action": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "evidence_refs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source"],
+            "properties": {
+              "source": {
+                "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/source_ref"
+              },
+              "note": { "type": "string", "minLength": 1, "maxLength": 512 }
+            }
+          }
+        },
+        "score": { "type": "number" },
+        "score_milli": { "type": "integer" },
+        "score_breakdown": {
+          "type": "object",
+          "required": [
+            "category",
+            "impact",
+            "urgency",
+            "score_milli",
+            "kill_rule_applied",
+            "freshness_status",
+            "confidence"
+          ],
+          "properties": {
+            "category": { "type": "string" },
+            "impact": { "type": "number" },
+            "urgency": { "type": "number" },
+            "score_milli": { "type": "integer" },
+            "kill_rule_applied": { "type": "boolean" },
+            "freshness_status": {
+              "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+            },
+            "confidence": {
+              "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+            }
+          },
+          "additionalProperties": true
+        },
+        "category": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "domain": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+        "status": {
+          "type": "string",
+          "enum": ["open", "acknowledged", "resolved", "dismissed"]
+        },
+        "item_kind": { "type": "string", "enum": ["work", "dados_stale"] },
+        "provenance": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+        },
+        "horizon": { "type": "string", "enum": ["now", "today", "this_week"] },
+        "attention_item_ids": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+          }
+        },
+        "forced_by_kill_rule": { "type": "boolean" },
+        "merge_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "observation_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "scope",
+        "source",
+        "observed_at",
+        "freshness_status",
+        "confidence",
+        "collected_at",
+        "idempotency_key",
+        "payload"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.source-observation.v1" },
+        "id": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+        },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "source": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/source_ref"
+        },
+        "observed_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "collected_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "idempotency_key": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/idempotency_key"
+        },
+        "payload": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/non_secret_property_names"
+          }
+        },
+        "payload_schema_ref": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "error": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/error_object"
+        }
+      }
+    },
+    "domain_query_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scope",
+        "generated_at",
+        "freshness_status",
+        "confidence",
+        "domain",
+        "snapshot"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.operational-envelope.v1" },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "generated_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "domain": { "$ref": "#/$defs/operational_domain" },
+        "snapshot": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/domain_slot" }
+          ]
+        }
+      }
+    },
+    "attention_query_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scope",
+        "generated_at",
+        "freshness_status",
+        "confidence",
+        "horizon",
+        "items"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.operational-envelope.v1" },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "generated_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "horizon": { "type": "string", "enum": ["now", "today"] },
+        "items": {
+          "type": "array",
+          "maxItems": 99,
+          "items": { "$ref": "#/$defs/attention_entry" }
+        },
+        "audit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/override_audit" }
+        }
+      }
+    },
+    "today_query_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scope",
+        "generated_at",
+        "freshness_status",
+        "confidence",
+        "today"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.operational-envelope.v1" },
+        "scope": { "const": "company" },
+        "generated_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "today": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/attention_entry" }
+        },
+        "audit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/override_audit" }
+        }
+      }
+    },
+    "observations_query_response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "scope",
+        "generated_at",
+        "freshness_status",
+        "confidence",
+        "source_observations"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.operational-envelope.v1" },
+        "scope": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+        },
+        "generated_at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "freshness_status": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/freshness_status"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "source_observations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/observation_entry" }
+        }
+      }
+    },
+    "override_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "id",
+        "at",
+        "actor",
+        "action",
+        "resource_type",
+        "resource_id",
+        "scope",
+        "outcome",
+        "detail"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.audit-event.v1" },
+        "id": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+        },
+        "at": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "actor": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref"
+        },
+        "action": { "const": "founder_override" },
+        "resource_type": { "const": "PriorityRecommendation" },
+        "resource_id": { "type": "null" },
+        "scope": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+            }
+          ]
+        },
+        "outcome": { "const": "success" },
+        "detail": {
+          "type": "object",
+          "required": [
+            "override_action",
+            "target_ids",
+            "previous_ranking",
+            "resulting_ranking"
+          ],
+          "properties": {
+            "override_action": { "type": "string", "enum": ["pin", "reorder", "dismiss"] },
+            "target_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+              }
+            },
+            "previous_ranking": { "type": "object" },
+            "resulting_ranking": { "type": "object" }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

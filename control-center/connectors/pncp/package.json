@@ -1,0 +1,32 @@
+{
+  "name": "@confenge/control-center-pncp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only Control Center adapter of extra-cli PNCP_CONTRACT_FRESHNESS/1.0",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "cc-connector-canary": "./src/canary.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "evaluate": "tsx src/cli.ts",
+    "canary": "tsx src/canary.ts",
+    "cc-connector-canary": "tsx src/canary.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}

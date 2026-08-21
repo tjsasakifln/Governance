@@ -1,0 +1,130 @@
+# Example topology. Datastores are on an internal network and are not published.
+# Placeholders only. Do not deploy this file against a live VPS from this wave.
+
+name: cc-security-edge
+
+services:
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CC_PUBLIC_DOMAIN: ${CC_PUBLIC_DOMAIN}
+      CC_AUTH_DOMAIN: ${CC_AUTH_DOMAIN}
+      CC_APP_UPSTREAM: ${CC_APP_UPSTREAM}
+      AUTHELIA_URL: ${AUTHELIA_URL}
+      CC_TLS_CERT_FILE: /run/secrets/tls_cert
+      CC_TLS_KEY_FILE: /run/secrets/tls_key
+    secrets:
+      - tls_cert
+      - tls_key
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      cc_public: {}
+      cc_edge:
+        ipv4_address: 10.89.0.2
+    depends_on:
+      - authelia
+      - control-center
+
+  authelia:
+    image: authelia/authelia:4.39
+    restart: unless-stopped
+    expose:
+      - "9091"
+    environment:
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_jwt
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage
+      AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE: /run/secrets/authelia_postgres_password
+    secrets:
+      - authelia_jwt
+      - authelia_session
+      - authelia_storage
+      - authelia_postgres_password
+    volumes:
+      - ./authelia/configuration.yml:/config/configuration.yml:ro
+      - ./authelia/users.yml:/config/users.yml:ro
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.3
+      cc_internal: {}
+    depends_on:
+      - postgres
+      - redis
+
+  control-center:
+    image: ${CC_APP_IMAGE}
+    restart: unless-stopped
+    environment:
+      CC_TRUSTED_PROXY_CIDRS: 10.89.0.0/24,127.0.0.1/32,::1/128
+    networks:
+      cc_edge:
+        ipv4_address: 10.89.0.4
+      cc_internal: {}
+
+  postgres:
+    ports:
+      - "5432:5432"
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authelia
+      POSTGRES_DB: authelia
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      cc_internal: {}
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--protected-mode", "yes"]
+    networks:
+      cc_internal: {}
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    command: ["--jetstream"]
+    networks:
+      cc_internal: {}
+
+volumes:
+  postgres_data:
+
+networks:
+  cc_public:
+  cc_edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
+  cc_internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.89.1.0/24
+
+secrets:
+  authelia_jwt:
+    file: ${CC_SECRET_DIR}/authelia_jwt
+  authelia_session:
+    file: ${CC_SECRET_DIR}/authelia_session
+  authelia_storage:
+    file: ${CC_SECRET_DIR}/authelia_storage
+  authelia_postgres_password:
+    file: ${CC_SECRET_DIR}/authelia_postgres_password
+  postgres_password:
+    file: ${CC_SECRET_DIR}/postgres_password
+  tls_cert:
+    file: ${CC_SECRET_DIR}/tls_cert
+  tls_key:
+    file: ${CC_SECRET_DIR}/tls_key

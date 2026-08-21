@@ -1,0 +1,6 @@
+{
+  "contract_version": "PNCP_CONTRACT_FRESHNESS/1.0",
+  "reason_codes": ["NOT_A_VALID_STATUS"],
+  "as_of": "2026-08-20T12:00:00Z",
+  "deployed_sha": "9c5e7d47f99902d9d97cf479aefbba8cd391a14d"
+}

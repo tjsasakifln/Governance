@@ -1,0 +1,395 @@
+{
+  "now": "2026-08-20T15:00:00.000Z",
+  "signals": [
+    {
+      "id": "cc:attention-signal:invoice-overdue-asaas",
+      "title": "Fatura ACME vencida",
+      "summary": "Recebível BRL 4.500,00 em atraso. Fonte Asaas, observação read-only.",
+      "category": "receita",
+      "domain": "finance",
+      "scope": "finance",
+      "impact": 85,
+      "urgency": 70,
+      "severity": "high",
+      "status": "open",
+      "correlation_key": "invoice:acme-2026-08",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "asaas",
+            "kind": "payment",
+            "locator": "pay_acme_2026_08",
+            "label": "asaas-payment"
+          },
+          "note": "overdue receivable"
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "payment",
+          "locator": "pay_acme_2026_08"
+        },
+        "observed_at": "2026-08-20T14:00:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.95
+      },
+      "money": { "amount_cents": 450000, "currency": "BRL" },
+      "recommended_action": "Cobrar ACME pela fatura vencida (read-only neste motor; sem mutação Asaas)."
+    },
+    {
+      "id": "cc:attention-signal:invoice-overdue-warmbly",
+      "title": "Fatura ACME marcada no CRM",
+      "summary": "Warmbly confirma o mesmo recebível em atraso. Deve mesclar com o sinal Asaas.",
+      "category": "receita",
+      "domain": "finance",
+      "scope": "finance",
+      "impact": 80,
+      "urgency": 90,
+      "severity": "high",
+      "status": "open",
+      "correlation_key": "invoice:acme-2026-08",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "warmbly",
+            "kind": "deal",
+            "locator": "deal_acme_invoice"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "deal",
+          "locator": "deal_acme_invoice"
+        },
+        "observed_at": "2026-08-20T14:30:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "cc:attention-signal:churn-risk-beta",
+      "title": "Cliente Beta em risco de churn",
+      "summary": "Conta ativa com sinais de churn. Tratar o relacionamento.",
+      "category": "cliente",
+      "domain": "clients",
+      "scope": "client:beta",
+      "impact": 75,
+      "urgency": 40,
+      "severity": "high",
+      "status": "open",
+      "correlation_key": "client:beta:churn",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "warmbly",
+            "kind": "account",
+            "locator": "acct_beta"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "account",
+          "locator": "acct_beta"
+        },
+        "observed_at": "2026-08-20T13:00:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.8
+      }
+    },
+    {
+      "id": "cc:attention-signal:deadline-pncp",
+      "title": "Prazo PNCP desta semana",
+      "summary": "Janela de edital fecha em 48h. Somente leitura.",
+      "category": "prazo",
+      "domain": "inbound",
+      "scope": "inbound",
+      "impact": 70,
+      "urgency": 85,
+      "severity": "high",
+      "status": "open",
+      "correlation_key": "pncp:edital-48h",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "unknown",
+            "kind": "pncp-notice",
+            "locator": "notice-48h"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "unknown",
+          "kind": "pncp-notice",
+          "locator": "notice-48h"
+        },
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.7
+      }
+    },
+    {
+      "id": "cc:attention-signal:prod-outage",
+      "title": "Produção indisponível",
+      "summary": "Incidente crítico em infraestrutura. Kill-rule.",
+      "category": "risco_operacional",
+      "domain": "infrastructure",
+      "scope": "infrastructure",
+      "impact": 95,
+      "urgency": 100,
+      "severity": "critical",
+      "status": "open",
+      "correlation_key": "infra:prod-outage",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "extra-cli",
+            "kind": "health",
+            "locator": "prod/healthz"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "extra-cli",
+          "kind": "health",
+          "locator": "prod/healthz"
+        },
+        "observed_at": "2026-08-20T14:55:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.99
+      },
+      "recommended_action": "Restaurar produção; não executar mutações financeiras."
+    },
+    {
+      "id": "cc:attention-signal:button-color",
+      "title": "Ajustar cor do botão do marketing",
+      "summary": "Pedido estético. Não deve vencer receita/cliente/prazo/risco/blocker.",
+      "category": "estetica",
+      "domain": "engineering",
+      "scope": "repo:web-cfg",
+      "impact": 15,
+      "urgency": 99,
+      "severity": "low",
+      "status": "open",
+      "correlation_key": "eng:button-color",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "github",
+            "kind": "issue",
+            "locator": "web-cfg#401"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "issue",
+          "locator": "web-cfg#401"
+        },
+        "observed_at": "2026-08-20T14:40:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      }
+    },
+    {
+      "id": "cc:attention-signal:refactor-css",
+      "title": "Refatorar CSS legado",
+      "summary": "Refactor sem impacto de receita.",
+      "category": "refactor",
+      "domain": "engineering",
+      "scope": "repo:web-cfg",
+      "impact": 25,
+      "urgency": 80,
+      "severity": "low",
+      "status": "open",
+      "correlation_key": "eng:refactor-css",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "github",
+            "kind": "issue",
+            "locator": "web-cfg#402"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "issue",
+          "locator": "web-cfg#402"
+        },
+        "observed_at": "2026-08-20T14:41:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      }
+    },
+    {
+      "id": "cc:attention-signal:rename-var",
+      "title": "Renomear variável no header",
+      "summary": "Estética. Urgência artificial alta.",
+      "category": "estetica",
+      "domain": "engineering",
+      "scope": "repo:web-cfg",
+      "impact": 10,
+      "urgency": 100,
+      "severity": "low",
+      "status": "open",
+      "correlation_key": "eng:rename-var",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "github",
+            "kind": "issue",
+            "locator": "web-cfg#403"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "issue",
+          "locator": "web-cfg#403"
+        },
+        "observed_at": "2026-08-20T14:42:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      }
+    },
+    {
+      "id": "cc:attention-signal:stale-receivable",
+      "title": "Carteira de recebíveis desatualizada",
+      "summary": "Última coleta Asaas expirou. Deve despromover e/ou emitir dados stale.",
+      "category": "receita",
+      "domain": "finance",
+      "scope": "finance",
+      "impact": 80,
+      "urgency": 50,
+      "severity": "medium",
+      "status": "open",
+      "correlation_key": "finance:receivables-book",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "asaas",
+            "kind": "receivable-book",
+            "locator": "book/main"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "asaas",
+          "kind": "receivable-book",
+          "locator": "book/main"
+        },
+        "observed_at": "2026-08-18T15:00:00.000Z",
+        "freshness_status": "STALE",
+        "confidence": 0.6,
+        "freshness_window_seconds": 86400
+      }
+    },
+    {
+      "id": "cc:attention-signal:deploy-blocker",
+      "title": "PR bloqueando deploy",
+      "summary": "Check vermelho no GitHub. Blocker, não crítico o suficiente para kill-rule.",
+      "category": "blocker",
+      "domain": "engineering",
+      "scope": "repo:Governance",
+      "impact": 65,
+      "urgency": 75,
+      "severity": "high",
+      "status": "open",
+      "correlation_key": "eng:deploy-blocker",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "github",
+            "kind": "check",
+            "locator": "Governance/ci#889"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "check",
+          "locator": "Governance/ci#889"
+        },
+        "observed_at": "2026-08-20T14:50:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.92
+      }
+    },
+    {
+      "id": "cc:attention-signal:warmbly-unread",
+      "title": "Inbox comercial sem leitura",
+      "summary": "Mensagens inbound não lidas no Warmbly.",
+      "category": "cliente",
+      "domain": "commercial",
+      "scope": "commercial",
+      "impact": 55,
+      "urgency": 60,
+      "severity": "medium",
+      "status": "open",
+      "correlation_key": "commercial:unread",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "warmbly",
+            "kind": "inbox",
+            "locator": "inbox/unread"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "warmbly",
+          "kind": "inbox",
+          "locator": "inbox/unread"
+        },
+        "observed_at": "2026-08-20T14:20:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 0.85
+      }
+    },
+    {
+      "id": "cc:attention-signal:resolved-noise",
+      "title": "Item já resolvido",
+      "summary": "Não deve entrar no ranking.",
+      "category": "estetica",
+      "domain": "engineering",
+      "scope": "repo:web-cfg",
+      "impact": 100,
+      "urgency": 100,
+      "severity": "critical",
+      "status": "resolved",
+      "correlation_key": "eng:resolved-noise",
+      "evidence_refs": [
+        {
+          "source": {
+            "system": "github",
+            "kind": "issue",
+            "locator": "web-cfg#1"
+          }
+        }
+      ],
+      "provenance": {
+        "source": {
+          "system": "github",
+          "kind": "issue",
+          "locator": "web-cfg#1"
+        },
+        "observed_at": "2026-08-20T10:00:00.000Z",
+        "freshness_status": "FRESH",
+        "confidence": 1
+      }
+    }
+  ]
+}

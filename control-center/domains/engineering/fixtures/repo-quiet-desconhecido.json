@@ -1,0 +1,58 @@
+{
+  "schema": "confenge.control_center.engineering_snapshot.v1",
+  "snapshot_id": "github:engineering_snapshot:confenge/extra-cli",
+  "collected_at": "2026-08-20T12:00:00.000Z",
+  "allowlist": ["confenge/extra-cli"],
+  "source": "github",
+  "observed_at": "2026-08-20T12:00:00.000Z",
+  "freshness_status": "failed",
+  "confidence": 0,
+  "errors": [],
+  "repos": [
+    {
+      "repo": null,
+      "repo_collection": {
+        "ok": false,
+        "freshness_status": "failed",
+        "error_observation_id": "github:error:confenge%2Fextra-cli:repo:http_403"
+      },
+      "issues_collection": {
+        "skipped": true
+      },
+      "recent_commits": [],
+      "open_issues": [],
+      "open_pull_requests": [],
+      "check_failures": [],
+      "workflow_failures": [],
+      "divergence": {
+        "source": "github",
+        "observed_at": "2026-08-20T12:00:00.000Z",
+        "freshness_status": "unsupported",
+        "confidence": 0.5,
+        "observation_id": "github:compare:confenge%2Fextra-cli:none",
+        "repo": "confenge/extra-cli",
+        "base": null,
+        "head": null,
+        "support": "unavailable",
+        "ahead_by": null,
+        "behind_by": null,
+        "status": "unavailable",
+        "reason": "repo_unavailable"
+      },
+      "errors": [
+        {
+          "source": "github",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "freshness_status": "failed",
+          "confidence": 0,
+          "observation_id": "github:error:confenge%2Fextra-cli:repo:http_403",
+          "repo": "confenge/extra-cli",
+          "resource": "repo",
+          "code": "http_403",
+          "message": "github returned 403 for repo",
+          "http_status": 403
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": "control-center.commercial-observations.v1",
+  "observed_at": "2026-08-20T12:00:00Z",
+  "source": {
+    "system": "warmbly",
+    "kind": "commercial-observation",
+    "locator": "fixture:offer-discrepancy"
+  },
+  "freshness_status": "FRESH",
+  "confidence": 1,
+  "offer_pin": {
+    "authority_id": "CFG-OFFER-AUTHORITY-v1",
+    "catalog_id": "CFG-OFFER-CATALOG-v1",
+    "catalog_authority": "governance",
+    "known_offers": [
+      { "offer_id": "CFG-DIAG-EXP-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-FLEX-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-180-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-365-v1", "offer_version": "v1" }
+    ],
+    "not_an_offer": [
+      {
+        "kind": "extra_historical",
+        "exception_id": "CFG-EXC-EXTRA-HISTORICAL-v1",
+        "amount_cents": 1000000,
+        "currency": "BRL"
+      }
+    ],
+    "observed_at": "2026-08-17T00:00:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 1
+  },
+  "records": [
+    {
+      "id": "deal-unknown-offer",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "propostas",
+      "stage_entered_at": "2026-08-18T00:00:00Z",
+      "value": 5000,
+      "currency": "BRL",
+      "created_at": "2026-08-18T00:00:00Z",
+      "updated_at": "2026-08-19T00:00:00Z",
+      "last_activity_at": "2026-08-19T00:00:00Z",
+      "next_action": "clarify_sku",
+      "next_action_at": "2026-08-21T00:00:00Z",
+      "offer_id": "CFG-NOT-IN-CATALOG-v9",
+      "offer_version": "v9",
+      "treated_as_catalog_offer": true
+    },
+    {
+      "id": "deal-version-drift",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "propostas",
+      "stage_entered_at": "2026-08-18T00:00:00Z",
+      "amount_cents": 800000,
+      "currency": "BRL",
+      "created_at": "2026-08-18T00:00:00Z",
+      "updated_at": "2026-08-19T00:00:00Z",
+      "last_activity_at": "2026-08-19T00:00:00Z",
+      "next_action": "re_pin",
+      "next_action_at": "2026-08-21T00:00:00Z",
+      "offer_id": "CFG-DIAG-EXP-v1",
+      "offer_version": "v0"
+    },
+    {
+      "id": "deal-extra-as-offer",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "clientes",
+      "stage_name": "won",
+      "amount_cents": 1000000,
+      "currency": "BRL",
+      "created_at": "2026-02-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z",
+      "last_activity_at": "2026-08-01T00:00:00Z",
+      "offer_id": "CFG-DIAG-EXP-v1",
+      "offer_version": "v1",
+      "treated_as_catalog_offer": true
+    },
+    {
+      "id": "deal-extra-id",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "oportunidades",
+      "stage_entered_at": "2026-08-18T00:00:00Z",
+      "amount_cents": 1000000,
+      "currency": "BRL",
+      "created_at": "2026-08-18T00:00:00Z",
+      "updated_at": "2026-08-19T00:00:00Z",
+      "last_activity_at": "2026-08-19T00:00:00Z",
+      "next_action": "do_not_catalog",
+      "next_action_at": "2026-08-21T00:00:00Z",
+      "offer_id": "CFG-EXC-EXTRA-HISTORICAL-v1",
+      "treated_as_catalog_offer": true
+    }
+  ]
+}

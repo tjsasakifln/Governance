@@ -1,0 +1,25 @@
+{
+  "collector": "warmbly",
+  "mode": "read-only",
+  "network": {
+    "external": "warmbly-confenge_default",
+    "join": "optional-read-only-member",
+    "discovery": "docker inspect (read-only)",
+    "forbidden": ["compose_edit", "volume_mount", "postgres", "redis", "nats"]
+  },
+  "required_secrets": ["WARMBLY_BASE_URL", "WARMBLY_API_TOKEN"],
+  "secret_aliases": {
+    "WARMBLY_API_TOKEN": ["WARMBLY_TOKEN", "WARMBLY_API_KEY"]
+  },
+  "http": {
+    "allowed_methods": ["GET", "HEAD", "POST"],
+    "post_read_paths": [
+      "/v1/contacts/search",
+      "/v1/crm/deals/search",
+      "/v1/crm/deals/summary",
+      "/v1/crm/tasks/search",
+      "/v1/crm/tasks/summary"
+    ],
+    "forbidden_methods": ["PATCH", "PUT", "DELETE"]
+  }
+}

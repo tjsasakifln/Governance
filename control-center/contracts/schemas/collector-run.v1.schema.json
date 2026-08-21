@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/collector-run.v1.schema.json",
+  "title": "CollectorRun v1",
+  "description": "Idempotent collector execution. Collectors are read-only by default. Re-running the same idempotency_key MUST NOT duplicate observations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "collector_name",
+    "scope",
+    "status",
+    "started_at",
+    "finished_at",
+    "idempotency_key",
+    "read_only",
+    "observations_emitted"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.collector-run.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "collector_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "scope": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["started", "succeeded", "failed", "skipped"]
+    },
+    "started_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "finished_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/nullable_utc_datetime"
+    },
+    "idempotency_key": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/idempotency_key"
+    },
+    "read_only": { "const": true },
+    "observations_emitted": { "type": "integer", "minimum": 0 },
+    "error": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/error_object"
+    },
+    "cursor": {
+      "type": ["string", "null"],
+      "maxLength": 256
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/error_object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "started" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "finished_at": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

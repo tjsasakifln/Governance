@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/commercial-snapshot.v1.schema.json",
+  "title": "CommercialSnapshot v1",
+  "description": "Warmbly commercial/CRM read model. Governance remains catalog/terms authority; this document pins catalog identity and MUST NOT copy names, prices, terms, or offer copy. Funnel counts: new_leads, qualified, opportunities, proposals, clients. pipeline_weighted is absent unless probability is reliable. Not a checkout or send surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "scope",
+    "generated_at",
+    "provenance",
+    "authority",
+    "offer_pin",
+    "funnel",
+    "pipeline_nominal",
+    "aging_count",
+    "stalled_count",
+    "missing_next_action_count",
+    "pipeline_open_count",
+    "inbound_unread_count",
+    "at_risk_client_count"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.commercial-snapshot.v1" },
+    "id": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+    },
+    "scope": {
+      "oneOf": [
+        { "const": "commercial" },
+        { "const": "company" },
+        { "const": "inbound" },
+        { "const": "clients" },
+        {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/client_scope"
+        }
+      ]
+    },
+    "generated_at": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "provenance": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_authority", "commercial_runtime", "this_document"],
+      "properties": {
+        "catalog_authority": { "const": "governance" },
+        "commercial_runtime": { "const": "warmbly" },
+        "this_document": { "const": "read_model" }
+      }
+    },
+    "offer_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Identity pin of the Governance catalog. IDs only. Names, prices, terms, and copy are forbidden here.",
+      "required": ["catalog_authority", "catalog_id"],
+      "properties": {
+        "catalog_authority": { "const": "governance" },
+        "catalog_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "known_offer_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          }
+        }
+      }
+    },
+    "funnel": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Warmbly funnel counts. new_leads=novos leads, qualified=qualificados, opportunities=oportunidades, proposals=propostas, clients=clientes.",
+      "required": [
+        "new_leads",
+        "qualified",
+        "opportunities",
+        "proposals",
+        "clients"
+      ],
+      "properties": {
+        "new_leads": { "type": "integer", "minimum": 0 },
+        "qualified": { "type": "integer", "minimum": 0 },
+        "opportunities": { "type": "integer", "minimum": 0 },
+        "proposals": { "type": "integer", "minimum": 0 },
+        "clients": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "pipeline_nominal": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "pipeline_weighted": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/weighted_pipeline"
+    },
+    "aging_count": { "type": "integer", "minimum": 0 },
+    "stalled_count": { "type": "integer", "minimum": 0 },
+    "missing_next_action_count": { "type": "integer", "minimum": 0 },
+    "pipeline_open_count": { "type": "integer", "minimum": 0 },
+    "inbound_unread_count": { "type": "integer", "minimum": 0 },
+    "at_risk_client_count": { "type": "integer", "minimum": 0 },
+    "attention_item_ids": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
+      }
+    }
+  }
+}

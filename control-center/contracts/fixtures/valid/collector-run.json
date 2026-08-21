@@ -1,0 +1,13 @@
+{
+  "schema_version": "control-center.collector-run.v1",
+  "id": "cc:collector-run:01K3CC-GITHUB-HOURLY",
+  "collector_name": "github-repo",
+  "scope": "repo:tjsasakifln/Governance",
+  "status": "succeeded",
+  "started_at": "2026-08-20T17:54:00Z",
+  "finished_at": "2026-08-20T17:54:08Z",
+  "idempotency_key": "github-repo:tjsasakifln/Governance:2026-08-20T17:00:00Z",
+  "read_only": true,
+  "observations_emitted": 1,
+  "cursor": "github:etag:abc123"
+}

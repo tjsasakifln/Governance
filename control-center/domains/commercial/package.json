@@ -1,0 +1,30 @@
+{
+  "name": "@confenge/control-center-commercial-readmodel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executive commercial read model for Confenge Control Center. Warmbly-shaped observations + Governance offer pin in; one-screen summary out. Read-only. Never mutates Warmbly or Asaas.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cc-commercial-summary": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "summary": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

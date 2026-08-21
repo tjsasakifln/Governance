@@ -1,0 +1,575 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Confenge Control Center internal HTTP API",
+    "version": "1.0.0",
+    "description": "Internal HTTP contract for the Control Center cockpit and context service. MCP is the principal agent interface; this HTTP API is the human UI and service-to-service companion. Financial and provider mutations are forbidden. Agents and UIs query by scope; there is no whole-company dump endpoint."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "description": "Local loopback. Not a public internet surface."
+    }
+  ],
+  "tags": [
+    { "name": "context", "description": "Scoped agent/human context" },
+    { "name": "memory", "description": "Directives and audit" },
+    { "name": "cockpit", "description": "Exceptions and top priorities" },
+    { "name": "snapshots", "description": "Aggregated read models" },
+    { "name": "collectors", "description": "Read-only collector runs" }
+  ],
+  "paths": {
+    "/v1/context": {
+      "get": {
+        "tags": ["context"],
+        "operationId": "getContext",
+        "summary": "Fetch AgentContext for one or more scopes",
+        "description": "Query parameter scopes is required (CSV). Empty scopes is 400. The server returns only granted_scopes. MCP equivalent: cc_get_context.",
+        "parameters": [
+          {
+            "name": "scopes",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" },
+            "description": "Comma-separated scopes. minItems 1 after split. Each token matches Scope."
+          },
+          {
+            "name": "include_directives",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true }
+          },
+          {
+            "name": "include_snapshots",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true }
+          },
+          {
+            "name": "include_attention",
+            "in": "query",
+            "schema": { "type": "boolean", "default": true }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AgentContext",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/agent-context.v1.schema.json" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/directives": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "listDirectives",
+        "summary": "List directives for requested scopes",
+        "parameters": [
+          {
+            "name": "scopes",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["draft", "active", "superseded", "revoked", "expired"] }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["decision", "directive", "fact", "constraint", "priority", "risk", "hypothesis"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Directive list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/directive.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/attention": {
+      "get": {
+        "tags": ["cockpit"],
+        "operationId": "listAttention",
+        "summary": "List attention items (exceptions) for requested scopes. Homepage consumes homepage_eligible=true.",
+        "parameters": [
+          {
+            "name": "scopes",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["open", "acknowledged", "resolved", "dismissed"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AttentionItem list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/attention-item.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/priorities": {
+      "get": {
+        "tags": ["cockpit"],
+        "operationId": "listPriorities",
+        "summary": "The current most important things. Default and max limit is 3.",
+        "parameters": [
+          {
+            "name": "scopes",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/ScopeCsv" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 3, "default": 3 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PriorityRecommendation list, max 3",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": { "$ref": "../schemas/priority-recommendation.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshots/operational": {
+      "get": {
+        "tags": ["snapshots"],
+        "operationId": "getOperationalSnapshot",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OperationalSnapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/operational-snapshot.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshots/commercial": {
+      "get": {
+        "tags": ["snapshots"],
+        "operationId": "getCommercialSnapshot",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "CommercialSnapshot read model",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/commercial-snapshot.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshots/finance": {
+      "get": {
+        "tags": ["snapshots"],
+        "operationId": "getFinanceSnapshot",
+        "description": "Read-only finance aggregate. Does not create charges.",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "FinanceSnapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/finance-snapshot.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshots/engineering": {
+      "get": {
+        "tags": ["snapshots"],
+        "operationId": "getEngineeringSnapshot",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "EngineeringSnapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/engineering-snapshot.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clients/{slug}/status": {
+      "get": {
+        "tags": ["snapshots"],
+        "operationId": "getClientStatus",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ClientStatus",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/client-status.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health/services": {
+      "get": {
+        "tags": ["cockpit"],
+        "operationId": "listServiceHealth",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "ServiceHealth list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/service-health.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/collectors/runs": {
+      "get": {
+        "tags": ["collectors"],
+        "operationId": "listCollectorRuns",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "CollectorRun list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/collector-run.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent-sessions": {
+      "post": {
+        "tags": ["context"],
+        "operationId": "createAgentSession",
+        "summary": "Open a scoped agent session. requested_scopes minItems 1.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["agent_id", "requested_scopes", "purpose"],
+                "properties": {
+                  "agent_id": { "type": "string" },
+                  "requested_scopes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": { "$ref": "#/components/schemas/Scope" }
+                  },
+                  "purpose": { "type": "string" },
+                  "include_directives": { "type": "boolean" },
+                  "include_snapshots": { "type": "boolean" },
+                  "include_attention": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "AgentSession",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/agent-session.v1.schema.json" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/agent-sessions/{id}": {
+      "get": {
+        "tags": ["context"],
+        "operationId": "getAgentSession",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "AgentSession",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/agent-session.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent-activities": {
+      "get": {
+        "tags": ["context"],
+        "operationId": "listAgentActivities",
+        "summary": "List AgentActivity execution records for requested scopes. Distinct from AgentSession.",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Scope" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AgentActivity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/agent-activity.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit": {
+      "get": {
+        "tags": ["memory"],
+        "operationId": "listAuditEvents",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Scope" },
+            "description": "Required. Unscoped audit lists are a whole-company dump and are 400."
+          },
+          { "name": "resource_id", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "AuditEvent list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/audit-event.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/observations": {
+      "get": {
+        "tags": ["collectors"],
+        "operationId": "listSourceObservations",
+        "parameters": [
+          { "name": "scope", "in": "query", "required": true, "schema": { "$ref": "#/components/schemas/Scope" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "SourceObservation list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/source-observation.v1.schema.json" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Error": {
+        "description": "Fail-closed error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorBody" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Scope": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 128,
+        "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$"
+      },
+      "ScopeCsv": {
+        "type": "string",
+        "minLength": 2,
+        "description": "Comma-separated scopes. Empty list is 400. Each token must match Scope.",
+        "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)(?:,(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+))*$"
+      },
+      "ErrorBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string", "description": "No secrets, no PII." }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-principal-agent-interface": "MCP (docs/mcp.v1.json)",
+  "x-forbidden-paths": [
+    { "path": "/v1/charges", "reason": "Cobrança is forbidden in this campaign." },
+    { "path": "/v1/checkout", "reason": "Checkout is forbidden." },
+    { "path": "/v1/refunds", "reason": "Refund is forbidden." },
+    { "path": "/v1/cancellations", "reason": "Cancelamento is forbidden." },
+    { "path": "/v1/asaas", "reason": "Asaas writes/proxy are forbidden." },
+    { "path": "/v1/asaas/payments", "reason": "Asaas payment creation is forbidden." },
+    { "path": "/v1/billing", "reason": "Billing mutation surface is forbidden." },
+    { "path": "/v1/messages/send", "reason": "Commercial send remains in Warmbly." },
+    { "path": "/v1/memory/dump", "reason": "Whole-company memory dump is forbidden." }
+  ],
+  "x-scope-taxonomy": [
+    "company",
+    "commercial",
+    "finance",
+    "clients",
+    "infrastructure",
+    "inbound",
+    "repo:<name>",
+    "client:<slug>"
+  ],
+  "x-scope-extension": "Additional prefix:id namespaces are non-breaking. New bare literals require an additive schema revision. Unknown scopes are opaque and not granted by default."
+}

@@ -1,0 +1,9 @@
+users:
+  operator:
+    disabled: false
+    displayname: Operator
+    password: "hunter2"
+    email: ops@example.invalid
+    groups:
+      - admins
+      - operators

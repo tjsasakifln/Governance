@@ -1,0 +1,19 @@
+{
+  "name": "Confenge Control Center",
+  "short_name": "Control Center",
+  "description": "Cockpit operacional privado. Exceções e as 3 coisas mais importantes agora.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#121418",
+  "theme_color": "#121418",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

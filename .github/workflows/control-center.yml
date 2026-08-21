@@ -1,0 +1,135 @@
+name: control-center
+
+on:
+  push:
+    branches: [main, "campaign/**"]
+  pull_request:
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/package-lock.json
+      - name: Install workspace
+        working-directory: control-center
+        run: npm run install
+      - name: Validate contracts schemas
+        working-directory: control-center/contracts
+        run: npm test
+      - name: Typecheck
+        working-directory: control-center
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: control-center
+        run: npm test
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: control_center
+          POSTGRES_PASSWORD: control_center
+          POSTGRES_DB: control_center
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U control_center -d control_center"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/package-lock.json
+      - name: Install workspace
+        working-directory: control-center
+        run: npm run install
+      - name: Migrate and integration
+        working-directory: control-center
+        env:
+          CONTROL_CENTER_TEST_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+          CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+        run: npm run test:integration
+      - name: Live runtime QA gate
+        working-directory: control-center
+        env:
+          CONTROL_CENTER_TEST_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+          CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+        run: |
+          set -o pipefail
+          npm run qa:live | tee /tmp/cc-live-qa.log
+          grep -F "stale data mostrado como saudável" /tmp/cc-live-qa.log
+          grep -F "READY_FOR_INTERNAL_PRODUCTION" /tmp/cc-live-qa.log
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: control_center
+          POSTGRES_PASSWORD: control_center
+          POSTGRES_DB: control_center
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U control_center -d control_center"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/package-lock.json
+      - name: Install workspace
+        working-directory: control-center
+        run: npm run install
+      - name: Install Playwright OS deps including libnspr4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnspr4
+          npx --yes playwright@1.55.0 install-deps chromium
+          npx --yes playwright@1.55.0 install chromium
+          dpkg -l libnspr4
+          ldconfig -p | grep -E 'libnspr4'
+      - name: End-to-end
+        working-directory: control-center
+        env:
+          CONTROL_CENTER_TEST_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+          CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+        run: |
+          set -o pipefail
+          npm run test:e2e | tee /tmp/cc-e2e.log
+          grep -E "context_risks=[1-9]" /tmp/cc-e2e.log
+          grep -E "nav_changed_to=comercial" /tmp/cc-e2e.log
+          grep -E "launch-probe ok" /tmp/cc-e2e.log
+          grep -E "view_state_driven=empty" /tmp/cc-e2e.log
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build runtime images
+        working-directory: control-center
+        run: |
+          docker build -f services/context/Dockerfile -t confenge-control-center-context:ci .
+          docker build -f services/mcp/Dockerfile -t confenge-control-center-mcp:ci .
+          docker build -f connectors/runner/Dockerfile -t confenge-control-center-collector:ci .
+          docker build -f apps/web-shell/Dockerfile -t confenge-control-center-web:ci .
+          docker build -f deploy/docker/ops.Dockerfile -t confenge-control-center-ops:ci deploy
+      - name: Compose up real images and hit context provenance
+        working-directory: control-center
+        run: node scripts/compose-probe.mjs

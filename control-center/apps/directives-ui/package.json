@@ -1,0 +1,26 @@
+{
+  "name": "@confenge/control-center-directives-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first UX to register structured strategic memory (directives). Local mock adapter only.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --format=iife --outfile=dist/app.js --target=es2022 --legal-comments=none",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && tsx --test tests/*.test.ts",
+    "serve": "node scripts/serve.mjs",
+    "start": "npm run build && node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "esbuild": "^0.25.9",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

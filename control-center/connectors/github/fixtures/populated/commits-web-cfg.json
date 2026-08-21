@@ -1,0 +1,10 @@
+[
+  {
+    "sha": "111aaa222bbb333c",
+    "commit": {
+      "message": "chore: bump inbound copy",
+      "committer": { "date": "2026-08-17T08:00:00Z" }
+    },
+    "author": { "login": "tjsasakifln" }
+  }
+]

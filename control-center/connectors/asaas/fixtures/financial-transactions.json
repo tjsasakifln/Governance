@@ -1,0 +1,16 @@
+{
+  "object": "list",
+  "hasMore": false,
+  "totalCount": 1,
+  "limit": 100,
+  "offset": 0,
+  "data": [
+    {
+      "id": "ft_fixtureRecv01",
+      "type": "PAYMENT_RECEIVED",
+      "value": 19900.0,
+      "date": "2026-07-05",
+      "paymentId": "pay_fixtureReceived01"
+    }
+  ]
+}

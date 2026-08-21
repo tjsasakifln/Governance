@@ -1,0 +1,115 @@
+{
+  "schema_version": "control-center.qa-merge-checklist.v1",
+  "title": "Merge and convergência checklist",
+  "items": [
+    {
+      "id": "owned-path",
+      "required": true,
+      "text": "This campaign writes only under control-center/qa/. commercial/, decisions/, scripts/, root README, PR Governance #8, Warmbly, web-cfg, extra-cli, and other control-center/ trees stay untouched."
+    },
+    {
+      "id": "local-adapters",
+      "required": true,
+      "text": "Evaluators consume FixturePort / documented ports. Missing sibling workstreams are covered by local contracts; do not import control-center/contracts or other workstreams at runtime."
+    },
+    {
+      "id": "no-provider-mutation",
+      "required": true,
+      "text": "Gate and tests perform no cobrança, checkout, refund, cancelamento, Asaas write, or commercial send."
+    },
+    {
+      "id": "attack:stale data mostrado como saudável",
+      "attack_id": "stale data mostrado como saudável",
+      "required": true,
+      "text": "Gate rejects stale data mostrado como saudável."
+    },
+    {
+      "id": "attack:double counting financeiro",
+      "attack_id": "double counting financeiro",
+      "required": true,
+      "text": "Gate rejects double counting financeiro."
+    },
+    {
+      "id": "attack:hypothesis promovida a fact",
+      "attack_id": "hypothesis promovida a fact",
+      "required": true,
+      "text": "Gate rejects hypothesis promovida a fact."
+    },
+    {
+      "id": "attack:agent sobrescrevendo founder decision",
+      "attack_id": "agent sobrescrevendo founder decision",
+      "required": true,
+      "text": "Gate rejects agent sobrescrevendo founder decision."
+    },
+    {
+      "id": "attack:scope leakage entre cliente/repos",
+      "attack_id": "scope leakage entre cliente/repos",
+      "required": true,
+      "text": "Gate rejects scope leakage entre cliente/repos."
+    },
+    {
+      "id": "attack:duplicated collector event",
+      "attack_id": "duplicated collector event",
+      "required": true,
+      "text": "Gate rejects duplicated collector event."
+    },
+    {
+      "id": "attack:provider mutation acidental",
+      "attack_id": "provider mutation acidental",
+      "required": true,
+      "text": "Gate rejects provider mutation acidental."
+    },
+    {
+      "id": "attack:secret/PII leakage",
+      "attack_id": "secret/PII leakage",
+      "required": true,
+      "text": "Gate rejects secret/PII leakage."
+    },
+    {
+      "id": "attack:timezone boundary",
+      "attack_id": "timezone boundary",
+      "required": true,
+      "text": "Gate rejects timezone boundary."
+    },
+    {
+      "id": "attack:partial outage",
+      "attack_id": "partial outage",
+      "required": true,
+      "text": "Gate rejects partial outage."
+    },
+    {
+      "id": "attack:stale RUNNING agent session",
+      "attack_id": "stale RUNNING agent session",
+      "required": true,
+      "text": "Gate rejects stale RUNNING agent session."
+    },
+    {
+      "id": "attack:conflicting directives/supersession",
+      "attack_id": "conflicting directives/supersession",
+      "required": true,
+      "text": "Gate rejects conflicting directives/supersession."
+    },
+    {
+      "id": "attack:auth bypass assumptions",
+      "attack_id": "auth bypass assumptions",
+      "required": true,
+      "text": "Gate rejects auth bypass assumptions."
+    },
+    {
+      "id": "attack:missing provenance",
+      "attack_id": "missing provenance",
+      "required": true,
+      "text": "Gate rejects missing provenance."
+    },
+    {
+      "id": "ready-conjunction",
+      "required": true,
+      "text": "READY_FOR_INTERNAL_PRODUCTION is a fail-closed conjunction of the 14 named checks. UNKNOWN / unrun / missing evidence is not ready."
+    },
+    {
+      "id": "convergence-wiring",
+      "required": true,
+      "text": "Later convergência campaign: implement ObservationPort and siblings against PostgreSQL/MCP; keep this gate as the mechanical merge blocker; do not absorb PR #8."
+    }
+  ]
+}

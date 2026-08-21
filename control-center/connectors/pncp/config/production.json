@@ -1,0 +1,22 @@
+{
+  "collector": "pncp",
+  "mode": "read-only",
+  "contract": "PNCP_CONTRACT_FRESHNESS/1.0",
+  "bindings": {
+    "file": "PNCP_CONTRACT_PATH",
+    "http": "PNCP_CONTRACT_HTTP_URL"
+  },
+  "forbidden": [
+    "--live",
+    "ingest",
+    "recrawl",
+    "backfill",
+    "host-python",
+    "repo-fixture-as-production"
+  ],
+  "netcup_candidates": [
+    "/var/lib/extra-cli/pncp/PNCP_CONTRACT_FRESHNESS.json",
+    "/var/lib/extra-cli/pncp-contract-freshness.json",
+    "/opt/extra-cli/var/PNCP_CONTRACT_FRESHNESS.json"
+  ]
+}

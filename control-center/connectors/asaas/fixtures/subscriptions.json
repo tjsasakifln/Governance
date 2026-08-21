@@ -1,0 +1,35 @@
+{
+  "object": "list",
+  "hasMore": false,
+  "totalCount": 2,
+  "limit": 100,
+  "offset": 0,
+  "data": [
+    {
+      "object": "subscription",
+      "id": "sub_fixtureActive01",
+      "dateCreated": "2026-07-01",
+      "customer": "cus_fixtureBeta",
+      "value": 20000.0,
+      "nextDueDate": "2026-08-05",
+      "cycle": "MONTHLY",
+      "billingType": "PIX",
+      "status": "ACTIVE",
+      "externalReference": "cfg:CFG-DIRB2G-FLEX-v1:corr-fixture-02",
+      "deleted": false
+    },
+    {
+      "object": "subscription",
+      "id": "sub_fixtureInactive01",
+      "dateCreated": "2026-01-01",
+      "customer": "cus_fixtureAlfa",
+      "value": 12500.0,
+      "nextDueDate": "2026-02-01",
+      "cycle": "MONTHLY",
+      "billingType": "CREDIT_CARD",
+      "status": "INACTIVE",
+      "externalReference": "cfg:CFG-DIRB2G-365-v1:corr-cancelled",
+      "deleted": false
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@confenge/control-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Confenge Control Center workspace: contracts, persistence, context, MCP, collectors, read models, cockpit, deploy.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "contracts",
+    "persistence",
+    "services/context",
+    "services/mcp",
+    "connectors/github",
+    "connectors/warmbly",
+    "connectors/asaas",
+    "connectors/pncp",
+    "connectors/infrastructure",
+    "connectors/runner",
+    "domains/clients",
+    "domains/commercial",
+    "domains/finance",
+    "domains/engineering",
+    "domains/agent-activity",
+    "intelligence/attention",
+    "apps/web-shell",
+    "apps/directives-ui",
+    "apps/today-ui",
+    "importers/governance",
+    "security",
+    "deploy",
+    "qa"
+  ],
+  "scripts": {
+    "install": "node scripts/install-workspace.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:hardening": "tsx --test tests/convergence/dockerfiles.test.ts tests/convergence/cve-exceptions.test.ts tests/convergence/web-prod-hardening.test.ts",
+    "build": "npm run build --workspaces --if-present",
+    "test:integration": "node scripts/integration.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "qa": "npm run gate --workspace=@confenge/control-center-qa",
+    "qa:live": "npx tsx tests/convergence/live-runtime/run-gate.ts"
+  }
+}

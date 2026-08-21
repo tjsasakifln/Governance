@@ -1,0 +1,20 @@
+{
+  "collector": "asaas",
+  "mode": "read-only",
+  "egress": "https",
+  "environment": "SANDBOX XOR PRODUCTION",
+  "required_secrets": ["ASAAS_ENVIRONMENT", "ASAAS_API_KEY"],
+  "secret_aliases": {
+    "ASAAS_API_KEY": ["ASAAS_API_KEY_SANDBOX", "ASAAS_API_KEY_PRODUCTION"]
+  },
+  "confirmed_lifecycle": "paid-not-received",
+  "forbidden": [
+    "checkout",
+    "charge-create",
+    "customer-create",
+    "subscription-create",
+    "webhook-register",
+    "refund",
+    "cancel"
+  ]
+}

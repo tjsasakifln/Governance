@@ -1,0 +1,101 @@
+{
+  "schema_version": "control-center.commercial-observations.v1",
+  "observed_at": "2026-08-20T12:00:00Z",
+  "source": {
+    "system": "warmbly",
+    "kind": "commercial-observation",
+    "locator": "fixture:exceptions-gaps"
+  },
+  "freshness_status": "FRESH",
+  "confidence": 1,
+  "offer_pin": {
+    "authority_id": "CFG-OFFER-AUTHORITY-v1",
+    "catalog_id": "CFG-OFFER-CATALOG-v1",
+    "catalog_authority": "governance",
+    "known_offers": [
+      { "offer_id": "CFG-DIAG-EXP-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-FLEX-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-180-v1", "offer_version": "v1" },
+      { "offer_id": "CFG-DIRB2G-365-v1", "offer_version": "v1" }
+    ],
+    "not_an_offer": [
+      {
+        "kind": "extra_historical",
+        "exception_id": "CFG-EXC-EXTRA-HISTORICAL-v1",
+        "amount_cents": 1000000,
+        "currency": "BRL"
+      }
+    ],
+    "observed_at": "2026-08-17T00:00:00Z",
+    "freshness_status": "FRESH",
+    "confidence": 1
+  },
+  "records": [
+    {
+      "id": "deal-missing-next",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "oportunidades",
+      "stage_name": "opportunity",
+      "stage_entered_at": "2026-08-18T00:00:00Z",
+      "value": 8000,
+      "currency": "BRL",
+      "created_at": "2026-08-18T00:00:00Z",
+      "updated_at": "2026-08-18T00:00:00Z",
+      "last_activity_at": "2026-08-18T00:00:00Z",
+      "offer_id": "CFG-DIAG-EXP-v1",
+      "offer_version": "v1"
+    },
+    {
+      "id": "deal-stalled",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "propostas",
+      "stage_name": "proposal",
+      "stage_entered_at": "2026-07-01T00:00:00Z",
+      "value": 15000,
+      "currency": "BRL",
+      "created_at": "2026-06-01T00:00:00Z",
+      "updated_at": "2026-07-01T00:00:00Z",
+      "last_activity_at": "2026-07-01T00:00:00Z",
+      "next_action": "chase",
+      "next_action_at": "2026-08-21T00:00:00Z",
+      "expected_close_at": "2026-09-01T00:00:00Z",
+      "offer_id": "CFG-DIRB2G-FLEX-v1",
+      "offer_version": "v1"
+    },
+    {
+      "id": "deal-aging",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "qualificados",
+      "stage_name": "qualified",
+      "stage_entered_at": "2026-08-10T00:00:00Z",
+      "value": 8000,
+      "currency": "BRL",
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-07-30T00:00:00Z",
+      "last_activity_at": "2026-07-30T00:00:00Z",
+      "next_action": "nurture",
+      "next_action_at": "2026-08-22T00:00:00Z"
+    },
+    {
+      "id": "deal-conversion-gap",
+      "entity": "deal",
+      "status": "open",
+      "funnel_stage": "propostas",
+      "stage_name": "proposal",
+      "stage_entered_at": "2026-08-18T00:00:00Z",
+      "value": 8000,
+      "currency": "BRL",
+      "created_at": "2026-08-18T00:00:00Z",
+      "updated_at": "2026-08-19T00:00:00Z",
+      "last_activity_at": "2026-08-19T00:00:00Z",
+      "next_action": "close_call",
+      "next_action_at": "2026-08-21T00:00:00Z",
+      "expected_close_at": "2026-08-01T00:00:00Z",
+      "offer_id": "CFG-DIAG-EXP-v1",
+      "offer_version": "v1"
+    }
+  ]
+}

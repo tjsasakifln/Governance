@@ -1,0 +1,8 @@
+{
+  "status": "diverged",
+  "ahead_by": 4,
+  "behind_by": 2,
+  "total_commits": 4,
+  "base_commit": { "sha": "aa" },
+  "merge_base_commit": { "sha": "bb" }
+}

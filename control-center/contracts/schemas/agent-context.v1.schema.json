@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/agent-context.v1.schema.json",
+  "title": "AgentContext v1",
+  "description": "HTTP/MCP response envelope. Not a core resource. Returned only for granted_scopes. Empty requested_scopes is invalid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "requested_scopes",
+    "granted_scopes",
+    "as_of",
+    "directives",
+    "attention_items",
+    "top_priorities",
+    "snapshots",
+    "client_statuses",
+    "truncated"
+  ],
+  "properties": {
+    "schema_version": { "const": "control-center.agent-context.v1" },
+    "requested_scopes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+      }
+    },
+    "granted_scopes": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/scope"
+      }
+    },
+    "as_of": {
+      "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+    },
+    "directives": {
+      "type": "array",
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/directive.v1.schema.json"
+      }
+    },
+    "attention_items": {
+      "type": "array",
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/attention-item.v1.schema.json"
+      }
+    },
+    "top_priorities": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/priority-recommendation.v1.schema.json"
+      }
+    },
+    "snapshots": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operational": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/operational-snapshot.v1.schema.json"
+        },
+        "commercial": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/commercial-snapshot.v1.schema.json"
+        },
+        "finance": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/finance-snapshot.v1.schema.json"
+        },
+        "engineering": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/engineering-snapshot.v1.schema.json"
+        }
+      }
+    },
+    "client_statuses": {
+      "type": "array",
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/client-status.v1.schema.json"
+      }
+    },
+    "truncated": { "type": "boolean" }
+  }
+}

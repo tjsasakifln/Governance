@@ -1,0 +1,28 @@
+{
+  "name": "@confenge/control-center-web-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first Control Center shell. Fixture-backed mock adapters only. No live HTTP, MCP, or PostgreSQL in this workstream.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "tsx scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*",
+    "@confenge/control-center-today-ui": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vite": "^6.3.5"
+  }
+}

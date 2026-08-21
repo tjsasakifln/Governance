@@ -1,0 +1,122 @@
+{
+  "package": "@confenge/control-center-contracts",
+  "schema_family": "control-center",
+  "release": "v1",
+  "id_convention": "cc:<type-kebab>:<ulid-or-slug>",
+  "datetime": "UTC RFC3339 with mandatory Z suffix; never a civil-time offset.",
+  "money": "integer cents plus ISO-4217 currency; floats are invalid.",
+  "types": [
+    {
+      "name": "Directive",
+      "schema_version": "control-center.directive.v1",
+      "id_type": "directive",
+      "schema": "schemas/directive.v1.schema.json",
+      "valid_fixture": "fixtures/valid/directive.json",
+      "invalid_fixture": "fixtures/invalid/directive.json"
+    },
+    {
+      "name": "OperationalSnapshot",
+      "schema_version": "control-center.operational-snapshot.v1",
+      "id_type": "operational-snapshot",
+      "schema": "schemas/operational-snapshot.v1.schema.json",
+      "valid_fixture": "fixtures/valid/operational-snapshot.json",
+      "invalid_fixture": "fixtures/invalid/operational-snapshot.json"
+    },
+    {
+      "name": "SourceObservation",
+      "schema_version": "control-center.source-observation.v1",
+      "id_type": "source-observation",
+      "schema": "schemas/source-observation.v1.schema.json",
+      "valid_fixture": "fixtures/valid/source-observation.json",
+      "invalid_fixture": "fixtures/invalid/source-observation.json"
+    },
+    {
+      "name": "AttentionItem",
+      "schema_version": "control-center.attention-item.v1",
+      "id_type": "attention-item",
+      "schema": "schemas/attention-item.v1.schema.json",
+      "valid_fixture": "fixtures/valid/attention-item.json",
+      "invalid_fixture": "fixtures/invalid/attention-item.json"
+    },
+    {
+      "name": "PriorityRecommendation",
+      "schema_version": "control-center.priority-recommendation.v1",
+      "id_type": "priority-recommendation",
+      "schema": "schemas/priority-recommendation.v1.schema.json",
+      "valid_fixture": "fixtures/valid/priority-recommendation.json",
+      "invalid_fixture": "fixtures/invalid/priority-recommendation.json"
+    },
+    {
+      "name": "AgentSession",
+      "schema_version": "control-center.agent-session.v1",
+      "id_type": "agent-session",
+      "schema": "schemas/agent-session.v1.schema.json",
+      "valid_fixture": "fixtures/valid/agent-session.json",
+      "invalid_fixture": "fixtures/invalid/agent-session.json"
+    },
+    {
+      "name": "AgentActivity",
+      "schema_version": "control-center.agent-activity.v1",
+      "id_type": "agent-activity",
+      "schema": "schemas/agent-activity.v1.schema.json",
+      "valid_fixture": "fixtures/valid/agent-activity.json",
+      "invalid_fixture": "fixtures/invalid/agent-activity.json"
+    },
+    {
+      "name": "ClientStatus",
+      "schema_version": "control-center.client-status.v1",
+      "id_type": "client-status",
+      "schema": "schemas/client-status.v1.schema.json",
+      "valid_fixture": "fixtures/valid/client-status.json",
+      "invalid_fixture": "fixtures/invalid/client-status.json"
+    },
+    {
+      "name": "CommercialSnapshot",
+      "schema_version": "control-center.commercial-snapshot.v1",
+      "id_type": "commercial-snapshot",
+      "schema": "schemas/commercial-snapshot.v1.schema.json",
+      "valid_fixture": "fixtures/valid/commercial-snapshot.json",
+      "invalid_fixture": "fixtures/invalid/commercial-snapshot.json"
+    },
+    {
+      "name": "FinanceSnapshot",
+      "schema_version": "control-center.finance-snapshot.v1",
+      "id_type": "finance-snapshot",
+      "schema": "schemas/finance-snapshot.v1.schema.json",
+      "valid_fixture": "fixtures/valid/finance-snapshot.json",
+      "invalid_fixture": "fixtures/invalid/finance-snapshot.json"
+    },
+    {
+      "name": "EngineeringSnapshot",
+      "schema_version": "control-center.engineering-snapshot.v1",
+      "id_type": "engineering-snapshot",
+      "schema": "schemas/engineering-snapshot.v1.schema.json",
+      "valid_fixture": "fixtures/valid/engineering-snapshot.json",
+      "invalid_fixture": "fixtures/invalid/engineering-snapshot.json"
+    },
+    {
+      "name": "ServiceHealth",
+      "schema_version": "control-center.service-health.v1",
+      "id_type": "service-health",
+      "schema": "schemas/service-health.v1.schema.json",
+      "valid_fixture": "fixtures/valid/service-health.json",
+      "invalid_fixture": "fixtures/invalid/service-health.json"
+    },
+    {
+      "name": "CollectorRun",
+      "schema_version": "control-center.collector-run.v1",
+      "id_type": "collector-run",
+      "schema": "schemas/collector-run.v1.schema.json",
+      "valid_fixture": "fixtures/valid/collector-run.json",
+      "invalid_fixture": "fixtures/invalid/collector-run.json"
+    },
+    {
+      "name": "AuditEvent",
+      "schema_version": "control-center.audit-event.v1",
+      "id_type": "audit-event",
+      "schema": "schemas/audit-event.v1.schema.json",
+      "valid_fixture": "fixtures/valid/audit-event.json",
+      "invalid_fixture": "fixtures/invalid/audit-event.json"
+    }
+  ]
+}

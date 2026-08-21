@@ -1,0 +1,34 @@
+{
+  "name": "@confenge/control-center-context",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Confenge Control Center — strategic memory and directives (scoped context for agents).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test --test-concurrency=1 test/*.test.ts",
+    "test:integration": "tsx --test test/postgres-adapter.test.ts",
+    "start": "tsx src/server.ts",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@confenge/control-center-attention": "*",
+    "@confenge/control-center-contracts": "*",
+    "@confenge/control-center-persistence": "*"
+  },
+  "devDependencies": {
+    "@embedded-postgres/linux-x64": "16.14.0-beta.17",
+    "@types/node": "^24.3.0",
+    "embedded-postgres": "16.14.0-beta.17",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

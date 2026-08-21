@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#121418" />
+    <meta
+      name="description"
+      content="Confenge Control Center — cockpit operacional de exceções e prioridades. Sem chat. Sem mutações financeiras."
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <meta name="cc-context-url" content="" />
+    <meta name="cc-actor-id" content="" />
+    <meta name="cc-actor-kind" content="" />
+    <title>Control Center — Confenge</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      Este cockpit precisa de JavaScript. No diretório
+      <code>control-center/apps/web-shell</code> execute
+      <code>npm run dev</code> ou <code>npm run preview</code>.
+    </noscript>
+    <script src="./file-protocol-guard.js"></script>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

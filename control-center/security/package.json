@@ -1,0 +1,30 @@
+{
+  "name": "@confenge/control-center-security",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Single-user Authelia+Caddy security edge for the private Confenge Control Center. Forward-auth contract, fail-closed identity, and config validator. Not an identity store.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cc-security-validate": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "validate": "tsx src/cli.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

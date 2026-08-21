@@ -1,0 +1,29 @@
+{
+  "schema_version": "control-center.qa-fixture.v1",
+  "attack_id": "hypothesis promovida a fact",
+  "case_kind": "adversarial",
+  "description": "An agent stores a hypothesis as kind=fact with no human promotion audit.",
+  "expected_state": "fail",
+  "reject_outcome": "gate fail: hypothesis cannot be stored or presented as fact unless a human founder promotion is audited",
+  "payload": {
+    "directives": [
+      {
+        "id": "cc:directive:hyp-as-fact",
+        "kind": "fact",
+        "origin_kind": "hypothesis",
+        "scope": "commercial",
+        "status": "active",
+        "title": "Pipeline will close this week",
+        "created_by": { "kind": "agent", "id": "cc-agent-research" },
+        "promoted_by": { "kind": "agent", "id": "cc-agent-research" },
+        "audit": [
+          {
+            "at": "2026-08-20T11:00:00Z",
+            "actor": { "kind": "agent", "id": "cc-agent-research" },
+            "action": "created"
+          }
+        ]
+      }
+    ]
+  }
+}

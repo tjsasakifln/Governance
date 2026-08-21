@@ -1,0 +1,61 @@
+{
+  "id": "no-expenses",
+  "as_of": "2026-08-20T12:00:00Z",
+  "cash_in_window": {
+    "from": "2026-08-01T00:00:00Z",
+    "to": "2026-08-31T23:59:59Z"
+  },
+  "events": [
+    {
+      "id": "cc:finance-event:ne-contract",
+      "idempotency_key": "fixture:no-expenses:contract",
+      "kind": "contract_signed",
+      "occurred_at": "2026-08-02T10:00:00Z",
+      "amount_cents": 500000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:ne-acme",
+      "billing_mode": "ONE_TIME",
+      "billing_cycle": "NONE",
+      "settlement_proven": false,
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_ne" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "id": "cc:finance-event:ne-invoice",
+      "idempotency_key": "fixture:no-expenses:invoice",
+      "kind": "invoice_issued",
+      "occurred_at": "2026-08-03T10:00:00Z",
+      "amount_cents": 500000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:ne-acme",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": false,
+      "invoice_id": "inv:ne-acme",
+      "due_at": "2026-08-10T00:00:00Z",
+      "source": { "system": "asaas", "kind": "charge", "locator": "pay_ne" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    },
+    {
+      "id": "cc:finance-event:ne-received",
+      "idempotency_key": "fixture:no-expenses:received",
+      "kind": "settlement_received",
+      "occurred_at": "2026-08-08T10:00:00Z",
+      "amount_cents": 500000,
+      "currency": "BRL",
+      "client_id": "client:acme",
+      "obligation_id": "ob:ne-acme",
+      "billing_mode": "ONE_TIME",
+      "settlement_proven": true,
+      "source": { "system": "asaas", "kind": "receivable", "locator": "pay_ne" },
+      "observed_at": "2026-08-20T11:00:00Z",
+      "freshness_status": "FRESH",
+      "confidence": 0.9
+    }
+  ]
+}

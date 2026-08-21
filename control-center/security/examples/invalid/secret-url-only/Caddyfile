@@ -1,0 +1,17 @@
+{$CC_PUBLIC_DOMAIN} {
+	tls {$CC_TLS_CERT_FILE} {$CC_TLS_KEY_FILE}
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Content-Security-Policy "default-src 'self'"
+	}
+	@health path /healthz /livez
+	handle @health {
+		reverse_proxy {$CC_APP_UPSTREAM}
+	}
+	handle /cc-gate-9f3a7c2e1b88 {
+		reverse_proxy {$CC_APP_UPSTREAM}
+	}
+}
