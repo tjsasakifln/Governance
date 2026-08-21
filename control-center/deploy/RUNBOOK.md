@@ -1,16 +1,18 @@
-# Runbook — Control Center deploy, rollback, restore
+# Runbook — stub pack deploy, rollback, restore
 
-Operators should be able to deploy, roll back, and restore **from this file**, not from memory. This wave ships the procedures and a local restore drill. It does **not** change the live Netcup VPS.
+**Superseded for production apply.** Canonical production operations: [`PRODUCTION-RUNBOOK.md`](./PRODUCTION-RUNBOOK.md) (production-edge overlay, Authelia, loopback Caddy).
+
+This file remains the stub-pack CLI procedures (validate, encrypted backup, restore drill, disk-guard). The stub pack does **not** change the live Netcup VPS. Production-edge apply is authorized separately.
 
 Internal clocks are UTC. Display times below also show `America/Sao_Paulo`.
 
-## Never in this wave
+## Never with this stub pack
 
-- SSH to Netcup to apply this pack.
 - Bind host 80/443 (Warmbly nginx).
 - `kubectl apply`, Helm, Swarm.
 - Cobranca, checkout, refund, cancelamento, Asaas writes, commercial send.
-- Set `CONTROL_CENTER_APPLY_PRODUCTION=true` (validate fails closed).
+- Set `CONTROL_CENTER_APPLY_PRODUCTION=true` (this pack's validate fails closed).
+- Use this pack's Caddyfile (no `forward_auth`) as the production edge.
 
 ## Prerequisites (after convergence)
 

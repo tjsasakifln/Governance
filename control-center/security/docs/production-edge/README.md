@@ -14,4 +14,6 @@ MCP is internal (ccnet/loopback), bearer token only, no Authelia cookie, no publ
 
 The open reference `control-center/deploy/Caddyfile` (no `forward_auth`) is **not** the production pack.
 
-This campaign does not apply DNS, certbot, nginx reload, or `compose up` of project `confenge-control-center`. Isolated rehearsal uses `--project-name cc-edge-rehearsal` and high ports only.
+**Superseded for apply/refuse.** Canonical production operations: `control-center/deploy/PRODUCTION-RUNBOOK.md`.
+
+Isolated rehearsal still uses `--project-name cc-edge-rehearsal` and high ports only. Production compose project is `confenge-control-center`.

@@ -7,4 +7,6 @@ Canonical compose: `docker-compose.production-edge.yml`.
 - Datastores on `cc_internal` (`internal: true`). Edge traffic on `cc_edge`.
 - Collector has no datastore/volume access. Warmbly network is opt-in via `docker-compose.warmbly-collector.override.yml`.
 
-Do **not** `docker compose up` this file as project `confenge-control-center` in this campaign. Rehearsal: `rehearse-isolated.sh` (`--project-name cc-edge-rehearsal`, host ports 28080/28443).
+Canonical production apply is `control-center/deploy/PRODUCTION-RUNBOOK.md`. Compose project `confenge-control-center` **is** the production project.
+
+Isolated rehearsal (does not use the production project name): `rehearse-isolated.sh` (`--project-name cc-edge-rehearsal`, host ports 28080/28443).

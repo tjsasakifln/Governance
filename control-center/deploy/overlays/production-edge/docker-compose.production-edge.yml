@@ -1,12 +1,13 @@
 # Confenge Control Center — production-edge overlay.
-# Project name: confenge-control-center (do NOT `up` this project in this campaign).
+# Project name: confenge-control-center. Canonical apply: ../../PRODUCTION-RUNBOOK.md.
 # Isolated rehearsal MUST use `--project-name cc-edge-rehearsal` and high host ports.
 #
 # Hop: host nginx :443 -> 127.0.0.1:18080 Caddy -> Authelia forward_auth -> apps.
 # Caddy is compose-only. No host 80/443. No Caddy ACME. No 0.0.0.0 publish.
 # Datastores (postgres, redis, nats) are unpublished on network internal:true.
 # Collector may join Warmbly only via docker-compose.warmbly-collector.override.yml.
-# Secrets via files/env. This file does not apply itself to production.
+# CONTROL_CENTER_DATABASE_URL host is cc-postgres (never Warmbly's postgres hostname).
+# Secrets via files/env. The stub pack in deploy/docker-compose.yml is not this overlay.
 
 name: confenge-control-center
 

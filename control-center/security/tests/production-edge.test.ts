@@ -340,10 +340,31 @@ describe("production-edge security bundle", () => {
     const operatorPassword = "cc-operator-test-only-not-for-production";
     const missing = spawnSync("bash", [GENERATOR, dest], {
       encoding: "utf8",
-      env: { ...process.env, CI: "", GITHUB_ACTIONS: "", CC_OPERATOR_PASSWORD: "" },
+      env: {
+        ...process.env,
+        CI: "",
+        GITHUB_ACTIONS: "",
+        CC_OPERATOR_PASSWORD: "",
+        CC_OPERATOR_PASSWORD_FILE: "/no/such/bootstrap-operator-password",
+      },
     });
     assert.notEqual(missing.status, 0);
     assert.match(missing.stderr, /HUMAN_GATE_OPERATOR_PASSWORD/);
+    const bootstrapFile = path.join(dest, "bootstrap-operator-password");
+    writeFileSync(bootstrapFile, `${operatorPassword}\n`, { mode: 0o600 });
+    const fromFile = spawnSync("bash", [GENERATOR, dest], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CI: "",
+        GITHUB_ACTIONS: "",
+        CC_OPERATOR_PASSWORD: "",
+        CC_OPERATOR_PASSWORD_FILE: bootstrapFile,
+      },
+    });
+    assert.equal(fromFile.status, 0, fromFile.stderr);
+    assert.doesNotMatch(fromFile.stdout, new RegExp(operatorPassword));
+    assert.doesNotMatch(fromFile.stderr, new RegExp(operatorPassword));
     const ok = spawnSync("bash", [GENERATOR, dest], {
       encoding: "utf8",
       env: { ...process.env, CI: "", GITHUB_ACTIONS: "", CC_OPERATOR_PASSWORD: operatorPassword },

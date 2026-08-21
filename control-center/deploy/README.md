@@ -2,7 +2,7 @@
 
 Reproducible reference pack for running Confenge Control Center on a Linux VPS (Netcup) with Docker Compose, Caddy hooks, PostgreSQL, encrypted backups, retention, and a fail-closed disk guard.
 
-This workstream is **not** chat, **not** an ERP, and **not** a replacement for Warmbly or origin systems. It does **not** apply itself to production. It does **not** bind host ports 80/443. Warmbly keeps the existing host nginx.
+This workstream is **not** chat, **not** an ERP, and **not** a replacement for Warmbly or origin systems. The **stub pack in this directory** does **not** apply itself to production. Canonical production apply is `PRODUCTION-RUNBOOK.md` using the **production-edge** overlay (nginx `:443` → loopback Caddy → Authelia `forward_auth` → web/context). It does **not** bind host ports 80/443. Warmbly keeps the existing host nginx.
 
 Write path: `control-center/deploy/` only.
 
@@ -20,7 +20,7 @@ Write path: `control-center/deploy/` only.
 10. Single-user human initially. No identity or password is hardcoded. Secrets are injected from a secret store into a gitignored `.env`.
 11. Fail-closed security. No secrets in git, logs, URLs, analytics, or a client bundle. Structured logs are JSON with UTC timestamps and refuse secret-bearing field names.
 12. No Kubernetes, Swarm, or cluster orchestrator. No cobranca, checkout, refund, cancelamento, Asaas writes, or commercial send.
-13. `CONTROL_CENTER_APPLY_PRODUCTION` must stay false. There is no Netcup SSH/apply command. A green deploy to the live VPS in this wave is a violation.
+13. `CONTROL_CENTER_APPLY_PRODUCTION` must stay false **on this stub pack**. Production apply is the production-edge overlay documented in `PRODUCTION-RUNBOOK.md`. Applying the stub pack to the live VPS is a violation.
 
 ## Layout
 
@@ -31,7 +31,8 @@ Write path: `control-center/deploy/` only.
 | `docker/*.Dockerfile` | stub, postgres, caddy, ops (backup CLI + `pg_dump` client) |
 | `src/` | validate, backup/restore/verify, retention, disk guard, stub server, CLI |
 | `fixtures/postgres.dump.sql` | PII-free dump for the restore drill |
-| `RUNBOOK.md` | deploy / rollback / restore without relying on human memory |
+| `PRODUCTION-RUNBOOK.md` | **canonical** production apply / migration / DNS / TLS / MFA / backup / restore / rollback |
+| `RUNBOOK.md` | stub-pack procedures (superseded for production apply) |
 | `.env.example` | variable **names** and placeholders only |
 
 ## Run (local, no production)
