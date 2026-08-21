@@ -218,7 +218,7 @@ describe("production-edge security bundle", () => {
     assert.match(overlayText, /image:\s+redis:7-alpine@sha256:[0-9a-f]{64}/);
     assert.match(overlayText, /image:\s+authelia\/authelia:4.39@sha256:[0-9a-f]{64}/);
     assert.match(overlayText, /image:\s+postgres:16-alpine@sha256:[0-9a-f]{64}/);
-    assert.match(overlayText, /image:\s+nats:2\.12\.5-alpine@sha256:[0-9a-f]{64}/);
+    assert.match(overlayText, /image:\s+nats:2\.12\.6-alpine@sha256:[0-9a-f]{64}/);
     assert.match(overlayText, /internal:\s+true/);
     assert.match(overlayText, /cc_edge:/);
     assert.match(overlayText, /cc_internal:/);
