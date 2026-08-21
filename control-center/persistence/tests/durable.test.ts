@@ -368,6 +368,40 @@ test('retention with invalid or missing config fails closed and does not DELETE 
   assert.equal(afterValid.rows[0]?.n, before.rows[0]?.n);
 });
 
+test('frozen v_latest_collector_runs.status is OBJECTIVE RUNNING|DONE|PARTIAL|FAILED|UNKNOWN', async () => {
+  const vocab = await ctx.pool.query<{ ok: boolean }>(
+    `SELECT control_center.is_collector_run_status('RUNNING')
+            AND control_center.is_collector_run_status('DONE')
+            AND control_center.is_collector_run_status('PARTIAL')
+            AND control_center.is_collector_run_status('FAILED')
+            AND control_center.is_collector_run_status('UNKNOWN')
+            AND NOT control_center.is_collector_run_status('started')
+            AND NOT control_center.is_collector_run_status('succeeded')
+            AND NOT control_center.is_collector_run_status('skipped') AS ok`,
+  );
+  assert.equal(vocab.rows[0]?.ok, true);
+  await assert.rejects(() =>
+    ctx.pool.query(
+      `INSERT INTO control_center.collector_runs (
+         id, collector_name, idempotency_key, status, started_at,
+         source_system, source_kind, source_locator, observed_at, freshness_status, confidence, scope
+       ) VALUES (
+         'cc:collector-run:legacy-started-rejected', 'github', 'legacy-started-rejected', 'started', now(),
+         'github', 'collector', 'legacy-started', now(), 'FRESH', 0.5, 'company'
+       )`,
+    ),
+  );
+  const statuses = await ctx.pool.query<{ status: string }>(
+    `SELECT DISTINCT status FROM control_center.v_latest_collector_runs`,
+  );
+  for (const row of statuses.rows) {
+    assert.ok(
+      ['RUNNING', 'DONE', 'PARTIAL', 'FAILED', 'UNKNOWN'].includes(row.status),
+      `frozen view status drifted: ${row.status}`,
+    );
+  }
+});
+
 test('finishCollectorRun accepts legacy succeeded and stores OBJECTIVE DONE', async () => {
   const started = await ctx.persistence.startCollectorRun({
     collectorName: 'infra',
