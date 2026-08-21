@@ -96,7 +96,7 @@ services:
         reservations:
           cpus: "0.05"
           memory: 16M
-    command: ["redis-server", "--save", "", "--appendonly", "no", "--protected-mode", "yes"]
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--protected-mode", "no"]
     networks:
       cc_internal: {}
     healthcheck:
