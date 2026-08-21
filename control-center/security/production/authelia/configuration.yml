@@ -77,7 +77,8 @@ session:
       inactivity: 30 minutes
       remember_me: false
   redis:
-    address: 'tcp://redis:6379'
+    host: redis
+    port: 6379
 
 regulation:
   max_retries: 3
