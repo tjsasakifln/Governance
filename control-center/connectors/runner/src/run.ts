@@ -196,6 +196,7 @@ export async function runCollectors(options: {
   now?: Date;
   log?: (line: string) => void;
   collectFns?: Partial<Record<CollectorName, CollectFn>>;
+  signal?: AbortSignal;
 }): Promise<RunCollectorsResult> {
   const now = options.now ?? new Date();
   const env = options.env ?? process.env;
@@ -211,8 +212,16 @@ export async function runCollectors(options: {
   );
   for (const name of names) {
     const started = Date.now();
+    if (options.signal?.aborted) {
+      collectors.push(
+        envelope(name, "ERROR", now, { ok: false }, { code: "timeout", message: "collector timed out" }),
+      );
+      continue;
+    }
     const injected = options.collectFns?.[name];
-    const result = injected ? await injected({ env, now }) : await RUNNERS[name](env, now);
+    const result = injected
+      ? await injected({ env, now, signal: options.signal })
+      : await RUNNERS[name](env, now);
     collectors.push(result);
     log(
       JSON.stringify({

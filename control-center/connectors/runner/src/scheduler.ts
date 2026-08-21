@@ -58,7 +58,7 @@ function readNonNegativeInt(raw: string | undefined, fallback: number): number {
 export class CollectorScheduler {
   initialized = false;
   private readonly timers = new Map<CollectorName, ReturnType<typeof setTimeout>>();
-  private readonly inFlight = new Map<CollectorName, Promise<void>>();
+  private readonly inflightRuns = new Set<Promise<unknown>>();
   private stopping = false;
 
   constructor(
@@ -93,11 +93,24 @@ export class CollectorScheduler {
       clearTimeout(timer);
     }
     this.timers.clear();
-    await Promise.all([...this.inFlight.values()]);
+    await Promise.all([...this.inflightRuns]);
     this.initialized = false;
   }
 
   async runSource(name: CollectorName): Promise<"ran" | "skipped" | "stopped"> {
+    if (this.stopping || !this.initialized) {
+      return "stopped";
+    }
+    const run = this.runSourceLocked(name);
+    this.inflightRuns.add(run);
+    try {
+      return await run;
+    } finally {
+      this.inflightRuns.delete(run);
+    }
+  }
+
+  private async runSourceLocked(name: CollectorName): Promise<"ran" | "skipped" | "stopped"> {
     if (this.stopping || !this.initialized) {
       return "stopped";
     }
@@ -108,45 +121,8 @@ export class CollectorScheduler {
       if (!locked) {
         return "skipped";
       }
-      const timeoutMs = this.config.sources[name].timeoutMs;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      timer.unref();
-      try {
-        const now = this.options.clock();
-        const collectFn = this.options.collectFns?.[name];
-        let envelope: import("./run.ts").CollectorEnvelope | undefined;
-        try {
-          envelope = collectFn
-            ? await Promise.race([
-                collectFn({ env: this.options.env, now, signal: controller.signal }),
-                abortError(controller.signal, name, now),
-              ])
-            : (await runCollectors({
-                names: [name],
-                env: this.options.env,
-                now,
-                log: this.options.log ?? (() => undefined),
-              })).collectors[0];
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "collect failed";
-          envelope = {
-            collector: name,
-            freshness_status: "ERROR",
-            observed_at: now.toISOString(),
-            source: { system: name, kind: "collector-runner", locator: name },
-            confidence: 0,
-            error: { code: "collect_failed", message },
-            payload: { ok: false },
-          };
-        }
-        if (!envelope) {
-          return "ran";
-        }
-        await persistSourceResult(this.persistence, envelope);
-      } finally {
-        clearTimeout(timer);
-      }
+      const envelope = await this.collectWithTimeout(name);
+      await persistSourceResult(this.persistence, envelope);
       return "ran";
     } finally {
       try {
@@ -159,18 +135,66 @@ export class CollectorScheduler {
     }
   }
 
+  private async collectWithTimeout(name: CollectorName): Promise<import("./run.ts").CollectorEnvelope> {
+    const now = this.options.clock();
+    const timeoutMs = this.config.sources[name].timeoutMs;
+    const controller = new AbortController();
+    const collectPromise = this.invokeCollect(name, now, controller.signal);
+    const raced = await raceCollect(collectPromise, timeoutMs);
+    if (raced.timedOut) {
+      controller.abort();
+      await collectPromise.then(
+        () => undefined,
+        () => undefined,
+      );
+      return timeoutEnvelope(name, now);
+    }
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+    if (raced.error) {
+      const message = raced.error instanceof Error ? raced.error.message : "collect failed";
+      return {
+        collector: name,
+        freshness_status: "ERROR",
+        observed_at: now.toISOString(),
+        source: { system: name, kind: "collector-runner", locator: name },
+        confidence: 0,
+        error: { code: "collect_failed", message },
+        payload: { ok: false },
+      };
+    }
+    return raced.value ?? timeoutEnvelope(name, now);
+  }
+
+  private invokeCollect(
+    name: CollectorName,
+    now: Date,
+    signal: AbortSignal,
+  ): Promise<import("./run.ts").CollectorEnvelope> {
+    const collectFn = this.options.collectFns?.[name];
+    if (collectFn) {
+      return collectFn({ env: this.options.env, now, signal });
+    }
+    return runCollectors({
+      names: [name],
+      env: this.options.env,
+      now,
+      log: this.options.log ?? (() => undefined),
+      signal,
+    }).then((result) => result.collectors[0] ?? timeoutEnvelope(name, now));
+  }
+
   private arm(name: CollectorName, delayMs: number): void {
     if (this.stopping) {
       return;
     }
     const timer = setTimeout(() => {
-      const running = this.runSource(name)
+      void this.runSource(name)
         .catch(() => undefined)
         .finally(() => {
-          this.inFlight.delete(name);
           this.arm(name, this.nextDelay(name));
         });
-      this.inFlight.set(name, running.then(() => undefined));
     }, delayMs);
     timer.unref();
     this.timers.set(name, timer);
@@ -183,21 +207,36 @@ export class CollectorScheduler {
   }
 }
 
-async function abortError(
-  signal: AbortSignal,
-  collector: CollectorName,
-  now: Date,
-): Promise<import("./run.ts").CollectorEnvelope> {
-  if (signal.aborted) {
-    return timeoutEnvelope(collector, now);
-  }
+function raceCollect<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+): Promise<{ timedOut: true } | { timedOut: false; value?: T; error?: unknown }> {
   return new Promise((resolve) => {
-    signal.addEventListener(
-      "abort",
-      () => {
-        resolve(timeoutEnvelope(collector, now));
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) {
+        return;
+      }
+      done = true;
+      resolve({ timedOut: true });
+    }, timeoutMs);
+    work.then(
+      (value) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        clearTimeout(timer);
+        resolve({ timedOut: false, value });
       },
-      { once: true },
+      (error: unknown) => {
+        if (done) {
+          return;
+        }
+        done = true;
+        clearTimeout(timer);
+        resolve({ timedOut: false, error });
+      },
     );
   });
 }
