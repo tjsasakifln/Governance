@@ -1,0 +1,124 @@
+{
+  "schema_version": "control-center.internal-production-evidence.v1",
+  "campaign": "CONFENGE-CONTROL-CENTER-INTERNAL-PRODUCTION-LAUNCH-01",
+  "FINAL_VERDICT": "HUMAN_GATE_MFA_ENROLLMENT",
+  "RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "DEPLOYED_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "PRE_RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "main_matched_expected": true,
+  "pr_8_untouched": true,
+  "topology": {
+    "project": "confenge-control-center",
+    "host": "v2202607385716487230",
+    "public_ip": "159.195.18.88",
+    "hop": "nginx:443 -> 127.0.0.1:18080 Caddy -> Authelia forward_auth -> web/context",
+    "caddy_loopback": ["127.0.0.1:18080", "127.0.0.1:18443"],
+    "nginx_owns_80_443": true,
+    "mcp_exposure": "PRIVATE",
+    "postgres_alias": "cc-postgres",
+    "cc_edge_ips": {
+      "caddy": "10.89.0.2",
+      "context": "10.89.0.4",
+      "mcp": "10.89.0.6",
+      "collector": "10.89.0.7"
+    }
+  },
+  "dns": {
+    "ops.confenge.com.br": { "type": "A", "content": "159.195.18.88", "proxied": false, "ttl": 300 },
+    "auth.ops.confenge.com.br": { "type": "A", "content": "159.195.18.88", "proxied": false, "ttl": 300 },
+    "mcp.confenge.com.br": "absent"
+  },
+  "tls": {
+    "ops": { "issuer": "Let's Encrypt", "not_before": "2026-08-21T14:28:51Z", "not_after": "2026-11-19T14:28:50Z" },
+    "auth": { "issuer": "Let's Encrypt", "not_before": "2026-08-21T14:28:58Z", "not_after": "2026-11-19T14:28:57Z" }
+  },
+  "auth": {
+    "authelia_enforced": true,
+    "ops_unauthenticated": "302 to https://auth.ops.confenge.com.br/",
+    "mfa": "ENFORCED_POLICY_UNENROLLED",
+    "totp_configurations": 0,
+    "webauthn_credentials": 0,
+    "operator_enabled": true,
+    "bootstrap_operator_password_path": "/root/.confenge/control-center/bootstrap-operator-password"
+  },
+  "migrations": ["001_init", "002_current_state", "003_durable_operational_data_plane"],
+  "governance_bootstrap": {
+    "dry_run_candidates": 74,
+    "unclassifiable": 0,
+    "apply_1_inserted": 74,
+    "apply_2_inserted": 0,
+    "apply_2_skipped": 74,
+    "kinds": { "decision": 1, "fact": 28, "hypothesis": 45 }
+  },
+  "collectors": {
+    "github": { "status": "DONE", "freshness_status": "FRESH" },
+    "infra": { "status": "UNKNOWN", "freshness_status": "UNKNOWN", "error_code": "missing_credentials" },
+    "pncp": { "status": "DONE", "freshness_status": "ERROR" },
+    "warmbly": { "status": "FAILED", "freshness_status": "ERROR", "error_code": "missing_credentials" },
+    "asaas": { "status": "FAILED", "freshness_status": "ERROR", "error_code": "missing_credentials" }
+  },
+  "agent_activity_smoke_ids": [
+    "cc:agent-activity:01M0JM0KQ7JW4968NY860TTEM3",
+    "cc:agent-activity:01M0JKZWN4JVSWX81NG13V6T0E"
+  ],
+  "directive_smoke_ids": [
+    "cc:directive:4a71ccc4-43b7-4279-a5a7-7e82da2da726",
+    "cc:directive:f171f356-f9dd-47fd-b342-2ef95c30c159",
+    "cc:directive:c59ccf44-87fb-4918-be78-f7f0a0924d90"
+  ],
+  "backup": {
+    "dump_sha256": "aafc75d42657cb2f6ba6b9d2448760ac3cef0952319ebf656db66399de6b576c",
+    "enc_sha256": "84fc90a0b4717dcc5418ff41276cd506098b2267e81f162b3cac61e2e6b404af",
+    "same_content": true,
+    "ciphertext_ne_plaintext": true,
+    "path": "/var/backups/confenge-control-center/encrypted/cc-pg-2026-08-21T16-51-50-379Z.dump.enc"
+  },
+  "restart": {
+    "scope": "confenge-control-center only",
+    "all_healthy": true,
+    "directives_persisted": true,
+    "agent_activities_persisted": true,
+    "observations_persisted": true
+  },
+  "warmbly": {
+    "sha": "93dd039d7b9b310458beff8a6bd8819a61da6399",
+    "backend_id": "92e98e3217ad54c4633a031dad2e4bdaf3d6a38292493dd56bd38cf0edfcc14f",
+    "ready": true,
+    "live": true,
+    "auto_send_enabled": false,
+    "restarts": 0,
+    "WARMBLY_REGRESSION": false
+  },
+  "api_inbound": {
+    "url": "https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health",
+    "status": "READY",
+    "auto_send_enabled": false
+  },
+  "intranet": {
+    "state": "convenience_residual_until_mfa",
+    "reason": "OPS_HOST_AUTHENTICATED_AND_HEALTHY is false until founder MFA enrollment"
+  },
+  "ci_on_release_sha": {
+    "control-center": "https://github.com/tjsasakifln/Governance/actions/runs/32498571671",
+    "control-center-image-scan": "https://github.com/tjsasakifln/Governance/actions/runs/32498571672",
+    "commercial-authority": "https://github.com/tjsasakifln/Governance/actions/runs/32498571705"
+  },
+  "collector_hotfix": {
+    "dynamic_require_of_events": false,
+    "database_url_host": "cc-postgres",
+    "mcp_ip": "10.89.0.6",
+    "collector_ip": "10.89.0.7",
+    "caddy_ip": "10.89.0.2"
+  },
+  "asaas_mutations": 0,
+  "commercial_sends": 0,
+  "residuals": [
+    "HUMAN_GATE_MFA_ENROLLMENT",
+    "ASAAS_READ=BLOCKED_BY_SECRET",
+    "WARMBLY_READ=BLOCKED_BY_SECRET",
+    "INFRA_ALLOWLIST=UNKNOWN",
+    "PNCP_FRESHNESS=ERROR (extra-cli timers failed; shown honestly)",
+    "INTRANET_302=convenience residual until MFA",
+    "CODEX_MCP=NOT_TESTED_CLIENT_MISSING"
+  ]
+}

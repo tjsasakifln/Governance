@@ -1,6 +1,8 @@
-# DNS / ACME handoff (not executed in this campaign)
+# DNS / ACME handoff
 
-This file is a human gate. Do **not** create DNS records, run certbot, reload host nginx, or claim `DEPLOYED` from this campaign.
+**Superseded as a hard refuse.** Canonical production operations: `control-center/deploy/PRODUCTION-RUNBOOK.md`.
+
+DNS A records for `ops` / `auth.ops` and host nginx ACME **are** part of internal production apply. This file remains the record layout and ACME order. Do **not** create `mcp.confenge.com.br`.
 
 ## Records
 
@@ -30,4 +32,4 @@ Never invert this order. Never let Caddy bind host `80`/`443`.
 
 ## Status
 
-This campaign stops at `READY_FOR_CONTROLLED_APPLY`. Secrets, DNS, and certificates remain explicit human gates.
+Production-edge apply is authorized. Secrets remain host-only (never git). DNS/certificates follow the order below and `PRODUCTION-RUNBOOK.md`.

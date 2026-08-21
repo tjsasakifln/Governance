@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generate production-edge secrets into a gitignored directory.
 # Writes mode 0600 files. Prints no secret values. Refuses placeholders.
-# Must not run in CI. This campaign does not apply the generated material.
+# Must not run in CI. Generated material is for production-edge apply on the host only.
 set -euo pipefail
 set +x
 export PS4="${PS4-}"
@@ -94,7 +94,12 @@ BACKUP_KEY="$(rand_hex 32)"
 MCP_TOKEN="$(rand_hex 32)"
 FOUNDER_ID="$(rand_hex 16)"
 if [[ -z "${CC_OPERATOR_PASSWORD:-}" ]]; then
-  refuse "HUMAN_GATE_OPERATOR_PASSWORD: CC_OPERATOR_PASSWORD must be supplied by the operator over a local secure channel; refusing to invent an unrecoverable password"
+  BOOTSTRAP_PW_FILE="${CC_OPERATOR_PASSWORD_FILE:-/root/.confenge/control-center/bootstrap-operator-password}"
+  if [[ -f "$BOOTSTRAP_PW_FILE" && -r "$BOOTSTRAP_PW_FILE" ]]; then
+    CC_OPERATOR_PASSWORD="$(cat "$BOOTSTRAP_PW_FILE")"
+  else
+    refuse "HUMAN_GATE_OPERATOR_PASSWORD: CC_OPERATOR_PASSWORD must be supplied by the operator over a local secure channel, or present at ${BOOTSTRAP_PW_FILE}; refusing to invent an unrecoverable password"
+  fi
 fi
 if is_placeholder "$CC_OPERATOR_PASSWORD"; then
   refuse "refusing placeholder CC_OPERATOR_PASSWORD"
