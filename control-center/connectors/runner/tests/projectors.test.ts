@@ -124,6 +124,58 @@ test("engineering projector emits company plus repo snapshots from allowlist", (
   assert.equal((company?.payload.failing_check_count as number) > 0, true);
 });
 
+test("reply_rate denominator is contacted count and is never substituted with population", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      operations: {
+        contacts: [
+          { id: "c-1", company: "Only population", created_at: "2026-08-20T00:00:00.000Z" },
+          {
+            id: "c-2",
+            company: "Contacted silent",
+            created_at: "2026-08-20T00:00:00.000Z",
+            last_activity_at: "2026-08-20T01:00:00.000Z",
+          },
+          {
+            id: "c-3",
+            company: "Replied",
+            created_at: "2026-08-20T00:00:00.000Z",
+            last_activity_at: "2026-08-20T01:00:00.000Z",
+            campaign_lead: { status: "replied" },
+          },
+        ],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    cohorts: {
+      acquisition: Array<{
+        window: string;
+        population: number;
+        contacted: number;
+        reply_rate: { numerator: number; denominator: number; ratio: number | null };
+        qualified_reply_rate: { denominator: number };
+      }>;
+    };
+  };
+  const open = ops.cohorts.acquisition.find((row) => row.window === "open");
+  assert.ok(open);
+  assert.equal(open.population, 3);
+  assert.equal(open.contacted, 2);
+  assert.equal(open.reply_rate.numerator, 1);
+  assert.equal(open.reply_rate.denominator, 2);
+  assert.equal(open.qualified_reply_rate.denominator, 2);
+  assert.notEqual(open.reply_rate.denominator, open.population);
+});
+
 test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   const [commercial] = projectCollector({
     collector: "warmbly",

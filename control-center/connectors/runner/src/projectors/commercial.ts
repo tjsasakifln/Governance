@@ -239,8 +239,8 @@ function buildCohorts(input: {
       qualified_reply: qualified.length,
       opportunity_created: opportunities.length,
       won: won.length,
-      reply_rate: rate(replies.length, contacted.length || pop),
-      qualified_reply_rate: rate(qualified.length, contacted.length || pop),
+      reply_rate: rate(replies.length, contacted.length),
+      qualified_reply_rate: rate(qualified.length, contacted.length),
       opportunity_conversion: rate(opportunities.length, pop),
       win_conversion: rate(won.length, opportunities.length),
     };

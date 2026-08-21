@@ -104,6 +104,7 @@ function applyPaint(
     adapterMode: adapter.mode,
     surface: parsed.surface,
     resource: parsed.resource,
+    ...(adapter.lastOperatorResult ? { operatorResult: adapter.lastOperatorResult } : {}),
   });
   bindWriteShortcuts(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}`);
@@ -137,7 +138,10 @@ function bindOperatorActions(
           target_source_id: targetSource,
           note,
         }),
-      ).then(onDone);
+      ).then((result) => {
+        if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
     });
   }
 }

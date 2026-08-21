@@ -81,6 +81,7 @@ export interface AdapterWriteResult {
 export interface ControlCenterReadAdapter {
   readonly mode: "mock" | "http";
   readonly actions: readonly AdapterAction[];
+  lastOperatorResult?: AdapterWriteResult;
   readOperator(): ActorRef;
   readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
   readAttention(): AttentionItem[] | Promise<AttentionItem[]>;

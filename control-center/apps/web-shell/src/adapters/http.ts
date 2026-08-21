@@ -36,6 +36,7 @@ import {
 export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   readonly mode = "http" as const;
   readonly actions: readonly AdapterAction[] = ADAPTER_ACTIONS;
+  lastOperatorResult?: AdapterWriteResult;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly operator: ActorRef;
@@ -98,7 +99,14 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       "PAYMENT",
     ];
     if (forbidden.includes(input.action_type)) {
-      return { ok: false, path: "/v1/operator-actions", kind: "nota", message: "ação comercial proibida" };
+      const denied: AdapterWriteResult = {
+        ok: false,
+        path: "/v1/operator-actions",
+        kind: "nota",
+        message: "ação comercial proibida",
+      };
+      this.lastOperatorResult = denied;
+      return denied;
     }
     try {
       const idempotency = input.idempotency_key ?? `${input.action_type}:${input.target_canonical_id}:${input.note}`;
@@ -121,16 +129,32 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         }),
       });
       if (!response.ok) {
-        return { ok: false, path: "/v1/operator-actions", kind: "nota", message: `recusado (${response.status})` };
+        const denied: AdapterWriteResult = {
+          ok: false,
+          path: "/v1/operator-actions",
+          kind: "nota",
+          message: `recusado (${response.status})`,
+        };
+        this.lastOperatorResult = denied;
+        return denied;
       }
-      return { ok: true, path: "/v1/operator-actions", kind: "nota", message: "ação registrada no Control Center" };
+      const accepted: AdapterWriteResult = {
+        ok: true,
+        path: "/v1/operator-actions",
+        kind: "nota",
+        message: "ação registrada no Control Center",
+      };
+      this.lastOperatorResult = accepted;
+      return accepted;
     } catch (err) {
-      return {
+      const failed: AdapterWriteResult = {
         ok: false,
         path: "/v1/operator-actions",
         kind: "nota",
         message: err instanceof Error ? err.message : "gravação indisponível",
       };
+      this.lastOperatorResult = failed;
+      return failed;
     }
   }
 

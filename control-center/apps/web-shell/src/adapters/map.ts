@@ -46,6 +46,10 @@ function num(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function optionalInt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 export function fallbackProvenance(locator: string, now: string): Provenance {
   return {
     source: { system: "control-center", kind: "http", locator },
@@ -199,6 +203,12 @@ export function clientFrom(row: Record<string, unknown>, fallback: Provenance): 
   if (blockers) item.blockers = blockers;
   if (typeof row.next_action === "string") item.next_action = row.next_action;
   if (typeof row.evidence === "string") item.evidence = row.evidence;
+  const sources = asRecord(row.sources);
+  item.sources = {
+    warmbly: typeof sources?.warmbly === "string" ? sources.warmbly : "UNKNOWN",
+    asaas: typeof sources?.asaas === "string" ? sources.asaas : "UNKNOWN",
+    governance: typeof sources?.governance === "string" ? sources.governance : "UNKNOWN",
+  };
   return item;
 }
 
@@ -220,10 +230,13 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
       commercial_runtime: "warmbly",
       this_document: "read_model",
     },
-    pipeline_open_count: num(row.pipeline_open_count),
-    inbound_unread_count: num(row.inbound_unread_count),
-    at_risk_client_count: num(row.at_risk_client_count),
   };
+  const pipelineOpen = optionalInt(row.pipeline_open_count);
+  if (pipelineOpen !== undefined) snap.pipeline_open_count = pipelineOpen;
+  const inboundUnread = optionalInt(row.inbound_unread_count);
+  if (inboundUnread !== undefined) snap.inbound_unread_count = inboundUnread;
+  const atRisk = optionalInt(row.at_risk_client_count);
+  if (atRisk !== undefined) snap.at_risk_client_count = atRisk;
   if (authority) {
     snap.authority = {
       catalog_authority: "governance",
@@ -241,13 +254,18 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
     };
   }
   if (funnel) {
-    snap.funnel = {
-      new_leads: num(funnel.new_leads),
-      qualified: num(funnel.qualified),
-      opportunities: num(funnel.opportunities),
-      proposals: num(funnel.proposals),
-      clients: num(funnel.clients),
-    };
+    const mapped: CommercialSnapshot["funnel"] = {};
+    const newLeads = optionalInt(funnel.new_leads);
+    const qualified = optionalInt(funnel.qualified);
+    const opportunities = optionalInt(funnel.opportunities);
+    const proposals = optionalInt(funnel.proposals);
+    const clients = optionalInt(funnel.clients);
+    if (newLeads !== undefined) mapped.new_leads = newLeads;
+    if (qualified !== undefined) mapped.qualified = qualified;
+    if (opportunities !== undefined) mapped.opportunities = opportunities;
+    if (proposals !== undefined) mapped.proposals = proposals;
+    if (clients !== undefined) mapped.clients = clients;
+    if (Object.keys(mapped).length > 0) snap.funnel = mapped;
   }
   const nominal = moneyOf(row.pipeline_nominal);
   if (nominal) snap.pipeline_nominal = nominal;
@@ -283,14 +301,8 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
 }
 
 export function financeFrom(row: Record<string, unknown>, fallback: Provenance): FinanceSnapshot {
-  const overdue = moneyOf(row.overdue) ?? moneyOf(row.receivables_overdue) ?? {
-    amount_cents: 0,
-    currency: "BRL",
-  };
-  const receivable = moneyOf(row.receivable) ?? moneyOf(row.receivables_open) ?? {
-    amount_cents: 0,
-    currency: "BRL",
-  };
+  const overdue = moneyOf(row.overdue) ?? moneyOf(row.receivables_overdue);
+  const receivable = moneyOf(row.receivable) ?? moneyOf(row.receivables_open);
   const snap: FinanceSnapshot = {
     schema_version: "control-center.finance-snapshot.v1",
     id: str(row.id, "cc:finance-snapshot:unknown"),
@@ -299,8 +311,6 @@ export function financeFrom(row: Record<string, unknown>, fallback: Provenance):
     provenance: provenanceOf(row, fallback),
     read_model_only: true,
     provider_mutations: "forbidden",
-    receivables_open: receivable,
-    receivables_overdue: overdue,
   };
   const contracted = moneyOf(row.contracted);
   if (contracted) snap.contracted = contracted;
@@ -310,8 +320,14 @@ export function financeFrom(row: Record<string, unknown>, fallback: Provenance):
   if (paid) snap.paid = paid;
   const received = moneyOf(row.effectively_received);
   if (received) snap.effectively_received = received;
-  snap.overdue = overdue;
-  snap.receivable = receivable;
+  if (overdue) {
+    snap.overdue = overdue;
+    snap.receivables_overdue = overdue;
+  }
+  if (receivable) {
+    snap.receivable = receivable;
+    snap.receivables_open = receivable;
+  }
   const refunds = moneyOf(row.refunds);
   if (refunds) snap.refunds = refunds;
   const chargebacks = moneyOf(row.chargebacks);

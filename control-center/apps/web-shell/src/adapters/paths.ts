@@ -51,7 +51,7 @@ export function readPathsFor(id: DestinationId): readonly string[] {
       return [q("/v1/agent-activities", { scope })];
     case "crescimento":
       return [
-        q("/v1/domains/commercial", { scope: "inbound" }),
+        q("/v1/domains/commercial", { scope: "commercial" }),
         q("/v1/domains/pncp", { scope: "inbound" }),
       ];
     default:

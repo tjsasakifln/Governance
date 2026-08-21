@@ -42,6 +42,22 @@ test("each destination requests the frozen GETs and only Memória hits /v1/conte
   }
 });
 
+test("Crescimento reads commercial snapshots with scope=commercial, not inbound", async () => {
+  const calls: string[] = [];
+  const { adapter } = httpAdapterFor(operationalRouter(), calls);
+  const result = await adapter.readDestination("crescimento");
+  assert.equal(result.ok, true);
+  if (!result.ok || result.loading) throw new Error("crescimento");
+  const requested = calls.map(pathOf);
+  assert.ok(requested.includes("/v1/domains/commercial?scope=commercial"));
+  assert.ok(requested.includes("/v1/domains/pncp?scope=inbound"));
+  assert.equal(
+    requested.some((url) => url.includes("/v1/domains/commercial") && /scope=inbound/.test(url)),
+    false,
+  );
+  assert.equal(result.page.commercial?.funnel?.new_leads, 6);
+});
+
 test("Hoje/Comercial/Clientes/Financeiro/Engenharia/Infra/Agentes never request /v1/context", async () => {
   const calls: string[] = [];
   const { adapter } = httpAdapterFor(operationalRouter(), calls);

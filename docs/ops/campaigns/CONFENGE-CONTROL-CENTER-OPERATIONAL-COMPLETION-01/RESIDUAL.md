@@ -23,7 +23,7 @@
 
 ## CODE_BLOCKER
 
-- Playwright visual matrix at 360/390/430/desktop was **not** re-run in a headed browser in this environment (Playwright MCP failed to connect). Unit/layout tests cover destinations and commercial surfaces; adversarial visual regression remains for the dedicated release review.
+- Playwright visual matrix at 360/390/430/desktop was **not** re-run in a headed browser in this environment (Playwright MCP failed to connect; Chromium missing `libnspr4.so`). Honesty of omitted≠zero, Crescimento hops, client sources, and operator banners is covered by shipped HTTP paint tests, not by screenshots.
 - Operational envelope v1 was not broken to add a seventh `growth` domain (additionalProperties: false). Growth/inbound is served via Comercial operations + Crescimento destination + PNCP domain.
 
 ## NOT DONE ON PURPOSE

@@ -229,8 +229,8 @@ function composeClients(input: HojeComposeInput): HojeSection {
 
 function commercialInException(snap: CommercialSnapshot): boolean {
   return (
-    snap.at_risk_client_count > 0 ||
-    snap.inbound_unread_count > 0 ||
+    (snap.at_risk_client_count ?? 0) > 0 ||
+    (snap.inbound_unread_count ?? 0) > 0 ||
     (snap.missing_next_action_count ?? 0) > 0 ||
     (snap.stalled_count ?? 0) > 0 ||
     (snap.aging_count ?? 0) > 0 ||
@@ -245,13 +245,15 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
     return section(3, [], true, "Sem recorte comercial — ignorar");
   }
   const funnel = snap.funnel
-    ? `leads ${snap.funnel.new_leads} · qualificados ${snap.funnel.qualified} · oportunidades ${snap.funnel.opportunities}`
-    : `pipeline ${snap.pipeline_open_count} aberto`;
+    ? `leads ${snap.funnel.new_leads ?? "ausente"} · qualificados ${snap.funnel.qualified ?? "ausente"} · oportunidades ${snap.funnel.opportunities ?? "ausente"}`
+    : typeof snap.pipeline_open_count === "number"
+      ? `pipeline ${snap.pipeline_open_count} aberto`
+      : "funil ausente";
   if (!commercialInException(snap)) {
     return section(3, [], true, `${funnel} — ignorar`);
   }
   const rows: HojeRow[] = [];
-  if (snap.inbound_unread_count > 0 || isUntrusted(snap.provenance.freshness_status)) {
+  if ((snap.inbound_unread_count ?? 0) > 0) {
     rows.push(
       rowFrom(
         {
@@ -264,7 +266,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       ),
     );
   }
-  if (snap.at_risk_client_count > 0) {
+  if ((snap.at_risk_client_count ?? 0) > 0) {
     rows.push(
       rowFrom(
         {
@@ -335,7 +337,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
 function financeInException(snap: FinanceSnapshot): boolean {
   const overdue = snap.overdue ?? snap.receivables_overdue;
   return (
-    overdue.amount_cents > 0 ||
+    (overdue?.amount_cents ?? 0) > 0 ||
     (snap.chargebacks?.amount_cents ?? 0) > 0 ||
     isUntrusted(snap.provenance.freshness_status)
   );
@@ -348,12 +350,12 @@ function composeFinance(input: HojeComposeInput): HojeSection {
   }
   const overdue = snap.overdue ?? snap.receivables_overdue;
   const receivable = snap.receivable ?? snap.receivables_open;
-  const kpi = `a receber ${receivable.currency} ${receivable.amount_cents}¢ · vencido ${overdue.amount_cents}¢`;
+  const kpi = `a receber ${receivable ? `${receivable.currency} ${receivable.amount_cents}¢` : "ausente"} · vencido ${overdue ? `${overdue.amount_cents}¢` : "ausente"}`;
   if (!financeInException(snap)) {
     return section(4, [], true, `${kpi} — ignorar (somente leitura; sem cobrança neste cockpit)`);
   }
   const rows: HojeRow[] = [];
-  if (overdue.amount_cents > 0) {
+  if (overdue && overdue.amount_cents > 0) {
     rows.push(
       rowFrom(
         {

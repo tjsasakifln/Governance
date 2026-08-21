@@ -251,6 +251,10 @@ main {
   border-color: var(--crit);
 }
 
+.banner.ok {
+  border-color: var(--ok, var(--low));
+}
+
 .banner.stale {
   border-color: var(--high);
 }

@@ -388,6 +388,11 @@ export const CLIENT_FIXTURES: ClientStatus[] = [
     blockers: ["fatura vencida"],
     next_action: "Revisar no Warmbly; não cobrar daqui",
     evidence: "asaas/receivables/open",
+    sources: {
+      warmbly: "FRESH",
+      asaas: "UNKNOWN",
+      governance: "UNKNOWN",
+    },
   },
   {
     schema_version: "control-center.client-status.v1",

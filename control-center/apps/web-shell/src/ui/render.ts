@@ -1,4 +1,4 @@
-import type { DestinationPage } from "../adapters/contract";
+import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -17,6 +17,7 @@ import {
   commercialBlock,
   engineeringBlock,
   financeBlock,
+  growthFunnelBlock,
   healthCard,
   memoriaGroups,
 } from "./domains";
@@ -30,6 +31,7 @@ export interface ShellModel {
   adapterMode?: "mock" | "http";
   surface?: string | null;
   resource?: string | null;
+  operatorResult?: AdapterWriteResult;
 }
 
 function attentionCard(item: AttentionItem): string {
@@ -89,6 +91,13 @@ function viewBanner(view: ViewState<DestinationPage>): string {
   return "";
 }
 
+function operatorBanner(result: AdapterWriteResult | undefined): string {
+  if (!result) return "";
+  const cls = result.ok ? "ok" : "error";
+  const role = result.ok ? "status" : "alert";
+  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}"><p>${escapeHtml(result.message)}</p></div>`;
+}
+
 function hojeBody(page: DestinationPage): string {
   const view =
     page.hoje ??
@@ -124,6 +133,7 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
     return "";
   }
   const extras = [
+    destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
     page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
@@ -204,6 +214,7 @@ export function renderShell(model: ShellModel): string {
         </header>
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}
+        ${operatorBanner(model.operatorResult)}
         ${body}
       </main>
     </div>

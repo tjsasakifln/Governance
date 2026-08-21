@@ -57,7 +57,14 @@ Actions are Control Center audit records. Warmbly is not mutated (safe upstream 
 
 Destinations now include **Crescimento**. Comercial has surfaces: visão, coortes, atividade, pipeline, exceções. Engenharia is company-scoped multi-repo. Client hash `#/clientes/<slug>` filters the 360 card stack.
 
-Web-shell tests: 62 passed including commercial surfaces.
+Honesty (skeptic panel, retested on shipped HTTP mapper):
+
+- `commercialFrom` / `financeFrom` do not coerce omitted counts or money to zero; cockpit facts use `data-absent="true"` + `ausente`.
+- Crescimento requests `/v1/domains/commercial?scope=commercial` (not `inbound`) and always renders the nine growth hops (`search_visibility`…`client_revenue`). Missing hops stay UNKNOWN/BLOCKED, never invented joins.
+- Client 360 always paints Warmbly / Asaas / Governance; omitted sources are UNKNOWN + `data-absent`.
+- `operatorAction` stores `lastOperatorResult` on the HTTP adapter; the shell paints ok/error banners.
+
+Web-shell tests: 76 passed including `honesty-http.test.ts` (mapper + HTTP paint path). Projector: `reply_rate denominator is contacted count and is never substituted with population` — PASS.
 
 ## Companion PRs
 

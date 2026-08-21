@@ -15,7 +15,20 @@ test("commercial surfaces render cohort, pipeline, activity and exception operat
   paintShell(root, adapter, "#/comercial/pipeline");
   assert.match(root.innerHTML, /Pipeline ativo/);
   paintShell(root, adapter, "#/crescimento");
-  assert.match(root.innerHTML, /Crescimento|inbound|PNCP|comercial/i);
+  assert.match(root.innerHTML, /Funil de crescimento/);
+  for (const hop of [
+    "search_visibility",
+    "click_session",
+    "cta",
+    "inbound_event",
+    "lead",
+    "qualified_lead",
+    "opportunity",
+    "commercial_proposal",
+    "client_revenue",
+  ]) {
+    assert.match(root.innerHTML, new RegExp(`data-growth-hop="${hop}"`));
+  }
 });
 
 test("parseHash keeps commercial surfaces and client resources", () => {
