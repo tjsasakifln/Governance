@@ -17,6 +17,7 @@
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "rank": "tsx src/cli.ts",
     "cli": "tsx src/cli.ts"
   },

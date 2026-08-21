@@ -22,6 +22,8 @@ run("npx", [
   "--test-concurrency=1",
   "tests/convergence/contracts.test.ts",
   "tests/convergence/dockerfiles.test.ts",
+  "tests/convergence/cve-exceptions.test.ts",
+  "tests/convergence/web-prod-hardening.test.ts",
   "tests/convergence/importer-apply.test.ts",
   "tests/convergence/importer-apply-db.test.ts",
   "tests/convergence/mcp-context.test.ts",

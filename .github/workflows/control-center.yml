@@ -129,6 +129,7 @@ jobs:
           docker build -f services/mcp/Dockerfile -t confenge-control-center-mcp:ci .
           docker build -f connectors/runner/Dockerfile -t confenge-control-center-collector:ci .
           docker build -f apps/web-shell/Dockerfile -t confenge-control-center-web:ci .
+          docker build -f deploy/docker/ops.Dockerfile -t confenge-control-center-ops:ci deploy
       - name: Compose up real images and hit context provenance
         working-directory: control-center
         run: node scripts/compose-probe.mjs

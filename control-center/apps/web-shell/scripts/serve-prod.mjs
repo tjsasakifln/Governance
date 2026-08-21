@@ -2,7 +2,7 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../dist", import.meta.url)));
 const host = process.env.HOST ?? "0.0.0.0";
@@ -16,6 +16,21 @@ const TYPES = {
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json",
 };
+
+export const SECURITY_HEADERS = {
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+  "Cross-Origin-Resource-Policy": "same-origin",
+};
+
+export function applySecurityHeaders(res) {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(name, value);
+  }
+}
 
 const contextUpstream = (process.env.CC_CONTEXT_UPSTREAM ?? "").replace(/\/+$/, "");
 const actorId = (process.env.CC_ACTOR_ID ?? "").trim();
@@ -45,7 +60,8 @@ function injectIdentity(html) {
   return next;
 }
 
-const server = createServer((req, res) => {
+export const server = createServer((req, res) => {
+  applySecurityHeaders(res);
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
   if (contextUpstream && url.pathname.startsWith("/v1/")) {
     void fetch(`${contextUpstream}${url.pathname}${url.search}`, {
@@ -94,4 +110,9 @@ const server = createServer((req, res) => {
   }
 });
 
-server.listen(port, host);
+const isMain =
+  Boolean(process.argv[1]) && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+
+if (isMain) {
+  server.listen(port, host);
+}

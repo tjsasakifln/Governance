@@ -18,6 +18,9 @@ x-app-base: &app-base
   logging: *cc-logging
   mem_limit: 512m
   cpus: 0.75
+  read_only: true
+  tmpfs:
+    - /tmp:size=64M,mode=1777
   deploy:
     resources:
       limits:
@@ -92,7 +95,7 @@ services:
       CONTROL_CENTER_FOUNDER_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
       CONTROL_CENTER_ENV: production
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -115,7 +118,7 @@ services:
       CONTROL_CENTER_CONTEXT_URL: "http://context:8080"
       CONFENGE_MCP_AUTH_TOKEN: "${CONFENGE_MCP_AUTH_TOKEN:?CONFENGE_MCP_AUTH_TOKEN must be set from a secret store}"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -135,12 +138,14 @@ services:
       PORT: "8080"
       NODE_ENV: production
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 12s
     depends_on:
+      postgres:
+        condition: service_healthy
       context:
         condition: service_healthy
 
@@ -154,7 +159,7 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -164,7 +169,7 @@ services:
         condition: service_healthy
 
   authelia:
-    image: authelia/authelia:4.39
+    image: authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 256m

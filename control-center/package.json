@@ -5,7 +5,7 @@
   "description": "Confenge Control Center workspace: contracts, persistence, context, MCP, collectors, read models, cockpit, deploy.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "workspaces": [
     "contracts",
@@ -36,6 +36,7 @@
     "install": "node scripts/install-workspace.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:hardening": "tsx --test tests/convergence/dockerfiles.test.ts tests/convergence/cve-exceptions.test.ts tests/convergence/web-prod-hardening.test.ts",
     "build": "npm run build --workspaces --if-present",
     "test:integration": "node scripts/integration.mjs",
     "test:e2e": "node scripts/e2e.mjs",

@@ -1,0 +1,135 @@
+name: control-center-image-scan
+
+on:
+  push:
+    branches: [main, "campaign/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/package-lock.json
+
+      - name: Install workspace
+        working-directory: control-center
+        run: npm run install
+
+      - name: Provenance
+        working-directory: control-center
+        run: |
+          mkdir -p "${{ runner.temp }}/cc-scan"
+          cat > "${{ runner.temp }}/cc-scan/provenance.json" <<EOF
+          {
+            "git_sha": "${{ github.sha }}",
+            "ref": "${{ github.ref }}",
+            "run_id": "${{ github.run_id }}",
+            "workflow": "${{ github.workflow }}"
+          }
+          EOF
+          git rev-parse HEAD
+
+      - name: npm audit (prod, dev, all)
+        working-directory: control-center
+        run: |
+          mkdir -p "${{ runner.temp }}/cc-scan"
+          npm audit --omit=dev --json > "${{ runner.temp }}/cc-scan/npm-audit-prod.json" || true
+          npm audit --json > "${{ runner.temp }}/cc-scan/npm-audit-dev.json" || true
+          npm audit --json > "${{ runner.temp }}/cc-scan/npm-audit.json" || true
+          jq -e '.metadata.vulnerabilities.critical == 0' "${{ runner.temp }}/cc-scan/npm-audit-prod.json"
+
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          VER=0.74.0
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${VER}/trivy_${VER}_Linux-64bit.tar.gz" \
+            -o /tmp/trivy.tgz
+          sudo tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          trivy --version
+
+      - name: Trivy filesystem (vuln + secret + license)
+        working-directory: control-center
+        run: |
+          mkdir -p "${{ runner.temp }}/cc-scan/trivy"
+          trivy fs --scanners vuln --format json --output "${{ runner.temp }}/cc-scan/trivy/fs-vuln.json" .
+          trivy fs --scanners secret --format json --output "${{ runner.temp }}/cc-scan/trivy/fs-secret.json" .
+          trivy fs --scanners license --format json --output "${{ runner.temp }}/cc-scan/trivy/fs-license.json" .
+          trivy fs --format cyclonedx --output "${{ runner.temp }}/cc-scan/trivy/fs.cdx.json" .
+          trivy fs --format spdx-json --output "${{ runner.temp }}/cc-scan/trivy/fs.spdx.json" .
+
+      - name: Build runtime images
+        working-directory: control-center
+        run: |
+          docker build -f services/context/Dockerfile -t confenge-control-center-context:ci .
+          docker build -f services/mcp/Dockerfile -t confenge-control-center-mcp:ci .
+          docker build -f connectors/runner/Dockerfile -t confenge-control-center-collector:ci .
+          docker build -f apps/web-shell/Dockerfile -t confenge-control-center-web:ci .
+          docker build -f deploy/docker/ops.Dockerfile -t confenge-control-center-ops:ci deploy
+          docker build -f deploy/docker/postgres.Dockerfile -t confenge-control-center-postgres:ci deploy
+          docker build -f deploy/docker/caddy.Dockerfile -t confenge-control-center-caddy:ci deploy
+
+      - name: Pull pinned third-party images
+        working-directory: control-center
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const pins = JSON.parse(readFileSync("./supply-chain/image-pins.json", "utf8"));
+            for (const key of ["authelia-4.39", "caddy-2.11-alpine", "caddy-2.9-alpine", "redis-7-alpine", "postgres-16-alpine", "node-22-bookworm-slim"]) {
+              const pin = pins.images[key];
+              if (!pin) throw new Error("missing pin " + key);
+              console.log(pin.ref);
+            }
+          ' | while read -r ref; do
+            docker pull "$ref"
+          done
+
+      - name: Trivy image scans (CycloneDX and SPDX)
+        run: |
+          set -euo pipefail
+          out="${{ runner.temp }}/cc-scan/trivy"
+          mkdir -p "$out"
+          scan_image() {
+            local name="$1"
+            local image="$2"
+            trivy image --scanners vuln --format json --output "$out/${name}-vuln.json" "$image"
+            trivy image --scanners secret --format json --output "$out/${name}-secret.json" "$image"
+            trivy image --scanners license --format json --output "$out/${name}-license.json" "$image"
+            trivy image --format cyclonedx --output "$out/${name}.cdx.json" "$image"
+            trivy image --format spdx-json --output "$out/${name}.spdx.json" "$image"
+          }
+          scan_image context confenge-control-center-context:ci
+          scan_image mcp confenge-control-center-mcp:ci
+          scan_image collector confenge-control-center-collector:ci
+          scan_image web confenge-control-center-web:ci
+          scan_image ops confenge-control-center-ops:ci
+          scan_image postgres confenge-control-center-postgres:ci
+          scan_image caddy confenge-control-center-caddy:ci
+          scan_image authelia authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
+          scan_image redis redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+          scan_image caddy_overlay caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+
+      - name: CVE exception gate
+        working-directory: control-center
+        run: |
+          npx tsx supply-chain/image-scan-gate.ts \
+            --exceptions supply-chain/cve-exceptions.json \
+            --trivy-dir "${{ runner.temp }}/cc-scan/trivy" \
+            --npm-audit "${{ runner.temp }}/cc-scan/npm-audit.json"
+
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-center-supply-chain-${{ github.sha }}
+          path: ${{ runner.temp }}/cc-scan
+          if-no-files-found: error
+          retention-days: 30
