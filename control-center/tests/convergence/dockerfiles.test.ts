@@ -165,7 +165,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
   const nodeRef = pins.images["node-22-bookworm-slim"]?.ref;
   const pgRef = pins.images["postgres-16-alpine"]?.ref;
   const autheliaRef = pins.images["authelia-4.39"]?.ref;
-  const caddyRef = pins.images["caddy-2.8-alpine"]?.ref;
+  const caddyRef = pins.images["caddy-2.11-alpine"]?.ref;
   const redisRef = pins.images["redis-7-alpine"]?.ref;
   assert.ok(nodeRef && pgRef && autheliaRef && caddyRef && redisRef);
 
@@ -273,6 +273,7 @@ test("SBOM/image-scan workflow covers every image, CycloneDX and SPDX, and does 
   assert.match(wf, /cyclonedx/i);
   assert.match(wf, /spdx/i);
   assert.match(wf, /trivy/i);
+  assert.match(wf, /trivy_\$\{VER\}_Linux-64bit\.tar\.gz|trivy_[0-9.]+_Linux-64bit\.tar\.gz/);
   assert.match(wf, /npm audit/);
   assert.match(wf, /secret/);
   assert.match(wf, /license/i);

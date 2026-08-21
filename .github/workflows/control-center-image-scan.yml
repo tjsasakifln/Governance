@@ -49,7 +49,11 @@ jobs:
 
       - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.58.1/contrib/install.sh | sudo sh -s -- -b /usr/local/bin v0.58.1
+          set -euo pipefail
+          VER=0.74.0
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${VER}/trivy_${VER}_Linux-64bit.tar.gz" \
+            -o /tmp/trivy.tgz
+          sudo tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
           trivy --version
 
       - name: Trivy filesystem (vuln + secret + license)
@@ -79,7 +83,7 @@ jobs:
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const pins = JSON.parse(readFileSync("./supply-chain/image-pins.json", "utf8"));
-            for (const key of ["authelia-4.39", "caddy-2.8-alpine", "caddy-2.9-alpine", "redis-7-alpine", "postgres-16-alpine", "node-22-bookworm-slim"]) {
+            for (const key of ["authelia-4.39", "caddy-2.11-alpine", "caddy-2.9-alpine", "redis-7-alpine", "postgres-16-alpine", "node-22-bookworm-slim"]) {
               const pin = pins.images[key];
               if (!pin) throw new Error("missing pin " + key);
               console.log(pin.ref);

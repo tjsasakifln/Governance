@@ -1,6 +1,6 @@
 {
   "schema_version": "control-center.image-pins.v1",
-  "updated_at": "2026-08-21T00:00:00Z",
+  "updated_at": "2026-08-21T13:10:00Z",
   "notes": "Never use floating tags (latest or unpinned) in productive FROM/image lines. Re-resolve with `node scripts/update-image-digests.mjs`. Overlay files under security/examples are not rewritten; their images are pinned here for scan.",
   "images": {
     "node-22-bookworm-slim": {
@@ -24,13 +24,6 @@
       "ref": "authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b",
       "role": "authelia"
     },
-    "caddy-2.8-alpine": {
-      "name": "caddy",
-      "tag": "2.8-alpine",
-      "digest": "sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17",
-      "ref": "caddy:2.8-alpine@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17",
-      "role": "caddy-base"
-    },
     "caddy-2.9-alpine": {
       "name": "caddy",
       "tag": "2.9-alpine",
@@ -44,6 +37,13 @@
       "digest": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
       "ref": "redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
       "role": "redis-overlay-scan"
+    },
+    "caddy-2.11-alpine": {
+      "name": "caddy",
+      "tag": "2.11-alpine",
+      "digest": "sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648",
+      "ref": "caddy:2.11-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648",
+      "role": "caddy-base"
     }
   }
 }
