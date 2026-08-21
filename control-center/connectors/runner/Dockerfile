@@ -1,21 +1,33 @@
-FROM node:22-bookworm-slim
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends wget ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS builder
 
 WORKDIR /src
-COPY package.json package-lock.json .npmrc ./
-COPY contracts ./contracts
-COPY connectors ./connectors
-RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-collector --include-workspace-root \
-  && npm install tsx@4.20.5 --no-save --ignore-scripts \
-  && npm cache clean --force
+COPY . .
+# esbuild postinstall runs only in this builder to emit dist/server.js. Runtime copies JS only.
+RUN npm ci --ignore-scripts \
+  && npm rebuild esbuild --foreground-scripts
+RUN node scripts/build-runtime-packages.mjs collector
+RUN node scripts/rewrite-runtime-exports.mjs /src
+RUN node scripts/strip-runtime-tree.mjs /src \
+  && test ! -e /src/node_modules/tsx \
+  && test ! -e /src/node_modules/esbuild \
+  && test -z "$(find /src -name '*.map' -not -path '*/node_modules/*' | head -1)"
 
-WORKDIR /src/connectors/runner
+FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
+RUN rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack
+WORKDIR /app
+COPY --from=builder --chown=node:node /src/package.json /src/package-lock.json /src/.npmrc ./
+COPY --from=builder --chown=node:node /src/node_modules ./node_modules
+COPY --from=builder --chown=node:node /src/contracts ./contracts
+COPY --from=builder --chown=node:node /src/connectors ./connectors
+COPY --from=builder --chown=node:node /src/scripts/node-http-probe.mjs ./node-http-probe.mjs
 ENV HOST=0.0.0.0
 ENV PORT=8080
 ENV NODE_ENV=production
 EXPOSE 8080
 USER node
-CMD ["npx", "tsx", "src/server.ts"]
+WORKDIR /app/connectors/runner
+HEALTHCHECK --interval=15s --timeout=3s --start-period=12s --retries=5 \
+  CMD ["node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
+CMD ["node", "dist/server.js"]

@@ -16,7 +16,8 @@
     "test": "tsx --test tests/*.test.ts",
     "validate": "tsx src/cli.ts",
     "fingerprint": "tsx src/cli.ts --fingerprint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "engines": {
     "node": ">=20"

@@ -26,9 +26,11 @@ test("browser entry has no unguarded Node require/module.exports", () => {
     assert.doesNotMatch(src, /module\.exports/);
     assert.doesNotMatch(src, /\bexports\./);
   }
-  assert.match(html, /location\.protocol !== "file:"|location\.protocol === "file:"/);
-  assert.match(html, /npm run dev/);
-  assert.match(html, /npm run preview/);
+  assert.match(html, /file-protocol-guard\.js/);
+  const guard = readFileSync(join(rootDir, "public/file-protocol-guard.js"), "utf8");
+  assert.match(guard, /location\.protocol !== "file:"|location\.protocol === "file:"/);
+  assert.match(guard, /npm run dev/);
+  assert.match(guard, /npm run preview/);
 });
 
 test("installShellGlobals exposes destinations and mount on window", () => {

@@ -1,0 +1,49 @@
+{
+  "schema_version": "control-center.image-pins.v1",
+  "updated_at": "2026-08-21T00:00:00Z",
+  "notes": "Never use floating tags (latest or unpinned) in productive FROM/image lines. Re-resolve with `node scripts/update-image-digests.mjs`. Overlay files under security/examples are not rewritten; their images are pinned here for scan.",
+  "images": {
+    "node-22-bookworm-slim": {
+      "name": "node",
+      "tag": "22-bookworm-slim",
+      "digest": "sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436",
+      "ref": "node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436",
+      "role": "node-builder-runtime"
+    },
+    "postgres-16-alpine": {
+      "name": "postgres",
+      "tag": "16-alpine",
+      "digest": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+      "ref": "postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+      "role": "postgres"
+    },
+    "authelia-4.39": {
+      "name": "authelia/authelia",
+      "tag": "4.39",
+      "digest": "sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b",
+      "ref": "authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b",
+      "role": "authelia"
+    },
+    "caddy-2.8-alpine": {
+      "name": "caddy",
+      "tag": "2.8-alpine",
+      "digest": "sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17",
+      "ref": "caddy:2.8-alpine@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17",
+      "role": "caddy-base"
+    },
+    "caddy-2.9-alpine": {
+      "name": "caddy",
+      "tag": "2.9-alpine",
+      "digest": "sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0",
+      "ref": "caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0",
+      "role": "caddy-overlay-scan"
+    },
+    "redis-7-alpine": {
+      "name": "redis",
+      "tag": "7-alpine",
+      "digest": "sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+      "ref": "redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf",
+      "role": "redis-overlay-scan"
+    }
+  }
+}

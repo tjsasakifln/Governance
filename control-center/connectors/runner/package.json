@@ -17,7 +17,8 @@
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "start": "tsx src/server.ts",
-    "run": "tsx src/cli.ts"
+    "run": "tsx src/cli.ts",
+    "build": "node ../../scripts/bundle-collector.mjs"
   },
   "dependencies": {
     "@confenge/control-center-contracts": "*"
