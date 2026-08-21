@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   DEFAULT_TRUSTED_HOPS,
+  actorRefFromIdentity,
   defaultTrustedHopPolicy,
   parseForwardAuthIdentity,
   type IdentityRequest,
@@ -34,6 +35,10 @@ describe("parseForwardAuthIdentity", () => {
     assert.deepEqual(result.identity.groups, ["admins", "operators"]);
     assert.equal(result.identity.name, "Control Center Operator");
     assert.equal(result.identity.email, "ops@example.invalid");
+    const actor = actorRefFromIdentity(result.identity);
+    assert.equal(actor.kind, "human");
+    assert.equal(actor.id, "operator");
+    assert.equal(actor.display_name, "Control Center Operator");
   });
 
   it("is case-insensitive on header names and trusts IPv4-mapped IPv6 hops", () => {

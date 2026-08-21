@@ -43,7 +43,7 @@
   }
 
   handle {
-    reverse_proxy web-shell:8080
+    reverse_proxy web:8080
   }
 }
 

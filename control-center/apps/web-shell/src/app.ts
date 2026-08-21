@@ -65,18 +65,20 @@ export interface MountableRoot {
   innerHTML: string;
 }
 
-export function paintShell(
+function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof (value as Promise<T>).then === "function";
+}
+
+function applyPaint(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter & {
     setScenario?(s: MockScenario): void;
     getScenario?(): MockScenario;
   },
-  hash: string,
+  parsed: ReturnType<typeof parseHash>,
+  override: ReturnType<typeof parseViewKind>,
+  result: import("./adapters/contract").AdapterReadResult,
 ): void {
-  const parsed = parseHash(hash || "#/hoje");
-  const override = parseViewKind(parsed.view);
-  adapter.setScenario?.(scenarioFromView(override));
-  const result = adapter.readDestination(parsed.destination);
   const input: ResolveViewInput<DestinationPage> = {
     loading: result.ok && result.loading,
     data: result.ok && !result.loading ? result.page : null,
@@ -93,7 +95,27 @@ export function paintShell(
     viewKind: view.kind,
     view,
     mockScenario: adapter.getScenario?.() ?? adapter.mode,
+    adapterMode: adapter.mode,
   });
+}
+
+export function paintShell(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter & {
+    setScenario?(s: MockScenario): void;
+    getScenario?(): MockScenario;
+  },
+  hash: string,
+): void {
+  const parsed = parseHash(hash || "#/hoje");
+  const override = parseViewKind(parsed.view);
+  adapter.setScenario?.(scenarioFromView(override));
+  const result = adapter.readDestination(parsed.destination);
+  if (isPromise(result)) {
+    void result.then((resolved) => applyPaint(root, adapter, parsed, override, resolved));
+    return;
+  }
+  applyPaint(root, adapter, parsed, override, result);
 }
 
 export function mount(
@@ -105,7 +127,7 @@ export function mount(
   runtime: ShellRuntime = browserRuntime(),
 ): { unmount: () => void } {
   const paint = (): void => {
-    paintShell(root, adapter, runtime.getHash());
+    void paintShell(root, adapter, runtime.getHash());
   };
   const stop = runtime.onHashChange(paint);
   if (!runtime.getHash()) {

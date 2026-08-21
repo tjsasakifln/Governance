@@ -6,7 +6,8 @@ import { createLogger, type Logger } from "./log.ts";
 import { REPRESENTATIVE_NOW, REPRESENTATIVE_REPO_DOMAINS, seedRepresentative } from "./representative.ts";
 import { parseRepoDomainMap, type RepoDomainMap } from "./scope.ts";
 import { createContextService, type ContextService } from "./service.ts";
-import { createStoreFromEnv } from "./store/from-env.ts";
+import { createStoreFromEnv, createStoreFromEnvAsync } from "./store/from-env.ts";
+import type { PersistencePort } from "./store/adapter.ts";
 import { sanitizeActorId } from "./sanitize.ts";
 import type { ActorRef, Scope } from "./types.ts";
 
@@ -15,7 +16,7 @@ export interface BootResult {
   founderActorId: string;
   defaultScope: Scope;
   fixture: string;
-  storeName: "fixture";
+  storeName: "fixture" | "postgres";
   repoDomains: RepoDomainMap;
 }
 
@@ -35,13 +36,14 @@ function repoDomainsFromEnv(env: NodeJS.ProcessEnv, fixture: string): RepoDomain
   return parsed;
 }
 
-export function bootFromEnv(
+function assembleBoot(
   env: NodeJS.ProcessEnv,
+  store: PersistencePort,
+  storeName: BootResult["storeName"],
   opts?: { logger?: Logger; clock?: Clock },
 ): BootResult {
   const founderActorId = readFounderActorId(env);
   const defaultScope: Scope = "company";
-  const store = createStoreFromEnv(env);
   const fixture = (env.CONTEXT_SERVICE_FIXTURE ?? "empty").trim() || "empty";
   const clock =
     opts?.clock ??
@@ -62,7 +64,27 @@ export function bootFromEnv(
     defaultScope,
     repoDomains,
   });
-  return { service, founderActorId, defaultScope, fixture, storeName: "fixture", repoDomains };
+  return { service, founderActorId, defaultScope, fixture, storeName, repoDomains };
+}
+
+export function bootFromEnv(
+  env: NodeJS.ProcessEnv,
+  opts?: { logger?: Logger; clock?: Clock },
+): BootResult {
+  const store = createStoreFromEnv(env);
+  return assembleBoot(env, store, "fixture", opts);
+}
+
+export async function bootFromEnvAsync(
+  env: NodeJS.ProcessEnv,
+  opts?: { logger?: Logger; clock?: Clock },
+): Promise<BootResult> {
+  const { store, storeName } = await createStoreFromEnvAsync(env);
+  const boot = assembleBoot(env, store, storeName, opts);
+  if (store.flush) {
+    await store.flush();
+  }
+  return boot;
 }
 
 export function actorFromEnv(env: NodeJS.ProcessEnv): ActorRef {

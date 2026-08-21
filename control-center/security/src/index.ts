@@ -22,7 +22,13 @@ export {
   THREAT_IDS,
 } from "./constants.js";
 export type { InvalidFixtureName, RuleId, ThreatId } from "./constants.js";
-export { parseForwardAuthIdentity, extractForwardAuthHeaders, defaultTrustedHopPolicy } from "./identity.js";
+export {
+  parseForwardAuthIdentity,
+  extractForwardAuthHeaders,
+  defaultTrustedHopPolicy,
+  actorRefFromIdentity,
+  actorRefFromIdentityResult,
+} from "./identity.js";
 export { isTrustedHop, normalizeRemoteAddress, parseCidr } from "./hop.js";
 export {
   classifyPath,

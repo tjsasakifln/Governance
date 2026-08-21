@@ -53,17 +53,17 @@ test("expected-schema.sql is a test-only contract of canonical PersistencePort r
   }
 });
 
-test("package has no postgres production dependency and DATABASE_URL still fail-closes", () => {
+test("sync createStoreFromEnv refuses fixture fallback when DATABASE_URL is set or production is missing it", () => {
   const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")) as {
     dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
   };
-  const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
-  for (const name of Object.keys(deps)) {
-    assert.equal(["pg", "postgres", "postgresql"].includes(name), false);
-  }
+  assert.equal(Boolean(pkg.dependencies?.["@confenge/control-center-persistence"]), true);
   assert.throws(
     () => createStoreFromEnv({ DATABASE_URL: "postgresql://127.0.0.1/control_center" }),
+    (err: unknown) => err instanceof ServiceError && err.code === "store_misconfigured",
+  );
+  assert.throws(
+    () => createStoreFromEnv({ NODE_ENV: "production" }),
     (err: unknown) => err instanceof ServiceError && err.code === "store_misconfigured",
   );
 });

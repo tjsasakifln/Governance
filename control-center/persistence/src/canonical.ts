@@ -1,48 +1,42 @@
 /**
- * Local canonical primitives for Control Center persistence v1.
- * Encoded here so this package does not depend on sibling workstreams.
+ * Persistence canonical primitives. Public ontology is control-center/contracts.
+ * Helpers below are storage-side; they must not invent a second freshness enum.
  */
+import {
+  CONFIDENCE_MAX as CONTRACTS_CONFIDENCE_MAX,
+  CONFIDENCE_MIN as CONTRACTS_CONFIDENCE_MIN,
+  CURRENCY_PATTERN as CONTRACTS_CURRENCY_PATTERN,
+  DIRECTIVE_KINDS as CONTRACTS_DIRECTIVE_KINDS,
+  DIRECTIVE_STATUSES as CONTRACTS_DIRECTIVE_STATUSES,
+  FRESHNESS_STATUSES as CONTRACTS_FRESHNESS_STATUSES,
+  RESOURCE_ID_PATTERN as CONTRACTS_RESOURCE_ID_PATTERN,
+  SCOPE_CORE as CONTRACTS_SCOPE_CORE,
+  SCOPE_LITERALS as CONTRACTS_SCOPE_LITERALS,
+  SCOPE_PATTERN as CONTRACTS_SCOPE_PATTERN,
+} from "@confenge/control-center-contracts";
 
-export const FRESHNESS_STATUSES = ['FRESH', 'STALE', 'UNKNOWN', 'ERROR'] as const;
+export const FRESHNESS_STATUSES = CONTRACTS_FRESHNESS_STATUSES;
 export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
 
-export const DIRECTIVE_KINDS = [
-  'decision',
-  'directive',
-  'fact',
-  'constraint',
-  'priority',
-  'risk',
-  'hypothesis',
-] as const;
+export const DIRECTIVE_KINDS = CONTRACTS_DIRECTIVE_KINDS;
 export type DirectiveKind = (typeof DIRECTIVE_KINDS)[number];
 
-export const DIRECTIVE_STATUSES = [
-  'draft',
-  'active',
-  'superseded',
-  'revoked',
-  'expired',
-] as const;
+export const DIRECTIVE_STATUSES = CONTRACTS_DIRECTIVE_STATUSES;
 export type DirectiveStatus = (typeof DIRECTIVE_STATUSES)[number];
 
-export const SCOPE_LITERALS = [
-  'company',
-  'commercial',
-  'finance',
-  'clients',
-  'infrastructure',
-  'inbound',
-] as const;
+export const SCOPE_LITERALS = CONTRACTS_SCOPE_LITERALS;
 export type ScopeLiteral = (typeof SCOPE_LITERALS)[number];
 
-export const RESOURCE_ID_PATTERN = '^cc:[a-z][a-z0-9-]*:[A-Za-z0-9._~-]+$';
+export const RESOURCE_ID_PATTERN = CONTRACTS_RESOURCE_ID_PATTERN;
 export const RESOURCE_ID_RE = new RegExp(RESOURCE_ID_PATTERN);
 
-export const SCOPE_CORE =
-  '(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)';
-export const SCOPE_PATTERN = `^${SCOPE_CORE}$`;
+export const SCOPE_CORE = CONTRACTS_SCOPE_CORE;
+export const SCOPE_PATTERN = CONTRACTS_SCOPE_PATTERN;
 export const SCOPE_RE = new RegExp(SCOPE_PATTERN);
+
+export const CONFIDENCE_MIN = CONTRACTS_CONFIDENCE_MIN;
+export const CONFIDENCE_MAX = CONTRACTS_CONFIDENCE_MAX;
+export const CURRENCY_PATTERN = CONTRACTS_CURRENCY_PATTERN;
 
 export const SOURCE_SYSTEM_PATTERN = '^[a-z][a-z0-9-]*$';
 export const SOURCE_SYSTEM_RE = new RegExp(SOURCE_SYSTEM_PATTERN);
@@ -53,11 +47,7 @@ export const UUID_PATTERN =
   '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
 export const UUID_RE = new RegExp(UUID_PATTERN, 'i');
 
-export const CURRENCY_PATTERN = '^[A-Z]{3}$';
 export const CURRENCY_RE = new RegExp(CURRENCY_PATTERN);
-
-export const CONFIDENCE_MIN = 0;
-export const CONFIDENCE_MAX = 1;
 
 export type SourceRef = {
   system: string;

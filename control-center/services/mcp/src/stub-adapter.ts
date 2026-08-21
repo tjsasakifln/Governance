@@ -49,7 +49,7 @@ function receipt(kind: WriteReceipt["kind"], id: string): WriteReceipt {
     recorded_at: observed_at,
     source: "mcp.agent-report",
     observed_at,
-    freshness_status: "fresh",
+    freshness_status: "FRESH",
     confidence: 1,
   };
 }
@@ -83,7 +83,7 @@ export class StubContextApi implements ContextApiPort {
       records: structuredClone(records),
       source: first?.source ?? "control-center.stub.fixtures",
       observed_at: first?.observed_at ?? utcNow(),
-      freshness_status: first?.freshness_status ?? "unknown",
+      freshness_status: first?.freshness_status ?? "UNKNOWN",
       confidence: first?.confidence,
     };
   }

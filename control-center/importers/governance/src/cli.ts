@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { injectedGit, isUsableCommitSha, liveGit } from "./git.js";
+import { createControlCenterPersistPort } from "./cc-db.js";
 import { importGovernance } from "./import.js";
 import { createLogger, redactValue } from "./log.js";
 import { DEFAULT_RELATIVE_ROOTS } from "./tree.js";
@@ -15,6 +16,7 @@ export type CliArgs = {
   commitSha: string | null;
   out: string | null;
   persist: boolean;
+  apply: boolean;
   relativeRoots: string[] | null;
 };
 
@@ -26,6 +28,7 @@ export function parseArgv(argv: string[]): CliArgs {
     commitSha: null,
     out: null,
     persist: false,
+    apply: false,
     relativeRoots: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -36,6 +39,10 @@ export function parseArgv(argv: string[]): CliArgs {
     }
     if (token === "--persist") {
       args.persist = true;
+      continue;
+    }
+    if (token === "--apply") {
+      args.apply = true;
       continue;
     }
     const next = argv[i + 1];
@@ -74,15 +81,21 @@ export function helpText(): string {
 
 Usage:
   npm run dry-run -- --root <repo-or-fixture> [--now ISO-UTC] [--commit-sha SHA] [--out report.json]
+  npm run import -- --apply --root <repo>     # opt-in, Control Center DB only
 
-Dry-run is mandatory and the default. It prints candidates and the unclassifiable
-report. It does not write origin Git files, PostgreSQL, or sibling workstreams.
+Dry-run is the default. It prints candidates and does not write origin Git,
+Warmbly, Asaas, or the Control Center database.
+
+--apply is opt-in and requires CC_GOVERNANCE_IMPORTER_ALLOW_APPLY=1 plus
+CONTROL_CENTER_DATABASE_URL. Apply is idempotent and writes only the Control
+Center database. --persist remains refused.
 
 Env:
   CC_GOVERNANCE_IMPORTER_ROOT         Repository or fixture root
   CC_GOVERNANCE_IMPORTER_NOW          Pin observed_at (UTC RFC3339)
   CC_GOVERNANCE_IMPORTER_COMMIT_SHA   Injected commit SHA for virtual trees
-  CC_GOVERNANCE_IMPORTER_ALLOW_PERSIST  Never set in this campaign
+  CC_GOVERNANCE_IMPORTER_ALLOW_APPLY  Must be 1 to enable --apply
+  CONTROL_CENTER_DATABASE_URL         Postgres URL for opt-in apply
 
 Missing commit SHA is fail-closed (unclassifiable, freshness ERROR). SHA is never fabricated.
 `;
@@ -125,7 +138,19 @@ export async function runCli(
       JSON.stringify({
         event: "persist_refused",
         code: "CC_GOVERNANCE_IMPORTER_PERSIST_DISABLED",
-        message: "persist adapter is unused by default; dry-run only until convergence",
+        message: "--persist is refused; use opt-in --apply against the Control Center database only",
+      }),
+    );
+    return { code: 2 };
+  }
+
+  const applyRequested = args.apply || env.CC_GOVERNANCE_IMPORTER_APPLY === "1";
+  if (applyRequested && env.CC_GOVERNANCE_IMPORTER_ALLOW_APPLY !== "1") {
+    io.stderr(
+      JSON.stringify({
+        event: "apply_refused",
+        code: "CC_GOVERNANCE_IMPORTER_APPLY_NOT_ALLOWED",
+        message: "--apply requires CC_GOVERNANCE_IMPORTER_ALLOW_APPLY=1",
       }),
     );
     return { code: 2 };
@@ -165,8 +190,9 @@ export async function runCli(
       root,
       now,
       git,
-      dryRun: true,
-      persistEnabled: false,
+      dryRun: !applyRequested,
+      persistEnabled: applyRequested,
+      persist: applyRequested ? createControlCenterPersistPort(env) : undefined,
       relativeRoots: args.relativeRoots ?? [...DEFAULT_RELATIVE_ROOTS],
       log,
     });

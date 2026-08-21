@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,7 +29,7 @@ describe("launchable fixture runner", () => {
       "--now",
       "2026-08-20T12:00:00Z",
     ];
-    const tsxBin = join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
+    const tsxBin = join(dirname(createRequire(import.meta.url).resolve("tsx/package.json")), "dist", "cli.mjs");
     const first = spawnSync(process.execPath, [tsxBin, ...args], {
       cwd: ROOT,
       encoding: "utf8",

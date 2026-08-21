@@ -1,46 +1,21 @@
-import type { FreshnessStatus } from "./taxonomy.js";
+import { FRESHNESS_STATUSES, type FreshnessStatus } from "@confenge/control-center-contracts/taxonomy";
 
 /**
- * Local adapters for later convergence. Sibling packages are NOT imported.
- *
- * Vocab (documented, not unified in this campaign):
- * - contracts (cc-01): FRESH | STALE | UNKNOWN | ERROR
- * - persistence (cc-02): fresh | stale | unknown | expired
- * - this engine: contracts-shaped uppercase enum
- *
- * Mapping `ERROR` ↔ `expired` is an explicit divergence to resolve at
- * convergence; do not silently coerce in consumers.
+ * Persistence v1 uses the same FRESH|STALE|UNKNOWN|ERROR tokens as contracts.
+ * Identity mapping — no expired-as-freshness, no lowercase aliases.
  */
-export const CONTRACTS_FRESHNESS = ["FRESH", "STALE", "UNKNOWN", "ERROR"] as const;
+export const CONTRACTS_FRESHNESS = FRESHNESS_STATUSES;
 
-export const PERSISTENCE_FRESHNESS = ["fresh", "stale", "unknown", "expired"] as const;
+export const PERSISTENCE_FRESHNESS = FRESHNESS_STATUSES;
 
-export type PersistenceFreshness = (typeof PERSISTENCE_FRESHNESS)[number];
+export type PersistenceFreshness = FreshnessStatus;
 
 export function toPersistenceFreshness(status: FreshnessStatus): PersistenceFreshness {
-  switch (status) {
-    case "FRESH":
-      return "fresh";
-    case "STALE":
-      return "stale";
-    case "UNKNOWN":
-      return "unknown";
-    case "ERROR":
-      return "expired";
-  }
+  return status;
 }
 
 export function fromPersistenceFreshness(status: PersistenceFreshness): FreshnessStatus {
-  switch (status) {
-    case "fresh":
-      return "FRESH";
-    case "stale":
-      return "STALE";
-    case "unknown":
-      return "UNKNOWN";
-    case "expired":
-      return "ERROR";
-  }
+  return status;
 }
 
 /**

@@ -1,3 +1,5 @@
+import { createMockAdapter } from "./adapters/mock";
+import { createProductionAdapter } from "./adapters/http";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
 
@@ -70,5 +72,10 @@ export function startBrowser(
   if (applyFileProtocolGuard(win.location, root)) {
     return;
   }
-  mount(root);
+  const adapter =
+    typeof document !== "undefined" &&
+    document.querySelector('meta[name="cc-use-mock"]')?.getAttribute("content") === "1"
+      ? createMockAdapter()
+      : createProductionAdapter();
+  mount(root, adapter);
 }

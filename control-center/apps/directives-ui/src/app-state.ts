@@ -8,7 +8,7 @@ import {
   parseScopeFilter,
   parseStatusFilter,
 } from "./filter.ts";
-import type { MockDirectiveService } from "./service.ts";
+import type { DirectiveMemoryPort } from "./service.ts";
 import { kindOption } from "./ui/labels.ts";
 import type { DirectiveFilter, DirectiveKind, FounderApproval, ResourceId } from "./types.ts";
 
@@ -43,11 +43,11 @@ export type Action =
   | { type: "submit-supersede" };
 
 export interface AppSession {
-  service: MockDirectiveService;
+  service: DirectiveMemoryPort;
   ui: UiState;
 }
 
-export function initialUiState(service: MockDirectiveService): UiState {
+export function initialUiState(service: DirectiveMemoryPort): UiState {
   return {
     filter: { ...EMPTY_FILTER },
     screen: "list",

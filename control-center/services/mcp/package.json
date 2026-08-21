@@ -18,6 +18,7 @@
     "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "@confenge/control-center-contracts": "*",
     "zod": "^3.24.2"
   },
   "devDependencies": {

@@ -1,12 +1,9 @@
-import type { AuditEvent, DirectiveProposal, DirectiveRecord } from "../types.ts";
+import type { AgentActivityRecord, AuditEvent, DirectiveProposal, DirectiveRecord } from "../types.ts";
 
 /**
- * Persistence port expected from control-center/persistence at convergence.
- * This workstream ships an in-memory fixture implementation only.
- *
- * All methods are synchronous on the fixture store so policy tests can
- * run without I/O. A PostgreSQL adapter MUST provide the same semantics
- * and MUST write the audit event in the same commit as the mutation.
+ * Persistence port. Production uses the Postgres adapter in `./postgres.ts`.
+ * The fixture store is test-only. A PostgreSQL adapter MUST provide the same
+ * semantics and MUST write the audit event in the same commit as the mutation.
  *
  * `src/store/expected-schema.sql` is a test-only contract snapshot of
  * these records. The service MUST NOT load or apply that file.
@@ -24,6 +21,10 @@ export interface PersistencePort {
   getProposal(id: string): DirectiveProposal | undefined;
   listProposals(): DirectiveProposal[];
   updateProposal(record: DirectiveProposal): void;
+  recordAgentActivity(record: AgentActivityRecord): void;
+  listAgentActivities(): AgentActivityRecord[];
+  flush?(): Promise<void>;
+  readyCheck?(): Promise<boolean>;
 }
 
 /** @deprecated Use PersistencePort. */

@@ -1,22 +1,15 @@
-/**
- * Local copies of Control Center v1 taxonomies.
- * Canonical JSON Schema lives in `control-center/contracts` (cc/01).
- * This package MUST NOT import that workstream until convergence.
- */
+export {
+  CURRENCY_PATTERN,
+  FRESHNESS_STATUSES,
+  RESOURCE_ID_PATTERN,
+  UTC_DATETIME_PATTERN,
+} from "@confenge/control-center-contracts";
+export type { FreshnessStatus } from "@confenge/control-center-contracts";
 
-export const UTC_DATETIME_PATTERN =
-  "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$";
-
-export const UTC_DATETIME_RE = new RegExp(UTC_DATETIME_PATTERN);
-
-export const RESOURCE_ID_PATTERN = "^cc:[a-z][a-z0-9-]*:[A-Za-z0-9._~-]+$";
-
-export const CURRENCY_PATTERN = "^[A-Z]{3}$";
-
-export const CURRENCY_RE = new RegExp(CURRENCY_PATTERN);
-
-export const FRESHNESS_STATUSES = ["FRESH", "STALE", "UNKNOWN", "ERROR"] as const;
-export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
+export const UTC_DATETIME_RE = new RegExp(
+  "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+);
+export const CURRENCY_RE = new RegExp("^[A-Z]{3}$");
 
 export const ATTENTION_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];

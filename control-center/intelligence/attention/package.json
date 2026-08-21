@@ -20,6 +20,9 @@
     "rank": "tsx src/cli.ts",
     "cli": "tsx src/cli.ts"
   },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
   "devDependencies": {
     "@types/node": "^22.18.0",
     "tsx": "^4.20.5",

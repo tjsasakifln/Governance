@@ -15,7 +15,7 @@ export interface CaddyHook {
   jsonLogs: boolean;
 }
 
-const REQUIRED_UPSTREAMS = ["context:8080", "mcp:8080", "web-shell:8080"] as const;
+const REQUIRED_UPSTREAMS = ["context:8080", "mcp:8080", "web:8080"] as const;
 
 export function parseCaddyfile(text: string): CaddyHook {
   const reverseProxies: CaddyReverseProxy[] = [];

@@ -12,7 +12,12 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*",
+    "@confenge/control-center-today-ui": "*"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",

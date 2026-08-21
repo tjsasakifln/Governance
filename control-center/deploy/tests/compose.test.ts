@@ -23,7 +23,9 @@ test("shipped compose names the Control Center project, postgres volume, health+
   assert.ok(inspected.services.includes("postgres"));
   assert.ok(inspected.services.includes("context"));
   assert.ok(inspected.services.includes("mcp"));
-  assert.ok(inspected.services.includes("web-shell"));
+  assert.ok(inspected.services.includes("web"));
+  assert.ok(inspected.services.includes("collector"));
+  assert.ok(inspected.services.includes("authelia"));
   assert.ok(inspected.services.includes("caddy"));
   assert.ok(inspected.services.includes("backup-ops"));
 
@@ -35,7 +37,7 @@ test("shipped compose names the Control Center project, postgres volume, health+
   assert.ok(healthcheckText(postgres).includes("pg_isready"));
   assert.equal(postgres.build?.dockerfile, "docker/postgres.Dockerfile");
 
-  for (const name of ["context", "mcp", "web-shell"] as const) {
+  for (const name of ["context", "mcp", "web", "collector"] as const) {
     const svc = requireService(doc, name);
     assert.equal(svc.restart, "unless-stopped");
     assert.ok(hasResourceLimits(svc));
@@ -43,8 +45,13 @@ test("shipped compose names the Control Center project, postgres volume, health+
     const hc = healthcheckText(svc);
     assert.ok(hc.includes("/healthz"), `${name} healthcheck must include /healthz`);
     assert.ok(hc.includes("/ready"), `${name} healthcheck must include /ready`);
-    assert.equal(svc.build?.dockerfile, "docker/stub.Dockerfile");
+    assert.notEqual(svc.build?.dockerfile, "docker/stub.Dockerfile");
+    assert.notEqual(svc.image, "confenge-control-center-stub:local");
   }
+  assert.equal(requireService(doc, "context").build?.dockerfile, "services/context/Dockerfile");
+  assert.equal(requireService(doc, "mcp").build?.dockerfile, "services/mcp/Dockerfile");
+  assert.equal(requireService(doc, "collector").build?.dockerfile, "connectors/runner/Dockerfile");
+  assert.equal(requireService(doc, "web").build?.dockerfile, "apps/web-shell/Dockerfile");
 
   const caddy = requireService(doc, "caddy");
   assert.equal(caddy.restart, "unless-stopped");

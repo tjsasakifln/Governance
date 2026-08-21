@@ -166,7 +166,7 @@ export async function executeTool(
         directives,
         source: directives[0]?.source ?? "control-center.stub.fixtures",
         observed_at: directives[0]?.observed_at ?? new Date().toISOString(),
-        freshness_status: directives[0]?.freshness_status ?? "unknown",
+        freshness_status: directives[0]?.freshness_status ?? "UNKNOWN",
         confidence: directives[0]?.confidence,
       };
     }

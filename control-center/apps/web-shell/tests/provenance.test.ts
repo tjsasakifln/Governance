@@ -9,6 +9,7 @@ import { FRESHNESS_STATUSES } from "../src/types";
 test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation model", () => {
   for (const status of FRESHNESS_STATUSES) {
     const fixture = FRESHNESS_SAMPLES[status];
+    assert.ok(fixture);
     const presentation = mapProvenance(fixture);
     assert.equal(presentation.freshnessStatus, status);
     assert.equal(presentation.sourceSystem, fixture.source.system);
@@ -26,10 +27,10 @@ test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation 
     assert.equal(roundTrip.freshness_status, fixture.freshness_status);
     assert.equal(roundTrip.confidence, fixture.confidence);
   }
-  assert.equal(FRESHNESS_SAMPLES.STALE.freshness_status, "STALE");
-  assert.equal(FRESHNESS_SAMPLES.FRESH.freshness_status, "FRESH");
-  assert.equal(FRESHNESS_SAMPLES.ERROR.freshness_status, "ERROR");
-  assert.equal(FRESHNESS_SAMPLES.UNKNOWN.freshness_status, "UNKNOWN");
+  assert.equal(FRESHNESS_SAMPLES.STALE?.freshness_status, "STALE");
+  assert.equal(FRESHNESS_SAMPLES.FRESH?.freshness_status, "FRESH");
+  assert.equal(FRESHNESS_SAMPLES.ERROR?.freshness_status, "ERROR");
+  assert.equal(FRESHNESS_SAMPLES.UNKNOWN?.freshness_status, "UNKNOWN");
 });
 
 test("finance money formats integer cents plus currency", () => {

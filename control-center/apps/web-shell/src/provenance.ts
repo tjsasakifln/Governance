@@ -26,7 +26,7 @@ const FRESHNESS_LABELS: Record<FreshnessStatus, string> = {
 };
 
 export function freshnessLabel(status: FreshnessStatus): string {
-  return FRESHNESS_LABELS[status];
+  return FRESHNESS_LABELS[status] ?? status;
 }
 
 export function isFreshnessStatus(value: string): value is FreshnessStatus {

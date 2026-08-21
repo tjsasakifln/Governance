@@ -44,15 +44,22 @@ function boot(): void {
     CONTROL_CENTER_FOUNDER_ACTOR_ID: readMeta("cc-founder-actor-id"),
     CC_ACTOR_ID: readMeta("cc-actor-id"),
     CC_ACTOR_ROLE: readMeta("cc-actor-role"),
-    CC_USE_MOCK_IDENTITY: readMeta("cc-use-mock-identity") || "1",
+    CC_USE_MOCK_IDENTITY: readMeta("cc-use-mock-identity") || "0",
   };
 
-  const service = createLiveClockService(env);
-  const session = { service, ui: initialUiState(service) };
-  mount(root, session);
-  if (typeof window !== "undefined") {
+  const contextUrl = readMeta("cc-context-url");
+  const useMock = readMeta("cc-use-mock") === "1" || !contextUrl;
+  if (useMock) {
+    const service = createLiveClockService(env);
+    mount(root, { service, ui: initialUiState(service) });
     window.__CC_DIRECTIVES_UI__ = { mounted: true };
+    return;
   }
+  void import("./http.ts").then(async ({ createHttpDirectiveService }) => {
+    const service = await createHttpDirectiveService(contextUrl, env);
+    mount(root, { service, ui: initialUiState(service) });
+    window.__CC_DIRECTIVES_UI__ = { mounted: true };
+  });
 }
 
 if (typeof document !== "undefined") {

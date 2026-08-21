@@ -65,6 +65,8 @@ export const provenanceSchema = z.object({
 });
 
 export const createDirectiveInputSchema = provenanceSchema.extend({
+  id: resourceIdSchema.optional(),
+  revisionId: resourceIdSchema.optional(),
   kind: z.enum(DIRECTIVE_KINDS),
   scope: scopeSchema,
   status: z.enum(DIRECTIVE_STATUSES).optional().default('active'),

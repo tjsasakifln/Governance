@@ -30,8 +30,8 @@ export interface ValidateReport {
   summary: string;
 }
 
-const STUB_SERVICES = ["context", "mcp", "web-shell"] as const;
-const ALWAYS_ON = ["postgres", "context", "mcp", "web-shell", "caddy"] as const;
+const APP_SERVICES = ["context", "mcp", "collector", "web"] as const;
+const ALWAYS_ON = ["postgres", "context", "mcp", "collector", "web", "caddy"] as const;
 
 function truthy(raw: string | undefined): boolean {
   if (raw === undefined) {
@@ -84,7 +84,7 @@ export function assertComposeInvariants(doc: ReturnType<typeof loadCompose>["doc
   if (!pg.includes("pg_isready")) {
     failClosed("postgres healthcheck must use pg_isready");
   }
-  for (const name of STUB_SERVICES) {
+  for (const name of APP_SERVICES) {
     const hc = healthcheckText(requireService(doc, name));
     if (!hc.includes("/healthz") || !hc.includes("/ready")) {
       failClosed(`service ${name} healthcheck must probe /healthz and /ready`);

@@ -20,6 +20,9 @@
     "page": "tsx src/cli.ts page",
     "generate-public": "tsx src/cli.ts generate-public"
   },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
   "devDependencies": {
     "@types/node": "^22.18.0",
     "tsx": "^4.20.5",

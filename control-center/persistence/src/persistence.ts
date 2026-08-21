@@ -8,6 +8,7 @@ import {
 } from './migrate.js';
 import {
   listAgentActivitiesByScope,
+  listAllAgentActivities,
   recordAgentActivity,
 } from './repositories/agent-activities.js';
 import { endAgentSession, listAgentSessionsByScope, startAgentSession } from './repositories/agent-sessions.js';
@@ -23,6 +24,8 @@ import {
   createDirective,
   getDirective,
   getRevision,
+  listAllCurrentDirectives,
+  listAllRevisions,
   listCurrentDirectivesByScope,
   listRevisionsByScope,
   supersedeDirective,
@@ -79,6 +82,14 @@ export class Persistence {
 
   async listCurrentDirectivesByScope(scope: string) {
     return withTransaction(this.pool, (tx) => listCurrentDirectivesByScope(tx, scope));
+  }
+
+  async listAllCurrentDirectives() {
+    return withTransaction(this.pool, (tx) => listAllCurrentDirectives(tx));
+  }
+
+  async listAllRevisions() {
+    return withTransaction(this.pool, (tx) => listAllRevisions(tx));
   }
 
   async listRevisionsByScope(scope: string, directiveId: string) {
@@ -151,6 +162,10 @@ export class Persistence {
 
   async listAgentActivitiesByScope(scope: string) {
     return withTransaction(this.pool, (tx) => listAgentActivitiesByScope(tx, scope));
+  }
+
+  async listAllAgentActivities() {
+    return withTransaction(this.pool, (tx) => listAllAgentActivities(tx));
   }
 
   async appendAuditEvent(input: AppendAuditEventInput) {

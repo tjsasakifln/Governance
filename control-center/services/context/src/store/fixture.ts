@@ -1,4 +1,10 @@
-import type { AuditEvent, DirectiveProposal, DirectiveRecord, Provenance } from "../types.ts";
+import type {
+  AgentActivityRecord,
+  AuditEvent,
+  DirectiveProposal,
+  DirectiveRecord,
+  Provenance,
+} from "../types.ts";
 import type { PersistencePort } from "./adapter.ts";
 
 function cloneProvenance(provenance: Provenance): Provenance {
@@ -40,6 +46,7 @@ export function createFixtureStore(): PersistencePort {
   const current = new Map<string, string>();
   const audits: AuditEvent[] = [];
   const proposals = new Map<string, DirectiveProposal>();
+  const activities: AgentActivityRecord[] = [];
 
   return {
     insertRevision(record: DirectiveRecord): void {
@@ -110,6 +117,28 @@ export function createFixtureStore(): PersistencePort {
         throw new Error(`unknown proposal ${record.id}`);
       }
       proposals.set(record.id, cloneProposal(record));
+    },
+    recordAgentActivity(record: AgentActivityRecord): void {
+      const idx = activities.findIndex((row) => row.correlation_id === record.correlation_id);
+      const cloned: AgentActivityRecord = {
+        ...record,
+        payload: { ...record.payload },
+        actor: { ...record.actor },
+        provenance: cloneProvenance(record.provenance),
+      };
+      if (idx >= 0) {
+        activities[idx] = cloned;
+      } else {
+        activities.push(cloned);
+      }
+    },
+    listAgentActivities(): AgentActivityRecord[] {
+      return activities.map((row) => ({
+        ...row,
+        payload: { ...row.payload },
+        actor: { ...row.actor },
+        provenance: cloneProvenance(row.provenance),
+      }));
     },
   };
 }

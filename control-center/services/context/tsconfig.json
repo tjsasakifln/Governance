@@ -10,7 +10,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "useUnknownInCatchVariables": true,
     "skipLibCheck": true,
     "declaration": true,

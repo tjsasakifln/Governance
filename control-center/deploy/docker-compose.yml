@@ -2,13 +2,7 @@
 # Project: confenge-control-center
 # This file does NOT apply itself to production. Do not bind host 80/443:
 # Warmbly continues to use the existing host nginx on those ports.
-# Sibling services (context, MCP, web-shell, persistence) are not in this
-# tree yet. Stubs satisfy health/readiness. Later convergence replaces
-# build contexts, for example:
-#   context:   ../services/context
-#   mcp:       ../services/mcp
-#   web-shell: ../apps/web-shell
-# Persistence applies migrations into schema control_center on `postgres`.
+# Runtime: context, mcp, collector, web, postgres, authelia, caddy gateway.
 # No Kubernetes. No Swarm. No production apply from this wave.
 
 name: confenge-control-center
@@ -19,20 +13,16 @@ x-logging: &cc-logging
     max-size: "10m"
     max-file: "5"
 
-x-stub-base: &stub-base
-  build:
-    context: .
-    dockerfile: docker/stub.Dockerfile
-  image: confenge-control-center-stub:local
+x-app-base: &app-base
   restart: unless-stopped
   logging: *cc-logging
-  mem_limit: 256m
-  cpus: 0.50
+  mem_limit: 512m
+  cpus: 0.75
   deploy:
     resources:
       limits:
-        cpus: "0.50"
-        memory: 256M
+        cpus: "0.75"
+        memory: 512M
       reservations:
         cpus: "0.10"
         memory: 64M
@@ -40,12 +30,6 @@ x-stub-base: &stub-base
     - ccnet
   expose:
     - "8080"
-  healthcheck:
-    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
-    interval: 10s
-    timeout: 3s
-    retries: 5
-    start_period: 8s
   security_opt:
     - no-new-privileges:true
 
@@ -95,37 +79,118 @@ services:
       - no-new-privileges:true
 
   context:
-    <<: *stub-base
+    <<: *app-base
+    build:
+      context: ..
+      dockerfile: services/context/Dockerfile
+    image: confenge-control-center-context:local
     environment:
-      CONTROL_CENTER_STUB_SERVICE: context
       HOST: 0.0.0.0
       PORT: "8080"
-      STUB_READY: "${STUB_READY:-true}"
+      NODE_ENV: production
+      DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:-postgres://control_center@postgres:5432/control_center}"
+      CONTROL_CENTER_FOUNDER_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
+      CONTROL_CENTER_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
 
   mcp:
-    <<: *stub-base
+    <<: *app-base
+    build:
+      context: ..
+      dockerfile: services/mcp/Dockerfile
+    image: confenge-control-center-mcp:local
     environment:
-      CONTROL_CENTER_STUB_SERVICE: mcp
       HOST: 0.0.0.0
-      PORT: "8080"
-      STUB_READY: "${STUB_READY:-true}"
+      CONFENGE_MCP_HTTP_HOST: 0.0.0.0
+      CONFENGE_MCP_HTTP_PORT: "8080"
+      NODE_ENV: production
+      CONTROL_CENTER_CONTEXT_URL: "http://context:8080"
+      CONFENGE_MCP_AUTH_TOKEN: "${CONFENGE_MCP_AUTH_TOKEN:?CONFENGE_MCP_AUTH_TOKEN must be set from a secret store}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 12s
     depends_on:
       context:
         condition: service_healthy
 
-  web-shell:
-    <<: *stub-base
+  collector:
+    <<: *app-base
+    build:
+      context: ..
+      dockerfile: connectors/runner/Dockerfile
+    image: confenge-control-center-collector:local
     environment:
-      CONTROL_CENTER_STUB_SERVICE: web-shell
       HOST: 0.0.0.0
       PORT: "8080"
-      STUB_READY: "${STUB_READY:-true}"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 12s
     depends_on:
       context:
         condition: service_healthy
+
+  web:
+    <<: *app-base
+    build:
+      context: ..
+      dockerfile: apps/web-shell/Dockerfile
+    image: confenge-control-center-web:local
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 8s
+    depends_on:
+      context:
+        condition: service_healthy
+
+  authelia:
+    image: authelia/authelia:4.39
+    restart: unless-stopped
+    logging: *cc-logging
+    mem_limit: 256m
+    cpus: 0.50
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    expose:
+      - "9091"
+    volumes:
+      - ../security/examples/valid/authelia:/config:ro
+    networks:
+      - ccnet
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9091/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
 
   caddy:
     build:
@@ -168,7 +233,7 @@ services:
         condition: service_healthy
       mcp:
         condition: service_healthy
-      web-shell:
+      web:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:18080/healthz && wget -qO- http://127.0.0.1:18080/ready"]

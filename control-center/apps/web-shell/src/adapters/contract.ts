@@ -67,12 +67,12 @@ export type AdapterReadResult =
  * interface and is not consumed here.
  */
 export interface ControlCenterReadAdapter {
-  readonly mode: "mock";
+  readonly mode: "mock" | "http";
   readonly actions: readonly AdapterAction[];
   readOperator(): ActorRef;
-  readDestination(id: DestinationId): AdapterReadResult;
-  readAttention(): AttentionItem[];
-  readPriorities(): PriorityRecommendation[];
+  readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
+  readAttention(): AttentionItem[] | Promise<AttentionItem[]>;
+  readPriorities(): PriorityRecommendation[] | Promise<PriorityRecommendation[]>;
 }
 
 export function adapterAllows(action: string): action is AdapterAction {

@@ -3,6 +3,7 @@ import { createLogger } from "./logging.js";
 import { serveHttp } from "./http.js";
 import { createMcpRuntime, loadAuthTokenFromEnv, loadRateLimitFromEnv } from "./server.js";
 import { serveStdio } from "./stdio.js";
+import { createContextApiFromEnv } from "./context-http.js";
 import { createStubContextApi } from "./stub-adapter.js";
 
 async function main(): Promise<void> {
@@ -14,8 +15,18 @@ async function main(): Promise<void> {
     });
   }
 
+  let context;
+  try {
+    context = createContextApiFromEnv(process.env, createStubContextApi);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "context api misconfigured";
+    logger.error("mcp.boot_fail_closed", { reason: message });
+    process.exitCode = 1;
+    return;
+  }
+
   const runtime = createMcpRuntime({
-    context: createStubContextApi(),
+    context,
     authToken,
     logger,
     rateLimit: loadRateLimitFromEnv(),

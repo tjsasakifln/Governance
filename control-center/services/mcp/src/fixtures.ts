@@ -29,7 +29,7 @@ function prov(
   return {
     source: extra?.source ?? SOURCE,
     observed_at: extra?.observed_at ?? OBSERVED,
-    freshness_status: extra?.freshness_status ?? ("fresh" as const),
+    freshness_status: extra?.freshness_status ?? ("FRESH" as const),
     confidence: extra?.confidence ?? 0.9,
   };
 }
@@ -76,7 +76,7 @@ export const exceptions: ExceptionRecord[] = [
     body: "Missing founder-approved legal packet freshness.",
     scope: "ops.commercial",
     severity: "high",
-    ...prov({ freshness_status: "stale", confidence: 0.8 }),
+    ...prov({ freshness_status: "STALE", confidence: 0.8 }),
   },
   {
     id: "exc-2",
@@ -119,7 +119,7 @@ export const contextRecords: ContextRecord[] = [
     title: "Finance observation only",
     body: `${MARKERS.finance}: Asaas is the payment provider; MCP tools must not charge, refund, checkout, or cancel. Open Diagnóstico receivable is 150000 cents BRL.`,
     scope: "ops.finance",
-    ...prov({ source: "finance.ledger.read-model", freshness_status: "stale", confidence: 0.7 }),
+    ...prov({ source: "finance.ledger.read-model", freshness_status: "STALE", confidence: 0.7 }),
   },
 ];
 
@@ -269,10 +269,10 @@ export const clients: Record<string, ClientContext> = {
         title: "ACME onboarding",
         body: `${MARKERS.acme}: legal packet stale; commercial send blocked by active directive dir-comm-1.`,
         scope: "client.acme-ltda",
-        ...prov({ source: "warmbly.crm.read-model", freshness_status: "stale", confidence: 0.81 }),
+        ...prov({ source: "warmbly.crm.read-model", freshness_status: "STALE", confidence: 0.81 }),
       },
     ],
-    ...prov({ source: "warmbly.crm.read-model", freshness_status: "stale", confidence: 0.81 }),
+    ...prov({ source: "warmbly.crm.read-model", freshness_status: "STALE", confidence: 0.81 }),
   },
   "beta-industria": {
     client: "beta-industria",

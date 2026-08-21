@@ -11,3 +11,4 @@ export {
   type ForbiddenAdapterAction,
 } from "./contract";
 export { MockControlCenterAdapter, createMockAdapter, type MockScenario } from "./mock";
+export { HttpControlCenterAdapter, createHttpAdapter, createProductionAdapter } from "./http";

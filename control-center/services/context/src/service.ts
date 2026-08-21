@@ -8,6 +8,7 @@ import { parseScope, scopeVisibleUnderQuery, type RepoDomainMap } from "./scope.
 import type { PersistencePort } from "./store/adapter.ts";
 import type {
   ActorRef,
+  AgentActivityRecord,
   AuditEvent,
   ContextPayload,
   CreateDirectiveInput,
@@ -47,6 +48,10 @@ export interface ContextService {
   getPriorities(actor: ActorRef, scope?: Scope): DirectiveView[];
   getDecisions(actor: ActorRef, scope?: Scope): DirectiveView[];
   listAudit(actor: ActorRef): AuditEvent[];
+  recordAgentActivity(actor: ActorRef, raw: unknown): AgentActivityRecord;
+  listAgentActivities(actor: ActorRef, scope?: Scope): AgentActivityRecord[];
+  flush(): Promise<void>;
+  ready(): Promise<boolean>;
 }
 
 function provenanceFromInput(input: {
@@ -468,9 +473,11 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
       const query = parseScope(scope);
       const active = visibleActive(query);
       const parts = partitionByKind(active);
+      const views = viewsOf(active);
+      const first = views[0];
       return {
         scope: query,
-        active_directives: viewsOf(active),
+        active_directives: views,
         decisions: viewsOf(parts.decisions),
         facts: viewsOf(parts.facts),
         constraints: viewsOf(parts.constraints),
@@ -478,6 +485,14 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
         risks: viewsOf(parts.risks),
         directives: viewsOf(parts.directives),
         hypotheses: viewsOf(parts.hypotheses),
+        source: first?.source ?? {
+          system: "control-center",
+          kind: "context",
+          locator: query,
+        },
+        observed_at: first?.observed_at ?? toUtcIso(deps.clock.now()),
+        freshness_status: first?.freshness_status ?? "UNKNOWN",
+        confidence: first?.confidence ?? 0,
       };
     },
 
@@ -501,6 +516,97 @@ export function createContextService(deps: ContextServiceDeps): ContextService {
     listAudit(actor: ActorRef): AuditEvent[] {
       assertFounder(actor, founderActorId);
       return deps.store.listAudit();
+    },
+
+    recordAgentActivity(actor: ActorRef, raw: unknown): AgentActivityRecord {
+      assertReadable(actor, founderActorId);
+      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+        throw invalid("agent activity body must be an object");
+      }
+      const body = raw as Record<string, unknown>;
+      const scope = parseScope(typeof body.scope === "string" ? body.scope : "");
+      const kind = body.kind === "blocker" ? "blocker" : "session_result";
+      const summary = typeof body.summary === "string" ? body.summary : "";
+      if (!summary.trim()) {
+        throw invalid("summary is required");
+      }
+      const outcome = typeof body.outcome === "string" ? body.outcome : "completed";
+      const status =
+        outcome === "blocked" || kind === "blocker"
+          ? "blocked"
+          : outcome === "failed"
+            ? "failed"
+            : outcome === "partial"
+              ? "partial"
+              : "done";
+      const correlation =
+        typeof body.session_id === "string" && body.session_id.trim()
+          ? body.session_id.trim()
+          : typeof body.correlation_id === "string" && body.correlation_id.trim()
+            ? body.correlation_id.trim()
+            : deps.ids.next("agent-activity");
+      const existing = deps.store
+        .listAgentActivities()
+        .find((row) => row.correlation_id === correlation);
+      const now = toUtcIso(deps.clock.now());
+      const record: AgentActivityRecord = {
+        id: existing?.id ?? deps.ids.next("agent-activity"),
+        correlation_id: correlation,
+        agent_id: actor.id,
+        scope,
+        status,
+        goal: typeof body.goal === "string" ? body.goal : summary,
+        summary,
+        started_at: existing?.started_at ?? now,
+        finished_at: now,
+        kind,
+        payload: {
+          outcome,
+          notes: typeof body.notes === "string" ? body.notes : null,
+          severity: typeof body.severity === "string" ? body.severity : null,
+          blocking: body.blocking === true,
+        },
+        provenance: {
+          source: {
+            system: "control-center",
+            kind: "mcp-agent-report",
+            locator: correlation,
+          },
+          observed_at: now,
+          freshness_status: "FRESH",
+          confidence: 1,
+        },
+        actor: { kind: actor.kind, id: actor.id },
+      };
+      deps.store.recordAgentActivity(record);
+      writeAudit(actor, "agent_activity.record", "agent_activity", record.id, null, {
+        kind: record.kind,
+        status: record.status,
+      });
+      return record;
+    },
+
+    listAgentActivities(actor: ActorRef, scope?: Scope): AgentActivityRecord[] {
+      assertReadable(actor, founderActorId);
+      const rows = deps.store.listAgentActivities();
+      if (!scope) {
+        return rows;
+      }
+      const query = parseScope(scope);
+      return rows.filter((row) => scopeVisibleUnderQuery(row.scope, query, deps.repoDomains));
+    },
+
+    async flush() {
+      if (deps.store.flush) {
+        await deps.store.flush();
+      }
+    },
+
+    async ready() {
+      if (deps.store.readyCheck) {
+        return deps.store.readyCheck();
+      }
+      return true;
     },
   };
 }

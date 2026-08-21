@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { bootFromEnv } from "./boot.ts";
+import { bootFromEnvAsync } from "./boot.ts";
 import { createRequestListener } from "./http.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { isServiceError } from "./errors.ts";
@@ -21,12 +21,12 @@ function listenHost(env: NodeJS.ProcessEnv): string {
   return host;
 }
 
-export function startServer(
+export async function startServer(
   env: NodeJS.ProcessEnv = process.env,
   opts?: { logger?: Logger },
 ): Promise<{ server: ReturnType<typeof createServer>; host: string; port: number }> {
   const logger = opts?.logger ?? createLogger();
-  const boot = bootFromEnv(env, { logger });
+  const boot = await bootFromEnvAsync(env, { logger });
   const host = listenHost(env);
   const port = listenPort(env);
   const listener = createRequestListener({ service: boot.service, logger });

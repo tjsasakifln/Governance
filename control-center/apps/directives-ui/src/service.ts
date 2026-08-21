@@ -26,7 +26,7 @@ import type {
  * `control-center/services/context` while keeping the same method names.
  */
 export interface DirectiveMemoryPort {
-  readonly mode: "mock";
+  readonly mode: "mock" | "http";
   list(filter?: DirectiveFilter): Directive[];
   get(id: ResourceId): Directive | undefined;
   create(input: CreateDirectiveInput): Directive;
@@ -37,6 +37,8 @@ export interface DirectiveMemoryPort {
   };
   preview(scope: string): AgentScopePreview;
   identity(): SessionIdentity;
+  newDraft(): CreateDraft;
+  refusesForbiddenMutation(action: string): boolean;
 }
 
 export interface ServiceOptions {

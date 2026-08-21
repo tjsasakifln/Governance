@@ -1,4 +1,6 @@
-export const FRESHNESS_STATUSES = ["fresh", "stale", "unknown", "degraded"] as const;
+import { FRESHNESS_STATUSES as CONTRACTS_FRESHNESS } from "@confenge/control-center-contracts";
+
+export const FRESHNESS_STATUSES = CONTRACTS_FRESHNESS;
 export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
 
 export const DIRECTIVE_KINDS = [

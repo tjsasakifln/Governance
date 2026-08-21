@@ -9,7 +9,7 @@ test("shipped Caddyfile reverse_proxies Control Center services and documents au
   const upstreams = hook.reverseProxies.map((p) => p.upstream);
   assert.ok(upstreams.includes("context:8080"));
   assert.ok(upstreams.includes("mcp:8080"));
-  assert.ok(upstreams.includes("web-shell:8080"));
+  assert.ok(upstreams.includes("web:8080"));
   const paths = hook.reverseProxies.map((p) => p.path);
   assert.ok(paths.includes("/healthz"));
   assert.ok(paths.includes("/ready"));
@@ -19,7 +19,7 @@ test("shipped Caddyfile reverse_proxies Control Center services and documents au
   assert.ok(hook.jsonLogs);
   assert.match(text, /reverse_proxy context:8080/);
   assert.match(text, /reverse_proxy mcp:8080/);
-  assert.match(text, /reverse_proxy web-shell:8080/);
+  assert.match(text, /reverse_proxy web:8080/);
   assert.match(text, /automatic HTTPS/i);
   assert.match(text, /ACME/);
   assert.doesNotMatch(text, /^\s*:\s*80\s*\{/m);

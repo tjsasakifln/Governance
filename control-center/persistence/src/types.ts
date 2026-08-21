@@ -179,6 +179,8 @@ export type AuditEvent = {
 } & Provenance;
 
 export type CreateDirectiveInput = {
+  id?: string;
+  revisionId?: string;
   kind: DirectiveKind;
   scope: string;
   status?: DirectiveStatus;

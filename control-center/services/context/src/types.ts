@@ -118,6 +118,28 @@ export interface ContextPayload {
   risks: DirectiveView[];
   directives: DirectiveView[];
   hypotheses: DirectiveView[];
+  source: SourceRef;
+  observed_at: string;
+  freshness_status: FreshnessStatus;
+  confidence: number;
+}
+
+export type AgentActivityKind = "session_result" | "blocker";
+
+export interface AgentActivityRecord {
+  id: ResourceId;
+  correlation_id: string;
+  agent_id: string;
+  scope: Scope;
+  status: "running" | "done" | "partial" | "blocked" | "failed";
+  goal: string;
+  summary: string;
+  started_at: string;
+  finished_at: string | null;
+  kind: AgentActivityKind;
+  payload: Record<string, unknown>;
+  provenance: Provenance;
+  actor: ActorRef;
 }
 
 export interface AuditEvent {
@@ -125,7 +147,7 @@ export interface AuditEvent {
   at: string;
   actor: ActorRef;
   action: string;
-  entity_type: "directive" | "proposal";
+  entity_type: "directive" | "proposal" | "agent_activity";
   entity_id: ResourceId;
   revision_id: ResourceId | null;
   metadata: Record<string, string | number | boolean | null>;

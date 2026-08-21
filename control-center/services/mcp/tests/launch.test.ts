@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,9 @@ import { PROMPT_NAMES, RESOURCE_URIS } from "../src/types.js";
 import { PROTOCOL_VERSION, TEST_TOKEN, errorData, isRecord, toolPayload } from "./helpers.js";
 
 const root = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-const tsxCli = path.join(root, "node_modules/tsx/dist/cli.mjs");
+const require = createRequire(import.meta.url);
+const tsxRoot = path.dirname(require.resolve("tsx/package.json"));
+const tsxCli = path.join(tsxRoot, "dist/cli.mjs");
 const entry = path.join(root, "src/index.ts");
 
 describe("real entry point against fixtures", () => {

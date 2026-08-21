@@ -19,6 +19,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@confenge/control-center-contracts": "*",
     "yaml": "^2.8.1"
   },
   "devDependencies": {

@@ -27,6 +27,7 @@ export interface ShellModel {
   viewKind: ViewKind;
   view: ViewState<DestinationPage>;
   mockScenario: string;
+  adapterMode?: "mock" | "http";
 }
 
 function provenanceBlock(provenance: Provenance): string {
@@ -301,7 +302,7 @@ export function renderShell(model: ShellModel): string {
     <div class="shell" data-destination="${escapeHtml(model.destination)}" data-view-state="${escapeHtml(model.viewKind)}">
       <header class="topbar">
         <p class="brand">Control Center</p>
-        <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)} · modo mock</p>
+        <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
       </header>
       <nav class="nav" aria-label="Áreas do Control Center">
         ${nav}
@@ -311,7 +312,7 @@ export function renderShell(model: ShellModel): string {
           <h1>${escapeHtml(label)}</h1>
           <p>${escapeHtml(headline)}</p>
         </header>
-        ${mockLab(model.destination, model.viewKind)}
+        ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}
         ${body}
       </main>

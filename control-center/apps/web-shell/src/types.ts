@@ -1,40 +1,35 @@
-/**
- * Local copies of Control Center v1 field names.
- * Canonical JSON Schema lives in the contracts workstream
- * (`control-center/contracts`). This shell MUST NOT import that package
- * until the convergence campaign. Keep names in lockstep:
- * source, observed_at, freshness_status, confidence, cents+currency,
- * directive kinds, freshness FRESH|STALE|UNKNOWN|ERROR.
- */
+import type {
+  ActorKind,
+  DirectiveKind,
+  DirectiveStatus,
+  FreshnessStatus,
+} from "@confenge/control-center-contracts/taxonomy";
+import {
+  ACTOR_KINDS,
+  DIRECTIVE_KINDS,
+  DIRECTIVE_STATUSES,
+  FRESHNESS_STATUSES,
+} from "@confenge/control-center-contracts/taxonomy";
+import type {
+  ActorRef,
+  ResourceId,
+  Scope,
+  SourceRef,
+  UtcDateTime,
+} from "@confenge/control-center-contracts/types";
 
-export type UtcDateTime = string;
-
-export type ResourceId = string;
-
-export type Scope = string;
-
-export const FRESHNESS_STATUSES = ["FRESH", "STALE", "UNKNOWN", "ERROR"] as const;
-export type FreshnessStatus = (typeof FRESHNESS_STATUSES)[number];
-
-export const DIRECTIVE_KINDS = [
-  "decision",
-  "directive",
-  "fact",
-  "constraint",
-  "priority",
-  "risk",
-  "hypothesis",
-] as const;
-export type DirectiveKind = (typeof DIRECTIVE_KINDS)[number];
-
-export const DIRECTIVE_STATUSES = [
-  "draft",
-  "active",
-  "superseded",
-  "revoked",
-  "expired",
-] as const;
-export type DirectiveStatus = (typeof DIRECTIVE_STATUSES)[number];
+export type {
+  ActorKind,
+  ActorRef,
+  DirectiveKind,
+  DirectiveStatus,
+  FreshnessStatus,
+  ResourceId,
+  Scope,
+  SourceRef,
+  UtcDateTime,
+};
+export { ACTOR_KINDS, DIRECTIVE_KINDS, DIRECTIVE_STATUSES, FRESHNESS_STATUSES };
 
 export const ATTENTION_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
@@ -65,22 +60,6 @@ export type ClientLifecycle = (typeof CLIENT_LIFECYCLES)[number];
 
 export const HEALTH_STATUSES = ["healthy", "degraded", "down", "unknown"] as const;
 export type HealthStatus = (typeof HEALTH_STATUSES)[number];
-
-export const ACTOR_KINDS = ["human", "agent", "system"] as const;
-export type ActorKind = (typeof ACTOR_KINDS)[number];
-
-export interface SourceRef {
-  system: string;
-  kind: string;
-  locator: string;
-  label?: string;
-}
-
-export interface ActorRef {
-  kind: ActorKind;
-  id: string;
-  display_name?: string;
-}
 
 export interface Money {
   amount_cents: number;

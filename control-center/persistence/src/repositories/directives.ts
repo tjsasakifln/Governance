@@ -204,8 +204,8 @@ export async function createDirective(tx: PoolClient, raw: CreateDirectiveInput)
   if (input.expiresAt && input.expiresAt <= input.effectiveFrom) {
     throw new ValidationError('expiresAt must be after effectiveFrom');
   }
-  const directiveId = generatePublicId('directive');
-  const revisionId = generatePublicId('directive-revision');
+  const directiveId = input.id ?? generatePublicId('directive');
+  const revisionId = input.revisionId ?? generatePublicId('directive-revision');
   const recordedBy = input.recordedBy ?? input.createdBy;
   const status = input.status;
   const supersedes = input.supersedes ?? [];
@@ -417,6 +417,24 @@ export async function listCurrentDirectivesByScope(
     [parsed.scope],
   );
   return result.rows.map((row) => mapCurrentDirective(row as CurrentDirectiveRow));
+}
+
+export async function listAllCurrentDirectives(tx: PoolClient): Promise<CurrentDirective[]> {
+  const result = await tx.query(
+    `SELECT ${CURRENT_COLUMNS}
+     FROM control_center.current_directives
+     ORDER BY effective_from DESC, directive_id ASC`,
+  );
+  return result.rows.map((row) => mapCurrentDirective(row as CurrentDirectiveRow));
+}
+
+export async function listAllRevisions(tx: PoolClient): Promise<DirectiveRevision[]> {
+  const result = await tx.query(
+    `SELECT ${REVISION_COLUMNS}
+     FROM control_center.directive_revisions
+     ORDER BY directive_id ASC, revision_no ASC`,
+  );
+  return result.rows.map((row) => mapRevision(row as DirectiveRevisionRow));
 }
 
 export async function listRevisionsByScope(

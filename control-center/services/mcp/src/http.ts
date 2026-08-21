@@ -16,6 +16,10 @@ export function serveHttp(
       json(res, 200, { ok: true, service: "confenge-control-center-mcp" });
       return;
     }
+    if (req.method === "GET" && req.url === "/ready") {
+      json(res, 200, { ready: true, service: "confenge-control-center-mcp" });
+      return;
+    }
     if (req.method !== "POST" || req.url !== "/mcp") {
       json(res, 404, { error: { code: "NOT_FOUND", message: "POST /mcp" } });
       return;

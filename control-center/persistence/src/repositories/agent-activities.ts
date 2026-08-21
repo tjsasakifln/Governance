@@ -166,6 +166,15 @@ export async function listAgentActivitiesByScope(tx: PoolClient, scope: string):
   return result.rows.map((row) => mapAgentActivity(row as AgentActivityRow));
 }
 
+export async function listAllAgentActivities(tx: PoolClient): Promise<AgentActivity[]> {
+  const result = await tx.query(
+    `SELECT ${ACTIVITY_COLUMNS}
+     FROM control_center.agent_activities
+     ORDER BY started_at DESC, id ASC`,
+  );
+  return result.rows.map((row) => mapAgentActivity(row as AgentActivityRow));
+}
+
 export async function countAgentActivitiesInSessionsTable(tx: PoolClient, activityId: string): Promise<number> {
   const result = await tx.query(
     `SELECT count(*)::int AS n FROM control_center.agent_sessions WHERE id = $1`,

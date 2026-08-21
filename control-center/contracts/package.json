@@ -5,7 +5,9 @@
   "description": "Canonical Control Center contracts: JSON Schema, TypeScript types, HTTP/MCP docs, fixtures, and validator. No services.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./taxonomy": "./src/taxonomy.ts",
+    "./types": "./src/types.ts"
   },
   "bin": {
     "cc-contracts-validate": "./src/cli.ts"

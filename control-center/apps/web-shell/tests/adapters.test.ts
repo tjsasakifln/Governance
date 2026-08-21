@@ -5,6 +5,7 @@ import {
   CHAT_SURFACE_ACTIONS,
   FORBIDDEN_ADAPTER_ACTIONS,
   adapterAllows,
+  createHttpAdapter,
   createMockAdapter,
   isForbiddenAdapterAction,
 } from "../src/adapters/index";
@@ -89,4 +90,55 @@ test("fixture catalog covers every freshness status", () => {
   for (const status of FRESHNESS_STATUSES) {
     assert.equal(seen.has(status), true, `missing freshness ${status}`);
   }
+});
+
+test("production HTTP adapter is not mock and maps context provenance", async () => {
+  const fetchImpl = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    assert.match(url, /\/v1\/context/);
+    return new Response(
+      JSON.stringify({
+        scope: "company",
+        active_directives: [
+          {
+            id: "cc:directive:01",
+            kind: "risk",
+            title: "Collector credentials missing",
+            body: "GitHub token absent",
+            scope: "company",
+            status: "active",
+            source: { system: "control-center", kind: "context", locator: "company" },
+            observed_at: "2026-08-20T12:00:00.000Z",
+            freshness_status: "ERROR",
+            confidence: 0,
+          },
+        ],
+        priorities: [
+          {
+            id: "cc:directive:02",
+            kind: "priority",
+            title: "Wire production adapters",
+            body: "HTTP not mock",
+            scope: "company",
+            observed_at: "2026-08-20T12:00:00.000Z",
+            freshness_status: "FRESH",
+            confidence: 1,
+            source: { system: "control-center", kind: "context", locator: "company" },
+          },
+        ],
+        source: { system: "control-center", kind: "context", locator: "company" },
+        observed_at: "2026-08-20T12:00:00.000Z",
+        freshness_status: "ERROR",
+        confidence: 0,
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as typeof fetch;
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl);
+  assert.equal(adapter.mode, "http");
+  const page = await adapter.readDestination("hoje");
+  assert.equal(page.ok, true);
+  if (!page.ok || page.loading) throw new Error("expected http page");
+  assert.equal(page.page.attention.length > 0, true);
+  assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(page.page.attention[0]?.provenance.freshness_status ?? ""));
 });

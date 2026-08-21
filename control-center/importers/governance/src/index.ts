@@ -4,6 +4,7 @@ export { contentHash } from "./hash.js";
 export { injectedGit, liveGit, resolveCommitSha, isUsableCommitSha } from "./git.js";
 export { parseArgv, runCli, helpText } from "./cli.js";
 export { refusePersistPort, recordingPersistPort } from "./persist.js";
+export { createControlCenterPersistPort } from "./cc-db.js";
 export { assertValidCandidate, assertValidResult } from "./validate.js";
 export { candidateId, idempotencyKey } from "./idempotency.js";
 export {

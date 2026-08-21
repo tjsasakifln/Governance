@@ -9,10 +9,11 @@ export { parseScope, scopeVisibleUnderQuery, expandInheritedScopes, parseRepoDom
 export { createContextService } from "./service.ts";
 export type { ContextService, ContextServiceDeps } from "./service.ts";
 export { createFixtureStore } from "./store/fixture.ts";
-export { createStoreFromEnv } from "./store/from-env.ts";
+export { createStoreFromEnv, createStoreFromEnvAsync } from "./store/from-env.ts";
+export { createPostgresStore, createPostgresStoreFromPool } from "./store/postgres.ts";
 export { ADAPTER_CONTRACT_VERSION } from "./store/adapter.ts";
 export type { PersistencePort, PersistenceAdapter } from "./store/adapter.ts";
-export { bootFromEnv, actorFromEnv } from "./boot.ts";
+export { bootFromEnv, bootFromEnvAsync, actorFromEnv } from "./boot.ts";
 export { createRequestListener } from "./http.ts";
 export { startServer } from "./server.ts";
 export { runCli } from "./cli.ts";

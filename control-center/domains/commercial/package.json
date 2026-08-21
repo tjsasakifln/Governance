@@ -19,6 +19,9 @@
     "summary": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*"
+  },
   "devDependencies": {
     "@types/node": "^22.18.0",
     "tsx": "^4.20.5",

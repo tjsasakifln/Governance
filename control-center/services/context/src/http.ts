@@ -113,6 +113,11 @@ async function handle(
       send(res, 200, { ok: true, service: "control-center-context" });
       return;
     }
+    if (method === "GET" && url.pathname === "/ready") {
+      const ready = await deps.service.ready();
+      send(res, ready ? 200 : 503, { ready, service: "control-center-context" });
+      return;
+    }
     const actor = actorFromRequest(req);
     const parts = url.pathname.split("/").filter(Boolean);
 
@@ -138,12 +143,27 @@ async function handle(
     }
     if (method === "POST" && url.pathname === "/v1/directives") {
       const body = await readBody(req);
-      send(res, 201, deps.service.createDirective(actor, body));
+      const created = deps.service.createDirective(actor, body);
+      await deps.service.flush();
+      send(res, 201, created);
+      return;
+    }
+    if (method === "POST" && url.pathname === "/v1/agent-activities") {
+      const body = await readBody(req);
+      const recorded = deps.service.recordAgentActivity(actor, body);
+      await deps.service.flush();
+      send(res, 201, recorded);
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/agent-activities") {
+      send(res, 200, { items: deps.service.listAgentActivities(actor, optionalQueryScope(url)) });
       return;
     }
     if (method === "POST" && url.pathname === "/v1/proposals") {
       const body = await readBody(req);
-      send(res, 201, deps.service.submitProposal(actor, body));
+      const created = deps.service.submitProposal(actor, body);
+      await deps.service.flush();
+      send(res, 201, created);
       return;
     }
     if (method === "GET" && url.pathname === "/v1/proposals") {
@@ -167,28 +187,40 @@ async function handle(
       const id = parts[2];
       const action = parts[3];
       if (action === "versions") {
-        send(res, 201, deps.service.createVersion(actor, id, await readBody(req)));
+        const created = deps.service.createVersion(actor, id, await readBody(req));
+        await deps.service.flush();
+        send(res, 201, created);
         return;
       }
       if (action === "supersede") {
-        send(res, 201, deps.service.supersede(actor, id, await readBody(req)));
+        const created = deps.service.supersede(actor, id, await readBody(req));
+        await deps.service.flush();
+        send(res, 201, created);
         return;
       }
       if (action === "expire") {
-        send(res, 200, deps.service.expire(actor, id, await readBody(req)));
+        const updated = deps.service.expire(actor, id, await readBody(req));
+        await deps.service.flush();
+        send(res, 200, updated);
         return;
       }
       if (action === "activate") {
-        send(res, 200, deps.service.activate(actor, id));
+        const updated = deps.service.activate(actor, id);
+        await deps.service.flush();
+        send(res, 200, updated);
         return;
       }
       if (action === "revoke") {
-        send(res, 200, deps.service.revoke(actor, id));
+        const updated = deps.service.revoke(actor, id);
+        await deps.service.flush();
+        send(res, 200, updated);
         return;
       }
     }
     if (parts[0] === "v1" && parts[1] === "proposals" && parts[2] && parts[3] === "reject" && method === "POST") {
-      send(res, 200, deps.service.rejectProposal(actor, parts[2]));
+      const updated = deps.service.rejectProposal(actor, parts[2]);
+      await deps.service.flush();
+      send(res, 200, updated);
       return;
     }
 

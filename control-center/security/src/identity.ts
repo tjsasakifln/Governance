@@ -1,3 +1,4 @@
+import type { ActorRef } from "@confenge/control-center-contracts";
 import { FORWARD_AUTH_HEADERS, REQUIRED_GROUPS } from "./constants.js";
 import { isTrustedHop } from "./hop.js";
 import type {
@@ -141,4 +142,19 @@ function headerLabel(field: "user" | "groups" | "name" | "email"): string {
 
 export function defaultTrustedHopPolicy(trustedHops: readonly string[]): TrustedHopPolicy {
   return { trustedHops, requiredGroups: REQUIRED_GROUPS };
+}
+
+export function actorRefFromIdentity(identity: ForwardAuthIdentity): ActorRef {
+  return {
+    kind: "human",
+    id: identity.user,
+    display_name: identity.name,
+  };
+}
+
+export function actorRefFromIdentityResult(result: IdentityResult): ActorRef | null {
+  if (!result.ok) {
+    return null;
+  }
+  return actorRefFromIdentity(result.identity);
 }
