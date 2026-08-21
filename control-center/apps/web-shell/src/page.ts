@@ -33,7 +33,8 @@ export function collectProvenance(page: DestinationPage): Provenance[] {
 }
 
 export function pageIsEmpty(page: DestinationPage): boolean {
-  const hojeRows = page.hoje?.sections.reduce((sum, section) => sum + section.rows.length, 0) ?? 0;
+  if (page.hoje != null && page.hoje.sections.length > 0) return false;
+  if ((page.activities?.length ?? 0) > 0) return false;
   return (
     page.attention.length === 0 &&
     page.priorities.length === 0 &&
@@ -43,9 +44,7 @@ export function pageIsEmpty(page: DestinationPage): boolean {
     (page.clients?.length ?? 0) === 0 &&
     (page.health?.length ?? 0) === 0 &&
     (page.directives?.length ?? 0) === 0 &&
-    (page.sessions?.length ?? 0) === 0 &&
-    (page.activities?.length ?? 0) === 0 &&
-    hojeRows === 0
+    (page.sessions?.length ?? 0) === 0
   );
 }
 
