@@ -6,6 +6,8 @@ import { createLogger, type Logger } from "./log.ts";
 import { REPRESENTATIVE_NOW, REPRESENTATIVE_REPO_DOMAINS, seedRepresentative } from "./representative.ts";
 import { parseRepoDomainMap, type RepoDomainMap } from "./scope.ts";
 import { createContextService, type ContextService } from "./service.ts";
+import { createOperationalPortFromEnv } from "./operational/from-env.ts";
+import { createOperationalService, type OperationalService } from "./operational/service.ts";
 import { createStoreFromEnv, createStoreFromEnvAsync } from "./store/from-env.ts";
 import type { PersistencePort } from "./store/adapter.ts";
 import { sanitizeActorId } from "./sanitize.ts";
@@ -13,6 +15,7 @@ import type { ActorRef, Scope } from "./types.ts";
 
 export interface BootResult {
   service: ContextService;
+  operational: OperationalService;
   founderActorId: string;
   defaultScope: Scope;
   fixture: string;
@@ -64,7 +67,13 @@ function assembleBoot(
     defaultScope,
     repoDomains,
   });
-  return { service, founderActorId, defaultScope, fixture, storeName, repoDomains };
+  const operational = createOperationalService({
+    port: createOperationalPortFromEnv(env),
+    clock,
+    founderActorId,
+    repoDomains,
+  });
+  return { service, operational, founderActorId, defaultScope, fixture, storeName, repoDomains };
 }
 
 export function bootFromEnv(

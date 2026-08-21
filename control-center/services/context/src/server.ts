@@ -29,7 +29,11 @@ export async function startServer(
   const boot = await bootFromEnvAsync(env, { logger });
   const host = listenHost(env);
   const port = listenPort(env);
-  const listener = createRequestListener({ service: boot.service, logger });
+  const listener = createRequestListener({
+    service: boot.service,
+    operational: boot.operational,
+    logger,
+  });
   const server = createServer(listener);
   return new Promise((resolve, reject) => {
     server.once("error", reject);
