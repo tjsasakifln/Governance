@@ -77,7 +77,7 @@ INSERT INTO control_center.collector_runs (
   'cc:collector-run:synthetic-warmbly-2026-01-01',
   'synthetic-warmbly-readonly',
   'synthetic-warmbly-readonly:2026-01-01T00:00:00Z',
-  'succeeded',
+  'DONE',
   TIMESTAMPTZ '2026-01-01 00:00:00+00',
   TIMESTAMPTZ '2026-01-01 00:00:05+00',
   'warmbly',
@@ -90,6 +90,30 @@ INSERT INTO control_center.collector_runs (
   'commercial',
   NULL,
   '{"rows": 1}'::jsonb
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO control_center.collector_run_revisions (
+  id, run_id, revision_no, status, started_at, finished_at,
+  source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence, error_code, error_message, payload, payload_ref
+) VALUES (
+  'cc:collector-run-revision:synthetic-warmbly-2026-01-01',
+  'cc:collector-run:synthetic-warmbly-2026-01-01',
+  1,
+  'DONE',
+  TIMESTAMPTZ '2026-01-01 00:00:00+00',
+  TIMESTAMPTZ '2026-01-01 00:00:05+00',
+  'warmbly',
+  'collector',
+  'synthetic-warmbly-readonly:2026-01-01',
+  NULL,
+  TIMESTAMPTZ '2026-01-01 00:00:00+00',
+  'FRESH',
+  0.9000,
+  NULL,
+  NULL,
+  '{"rows": 1}'::jsonb,
+  NULL
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO control_center.source_observations (
@@ -133,7 +157,7 @@ INSERT INTO control_center.current_source_observations (
 INSERT INTO control_center.operational_snapshots (
   id, scope, snapshot_kind, source_system, source_kind, source_locator, source_label,
   observed_at, freshness_status, confidence,
-  payload, money_amount_cents, money_currency, created_at
+  payload, money_amount_cents, money_currency, created_at, idempotency_key
 ) VALUES (
   'cc:operational-snapshot:synthetic-exceptions-brief',
   'commercial',
@@ -148,7 +172,26 @@ INSERT INTO control_center.operational_snapshots (
   '{"headline": "3 synthetic exceptions", "items": 3}'::jsonb,
   250000,
   'BRL',
-  TIMESTAMPTZ '2026-01-01 00:00:05+00'
+  TIMESTAMPTZ '2026-01-01 00:00:05+00',
+  'commercial:exceptions-brief:warmbly:collector:synthetic-warmbly-readonly:2026-01-01:2026-01-01T00:00:00.000Z'
+) ON CONFLICT DO NOTHING;
+
+INSERT INTO control_center.operational_snapshot_revisions (
+  id, snapshot_id, revision_no,
+  source_system, source_kind, source_locator, source_label,
+  observed_at, freshness_status, confidence, snapshot_json
+) VALUES (
+  'cc:operational-snapshot-revision:synthetic-exceptions-brief',
+  'cc:operational-snapshot:synthetic-exceptions-brief',
+  1,
+  'warmbly',
+  'collector',
+  'synthetic-warmbly-readonly:2026-01-01',
+  NULL,
+  TIMESTAMPTZ '2026-01-01 00:00:00+00',
+  'FRESH',
+  0.9000,
+  '{"headline": "3 synthetic exceptions", "items": 3}'::jsonb
 ) ON CONFLICT DO NOTHING;
 
 INSERT INTO control_center.attention_items (

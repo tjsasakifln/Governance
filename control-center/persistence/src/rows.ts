@@ -88,7 +88,10 @@ export type CollectorRunRow = {
   confidence: string | number;
   scope: string;
   error_code: string | null;
+  error_message: string | null;
   stats: unknown;
+  payload_ref: string | null;
+  revision_no: number;
 } & SourceColumns;
 
 export type ObservationRow = {
@@ -117,6 +120,8 @@ export type SnapshotRow = {
   money_amount_cents: string | number | null;
   money_currency: string | null;
   created_at: Date;
+  idempotency_key: string;
+  revision_no: number;
 } & SourceColumns;
 
 export type AttentionRow = {
@@ -267,7 +272,10 @@ export function mapCollectorRun(row: CollectorRunRow): CollectorRun {
     confidence: parseConfidence(row.confidence),
     scope: row.scope,
     errorCode: row.error_code,
+    errorMessage: row.error_message,
     stats: jsonObject(row.stats),
+    payloadRef: row.payload_ref,
+    revisionNo: Number(row.revision_no),
   };
 }
 
@@ -300,6 +308,8 @@ export function mapSnapshot(row: SnapshotRow): OperationalSnapshot {
     payload: jsonObject(row.payload),
     money: moneyFromColumns(row.money_amount_cents, row.money_currency),
     createdAt: row.created_at,
+    idempotencyKey: row.idempotency_key,
+    revisionNo: Number(row.revision_no),
   };
 }
 

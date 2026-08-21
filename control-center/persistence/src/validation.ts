@@ -19,6 +19,8 @@ import {
   DIRECTIVE_STATUSES,
   FRESHNESS_STATUSES,
 } from './types.js';
+import { COLLECTOR_RUN_STATUSES, LEGACY_COLLECTOR_RUN_STATUSES } from './run-status.js';
+import { assertSanitizedJson } from './sanitize.js';
 
 const isoCurrency = z.string().regex(/^[A-Z]{3}$/, 'currency must be a 3-letter ISO code');
 
@@ -91,10 +93,21 @@ export const supersedeDirectiveInputSchema = provenanceSchema.extend({
   recordedBy: z.string().trim().min(1).max(256).optional(),
 });
 
+const sanitizedObjectSchema = z.record(z.unknown()).superRefine((value, ctx) => {
+  try {
+    assertSanitizedJson(value, 'payload');
+  } catch (error) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: error instanceof Error ? error.message : 'payload is invalid',
+    });
+  }
+});
+
 export const recordObservationInputSchema = provenanceSchema.extend({
   scope: scopeSchema,
   observationKind: z.string().trim().min(1).max(128),
-  payload: z.record(z.unknown()).optional().default({}),
+  payload: sanitizedObjectSchema.optional().default({}),
   money: moneySchema.nullable().optional().default(null),
   idempotencyKey: z.string().trim().min(1).max(512),
   collectorRunId: nullableResourceIdSchema,
@@ -108,9 +121,12 @@ export const startCollectorRunInputSchema = provenanceSchema.extend({
 
 export const finishCollectorRunInputSchema = z.object({
   id: resourceIdSchema,
-  status: z.enum(['succeeded', 'failed', 'skipped'] as const),
+  status: z.enum([...COLLECTOR_RUN_STATUSES, ...LEGACY_COLLECTOR_RUN_STATUSES]),
   errorCode: z.string().trim().min(1).max(64).nullable().optional().default(null),
-  stats: z.record(z.unknown()).optional().default({}),
+  errorMessage: z.string().trim().min(1).max(512).nullable().optional().default(null),
+  stats: sanitizedObjectSchema.optional().default({}),
+  payload: sanitizedObjectSchema.optional().default({}),
+  payloadRef: z.string().trim().min(1).max(512).nullable().optional().default(null),
   observedAt: z.date(),
   freshnessStatus: freshnessSchema,
   confidence: confidenceSchema,
@@ -119,8 +135,18 @@ export const finishCollectorRunInputSchema = z.object({
 export const recordSnapshotInputSchema = provenanceSchema.extend({
   scope: scopeSchema,
   snapshotKind: z.string().trim().min(1).max(128),
-  payload: z.record(z.unknown()),
+  payload: sanitizedObjectSchema,
   money: moneySchema.nullable().optional().default(null),
+  idempotencyKey: z.string().trim().min(1).max(512).optional(),
+});
+
+export const reviseSnapshotInputSchema = z.object({
+  id: resourceIdSchema,
+  payload: sanitizedObjectSchema,
+  observedAt: z.date(),
+  freshnessStatus: freshnessSchema,
+  confidence: confidenceSchema,
+  source: sourceRefSchema,
 });
 
 export const createAttentionItemInputSchema = provenanceSchema.extend({

@@ -182,7 +182,7 @@ test('FRESH STALE UNKNOWN ERROR round-trip and ERROR is preserved', async () => 
       scope: 'infrastructure',
       observationKind: 'freshness-round-trip',
       idempotencyKey: key,
-      payload: { token: freshnessStatus },
+      payload: { freshness: freshnessStatus },
       source: { system: 'collector', kind: 'health', locator: key },
       observedAt: new Date('2026-04-01T00:00:00.000Z'),
       freshnessStatus,
@@ -302,7 +302,7 @@ test('AgentActivity is persisted separately from AgentSession', async () => {
     `SELECT count(*)::int AS n FROM control_center.agent_sessions`,
   );
   const activity = await ctx.persistence.recordAgentActivity({
-    correlationId: 'synthetic-activity-separation-1',
+    correlationId: `synthetic-activity-separation-${Date.now()}`,
     agentId: 'synthetic-agent-01',
     scope: 'company',
     status: 'DONE',

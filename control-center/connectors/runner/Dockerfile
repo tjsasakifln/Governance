@@ -7,6 +7,7 @@ RUN apt-get update \
 WORKDIR /src
 COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
+COPY persistence ./persistence
 COPY connectors ./connectors
 RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-collector --include-workspace-root \
   && npm install tsx@4.20.5 --no-save --ignore-scripts \

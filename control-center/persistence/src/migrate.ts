@@ -11,6 +11,11 @@ export const MIGRATIONS = [
     up: 'sql/migrations/002_current_state.up.sql',
     down: 'sql/migrations/002_current_state.down.sql',
   },
+  {
+    id: '003_durable_operational_data_plane',
+    up: 'sql/migrations/003_durable_operational_data_plane.up.sql',
+    down: 'sql/migrations/003_durable_operational_data_plane.down.sql',
+  },
 ] as const;
 
 export const REQUIRED_TABLES = [
@@ -29,9 +34,55 @@ export const REQUIRED_TABLES = [
   'current_directives',
   'current_attention_items',
   'current_source_observations',
+  'collector_run_revisions',
+  'operational_snapshot_revisions',
 ] as const;
 
 export const REQUIRED_MATERIALIZED_VIEWS = ['mv_open_attention'] as const;
+
+export const REQUIRED_VIEWS = [
+  'v_latest_collector_runs',
+  'v_latest_source_observations',
+  'v_latest_operational_snapshots',
+] as const;
+
+export const FROZEN_VIEW_COLUMNS = {
+  v_latest_collector_runs: [
+    'collector',
+    'run_id',
+    'status',
+    'freshness_status',
+    'started_at',
+    'finished_at',
+    'observed_at',
+    'error_code',
+    'payload_json',
+  ],
+  v_latest_source_observations: [
+    'observation_id',
+    'scope',
+    'observation_type',
+    'source_system',
+    'source_kind',
+    'source_locator',
+    'observed_at',
+    'freshness_status',
+    'confidence',
+    'payload_json',
+  ],
+  v_latest_operational_snapshots: [
+    'snapshot_id',
+    'scope',
+    'snapshot_type',
+    'observed_at',
+    'freshness_status',
+    'confidence',
+    'source_system',
+    'source_kind',
+    'source_locator',
+    'snapshot_json',
+  ],
+} as const;
 
 async function appliedIds(client: Queryable): Promise<string[]> {
   const exists = await client.query(
@@ -133,6 +184,7 @@ export async function appliedMigrations(client: Queryable): Promise<string[]> {
 export async function listNamedObjects(client: Queryable): Promise<{
   tables: string[];
   materializedViews: string[];
+  views: string[];
 }> {
   const tables = await client.query(
     `SELECT tablename
@@ -140,14 +192,37 @@ export async function listNamedObjects(client: Queryable): Promise<{
      WHERE schemaname = 'control_center'
      ORDER BY tablename`,
   );
-  const views = await client.query(
+  const matviews = await client.query(
     `SELECT matviewname
      FROM pg_matviews
      WHERE schemaname = 'control_center'
      ORDER BY matviewname`,
   );
+  const views = await client.query(
+    `SELECT viewname
+     FROM pg_views
+     WHERE schemaname = 'control_center'
+     ORDER BY viewname`,
+  );
   return {
     tables: tables.rows.map((row) => (row as { tablename: string }).tablename),
-    materializedViews: views.rows.map((row) => (row as { matviewname: string }).matviewname),
+    materializedViews: matviews.rows.map((row) => (row as { matviewname: string }).matviewname),
+    views: views.rows.map((row) => (row as { viewname: string }).viewname),
   };
+}
+
+export async function listViewColumns(client: Queryable, viewName: string): Promise<string[]> {
+  const result = await client.query(
+    `SELECT a.attname
+     FROM pg_attribute a
+     JOIN pg_class c ON c.oid = a.attrelid
+     JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'control_center'
+       AND c.relname = $1
+       AND a.attnum > 0
+       AND NOT a.attisdropped
+     ORDER BY a.attnum`,
+    [viewName],
+  );
+  return result.rows.map((row) => (row as { attname: string }).attname);
 }

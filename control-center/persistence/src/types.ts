@@ -10,9 +10,9 @@ export {
 } from './canonical.js';
 
 import type { DirectiveKind, DirectiveStatus, FreshnessStatus, SourceRef } from './canonical.js';
+import type { CollectorRunStatus, CollectorRunStatusInput } from './run-status.js';
 
-export const COLLECTOR_RUN_STATUSES = ['started', 'succeeded', 'failed', 'skipped'] as const;
-export type CollectorRunStatus = (typeof COLLECTOR_RUN_STATUSES)[number];
+export { COLLECTOR_RUN_STATUSES, type CollectorRunStatus, type CollectorRunStatusInput } from './run-status.js';
 
 export const ATTENTION_SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
 export type AttentionSeverity = (typeof ATTENTION_SEVERITIES)[number];
@@ -97,7 +97,10 @@ export type CollectorRun = {
   finishedAt: Date | null;
   scope: string;
   errorCode: string | null;
+  errorMessage: string | null;
   stats: Record<string, unknown>;
+  payloadRef: string | null;
+  revisionNo: number;
 } & Provenance;
 
 export type SourceObservation = {
@@ -118,6 +121,8 @@ export type OperationalSnapshot = {
   payload: Record<string, unknown>;
   money: Money | null;
   createdAt: Date;
+  idempotencyKey: string;
+  revisionNo: number;
 } & Provenance;
 
 export type AttentionItem = {
@@ -222,9 +227,12 @@ export type StartCollectorRunInput = {
 
 export type FinishCollectorRunInput = {
   id: string;
-  status: Exclude<CollectorRunStatus, 'started'>;
+  status: CollectorRunStatusInput;
   errorCode?: string | null;
+  errorMessage?: string | null;
   stats?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+  payloadRef?: string | null;
   observedAt: Date;
   freshnessStatus: FreshnessStatus;
   confidence: number;
@@ -235,7 +243,25 @@ export type RecordSnapshotInput = {
   snapshotKind: string;
   payload: Record<string, unknown>;
   money?: Money | null;
+  idempotencyKey?: string;
 } & Provenance;
+
+export type ReviseSnapshotInput = {
+  id: string;
+  payload: Record<string, unknown>;
+  observedAt: Date;
+  freshnessStatus: FreshnessStatus;
+  confidence: number;
+  source: SourceRef;
+};
+
+export type RetentionPolicyInput = {
+  maxAgeDays: number;
+  applyDeletes?: boolean;
+  actor: string;
+  scope?: string;
+  observedAt?: Date;
+};
 
 export type CreateAttentionItemInput = {
   scope: string;
