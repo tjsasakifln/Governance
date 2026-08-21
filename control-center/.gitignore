@@ -4,3 +4,5 @@ dist/
 .playwright-cli/
 test-results/
 playwright-report/
+playwright-env.log
+apps/web-shell/playwright-env.log

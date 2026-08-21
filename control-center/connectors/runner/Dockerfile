@@ -1,15 +1,15 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY package.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
 COPY connectors ./connectors
-RUN npm install --omit=dev --workspace=@confenge/control-center-collector --include-workspace-root \
-  && npm install tsx@4.20.5 --no-save \
+RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-collector --include-workspace-root \
+  && npm install tsx@4.20.5 --no-save --ignore-scripts \
   && npm cache clean --force
 
 WORKDIR /src/connectors/runner

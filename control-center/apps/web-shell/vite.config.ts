@@ -7,12 +7,26 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   base: "./",
   resolve: {
-    alias: {
-      "@confenge/control-center-contracts": path.resolve(here, "../../contracts/src/index.ts"),
-      "@confenge/control-center-contracts/taxonomy": path.resolve(here, "../../contracts/src/taxonomy.ts"),
-      "@confenge/control-center-contracts/types": path.resolve(here, "../../contracts/src/types.ts"),
-      "@confenge/control-center-today-ui": path.resolve(here, "../today-ui/src/index.ts"),
-    },
+    // Regex finds are exact. A string alias of the package root to index.ts
+    // prefix-matches `/taxonomy` and `/types` into `index.ts/taxonomy`.
+    alias: [
+      {
+        find: /^@confenge\/control-center-contracts\/taxonomy$/,
+        replacement: path.resolve(here, "../../contracts/src/taxonomy.ts"),
+      },
+      {
+        find: /^@confenge\/control-center-contracts\/types$/,
+        replacement: path.resolve(here, "../../contracts/src/types.ts"),
+      },
+      {
+        find: /^@confenge\/control-center-contracts$/,
+        replacement: path.resolve(here, "../../contracts/src/index.ts"),
+      },
+      {
+        find: /^@confenge\/control-center-today-ui$/,
+        replacement: path.resolve(here, "../today-ui/src/index.ts"),
+      },
+    ],
   },
   publicDir: "public",
   build: {

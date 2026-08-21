@@ -5,12 +5,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY package.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
 COPY persistence ./persistence
 COPY services/context ./services/context
-RUN npm install --omit=dev --workspace=@confenge/control-center-context --include-workspace-root \
-  && npm install tsx@4.20.5 --no-save \
+RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-context --include-workspace-root \
+  && npm install tsx@4.20.5 --no-save --ignore-scripts \
   && npm cache clean --force
 
 WORKDIR /src/services/context

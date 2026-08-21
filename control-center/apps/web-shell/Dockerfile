@@ -1,11 +1,11 @@
 FROM node:20-bookworm-slim AS build
 
 WORKDIR /src
-COPY package.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
 COPY apps/web-shell ./apps/web-shell
 COPY apps/today-ui ./apps/today-ui
-RUN npm install --workspace=@confenge/control-center-web-shell --include-workspace-root \
+RUN npm install --ignore-scripts --workspace=@confenge/control-center-web-shell --include-workspace-root \
   && npm cache clean --force
 WORKDIR /src/apps/web-shell
 RUN npm run build

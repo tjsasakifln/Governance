@@ -5,11 +5,11 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY package.json ./
+COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
 COPY services/mcp ./services/mcp
-RUN npm install --omit=dev --workspace=@confenge/control-center-mcp --include-workspace-root \
-  && npm install tsx@4.20.5 --no-save \
+RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-mcp --include-workspace-root \
+  && npm install tsx@4.20.5 --no-save --ignore-scripts \
   && npm cache clean --force
 
 WORKDIR /src/services/mcp
