@@ -27,6 +27,9 @@ export {
   TimeoutError,
 } from "./http/client.ts";
 export { COLLECT_ROUTES, MAPPED_READ_ROUTES } from "./collector/routes.ts";
+export { normalizeIntelEnvelope, intelSurfaceForRouteKey } from "./collector/envelope.ts";
+export type { EnvelopeResult, IntelSurface } from "./collector/envelope.ts";
+export { fetchWarmblyPayload } from "./collector/fetch.ts";
 export {
   parseCanaryArgs,
   runCli as runCanaryCli,

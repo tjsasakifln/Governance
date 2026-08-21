@@ -347,6 +347,9 @@ export function collectFromWarmblyPayload(
       currency: d.currency,
       stage_id: d.stage_id,
       stage_name: d.stage?.name,
+      contact_id: d.contact_id ?? null,
+      account_id: d.account_id ?? null,
+      lead_id: d.lead_id ?? null,
       created_at: d.created_at,
       updated_at: d.updated_at,
       won_at: d.won_at,
@@ -373,6 +376,8 @@ export function collectFromWarmblyPayload(
       updated_at: c.updated_at,
       last_activity_at: c.campaign_lead?.last_activity_at,
       status: c.campaign_lead?.status,
+      account_id: c.account_id ?? null,
+      lead_id: c.lead_id ?? null,
     })),
     inbound: inbound.slice(0, 50).map((row) => ({
       lead_id: row.lead_id,

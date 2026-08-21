@@ -1,5 +1,11 @@
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
+  JOIN_UNPROVEN,
+  JOIN_UNPROVEN_REASON,
+  attributedDeals,
+  cohortJoinAvailable,
+} from "./cohort-join.ts";
+import {
   COHORT_WINDOWS,
   LIST_CAP,
   PROJECTOR_VERSION,
@@ -7,7 +13,6 @@ import {
   asArray,
   asRecord,
   capList,
-  finiteNumber,
   integerOrUndefined,
   isoOr,
   type Availability,
@@ -57,6 +62,19 @@ function rate(numerator: number, denominator: number): Record<string, unknown> {
     out.evidence_note = "tiny_denominator_not_statistical_evidence";
   }
   return out;
+}
+
+function unprovenRate(denominator: number): Record<string, unknown> {
+  const tiny = denominator < TINY_DENOMINATOR;
+  return {
+    numerator: null,
+    denominator,
+    ratio: null,
+    availability: JOIN_UNPROVEN,
+    omitted_reason: JOIN_UNPROVEN_REASON,
+    tiny_denominator: tiny,
+    ...(tiny ? { evidence_note: "tiny_denominator_not_statistical_evidence" } : {}),
+  };
 }
 
 function stripIdentity(row: Record<string, unknown>): Record<string, unknown> {
@@ -138,21 +156,10 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       .sort((a, b) => b.at.localeCompare(a.at)),
   );
 
-  const exceptions = capList(
-    attention
-      .map((item) => asRecord(item))
-      .filter((row): row is Record<string, unknown> => row !== null)
-      .map((row) => ({
-        id: typeof row.id === "string" ? row.id : "unknown",
-        canonical_id: `cc:attention-item:${typeof row.id === "string" ? row.id.replace(/[^A-Za-z0-9._~-]+/g, "-") : "unknown"}`,
-        source_id: typeof row.id === "string" ? row.id : "unknown",
-        why: typeof row.why === "string" ? row.why : typeof row.title === "string" ? row.title : "exception",
-        kind: typeof row.kind === "string" ? row.kind : "exception_state",
-        recommended_next_action: typeof row.recommended_action === "string" ? row.recommended_action : null,
-        status: "open",
-        evidence: stripIdentity(row),
-      })),
+  const intelExceptions = asArray(
+    nested.intel_exceptions ?? payload.intel_exceptions ?? payload.confenge_intel_exceptions,
   );
+  const exceptions = capList(mergeExceptions(intelExceptions, attention, observedAt));
 
   const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
   const autoSend =
@@ -162,6 +169,9 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
+  const organic =
+    nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
+  const intelExceptionsPresent = intelExceptions.length > 0 || intelExceptionsSourcePresent(nested, payload);
   const cohorts = buildCohorts({
     contacts: contacts.map((item) => asRecord(item)).filter((row): row is Record<string, unknown> => row !== null),
     deals: deals.map((item) => asRecord(item)).filter((row): row is Record<string, unknown> => row !== null),
@@ -191,8 +201,78 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
     activity,
     pipeline,
     exceptions,
-    growth: growthFromScoreboard(scoreboard, executive, observedAt),
+    intel: {
+      scoreboard: scoreboardPresent(scoreboard) ? scoreboard : null,
+      executive: asRecord(executive) ? stripIdentity(asRecord(executive) as Record<string, unknown>) : null,
+      exceptions: intelExceptionsPresent ? intelExceptions : null,
+      organic_scoreboard: organicPresent(organic) ? organic : null,
+    },
+    growth: growthFromIntel(scoreboard, executive, organic, observedAt),
   };
+}
+
+function intelExceptionsSourcePresent(nested: Record<string, unknown>, payload: Record<string, unknown>): boolean {
+  return (
+    (nested.intel_exceptions !== undefined && nested.intel_exceptions !== null) ||
+    (payload.intel_exceptions !== undefined && payload.intel_exceptions !== null) ||
+    (payload.confenge_intel_exceptions !== undefined && payload.confenge_intel_exceptions !== null)
+  );
+}
+
+function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  const push = (row: Record<string, unknown>, source: "warmbly.intel.exceptions" | "warmbly.attention") => {
+    const rawId = typeof row.id === "string" && row.id.trim() ? row.id.trim() : "";
+    const id = rawId || `${source}:${out.length}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    const slug = id.replace(/[^A-Za-z0-9._~-]+/g, "-");
+    out.push({
+      id,
+      canonical_id: `cc:attention-item:${slug}`,
+      source_id: typeof row.source_id === "string" ? row.source_id : id,
+      why:
+        typeof row.why === "string"
+          ? row.why
+          : typeof row.reason === "string"
+            ? row.reason
+            : typeof row.title === "string"
+              ? row.title
+              : typeof row.code === "string"
+                ? row.code
+                : "exception",
+      kind:
+        typeof row.kind === "string"
+          ? row.kind
+          : typeof row.code === "string"
+            ? row.code
+            : source === "warmbly.intel.exceptions"
+              ? "intel_exception"
+              : "exception_state",
+      recommended_next_action:
+        typeof row.recommended_next_action === "string"
+          ? row.recommended_next_action
+          : typeof row.next_action === "string"
+            ? row.next_action
+            : typeof row.recommended_action === "string"
+              ? row.recommended_action
+              : null,
+      status: typeof row.status === "string" ? row.status : "open",
+      source,
+      observed_at: isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt),
+      evidence: stripIdentity(row),
+    });
+  };
+  for (const item of intel) {
+    const row = asRecord(item);
+    if (row) push(row, "warmbly.intel.exceptions");
+  }
+  for (const item of attention) {
+    const row = asRecord(item);
+    if (row) push(row, "warmbly.attention");
+  }
+  return out;
 }
 
 function inWindow(created: number | undefined, now: number, window: CohortWindow): boolean {
@@ -224,9 +304,16 @@ function buildCohorts(input: {
       const status = String(asRecord(row.campaign_lead)?.status ?? row.status ?? "").toLowerCase();
       return status.includes("qualified");
     });
-    const opportunities = input.deals.filter((row) => inWindow(parseTime(row.created_at), input.now, window));
-    const won = opportunities.filter((row) => String(row.status ?? "").toLowerCase() === "won");
+    const joinOk = cohortJoinAvailable(population, input.deals);
+    const linked = joinOk ? attributedDeals(population, input.deals) : [];
+    const won = linked.filter((row) => String(row.status ?? "").toLowerCase() === "won");
     const pop = population.length;
+    const opportunityConversion = joinOk
+      ? rate(linked.length, pop)
+      : unprovenRate(pop);
+    const winConversion = joinOk
+      ? rate(won.length, linked.length)
+      : unprovenRate(linked.length);
     return {
       window,
       kind: "acquisition_cohort",
@@ -237,12 +324,15 @@ function buildCohorts(input: {
       contacted: contacted.length,
       reply: replies.length,
       qualified_reply: qualified.length,
-      opportunity_created: opportunities.length,
-      won: won.length,
+      opportunity_created: joinOk ? linked.length : null,
+      won: joinOk ? won.length : null,
+      join: joinOk
+        ? { availability: "PROVEN", rule: "durable_contact_account_or_lead_id" }
+        : { availability: JOIN_UNPROVEN, reason: JOIN_UNPROVEN_REASON },
       reply_rate: rate(replies.length, contacted.length),
       qualified_reply_rate: rate(qualified.length, contacted.length),
-      opportunity_conversion: rate(opportunities.length, pop),
-      win_conversion: rate(won.length, opportunities.length),
+      opportunity_conversion: opportunityConversion,
+      win_conversion: winConversion,
     };
   });
 
@@ -254,9 +344,26 @@ function buildCohorts(input: {
   };
 }
 
-function scoreboardToCohorts(scoreboard: unknown, executive: unknown, observedAt: string): Record<string, unknown> {
+function scoreboardPresent(scoreboard: unknown): boolean {
   const rec = asRecord(scoreboard);
-  if (!rec) {
+  if (!rec) return false;
+  if (Object.prototype.hasOwnProperty.call(rec, "data") && rec.stages === undefined && rec.schema_version === undefined && rec.schema === undefined) {
+    return false;
+  }
+  return rec.schema_version !== undefined || rec.schema !== undefined || Array.isArray(rec.stages);
+}
+
+function organicPresent(organic: unknown): boolean {
+  const rec = asRecord(organic);
+  if (!rec) return false;
+  if (Object.prototype.hasOwnProperty.call(rec, "data") && rec.windows === undefined && rec.schema_version === undefined) {
+    return false;
+  }
+  return rec.schema_version !== undefined || Array.isArray(rec.windows) || Array.isArray(rec.sources);
+}
+
+function scoreboardToCohorts(scoreboard: unknown, executive: unknown, observedAt: string): Record<string, unknown> {
+  if (!scoreboardPresent(scoreboard)) {
     return {
       configured: false,
       schema: "confenge.inbound_truth_scoreboard.v1",
@@ -265,6 +372,7 @@ function scoreboardToCohorts(scoreboard: unknown, executive: unknown, observedAt
       note: "Warmbly scoreboard was not present on this observation. Not derived from CRM counts.",
     };
   }
+  const rec = asRecord(scoreboard) as Record<string, unknown>;
   const stages = asArray(rec.stages).length > 0 ? asArray(rec.stages) : asArray(rec.items);
   return {
     configured: true,
@@ -291,8 +399,41 @@ function scoreboardToCohorts(scoreboard: unknown, executive: unknown, observedAt
   };
 }
 
-function growthFromScoreboard(scoreboard: unknown, executive: unknown, observedAt: string): Record<string, unknown> {
+function organicToGrowth(organic: unknown, observedAt: string): Record<string, unknown> {
+  if (!organicPresent(organic)) {
+    return {
+      configured: false,
+      availability: "NO_DATA",
+      observed_at: observedAt,
+      source: "warmbly.intel.organic-scoreboard",
+      note: "Warmbly OrganicScoreboard was not present on this observation.",
+    };
+  }
+  const rec = asRecord(organic) as Record<string, unknown>;
+  return {
+    configured: true,
+    availability: "FRESH",
+    schema: typeof rec.schema_version === "string" ? rec.schema_version : "confenge.organic_scoreboard.v1",
+    source: "warmbly.intel.organic-scoreboard",
+    authority: "warmbly",
+    include_synthetic: rec.include_synthetic === true,
+    real_empty: rec.real_empty === true,
+    windows: asArray(rec.windows),
+    sources: asArray(rec.sources),
+    recommendation: rec.recommendation ?? null,
+    generated_at: rec.generated_at ?? observedAt,
+    note: "Warmbly-owned organic/growth intelligence. Control Center does not recompute it.",
+  };
+}
+
+function growthFromIntel(
+  scoreboard: unknown,
+  executive: unknown,
+  organic: unknown,
+  observedAt: string,
+): Record<string, unknown> {
   const mapped = scoreboardToCohorts(scoreboard, executive, observedAt);
+  const organicMapped = organicToGrowth(organic, observedAt);
   return {
     schema_version: "control-center.growth-readmodel.v1",
     funnel_contract: [
@@ -308,9 +449,10 @@ function growthFromScoreboard(scoreboard: unknown, executive: unknown, observedA
     ],
     attribution: {
       cross_system_join: "not_invented",
-      note: "Hops without a durable ID stay UNKNOWN/BLOCKED. Scoreboard stages 1-2 stay BLOCKED without GSC/URL-index ingest.",
+      note: "Hops without a durable ID stay UNKNOWN/BLOCKED. Scoreboard stages 1-2 stay BLOCKED without GSC/URL-index ingest. OrganicScoreboard is Warmbly-owned.",
     },
     scoreboard: mapped,
+    organic_scoreboard: organicMapped,
   };
 }
 

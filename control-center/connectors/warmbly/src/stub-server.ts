@@ -33,6 +33,13 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+function wrapData(value: unknown): { data: unknown } {
+  if (value && typeof value === "object" && !Array.isArray(value) && "data" in value) {
+    return value as { data: unknown };
+  }
+  return { data: value };
+}
+
 function json(res: ServerResponse, status: number, body: unknown, apiVersion = "v1"): void {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -76,6 +83,22 @@ function routeBody(payload: WarmblyPayload, pathname: string): unknown | undefin
       return payload.confenge_today ?? { data: { summary: { total: 0 }, actions: [] } };
     case "/v1/confenge/inbound":
       return payload.confenge_inbound ?? { data: [] };
+    case "/v1/confenge/intel/scoreboard":
+      return payload.confenge_intel_scoreboard === undefined
+        ? undefined
+        : wrapData(payload.confenge_intel_scoreboard);
+    case "/v1/confenge/intel/executive":
+      return payload.confenge_intel_executive === undefined
+        ? undefined
+        : wrapData(payload.confenge_intel_executive);
+    case "/v1/confenge/intel/exceptions":
+      return payload.confenge_intel_exceptions === undefined
+        ? undefined
+        : wrapData(payload.confenge_intel_exceptions);
+    case "/v1/confenge/intel/organic-scoreboard":
+      return payload.confenge_intel_organic_scoreboard === undefined
+        ? undefined
+        : wrapData(payload.confenge_intel_organic_scoreboard);
     default:
       return undefined;
   }

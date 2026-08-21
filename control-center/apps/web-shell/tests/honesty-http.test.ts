@@ -247,7 +247,8 @@ test("operatorAction confirmation and error paint on the shipped HTTP path", asy
   paintShell(root, adapter, "#/comercial/excecoes");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.match(root.innerHTML, /data-operator-result="ok"/);
-  assert.match(root.innerHTML, /ação registrada no Control Center/);
+  assert.match(root.innerHTML, /reconhecido no Control Center; Warmbly não foi alterado/);
+  assert.equal(/resolvid[oa] no Warmbly|exception resolved in Warmbly/i.test(root.innerHTML), false);
 
   const denied = await adapter.operatorAction({
     action_type: "SEND_EMAIL",

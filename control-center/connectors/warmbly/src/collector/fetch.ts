@@ -5,6 +5,7 @@ import {
   TimeoutError,
   type WarmblyClient,
 } from "../http/client.ts";
+import { intelSurfaceForRouteKey, normalizeIntelEnvelope } from "./envelope.ts";
 import { COLLECT_ROUTES } from "./routes.ts";
 
 export type FetchResult = {
@@ -48,6 +49,22 @@ export async function fetchWarmblyPayload(client: WarmblyClient): Promise<FetchR
           reason: `Warmbly returned ${res.status} for ${route.method} ${route.path}`,
         };
         payload.unavailable = [...(payload.unavailable ?? []), failure];
+        continue;
+      }
+      const surface = intelSurfaceForRouteKey(route.key);
+      if (surface) {
+        const normalized = normalizeIntelEnvelope(res.json, surface);
+        if (!normalized.ok) {
+          const failure: EndpointFailure = {
+            method: route.method,
+            path: route.path.split("?")[0] ?? route.path,
+            status: 200,
+            reason: `CONTRACT_DRIFT: ${normalized.reason}`,
+          };
+          payload.unavailable = [...(payload.unavailable ?? []), failure];
+          continue;
+        }
+        assignRoute(payload, route.key, asPayloadValue(normalized.value));
         continue;
       }
       assignRoute(payload, route.key, asPayloadValue(res.json));
@@ -123,18 +140,24 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
     case "confenge_inbound":
       payload.confenge_inbound = json as WarmblyPayload["confenge_inbound"];
       break;
-    case "confenge_intel_scoreboard":
-      payload.confenge_intel_scoreboard = asRecord(json);
+    case "confenge_intel_scoreboard": {
+      const rec = asRecordOrUndefined(json);
+      if (rec) payload.confenge_intel_scoreboard = rec;
       break;
-    case "confenge_intel_executive":
-      payload.confenge_intel_executive = asRecord(json);
+    }
+    case "confenge_intel_executive": {
+      const rec = asRecordOrUndefined(json);
+      if (rec) payload.confenge_intel_executive = rec;
       break;
+    }
     case "confenge_intel_exceptions":
       payload.confenge_intel_exceptions = json;
       break;
-    case "confenge_intel_organic_scoreboard":
-      payload.confenge_intel_organic_scoreboard = asRecord(json);
+    case "confenge_intel_organic_scoreboard": {
+      const rec = asRecordOrUndefined(json);
+      if (rec) payload.confenge_intel_organic_scoreboard = rec;
       break;
+    }
     default:
       break;
   }
@@ -147,6 +170,13 @@ function asRecord(json: unknown): Record<string, unknown> {
     return json as Record<string, unknown>;
   }
   return {};
+}
+
+function asRecordOrUndefined(json: unknown): Record<string, unknown> | undefined {
+  if (json && typeof json === "object" && !Array.isArray(json)) {
+    return json as Record<string, unknown>;
+  }
+  return undefined;
 }
 
 function unwrapMaybeData(json: unknown): unknown {

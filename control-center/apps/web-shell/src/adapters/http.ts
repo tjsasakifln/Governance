@@ -142,7 +142,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         ok: true,
         path: "/v1/operator-actions",
         kind: "nota",
-        message: "ação registrada no Control Center",
+        message: "reconhecido no Control Center; Warmbly não foi alterado",
       };
       this.lastOperatorResult = accepted;
       return accepted;

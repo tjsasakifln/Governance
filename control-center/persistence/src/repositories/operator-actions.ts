@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { ConflictError } from '../errors.js';
 import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
 import { sourceColumns, toUtcIso } from '../money.js';
@@ -13,6 +14,14 @@ const COLUMNS = `
   source_system, source_kind, source_locator, source_label,
   observed_at, freshness_status, confidence, recorded_at
 `;
+
+function operatorPayloadConflicts(existing: OperatorAction, input: RecordOperatorActionInput): boolean {
+  return (
+    existing.actionType !== input.actionType ||
+    existing.targetCanonicalId !== input.targetCanonicalId ||
+    existing.targetSourceId !== input.targetSourceId
+  );
+}
 
 function mapRow(row: Record<string, unknown>): OperatorAction {
   return {
@@ -54,6 +63,9 @@ export async function recordOperatorAction(
   ]);
   if (existing.rowCount === 1) {
     const action = mapRow(existing.rows[0] as Record<string, unknown>);
+    if (operatorPayloadConflicts(action, input)) {
+      throw new ConflictError('idempotency key reused with conflicting payload');
+    }
     return { action: { ...action, resultingStatus: 'duplicate' }, inserted: false };
   }
   const id = generatePublicId('operator-action');
@@ -97,6 +109,9 @@ export async function recordOperatorAction(
       input.idempotencyKey,
     ]);
     const action = mapRow(again.rows[0] as Record<string, unknown>);
+    if (operatorPayloadConflicts(action, input)) {
+      throw new ConflictError('idempotency key reused with conflicting payload');
+    }
     return { action: { ...action, resultingStatus: 'duplicate' }, inserted: false };
   }
   const action = mapRow(inserted.rows[0] as Record<string, unknown>);

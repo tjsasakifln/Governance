@@ -95,10 +95,50 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
     attribution.note ??
       "Hops without a durable ID stay UNKNOWN/BLOCKED. No cross-system join is invented. GSC/URL-index hops stay BLOCKED without ingest.",
   );
+  const organic =
+    growth.organic_scoreboard && typeof growth.organic_scoreboard === "object"
+      ? (growth.organic_scoreboard as Record<string, unknown>)
+      : {};
+  const organicConfigured = organic.configured === true;
+  const organicWindows = Array.isArray(organic.windows) ? organic.windows : [];
+  const organicBlock = organicConfigured
+    ? `<article class="card" data-organic-scoreboard="true">
+        <h3>Organic scoreboard (Warmbly)</h3>
+        <p>${escapeHtml(String(organic.note ?? "Warmbly-owned organic/growth intelligence."))}</p>
+        <p>schema=${escapeHtml(String(organic.schema ?? "ausente"))} real_empty=${escapeHtml(String(organic.real_empty ?? "—"))}</p>
+        <div class="stack">${
+          organicWindows.length === 0
+            ? `<p class="banner empty">Organic scoreboard presente e vazio.</p>`
+            : organicWindows
+                .slice(0, 4)
+                .map((item) => {
+                  const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+                  const slices = Array.isArray(row.by_source)
+                    ? row.by_source
+                    : Array.isArray(row.slices)
+                      ? row.slices
+                      : [];
+                  const first = slices[0] && typeof slices[0] === "object" ? (slices[0] as Record<string, unknown>) : {};
+                  const layers = Array.isArray(first.layers) ? first.layers : [];
+                  return `<article class="card" data-organic-window="${escapeHtml(String(row.id ?? ""))}">
+                    <h4>Janela ${escapeHtml(String(row.id ?? "—"))}</h4>
+                    <ul>${layers
+                      .map((layer) => {
+                        const ly = layer && typeof layer === "object" ? (layer as Record<string, unknown>) : {};
+                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}">${escapeHtml(String(ly.id ?? "layer"))}: ${escapeHtml(String(ly.status ?? "UNKNOWN"))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
+                      })
+                      .join("")}</ul>
+                  </article>`;
+                })
+                .join("")
+        }</div>
+      </article>`
+    : `<p class="banner empty" data-organic-scoreboard="false">Organic scoreboard Warmbly ausente nesta observação (${escapeHtml(String(organic.availability ?? "NO_DATA"))}).</p>`;
   return `
     <section class="stack domain-crescimento" aria-labelledby="crescimento-funil" data-domain="growth">
       <h2 id="crescimento-funil">Funil de crescimento</h2>
       <p class="constraint">${escapeHtml(note)}</p>
+      ${organicBlock}
       <ol class="growth-hops">
         ${hops
           .map((hop) => {
@@ -122,6 +162,10 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
 function metricRate(value: unknown): string {
   const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
   if (!rec) return "—";
+  if (rec.availability === "JOIN_UNPROVEN" || rec.omitted_reason === "durable_contact_to_deal_join_unavailable") {
+    const den = typeof rec.denominator === "number" ? rec.denominator : "—";
+    return `join não comprovado (denominador ${den})`;
+  }
   const num = rec.numerator;
   const den = rec.denominator;
   if (typeof num !== "number" || typeof den !== "number") return "—";
@@ -280,7 +324,9 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
             .join("")
     }</div></section>`;
   } else if (current === "excecoes") {
-    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2><div class="stack">${
+    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2>
+      <p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>
+      <div class="stack">${
       exceptions.length === 0
         ? `<p class="banner empty">Nenhuma exceção observada.</p>`
         : exceptions
@@ -294,7 +340,7 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
                   <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
                   <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
                   <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Reconhecer</button>
+                  <button type="submit">Reconhecer no Control Center</button>
                 </form>
               </article>`;
             })

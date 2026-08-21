@@ -124,6 +124,8 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
           asaas: "UNKNOWN",
           governance: "UNKNOWN",
         },
+        identity_resolution: "not_proven",
+        note: "Warmbly commercial projection only. Asaas and Governance are labeled UNKNOWN; no cross-source identity join.",
       };
     }),
   );
@@ -136,6 +138,14 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
       schema_version: "control-center.clients-snapshot.v1",
       projector_version: PROJECTOR_VERSION,
       availability: commercial.availability,
+      client_360: "partial_warmbly_only",
+      identity_resolution: "not_proven",
+      sources: {
+        warmbly: commercial.availability,
+        asaas: "UNKNOWN",
+        governance: "UNKNOWN",
+      },
+      note: "Useful operational client view from Warmbly. Not a proven multi-source 360.",
       clients,
       open_blocker_count: exceptions.length,
       at_risk_client_count: clients.filter((row) => Number(row.active_exceptions) > 0).length,

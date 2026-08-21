@@ -12,6 +12,9 @@ test("commercial surfaces render cohort, pipeline, activity and exception operat
   assert.match(root.innerHTML, /Coortes/);
   paintShell(root, adapter, "#/comercial/excecoes");
   assert.match(root.innerHTML, /data-operator-form="ACKNOWLEDGE_EXCEPTION"|Exceções comerciais/);
+  assert.match(root.innerHTML, /data-operator-scope="control-center-only"/);
+  assert.match(root.innerHTML, /não resolve a exceção no Warmbly/);
+  assert.equal(/resolvid[oa] no Warmbly|exception resolved in Warmbly/i.test(root.innerHTML), false);
   paintShell(root, adapter, "#/comercial/pipeline");
   assert.match(root.innerHTML, /Pipeline ativo/);
   paintShell(root, adapter, "#/crescimento");

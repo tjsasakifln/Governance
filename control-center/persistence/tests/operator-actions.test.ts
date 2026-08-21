@@ -67,3 +67,46 @@ test("operator action is append-only, idempotent, and refuses forbidden types at
     ),
   );
 });
+
+test("same idempotency key with a conflicting payload fails closed at PostgreSQL", async () => {
+  const source = { system: "control-center", kind: "operator-action", locator: "ex-conflict" };
+  const observedAt = new Date("2026-08-21T12:00:00.000Z");
+  await ctx.persistence.recordOperatorAction({
+    actionType: "MARK_REVIEWED",
+    targetCanonicalId: "cc:attention-item:ex-conflict",
+    targetSourceId: "ex-conflict",
+    actorId: "human:founder",
+    occurredAt: observedAt,
+    correlationId: "corr-conflict",
+    idempotencyKey: "conflict-payload",
+    scope: "commercial",
+    source,
+    observedAt,
+    freshnessStatus: "FRESH",
+    confidence: 1,
+    note: "first",
+  });
+  await assert.rejects(
+    ctx.persistence.recordOperatorAction({
+      actionType: "ACKNOWLEDGE_EXCEPTION",
+      targetCanonicalId: "cc:attention-item:other",
+      targetSourceId: "other",
+      actorId: "human:founder",
+      occurredAt: observedAt,
+      correlationId: "corr-conflict",
+      idempotencyKey: "conflict-payload",
+      scope: "commercial",
+      source,
+      observedAt,
+      freshnessStatus: "FRESH",
+      confidence: 1,
+      note: "second",
+    }),
+    /conflicting payload/,
+  );
+  const counted = await ctx.pool.query(
+    `SELECT count(*)::int AS n FROM control_center.operator_actions WHERE idempotency_key = $1`,
+    ["conflict-payload"],
+  );
+  assert.equal(counted.rows[0]?.n, 1);
+});

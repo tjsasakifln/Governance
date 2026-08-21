@@ -31,6 +31,8 @@ export type WarmblyDeal = {
   pipeline_id?: string;
   stage_id?: string;
   contact_id?: string | null;
+  account_id?: string | null;
+  lead_id?: string | null;
   name: string;
   value?: number | null;
   currency?: string;
@@ -93,6 +95,8 @@ export type WarmblyContact = {
   phone?: string;
   subscribed?: boolean;
   verification_status?: string;
+  account_id?: string | null;
+  lead_id?: string | null;
   campaign_lead?: {
     status: string;
     last_activity_at?: string | null;

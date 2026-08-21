@@ -176,6 +176,214 @@ test("reply_rate denominator is contacted count and is never substituted with po
   assert.notEqual(open.reply_rate.denominator, open.population);
 });
 
+test("intel exceptions feed Commercial Exceptions and organic scoreboard feeds Crescimento", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      attention: [{ id: "att-1", kind: "overdue_task", title: "legacy attention", why: "task due" }],
+      operations: {
+        intel_exceptions: [
+          { id: "ex-intel-1", code: "orphan_chain", reason: "lead without deal", next_action: "review", status: "open" },
+        ],
+        intel_scoreboard: {
+          schema_version: "confenge.inbound_truth_scoreboard.v1",
+          stages: [{ id: "lead_persisted", status: "TRUE" }],
+        },
+        intel_organic_scoreboard: {
+          schema_version: "confenge.organic_scoreboard.v1",
+          windows: [
+            {
+              id: "28d",
+              by_source: [{ layers: [{ id: "LEAD_VALID", status: "UNKNOWN", count: 0, denominator: 0 }] }],
+            },
+          ],
+          sources: ["organic_search"],
+        },
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    exceptions: Array<{ id: string; source: string; why: string }>;
+    growth: { organic_scoreboard: { configured: boolean; windows: unknown[] }; scoreboard: { configured: boolean } };
+  };
+  assert.equal(ops.exceptions.some((row) => row.id === "ex-intel-1"), true);
+  assert.equal(ops.exceptions.some((row) => row.id === "att-1"), true);
+  const intel = ops.exceptions.find((row) => row.id === "ex-intel-1");
+  assert.equal(intel?.source, "warmbly.intel.exceptions");
+  assert.match(intel?.why ?? "", /lead without deal/);
+  assert.equal(ops.growth.organic_scoreboard.configured, true);
+  assert.equal(Array.isArray(ops.growth.organic_scoreboard.windows), true);
+  assert.equal(ops.growth.scoreboard.configured, true);
+});
+
+test("absent intel sources stay NO_DATA and a data wrapper is never configured", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.5,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      operations: {
+        intel_scoreboard: { data: { schema_version: "confenge.inbound_truth_scoreboard.v1", stages: [{ id: "x" }] } },
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    cohorts: { inbound_truth: { configured: boolean; availability: string } };
+    growth: { organic_scoreboard: { configured: boolean; availability: string } };
+  };
+  assert.equal(ops.cohorts.inbound_truth.configured, false);
+  assert.equal(ops.cohorts.inbound_truth.availability, "NO_DATA");
+  assert.equal(ops.growth.organic_scoreboard.configured, false);
+  assert.equal(ops.growth.organic_scoreboard.availability, "NO_DATA");
+});
+
+test("acquisition cohort excludes unrelated same-window deals and does not fake conversion without a join", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        contacts: [{ id: "c-member", company: "Member Co", created_at: "2026-08-20T00:00:00.000Z" }],
+        deals: [
+          {
+            id: "deal-linked",
+            status: "open",
+            contact_id: "c-member",
+            created_at: "2026-08-20T02:00:00.000Z",
+          },
+          {
+            id: "deal-unrelated",
+            status: "open",
+            contact_id: "c-other",
+            created_at: "2026-08-20T03:00:00.000Z",
+          },
+          {
+            id: "deal-linked-dup",
+            status: "open",
+            contact_id: "c-member",
+            created_at: "2026-08-20T04:00:00.000Z",
+          },
+          {
+            id: "deal-linked",
+            status: "open",
+            contact_id: "c-member",
+            created_at: "2026-08-20T05:00:00.000Z",
+          },
+          {
+            id: "win-unrelated",
+            status: "won",
+            contact_id: "c-stranger",
+            created_at: "2026-08-19T00:00:00.000Z",
+          },
+        ],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    cohorts: {
+      acquisition: Array<{
+        window: string;
+        population: number;
+        opportunity_created: number | null;
+        won: number | null;
+        opportunity_conversion: { ratio: number | null; numerator: number | null; denominator: number; availability?: string; omitted_reason?: string };
+        win_conversion: { ratio: number | null; numerator: number | null };
+        join: { availability: string };
+      }>;
+    };
+  };
+  const open = ops.cohorts.acquisition.find((row) => row.window === "open");
+  assert.ok(open);
+  assert.equal(open.population, 1);
+  assert.equal(open.join.availability, "PROVEN");
+  assert.equal(open.opportunity_created, 2);
+  assert.equal(open.won, 0);
+  assert.equal(open.opportunity_conversion.numerator, 2);
+  assert.equal(open.opportunity_conversion.denominator, 1);
+  assert.equal(open.opportunity_conversion.ratio, 2);
+  assert.equal(open.win_conversion.numerator, 0);
+});
+
+test("missing durable join yields JOIN_UNPROVEN null conversion, never a fabricated zero", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: {
+        contacts: [{ id: "c-1", company: "No join", created_at: "2026-08-20T00:00:00.000Z" }],
+        deals: [{ id: "deal-no-join", status: "open", created_at: "2026-08-20T00:00:00.000Z" }],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    cohorts: {
+      acquisition: Array<{
+        window: string;
+        opportunity_created: number | null;
+        opportunity_conversion: { ratio: number | null; numerator: number | null; availability?: string; omitted_reason?: string };
+        join: { availability: string; reason?: string };
+      }>;
+    };
+  };
+  const open = ops.cohorts.acquisition.find((row) => row.window === "open");
+  assert.ok(open);
+  assert.equal(open.join.availability, "JOIN_UNPROVEN");
+  assert.equal(open.join.reason, "durable_contact_to_deal_join_unavailable");
+  assert.equal(open.opportunity_conversion.ratio, null);
+  assert.equal(open.opportunity_conversion.numerator, null);
+  assert.equal(open.opportunity_conversion.availability, "JOIN_UNPROVEN");
+  assert.equal(open.opportunity_conversion.omitted_reason, "durable_contact_to_deal_join_unavailable");
+  assert.notEqual(open.opportunity_conversion.ratio, 0);
+  assert.equal(open.opportunity_created, null);
+});
+
+test("clients snapshot labels unavailable sources and does not claim full 360", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: {
+        deals: [{ id: "deal-1", name: "Acme", status: "open", created_at: now, updated_at: now }],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  assert.equal(clients.payload.client_360, "partial_warmbly_only");
+  assert.equal(clients.payload.identity_resolution, "not_proven");
+  const sources = clients.payload.sources as { asaas: string; governance: string };
+  assert.equal(sources.asaas, "UNKNOWN");
+  assert.equal(sources.governance, "UNKNOWN");
+});
+
 test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   const [commercial] = projectCollector({
     collector: "warmbly",

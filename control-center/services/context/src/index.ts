@@ -20,6 +20,7 @@ export { createOperationalService } from "./operational/service.ts";
 export {
   createMemoryOperatorActionService,
   createPostgresOperatorActionService,
+  parseOperatorActionSubmission,
 } from "./operational/actions.ts";
 export type { OperatorActionService } from "./operational/actions.ts";
 export type { OperationalService, OperationalServiceDeps } from "./operational/service.ts";

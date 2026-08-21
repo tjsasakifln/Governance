@@ -110,13 +110,22 @@ jobs:
         env:
           CONTROL_CENTER_TEST_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
           CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
+          CC_SCREENSHOT_DIR: ${{ runner.temp }}/cc-e2e-screenshots
         run: |
           set -o pipefail
+          mkdir -p "$CC_SCREENSHOT_DIR"
           npm run test:e2e | tee /tmp/cc-e2e.log
           grep -E "context_risks=[1-9]" /tmp/cc-e2e.log
           grep -E "nav_changed_to=comercial" /tmp/cc-e2e.log
           grep -E "launch-probe ok" /tmp/cc-e2e.log
           grep -E "view_state_driven=empty" /tmp/cc-e2e.log
+      - name: Upload Playwright screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-center-e2e-screenshots
+          path: ${{ runner.temp }}/cc-e2e-screenshots
+          if-no-files-found: warn
 
   docker:
     runs-on: ubuntu-latest

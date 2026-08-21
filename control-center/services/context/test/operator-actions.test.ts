@@ -110,3 +110,26 @@ test("agent cannot impersonate founder and send mutations are refused", async ()
     assert.equal(unknown.status >= 400, true);
   });
 });
+
+test("memory service fails closed on conflicting idempotency payload", async () => {
+  await withServer(async (base) => {
+    const first = await post(base, FOUNDER, {
+      action_type: "ACKNOWLEDGE_EXCEPTION",
+      target_canonical_id: "cc:attention-item:ex-1",
+      target_source_id: "ex-1",
+      idempotency_key: "conflict-mem",
+      scope: "commercial",
+      note: "first",
+    });
+    assert.equal(first.status, 201);
+    const conflicted = await post(base, FOUNDER, {
+      action_type: "MARK_REVIEWED",
+      target_canonical_id: "cc:attention-item:other",
+      target_source_id: "other",
+      idempotency_key: "conflict-mem",
+      scope: "commercial",
+      note: "second",
+    });
+    assert.equal(conflicted.status, 409);
+  });
+});
