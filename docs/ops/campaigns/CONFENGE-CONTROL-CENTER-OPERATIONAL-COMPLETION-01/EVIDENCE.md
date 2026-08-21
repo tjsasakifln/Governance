@@ -36,7 +36,9 @@ Warmbly collector now GETs (read-only, 404 = gap, never mock):
 - `/v1/confenge/intel/exceptions`
 - `/v1/confenge/intel/organic-scoreboard`
 
-Operations payload is a capped read model (not a CRM replica). Acquisition cohorts (anchor = `contact.created_at`) are labeled separately from Warmbly inbound-truth scoreboard (event-period). Every rate exposes numerator/denominator; tiny denominators (`n < 10`) are labeled as non-statistical.
+Intel bodies are `{data: payload}` on current Warmbly main. Collector unwraps them via `normalizeIntelEnvelope`; malformed success is CONTRACT_DRIFT; 404 is a gap.
+
+Operations payload is a capped read model (not a CRM replica). Acquisition cohorts (anchor = `contact.created_at`) convert only via durable contact/account/lead ids; otherwise `JOIN_UNPROVEN` / null ratio. Inbound-truth scoreboard is labeled separately. Tiny denominators (`n < 10`) are labeled as non-statistical. Intel exceptions feed Commercial Exceptions; organic scoreboard feeds Crescimento.
 
 Auto-send is observed, never enabled. Forbidden send mutations are not on the connector allowlist.
 
@@ -48,10 +50,11 @@ HTTP: `POST /v1/operator-actions`, `GET /v1/operator-actions?scope=`.
 
 Tests:
 
-- `services/context/test/operator-actions.test.ts` — founder accept + idempotent duplicate; agent impersonation fail-closed; `SEND_EMAIL` refused; missing actor fail-closed.
-- `persistence/tests/operator-actions.test.ts` — append-only + DB reject of `SEND_EMAIL`.
+- `services/context/test/operator-actions.test.ts` — founder accept + idempotent duplicate; agent impersonation fail-closed; `SEND_EMAIL` refused; missing actor fail-closed; conflicting payload 409.
+- `services/context/test/operator-actions-pg.test.ts` — DB failure then retry persists one row; concurrent duplicate = one row; restart still knows the key; conflicting payload fails closed; agent/stranger denied.
+- `persistence/tests/operator-actions.test.ts` — append-only + DB reject of `SEND_EMAIL` + conflicting payload.
 
-Actions are Control Center audit records. Warmbly is not mutated (safe upstream write was not proven on main without coupling to PR #104).
+PostgreSQL unique `idempotency_key` is the durable authority. Memory is not consulted before the write. Actions are Control Center audit records. Warmbly is not mutated.
 
 ## UI
 
@@ -61,7 +64,7 @@ Honesty (skeptic panel, retested on shipped HTTP mapper):
 
 - `commercialFrom` / `financeFrom` do not coerce omitted counts or money to zero; cockpit facts use `data-absent="true"` + `ausente`.
 - Crescimento requests `/v1/domains/commercial?scope=commercial` (not `inbound`) and always renders the nine growth hops (`search_visibility`…`client_revenue`). Missing hops stay UNKNOWN/BLOCKED, never invented joins.
-- Client 360 always paints Warmbly / Asaas / Governance; omitted sources are UNKNOWN + `data-absent`.
+- Client view always paints Warmbly / Asaas / Governance; omitted sources are UNKNOWN + `data-absent`. `client_360=partial_warmbly_only`; not a full multi-source 360.
 - `operatorAction` stores `lastOperatorResult` on the HTTP adapter; the shell paints ok/error banners.
 
 Web-shell tests: 76 passed including `honesty-http.test.ts` (mapper + HTTP paint path). Projector: `reply_rate denominator is contacted count and is never substituted with population` — PASS.
@@ -70,7 +73,7 @@ Web-shell tests: 76 passed including `honesty-http.test.ts` (mapper + HTTP paint
 
 None required.
 
-- Warmbly stable reads already exist on main; intel GETs 404 on the local stub and are recorded as gaps.
+- Warmbly PR #104 is merged; production SHA `13e7a08` already exposes intel GETs. Current Warmbly main `c8128f1` is PR #105 (compose SHA env) and is not required for this contract.
 - extra-cli `PNCP_CONTRACT_FRESHNESS/1.0` is already the Control Center producer contract.
 - web-cfg `/intranet` 302 is already merged (PR #218).
 
@@ -87,15 +90,9 @@ Governance PR #8 was not opened, edited, merged, or absorbed.
 | QA package tests | 55 pass |
 | QA adversarial CLI (`npm run qa`) | fail-closed as designed (14/14 attacks fail; READY_FOR_INTERNAL_PRODUCTION=false) |
 | web-shell unit including overflow CSS | pass |
-| e2e launch 1 + 2 | Context+web boot twice (`context_risks=1 context_priorities=1`); Chromium dies on `libnspr4.so` (OS-lib launcher failure) |
+| envelope + projector + PG operator-action tests | pass (`warmbly-envelope-tests.log`, `intel-projector-tests.log`, `cohort-adversarial-tests.log`, `operator-idempotency-tests.log`) |
+| e2e CI Playwright 360/390/430/desktop | pass on EXECUTED_CODE_SHA `80e75e6`; overflow=0; screenshots artifact 9465703704 |
 
-Playwright launcher log excerpt:
-
-```
-chrome: error while loading shared libraries: libnspr4.so: cannot open shared object file
-playwright launcher unavailable; adapter unit tests remain the e2e fallback
-```
-
-Launch-probe was extended to visit Crescimento, commercial surfaces, client detail, and 360/390/430/desktop overflow checks **when Chromium can start**.
+Local Chromium still lacks `libnspr4.so`. CI Playwright is the execution evidence. Adversarial screenshot review: commercial subnav first and distinct per surface at 360.
 
 See `OPERATIONAL-MATRIX.md`, `WARMBLY-MATRIX.md`, `MOBILE-MATRIX.md`.
