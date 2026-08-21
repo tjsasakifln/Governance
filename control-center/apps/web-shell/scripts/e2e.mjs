@@ -84,6 +84,8 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
     HOST: "127.0.0.1",
     PORT: "4173",
     CC_CONTEXT_UPSTREAM: "http://127.0.0.1:8799",
+    CC_ACTOR_ID: "founder-local",
+    CC_ACTOR_KIND: "human",
   },
   stdio: "ignore",
 });

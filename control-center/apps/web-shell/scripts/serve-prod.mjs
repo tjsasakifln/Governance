@@ -18,6 +18,8 @@ const TYPES = {
 };
 
 const contextUpstream = (process.env.CC_CONTEXT_UPSTREAM ?? "").replace(/\/+$/, "");
+const actorId = (process.env.CC_ACTOR_ID ?? "").trim();
+const actorKind = (process.env.CC_ACTOR_KIND ?? "").trim();
 
 function copyActorHeaders(req) {
   const headers = { accept: "application/json" };
@@ -27,7 +29,20 @@ function copyActorHeaders(req) {
       headers[name] = value;
     }
   }
+  if (!headers["x-actor-id"] && actorId) headers["x-actor-id"] = actorId;
+  if (!headers["x-actor-kind"] && actorKind) headers["x-actor-kind"] = actorKind;
   return headers;
+}
+
+function injectIdentity(html) {
+  let next = html;
+  if (actorId) {
+    next = next.replace(/name="cc-actor-id" content="[^"]*"/, `name="cc-actor-id" content="${actorId}"`);
+  }
+  if (actorKind) {
+    next = next.replace(/name="cc-actor-kind" content="[^"]*"/, `name="cc-actor-kind" content="${actorKind}"`);
+  }
+  return next;
 }
 
 const server = createServer((req, res) => {
@@ -65,9 +80,13 @@ const server = createServer((req, res) => {
   }
   const file = existsSync(candidate) && statSync(candidate).isFile() ? candidate : join(root, "index.html");
   try {
-    const body = readFileSync(file);
+    let body = readFileSync(file);
+    const type = TYPES[extname(file)] ?? "application/octet-stream";
+    if (extname(file) === ".html" || file.endsWith("index.html")) {
+      body = Buffer.from(injectIdentity(body.toString("utf8")));
+    }
     res.statusCode = 200;
-    res.setHeader("content-type", TYPES[extname(file)] ?? "application/octet-stream");
+    res.setHeader("content-type", type);
     res.end(body);
   } catch {
     res.statusCode = 404;

@@ -83,6 +83,12 @@ try {
   }
 
   await page.waitForSelector('[data-destination="hoje"]');
+  const viewState = await page.locator("[data-destination]").getAttribute("data-view-state");
+  console.log(`view_state=${viewState}`);
+  if (viewState === "error") {
+    const banner = await page.locator("main").innerText();
+    throw new Error(`production shell rendered error: ${banner.slice(0, 400)}`);
+  }
   await page.waitForSelector(".attention");
   await page.waitForSelector(".priority");
   const box = await page.locator("#root").boundingBox();
