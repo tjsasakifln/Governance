@@ -215,11 +215,10 @@ try {
     for (const hash of matrixHashes) {
       await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
       const surface = hash.includes("/") ? hash.split("/")[1] : null;
-      if (hash.startsWith("comercial")) {
-        const expected = surface && surface !== "comercial" ? surface : "visao";
+      if (hash.startsWith("comercial/") && surface) {
         await page.waitForFunction(
           (wanted) => document.querySelector("[data-destination]")?.getAttribute("data-surface") === wanted,
-          expected,
+          surface,
         );
       }
       const pageOverflow = await overflowPx();
