@@ -59,3 +59,11 @@ export function assertAgent(actor: ActorRef, founderActorId: string): void {
     throw forbidden("agent_mutation_forbidden", "proposals are submitted by agents");
   }
 }
+
+/** Founder or authenticated agent. Unknown and system actors fail closed. No admin bypass. */
+export function assertOperationalReader(actor: ActorRef, founderActorId: string): void {
+  assertReadable(actor, founderActorId);
+  if (actor.kind !== "human" && actor.kind !== "agent") {
+    throw authError("unknown_actor", "operational reads require the founder or an authenticated agent");
+  }
+}

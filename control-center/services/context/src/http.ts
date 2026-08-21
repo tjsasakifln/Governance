@@ -5,12 +5,14 @@ import { invalid, isServiceError, payloadTooLarge } from "./errors.ts";
 import type { Logger } from "./log.ts";
 import { assertJsonSize } from "./sanitize.ts";
 import { parseScope } from "./scope.ts";
+import type { OperationalService } from "./operational/service.ts";
 import type { ContextService } from "./service.ts";
 import { LIMITS, type ActorRef, type Scope } from "./types.ts";
 
 export interface HttpDeps {
   service: ContextService;
   logger: Logger;
+  operational?: OperationalService;
 }
 
 function header(req: IncomingMessage, name: string): string | undefined {
@@ -92,6 +94,29 @@ function optionalQueryScope(url: URL): Scope | undefined {
   return parseScope(scope);
 }
 
+function queryHorizon(url: URL): "now" | "today" {
+  const horizon = url.searchParams.get("horizon");
+  if (horizon !== "now" && horizon !== "today") {
+    throw invalid("horizon query parameter must be now or today");
+  }
+  return horizon;
+}
+
+function optionalQuerySource(url: URL): string | undefined {
+  const source = url.searchParams.get("source");
+  if (!source) {
+    return undefined;
+  }
+  return source;
+}
+
+function mustOperational(deps: HttpDeps): OperationalService {
+  if (!deps.operational) {
+    throw invalid("operational read port is not configured");
+  }
+  return deps.operational;
+}
+
 export function createRequestListener(
   deps: HttpDeps,
 ): (req: IncomingMessage, res: ServerResponse) => void {
@@ -123,6 +148,34 @@ async function handle(
 
     if (method === "GET" && url.pathname === "/v1/context") {
       send(res, 200, deps.service.getContext(actor, queryScope(url)));
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/operational-snapshots") {
+      send(res, 200, await mustOperational(deps).getEnvelope(actor, queryScope(url)));
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/attention") {
+      send(
+        res,
+        200,
+        await mustOperational(deps).getAttention(actor, queryScope(url), queryHorizon(url)),
+      );
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/today") {
+      send(res, 200, await mustOperational(deps).getToday(actor, queryScope(url)));
+      return;
+    }
+    if (method === "GET" && url.pathname === "/v1/source-observations") {
+      send(
+        res,
+        200,
+        await mustOperational(deps).getSourceObservations(actor, queryScope(url), optionalQuerySource(url)),
+      );
+      return;
+    }
+    if (method === "GET" && parts[0] === "v1" && parts[1] === "domains" && parts[2] && !parts[3]) {
+      send(res, 200, await mustOperational(deps).getDomain(actor, parts[2], queryScope(url)));
       return;
     }
     if (method === "GET" && url.pathname === "/v1/active-directives") {

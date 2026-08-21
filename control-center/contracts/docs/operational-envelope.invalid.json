@@ -1,0 +1,35 @@
+{
+  "schema_version": "control-center.operational-envelope.v1",
+  "scope": "company",
+  "generated_at": "2026-08-20T12:00:00.000Z",
+  "freshness_status": "STALE",
+  "confidence": 0.4,
+  "snapshots": {
+    "commercial": {
+      "schema_version": "control-center.operational-domain.v1",
+      "domain": "commercial",
+      "scope": "commercial",
+      "source": {
+        "system": "warmbly",
+        "kind": "crm-read-model",
+        "locator": "commercial/pipeline"
+      },
+      "observed_at": "2026-08-19T11:50:00.000Z",
+      "freshness_status": "STALE",
+      "confidence": 0.4,
+      "presence": "present",
+      "healthy": true,
+      "snapshot": {
+        "id": "cc:commercial-snapshot:stale-must-not-look-healthy"
+      }
+    },
+    "finance": null,
+    "clients": null,
+    "engineering": null,
+    "infrastructure": null,
+    "pncp": null
+  },
+  "attention_now": [],
+  "today": [],
+  "source_observations": []
+}

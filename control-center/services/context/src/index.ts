@@ -1,4 +1,4 @@
-export { parseActor, assertFounder, assertReadable } from "./actor.ts";
+export { parseActor, assertFounder, assertReadable, assertOperationalReader } from "./actor.ts";
 export { canonicalStringify, stableEqualJson } from "./canonical.ts";
 export { frozenClock, systemClock, toUtcIso } from "./clock.ts";
 export { ServiceError, isServiceError } from "./errors.ts";
@@ -16,6 +16,19 @@ export type { PersistencePort, PersistenceAdapter } from "./store/adapter.ts";
 export { bootFromEnv, bootFromEnvAsync, actorFromEnv } from "./boot.ts";
 export { createRequestListener } from "./http.ts";
 export { startServer } from "./server.ts";
+export { createOperationalService } from "./operational/service.ts";
+export type { OperationalService, OperationalServiceDeps } from "./operational/service.ts";
+export { createFixtureOperationalPort, createUnavailableOperationalPort } from "./operational/fixture.ts";
+export { createPostgresOperationalPort } from "./operational/postgres.ts";
+export { OPERATIONAL_READ_CONTRACT_VERSION } from "./operational/port.ts";
+export type { OperationalReadPort } from "./operational/port.ts";
+export {
+  OPERATIONAL_DOMAINS,
+  OPERATIONAL_ENVELOPE_SCHEMA_VERSION,
+  OPERATIONAL_VIEWS,
+} from "./operational/types.ts";
+export { representativeOperationalData, OPERATIONAL_NOW } from "./operational/representative.ts";
+export { assembleEnvelope } from "./operational/assemble.ts";
 export { runCli } from "./cli.ts";
 export {
   REPRESENTATIVE_IDS,

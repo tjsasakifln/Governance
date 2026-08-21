@@ -1,0 +1,229 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Confenge Control Center operational HTTP API v1",
+    "version": "1.0.0",
+    "description": "Read-only operational state for the cockpit. Distinct from /v1/context strategic memory. Request path never calls GitHub, Warmbly, Asaas, PNCP, or host infra. Data is read from control_center.v_latest_collector_runs, control_center.v_latest_source_observations, and control_center.v_latest_operational_snapshots."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8787",
+      "description": "Context service loopback."
+    }
+  ],
+  "tags": [
+    { "name": "operational", "description": "Operational snapshots, attention, today, and source observations" }
+  ],
+  "paths": {
+    "/v1/operational-snapshots": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getOperationalSnapshots",
+        "summary": "Operational envelope for a single scope",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OperationalEnvelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/operational-envelope.v1.schema.json"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/domains/{domain}": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getOperationalDomain",
+        "summary": "Single operational domain slot",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "commercial",
+                "finance",
+                "clients",
+                "engineering",
+                "infrastructure",
+                "pncp"
+              ]
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain slot envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/operational-envelope.v1.schema.json#/$defs/domain_query_response"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/attention": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getOperationalAttention",
+        "summary": "Deterministic attention_now or today for a scope. Query is scope + horizon, not the frozen cockpit scopes CSV.",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope"
+            }
+          },
+          {
+            "name": "horizon",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["now", "today"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Attention items for the requested horizon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/operational-envelope.v1.schema.json#/$defs/attention_query_response"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/today": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getOperationalToday",
+        "summary": "Today's top 3 for company scope. Maximum 3, action-first, domain-diverse.",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "const": "company" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Today list, length <= 3",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/operational-envelope.v1.schema.json#/$defs/today_query_response"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/source-observations": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getOperationalSourceObservations",
+        "summary": "Latest source observations for a scope, optionally filtered by source system",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "../schemas/primitives.v1.schema.json#/$defs/source_system"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source observations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/operational-envelope.v1.schema.json#/$defs/observations_query_response"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "Error": {
+        "description": "Fail-closed error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["error", "message"],
+              "properties": {
+                "error": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-identity-headers": {
+    "accepted": ["x-actor-id", "x-actor-kind"],
+    "rejected": ["Remote-User", "Remote-Groups", "X-Forwarded-For", "X-Admin", "Authorization"],
+    "note": "Identity headers are accepted only under the existing context-service proxy policy. Remote-* is the Authelia/Caddy contract, not a context-service bypass."
+  },
+  "x-forbidden-mutations": true,
+  "x-request-time-providers": []
+}
