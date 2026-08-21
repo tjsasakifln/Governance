@@ -50,6 +50,7 @@ const labels = [
   "Financeiro",
   "Engenharia",
   "Infra",
+  "Crescimento",
   "Memória/Decisões",
   "Agentes",
 ];
@@ -61,8 +62,17 @@ const destinations = [
   "financeiro",
   "engenharia",
   "infra",
+  "crescimento",
   "memoria",
   "agentes",
+];
+
+const extraHashes = [
+  "comercial/cohorts",
+  "comercial/atividade",
+  "comercial/pipeline",
+  "comercial/excecoes",
+  "clientes/acme",
 ];
 
 const viewports = [
@@ -176,6 +186,17 @@ try {
     console.log(`dest=${id} filled_chars=${destFilled.filled}`);
   }
 
+  for (const hash of extraHashes) {
+    await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
+    const destFilled = await assertFilled(page, 40);
+    console.log(`hash=${hash} filled_chars=${destFilled.filled}`);
+  }
+
+  async function overflowPx() {
+    return page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
+  }
+
+  const matrixHashes = [...destinations.map((id) => id), ...extraHashes];
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
@@ -184,9 +205,23 @@ try {
     if (vpFilled.box.width < Math.min(300, vp.width - 24)) {
       throw new Error(`viewport ${vp.name} width ${vpFilled.box.width} too small for ${vp.width}`);
     }
+    const overflow = await overflowPx();
+    if (overflow > 1) {
+      throw new Error(`viewport ${vp.name} accidental horizontal overflow ${overflow}px`);
+    }
     const shot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}$1`);
     await page.screenshot({ path: shot, fullPage: true });
-    console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)}`);
+    console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)} overflow=${overflow}`);
+    for (const hash of matrixHashes) {
+      await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
+      const pageOverflow = await overflowPx();
+      if (pageOverflow > 1) {
+        throw new Error(`viewport ${vp.name} hash ${hash} accidental horizontal overflow ${pageOverflow}px`);
+      }
+      const hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${hash.replaceAll("/", "-")}$1`);
+      await page.screenshot({ path: hashShot, fullPage: true });
+      console.log(`matrix viewport=${vp.name} hash=${hash} overflow=${pageOverflow} screenshot=${hashShot}`);
+    }
   }
 
   for (const kind of viewStates) {

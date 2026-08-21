@@ -110,6 +110,14 @@ test("loading, empty, stale and error remain distinct view states", () => {
   }
 });
 
+test("viewport overflow is confined to nav/subnav; html/body clip accidental horizontal scroll", () => {
+  const css = readFileSync(join(rootDir, "src/styles.css"), "utf8");
+  assert.match(css, /html,\s*body\s*\{[^}]*overflow-x:\s*hidden/s);
+  assert.match(css, /\.nav\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /\.subnav\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /min-height:\s*44px/);
+});
+
 test("keyboard-focusable nav exists and skip link is present", () => {
   const root = { innerHTML: "" };
   const handle = mount(root, createMockAdapter(), createMemoryRuntime("#/hoje"));

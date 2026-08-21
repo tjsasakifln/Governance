@@ -17,6 +17,11 @@ export { bootFromEnv, bootFromEnvAsync, actorFromEnv } from "./boot.ts";
 export { createRequestListener } from "./http.ts";
 export { startServer } from "./server.ts";
 export { createOperationalService } from "./operational/service.ts";
+export {
+  createMemoryOperatorActionService,
+  createPostgresOperatorActionService,
+} from "./operational/actions.ts";
+export type { OperatorActionService } from "./operational/actions.ts";
 export type { OperationalService, OperationalServiceDeps } from "./operational/service.ts";
 export { createFixtureOperationalPort, createUnavailableOperationalPort } from "./operational/fixture.ts";
 export { createPostgresOperationalPort, createPostgresOperationalPortFromPool } from "./operational/postgres.ts";

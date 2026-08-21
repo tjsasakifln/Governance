@@ -17,6 +17,10 @@
 - Warmbly PR #104 (controlled-eligible routes / bounded cohort auth) was inspected and **not** merged. If main's intel scoreboard 404s in production, the Control Center shows the gap (`NO_DATA` / unavailable), it does not invent cohorts.
 - GSC/GA4 search-visibility hops stay BLOCKED until a durable ingest contract exists. Adapter boundary is present via Warmbly scoreboard stages 1–2.
 
+## LIVE_ENVIRONMENT_GATE
+
+- Playwright Chromium starts then exits 127: missing `libnspr4.so`. Reproduced on two consecutive e2e launches. Host cannot `apt-get install` without sudo password. No screenshots; `MOBILE_FIRST_PROVEN_360_390_430=false`.
+
 ## CODE_BLOCKER
 
 - Playwright visual matrix at 360/390/430/desktop was **not** re-run in a headed browser in this environment (Playwright MCP failed to connect). Unit/layout tests cover destinations and commercial surfaces; adversarial visual regression remains for the dedicated release review.

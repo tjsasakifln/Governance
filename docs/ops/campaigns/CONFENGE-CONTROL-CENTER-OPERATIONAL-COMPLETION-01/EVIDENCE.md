@@ -73,10 +73,22 @@ Governance PR #8 was not opened, edited, merged, or absorbed.
 
 | Suite | Result |
 | --- | --- |
-| runner projectors + run | 10 pass |
-| runner persist-project (Postgres) | 1 pass |
-| runner http (Postgres collector) | 6 pass (with persist-project path fix afterward) |
-| warmbly connector | 20 pass |
-| persistence operator-actions + migrate | 2 pass (full persistence suite 30/31 before source_label fix; operator-actions+migrate pass after) |
-| context operator-actions + operational-http | 11 pass |
-| web-shell | 62 pass |
+| runner projectors + persist-project (Postgres) | pass (`data-plane.test.log`) |
+| Warmbly connector + operator-actions HTTP | pass (`commercial.test.log`) |
+| MCP protocol/abuse/aliases + convergence mcp-context | pass (`mcp.test.log`, 28 + 1) |
+| domain-gates (finance stages, PNCP map, infra partial, Hoje) | pass (`domains-hoje.test.log`) |
+| QA package tests | 55 pass |
+| QA adversarial CLI (`npm run qa`) | fail-closed as designed (14/14 attacks fail; READY_FOR_INTERNAL_PRODUCTION=false) |
+| web-shell unit including overflow CSS | pass |
+| e2e launch 1 + 2 | Context+web boot twice (`context_risks=1 context_priorities=1`); Chromium dies on `libnspr4.so` (OS-lib launcher failure) |
+
+Playwright launcher log excerpt:
+
+```
+chrome: error while loading shared libraries: libnspr4.so: cannot open shared object file
+playwright launcher unavailable; adapter unit tests remain the e2e fallback
+```
+
+Launch-probe was extended to visit Crescimento, commercial surfaces, client detail, and 360/390/430/desktop overflow checks **when Chromium can start**.
+
+See `OPERATIONAL-MATRIX.md`, `WARMBLY-MATRIX.md`, `MOBILE-MATRIX.md`.
