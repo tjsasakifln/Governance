@@ -5,15 +5,18 @@
  */
 import { createServer } from "node:http";
 import { startIsolatedTestPostgres } from "../persistence/tests/helpers/postgres.js";
+import { createPersistence } from "../persistence/src/index.js";
 import {
   createContextService,
+  createOperationalService,
+  createPostgresOperationalPortFromPool,
   createPostgresStoreFromPool,
   createRequestListener,
   cryptoIds,
   frozenClock,
   silentLogger,
 } from "../services/context/src/index.ts";
-import { FOUNDER, LIVE_NOW, seedLiveCockpit } from "../tests/convergence/live-runtime/seed.ts";
+import { FOUNDER, LIVE_NOW, seedLiveCockpit, seedOperationalCockpit } from "../tests/convergence/live-runtime/seed.ts";
 
 function listenPort(env: NodeJS.ProcessEnv): number {
   const port = Number.parseInt(env.PORT ?? "8787", 10);
@@ -29,6 +32,8 @@ const founderActorId = (process.env.CONTROL_CENTER_FOUNDER_ACTOR_ID ?? FOUNDER.i
 
 const pg = await startIsolatedTestPostgres();
 const store = await createPostgresStoreFromPool(pg.pool);
+const persistence = createPersistence(pg.pool);
+const repoDomains = { "tjsasakifln/Governance": "commercial", Governance: "commercial" };
 const service = createContextService({
   store,
   clock: frozenClock(LIVE_NOW),
@@ -36,12 +41,19 @@ const service = createContextService({
   founderActorId,
   logger: silentLogger,
   defaultScope: "company",
-  repoDomains: { "tjsasakifln/Governance": "commercial", Governance: "commercial" },
+  repoDomains,
 });
 seedLiveCockpit(service);
 await service.flush();
+await seedOperationalCockpit(persistence);
+const operational = createOperationalService({
+  port: createPostgresOperationalPortFromPool(pg.pool),
+  clock: frozenClock(LIVE_NOW),
+  founderActorId,
+  repoDomains,
+});
 
-const server = createServer(createRequestListener({ service, logger: silentLogger }));
+const server = createServer(createRequestListener({ service, operational, logger: silentLogger }));
 server.listen(port, host, () => {
   process.stdout.write(
     `${JSON.stringify({ ok: true, service: "control-center-context", store: "postgres", host, port })}\n`,

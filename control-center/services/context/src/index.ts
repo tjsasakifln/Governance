@@ -19,7 +19,7 @@ export { startServer } from "./server.ts";
 export { createOperationalService } from "./operational/service.ts";
 export type { OperationalService, OperationalServiceDeps } from "./operational/service.ts";
 export { createFixtureOperationalPort, createUnavailableOperationalPort } from "./operational/fixture.ts";
-export { createPostgresOperationalPort } from "./operational/postgres.ts";
+export { createPostgresOperationalPort, createPostgresOperationalPortFromPool } from "./operational/postgres.ts";
 export { OPERATIONAL_READ_CONTRACT_VERSION } from "./operational/port.ts";
 export type { OperationalReadPort } from "./operational/port.ts";
 export {

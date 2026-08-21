@@ -100,6 +100,16 @@ try {
   if (!proxied.ok || !Array.isArray(ctxBody.risks) || ctxBody.risks.length < 1 || !Array.isArray(ctxBody.priorities) || ctxBody.priorities.length < 1) {
     throw new Error(`production context proxy is not substantially filled: status=${proxied.status}`);
   }
+  const attentionHeaders = { "x-actor-id": "founder-local", "x-actor-kind": "human" };
+  const attention = await fetch("http://127.0.0.1:4173/v1/attention?scope=company&horizon=now", {
+    headers: attentionHeaders,
+  });
+  if (attention.status === 404) {
+    throw new Error("production cockpit still 404s /v1/attention?scope=company&horizon=now");
+  }
+  if (!attention.ok) {
+    throw new Error(`production /v1/attention is not served by the real backend: status=${attention.status}`);
+  }
   process.stdout.write(
     `context_risks=${ctxBody.risks.length} context_priorities=${ctxBody.priorities.length}\n`,
   );

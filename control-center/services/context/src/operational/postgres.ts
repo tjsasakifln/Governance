@@ -82,24 +82,41 @@ function sourceFrom(row: Record<string, unknown>): SourceRef {
 }
 
 function payloadOf(row: Record<string, unknown>): Record<string, unknown> {
-  const payload = row.payload;
-  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
-  }
-  if (typeof payload === "string") {
-    try {
-      const parsed: unknown = JSON.parse(payload);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
+  for (const key of ["payload", "payload_json", "snapshot_json"]) {
+    const payload = row[key];
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+      return payload as Record<string, unknown>;
+    }
+    if (typeof payload === "string") {
+      try {
+        const parsed: unknown = JSON.parse(payload);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      return {};
     }
   }
   return {};
 }
 
+const OBJECTIVE_TO_OPERATIONAL: Record<string, CollectorRunStatus> = {
+  RUNNING: "started",
+  started: "started",
+  DONE: "succeeded",
+  succeeded: "succeeded",
+  FAILED: "failed",
+  failed: "failed",
+  PARTIAL: "failed",
+  UNKNOWN: "skipped",
+  skipped: "skipped",
+};
+
 function runStatus(value: unknown): CollectorRunStatus {
+  if (typeof value === "string" && value in OBJECTIVE_TO_OPERATIONAL) {
+    return OBJECTIVE_TO_OPERATIONAL[value];
+  }
   if (typeof value === "string" && (COLLECTOR_RUN_STATUSES as readonly string[]).includes(value)) {
     return value as CollectorRunStatus;
   }
@@ -108,18 +125,20 @@ function runStatus(value: unknown): CollectorRunStatus {
 
 function mapCollector(row: Record<string, unknown>): CollectorRunRow {
   const stats = asRecord(row.stats);
+  const payload = payloadOf(row);
   const emitted =
     num(row, "observations_emitted", "observationsEmitted") ??
     num(stats, "observations_emitted") ??
+    num(payload, "observations_emitted") ??
     0;
   return {
-    id: str(row, "id") ?? "cc:collector-run:unknown",
-    collector_name: str(row, "collector_name", "collectorName") ?? "unknown",
+    id: str(row, "run_id", "id") ?? "cc:collector-run:unknown",
+    collector_name: str(row, "collector", "collector_name", "collectorName") ?? "unknown",
     scope: str(row, "scope") ?? "company",
     status: runStatus(row.status),
     started_at: utc(row.started_at ?? row.startedAt),
     finished_at: row.finished_at === null || row.finishedAt === null ? null : utc(row.finished_at ?? row.finishedAt),
-    idempotency_key: str(row, "idempotency_key", "idempotencyKey") ?? "unknown",
+    idempotency_key: str(row, "idempotency_key", "idempotencyKey") ?? str(payload, "idempotency_key") ?? "unknown",
     read_only: true,
     observations_emitted: emitted,
     error_code: str(row, "error_code", "errorCode") ?? null,
@@ -133,9 +152,9 @@ function mapCollector(row: Record<string, unknown>): CollectorRunRow {
 
 function mapObservation(row: Record<string, unknown>): SourceObservationRow {
   const mapped: SourceObservationRow = {
-    id: str(row, "id", "observation_id") ?? "cc:source-observation:unknown",
+    id: str(row, "observation_id", "id") ?? "cc:source-observation:unknown",
     scope: str(row, "scope") ?? "company",
-    observation_kind: str(row, "observation_kind", "observationKind") ?? "unknown",
+    observation_kind: str(row, "observation_type", "observation_kind", "observationKind") ?? "unknown",
     source: sourceFrom(row),
     observed_at: utc(row.observed_at ?? row.observedAt),
     freshness_status: freshness(row.freshness_status ?? row.freshnessStatus),
@@ -155,9 +174,9 @@ function mapObservation(row: Record<string, unknown>): SourceObservationRow {
 
 function mapSnapshot(row: Record<string, unknown>): OperationalSnapshotRow {
   return {
-    id: str(row, "id") ?? "cc:operational-snapshot:unknown",
+    id: str(row, "snapshot_id", "id") ?? "cc:operational-snapshot:unknown",
     scope: str(row, "scope") ?? "company",
-    snapshot_kind: str(row, "snapshot_kind", "snapshotKind") ?? "unknown",
+    snapshot_kind: str(row, "snapshot_type", "snapshot_kind", "snapshotKind") ?? "unknown",
     generated_at: utc(row.generated_at ?? row.generatedAt ?? row.created_at ?? row.observed_at),
     source: sourceFrom(row),
     observed_at: utc(row.observed_at ?? row.observedAt),
@@ -177,8 +196,7 @@ async function selectView(pool: pg.Pool, view: string): Promise<Record<string, u
   }
 }
 
-export function createPostgresOperationalPort(connectionString: string): OperationalReadPort {
-  const pool = createPool(connectionString);
+export function createPostgresOperationalPortFromPool(pool: pg.Pool): OperationalReadPort {
   return {
     async readLatest(): Promise<OperationalReadResult> {
       const [runs, observations, snapshots] = await Promise.all([
@@ -193,4 +211,8 @@ export function createPostgresOperationalPort(connectionString: string): Operati
       };
     },
   };
+}
+
+export function createPostgresOperationalPort(connectionString: string): OperationalReadPort {
+  return createPostgresOperationalPortFromPool(createPool(connectionString));
 }

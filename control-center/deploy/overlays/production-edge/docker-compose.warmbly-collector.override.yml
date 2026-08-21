@@ -1,12 +1,14 @@
 # OPTIONAL override. Not part of the default production-edge apply.
 # Grants collector access to an external Warmbly Docker network only.
-# Does NOT attach collector to datastore volumes or the internal:true network.
+# Keeps cc_internal so the collector ledger can reach PostgreSQL.
+# Does NOT attach collector to datastore volumes.
 # Does NOT publish collector. Does NOT share postgres/redis/nats volumes.
 
 services:
   collector:
     networks:
       cc_edge: {}
+      cc_internal: {}
       warmbly_net: {}
 
 networks:

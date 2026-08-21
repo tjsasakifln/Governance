@@ -215,9 +215,10 @@ describe("production-edge security bundle", () => {
       assert.ok(!analysis.published.some((p) => p.service === "redis"));
       assert.ok(!analysis.published.some((p) => p.service === "nats"));
     }
-    assert.match(overlayText, /image:\s+redis:7-alpine/);
-    assert.match(overlayText, /image:\s+authelia\/authelia:4.39/);
-    assert.match(overlayText, /image:\s+postgres:16-alpine/);
+    assert.match(overlayText, /image:\s+redis:7-alpine@sha256:[0-9a-f]{64}/);
+    assert.match(overlayText, /image:\s+authelia\/authelia:4.39@sha256:[0-9a-f]{64}/);
+    assert.match(overlayText, /image:\s+postgres:16-alpine@sha256:[0-9a-f]{64}/);
+    assert.match(overlayText, /image:\s+nats:2-alpine@sha256:[0-9a-f]{64}/);
     assert.match(overlayText, /internal:\s+true/);
     assert.match(overlayText, /cc_edge:/);
     assert.match(overlayText, /cc_internal:/);
@@ -336,11 +337,20 @@ describe("production-edge security bundle", () => {
 
   it("generator writes 0600 files, prints no values, and refuses placeholders and CI", () => {
     const dest = scratchDir("cc-secrets-");
+    const operatorPassword = "cc-operator-test-only-not-for-production";
+    const missing = spawnSync("bash", [GENERATOR, dest], {
+      encoding: "utf8",
+      env: { ...process.env, CI: "", GITHUB_ACTIONS: "", CC_OPERATOR_PASSWORD: "" },
+    });
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /HUMAN_GATE_OPERATOR_PASSWORD/);
     const ok = spawnSync("bash", [GENERATOR, dest], {
       encoding: "utf8",
-      env: { ...process.env, CI: "", GITHUB_ACTIONS: "" },
+      env: { ...process.env, CI: "", GITHUB_ACTIONS: "", CC_OPERATOR_PASSWORD: operatorPassword },
     });
     assert.equal(ok.status, 0, ok.stderr);
+    assert.doesNotMatch(ok.stdout, new RegExp(operatorPassword));
+    assert.doesNotMatch(ok.stderr, new RegExp(operatorPassword));
     assert.match(ok.stdout, /wrote secret files/);
     const postgres = readFileSync(path.join(dest, "POSTGRES_PASSWORD"), "utf8");
     assert.ok(postgres.length >= 16);

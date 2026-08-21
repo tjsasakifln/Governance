@@ -93,14 +93,13 @@ AUTHELIA_STORAGE="$(rand_hex 32)"
 BACKUP_KEY="$(rand_hex 32)"
 MCP_TOKEN="$(rand_hex 32)"
 FOUNDER_ID="$(rand_hex 16)"
-if [[ -n "${CC_OPERATOR_PASSWORD:-}" ]]; then
-  if is_placeholder "$CC_OPERATOR_PASSWORD"; then
-    refuse "refusing placeholder CC_OPERATOR_PASSWORD"
-  fi
-  OPERATOR_PASSWORD="$CC_OPERATOR_PASSWORD"
-else
-  OPERATOR_PASSWORD="$(rand_hex 24)"
+if [[ -z "${CC_OPERATOR_PASSWORD:-}" ]]; then
+  refuse "HUMAN_GATE_OPERATOR_PASSWORD: CC_OPERATOR_PASSWORD must be supplied by the operator over a local secure channel; refusing to invent an unrecoverable password"
 fi
+if is_placeholder "$CC_OPERATOR_PASSWORD"; then
+  refuse "refusing placeholder CC_OPERATOR_PASSWORD"
+fi
+OPERATOR_PASSWORD="$CC_OPERATOR_PASSWORD"
 
 HASH_FILE="$(mktemp)"
 chmod 600 "$HASH_FILE"
@@ -110,6 +109,7 @@ if ! openssl passwd -6 -stdin <<<"$OPERATOR_PASSWORD" > "$HASH_FILE"; then
 fi
 OPERATOR_HASH="$(cat "$HASH_FILE")"
 rm -f "$HASH_FILE"
+unset CC_OPERATOR_PASSWORD OPERATOR_PASSWORD
 if is_placeholder "$OPERATOR_HASH" || [[ ! "$OPERATOR_HASH" == \$6\$* ]]; then
   refuse "operator password hash was not produced"
 fi

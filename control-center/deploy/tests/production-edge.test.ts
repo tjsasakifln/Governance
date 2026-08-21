@@ -74,8 +74,12 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   assert.match(text, /published: "18443"/);
   assert.doesNotMatch(text, /published: "80"/);
   assert.doesNotMatch(text, /published: "443"/);
-  assert.match(text, /image:\s+redis:7-alpine/);
-  assert.match(text, /image:\s+authelia\/authelia:4.39/);
+  assert.match(text, /image:\s+redis:7-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(text, /image:\s+authelia\/authelia:4.39@sha256:[0-9a-f]{64}/);
+  assert.match(text, /image:\s+nats:2-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(text, /image:\s+postgres:16-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(text, /image:\s+caddy:2\.9-alpine@sha256:[0-9a-f]{64}/);
+  assert.doesNotMatch(text, /image:\s+\S+:latest(?:\s|$)/);
   assert.match(text, /internal:\s+true/);
   assert.match(text, /name:\s+confenge-cc-edge/);
   assert.match(text, /name:\s+confenge-cc-internal/);
@@ -90,8 +94,17 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   assert.ok(isRecord(collector));
   const collectorNets = serviceNetworks(collector);
   assert.ok(collectorNets.includes("cc_edge"));
-  assert.ok(!collectorNets.includes("cc_internal"));
+  assert.ok(collectorNets.includes("cc_internal"));
+  assert.equal(collector.ports, undefined);
   assert.equal(collector.volumes, undefined);
+  const collectorEnv = isRecord(collector.environment) ? collector.environment : {};
+  assert.match(String(collectorEnv.CONTROL_CENTER_DATABASE_URL ?? ""), /CONTROL_CENTER_DATABASE_URL/);
+  const collectorHealth = isRecord(collector.healthcheck) ? collector.healthcheck : {};
+  const collectorProbe = JSON.stringify(collectorHealth.test ?? []);
+  assert.match(collectorProbe, /node-http-probe\.mjs/);
+  assert.doesNotMatch(collectorProbe, /wget|curl|npx/);
+  const collectorDepends = isRecord(collector.depends_on) ? collector.depends_on : {};
+  assert.ok("postgres" in collectorDepends);
   const postgres = doc.services.postgres;
   assert.ok(isRecord(postgres));
   assert.ok(serviceNetworks(postgres).includes("cc_internal"));
@@ -103,6 +116,14 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   const autheliaNets = serviceNetworks(authelia);
   assert.ok(autheliaNets.includes("cc_internal"));
   assert.ok(autheliaNets.includes("cc_edge"));
+  for (const name of ["context", "mcp", "collector", "web"]) {
+    const svc = doc.services[name];
+    assert.ok(isRecord(svc), name);
+    const health = isRecord(svc.healthcheck) ? svc.healthcheck : {};
+    const probe = JSON.stringify(health.test ?? []);
+    assert.match(probe, /node-http-probe\.mjs/, `${name} healthcheck`);
+    assert.doesNotMatch(probe, /wget|curl|npx/, `${name} healthcheck`);
+  }
 });
 
 test("Warmbly collector override adds only an external network and no datastore volumes", () => {
@@ -113,8 +134,8 @@ test("Warmbly collector override adds only an external network and no datastore 
   assert.equal(collector.volumes, undefined);
   const nets = serviceNetworks(collector);
   assert.ok(nets.includes("cc_edge"));
+  assert.ok(nets.includes("cc_internal"));
   assert.ok(nets.includes("warmbly_net"));
-  assert.ok(!nets.includes("cc_internal"));
   assert.ok(isRecord(doc.networks) && isRecord(doc.networks.warmbly_net));
   assert.equal(doc.networks.warmbly_net.external, true);
   const uncommented = text

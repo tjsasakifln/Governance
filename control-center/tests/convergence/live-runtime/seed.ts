@@ -1,4 +1,6 @@
+import type { Persistence } from "../../../persistence/src/index.js";
 import type { ActorRef, ContextService } from "../../../services/context/src/index.ts";
+import { representativeOperationalSnapshots } from "../../../services/context/src/operational/representative.ts";
 
 export const LIVE_NOW = "2026-08-20T12:00:00.000Z";
 export const LIVE_AS_OF = "2026-08-20T15:00:00.000Z";
@@ -220,4 +222,23 @@ export function seedLiveCockpit(service: ContextService): SeededIds {
     siblingFactId: sibling.id,
     proposalId: proposal.id,
   };
+}
+
+export async function seedOperationalCockpit(persistence: Persistence): Promise<number> {
+  let inserted = 0;
+  for (const row of representativeOperationalSnapshots()) {
+    const recorded = await persistence.recordSnapshot({
+      scope: row.scope,
+      snapshotKind: row.snapshot_kind,
+      payload: row.payload,
+      source: row.source,
+      observedAt: new Date(row.observed_at),
+      freshnessStatus: row.freshness_status,
+      confidence: row.confidence,
+    });
+    if (recorded.inserted) {
+      inserted += 1;
+    }
+  }
+  return inserted;
 }

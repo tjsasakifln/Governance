@@ -36,7 +36,7 @@ x-app-base: &app-base
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 1g
@@ -83,7 +83,7 @@ services:
       - no-new-privileges:true
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m
@@ -109,7 +109,7 @@ services:
       - no-new-privileges:true
 
   nats:
-    image: nats:2-alpine
+    image: nats:2-alpine@sha256:d4ac35882ac65aff236cd65b9d3fa4d24332c681e1a85f94eedccd3cdd65b1da
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m
@@ -134,7 +134,7 @@ services:
       - no-new-privileges:true
 
   authelia:
-    image: authelia/authelia:4.39
+    image: authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 256m
@@ -199,7 +199,7 @@ services:
         ipv4_address: 10.89.0.4
       cc_internal: {}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -224,7 +224,7 @@ services:
     networks:
       - cc_edge
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -243,16 +243,18 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
       NODE_ENV: production
+      CONTROL_CENTER_DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:?CONTROL_CENTER_DATABASE_URL must be set from a secret store}"
     networks:
-      - cc_edge
+      cc_edge: {}
+      cc_internal: {}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 12s
     depends_on:
-      context:
+      postgres:
         condition: service_healthy
 
   web:
@@ -269,7 +271,7 @@ services:
       cc_edge:
         ipv4_address: 10.89.0.5
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz && wget -qO- http://127.0.0.1:8080/ready"]
+      test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -279,7 +281,7 @@ services:
         condition: service_healthy
 
   caddy:
-    image: caddy:2.9-alpine
+    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m

@@ -21,6 +21,8 @@ const REWRITE_GLOBS = [
   join(root, "deploy/docker/caddy.Dockerfile"),
   join(root, "deploy/docker/stub.Dockerfile"),
   join(root, "deploy/docker-compose.yml"),
+  join(root, "deploy/overlays/production-edge/docker-compose.production-edge.yml"),
+  join(root, "security/production/compose.yaml"),
   join(root, "supply-chain/image-pins.json"),
 ];
 

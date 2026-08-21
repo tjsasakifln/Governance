@@ -208,6 +208,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
     "caddy-base",
     "caddy-overlay-scan",
     "redis-overlay-scan",
+    "nats",
   ]);
   for (const pin of Object.values(pins.images)) {
     assert.notEqual(pin.tag, "latest");
@@ -248,6 +249,22 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
   assert.match(overlay, /caddy:2\.9-alpine/);
   assert.ok(redisRef.includes("redis:7-alpine@sha256:"));
   assert.ok(pins.images["caddy-2.9-alpine"]?.ref.includes("caddy:2.9-alpine@sha256:"));
+
+  const natsRef = pins.images["nats-2-alpine"]?.ref;
+  assert.ok(natsRef && natsRef.includes("nats:2-alpine@sha256:"));
+  const prodOverlay = read("deploy/overlays/production-edge/docker-compose.production-edge.yml");
+  assert.match(prodOverlay, new RegExp(escapeRegExp(natsRef)));
+  assert.match(prodOverlay, new RegExp(escapeRegExp(pgRef)));
+  assert.match(prodOverlay, new RegExp(escapeRegExp(autheliaRef)));
+  assert.match(prodOverlay, new RegExp(escapeRegExp(redisRef)));
+  assert.match(prodOverlay, new RegExp(escapeRegExp(pins.images["caddy-2.9-alpine"].ref)));
+  for (const line of prodOverlay.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("image:")) continue;
+    if (trimmed.includes("confenge-control-center-")) continue;
+    assert.match(trimmed, /@sha256:[0-9a-f]{64}/, trimmed);
+    assert.doesNotMatch(trimmed, /:latest(?:\s|$)/);
+  }
 });
 
 test("CVE exception records require owner, expiry, evidence, reachability, mitigation; expired fail", () => {
@@ -319,6 +336,7 @@ test("SBOM/image-scan workflow covers every image, CycloneDX and SPDX, and does 
     "caddy",
     "postgres",
     "redis",
+    "nats",
   ]) {
     assert.match(wf, new RegExp(name), `workflow must scan ${name}`);
   }

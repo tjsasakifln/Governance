@@ -3,6 +3,8 @@ import { createPersistence, type Persistence } from "../../../persistence/src/in
 import { startIsolatedTestPostgres, type TestPostgres } from "../../../persistence/tests/helpers/postgres.js";
 import {
   createContextService,
+  createOperationalService,
+  createPostgresOperationalPortFromPool,
   createPostgresStoreFromPool,
   createRequestListener,
   cryptoIds,
@@ -14,7 +16,7 @@ import { createHttpContextApi } from "../../../services/mcp/src/context-http.ts"
 import { createMcpRuntime, type McpRuntime } from "../../../services/mcp/src/server.ts";
 import { serveHttp } from "../../../services/mcp/src/http.ts";
 import { createLogger as createMcpLogger } from "../../../services/mcp/src/logging.ts";
-import { AGENT, FOUNDER, LIVE_NOW, seedLiveCockpit, type SeededIds } from "./seed.ts";
+import { AGENT, FOUNDER, LIVE_NOW, seedLiveCockpit, seedOperationalCockpit, type SeededIds } from "./seed.ts";
 
 export const MCP_TOKEN = "live-qa-mcp-token";
 export const FOUNDER_ID = FOUNDER.id;
@@ -91,9 +93,17 @@ export async function bootLiveRuntime(): Promise<LiveRuntime> {
   });
   const seeded = seedLiveCockpit(service);
   await service.flush();
+  await seedOperationalCockpit(persistence);
+  const repoDomains = { "tjsasakifln/Governance": "commercial", Governance: "commercial" };
+  const operational = createOperationalService({
+    port: createPostgresOperationalPortFromPool(pg.pool),
+    clock: frozenClock(LIVE_NOW),
+    founderActorId: FOUNDER_ID,
+    repoDomains,
+  });
 
   const contextServer = createServer(
-    createRequestListener({ service, logger: silentLogger }),
+    createRequestListener({ service, operational, logger: silentLogger }),
   );
   const contextPort = await listen(contextServer, "127.0.0.1");
   const contextBaseUrl = `http://127.0.0.1:${contextPort}`;
