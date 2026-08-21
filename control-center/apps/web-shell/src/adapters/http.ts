@@ -110,7 +110,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
 
   constructor(options: { baseUrl: string; fetchImpl?: typeof fetch; operator?: ActorRef }) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
     this.operator = options.operator ?? { kind: "human", id: "human:operator", display_name: "Operador" };
   }
 

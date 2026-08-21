@@ -149,3 +149,23 @@ test("production HTTP adapter is not mock and maps context provenance", async ()
   assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(page.page.attention[0]?.provenance.freshness_status ?? ""));
   assert.equal(seenHeaders.includes("founder-local:human"), true);
 });
+
+test("production HTTP adapter calls globalThis.fetch through a bound wrapper", async () => {
+  const original = globalThis.fetch;
+  let called = false;
+  globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    called = true;
+    return new Response(JSON.stringify({ scope: "company", active_directives: [], priorities: [], risks: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  try {
+    const adapter = createHttpAdapter("http://127.0.0.1:8787");
+    const page = await adapter.readDestination("hoje");
+    assert.equal(called, true);
+    assert.equal(page.ok, true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
