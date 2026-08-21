@@ -214,6 +214,14 @@ try {
     console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)} overflow=${overflow}`);
     for (const hash of matrixHashes) {
       await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
+      const surface = hash.includes("/") ? hash.split("/")[1] : null;
+      if (hash.startsWith("comercial")) {
+        const expected = surface && surface !== "comercial" ? surface : "visao";
+        await page.waitForFunction(
+          (wanted) => document.querySelector("[data-destination]")?.getAttribute("data-surface") === wanted,
+          expected,
+        );
+      }
       const pageOverflow = await overflowPx();
       if (pageOverflow > 1) {
         throw new Error(`viewport ${vp.name} hash ${hash} accidental horizontal overflow ${pageOverflow}px`);

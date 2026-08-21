@@ -214,7 +214,8 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
         escapeHtml(snapshot.offer_version_drift.detail ?? String(snapshot.offer_version_drift.count)),
       )
     : "";
-  return `
+  const current = surface && surface.length > 0 ? surface : "visao";
+  const recorte = `
     <section class="compact domain-comercial" aria-labelledby="comercial-recorte" data-domain="commercial">
       <h2 id="comercial-recorte">Recorte comercial (somente leitura)</h2>
       <p class="authority">Autoridade do catálogo: ${escapeHtml(snapshot.authority.catalog_authority)}. Runtime comercial: ${escapeHtml(snapshot.authority.commercial_runtime)}. Este documento: ${escapeHtml(snapshot.authority.this_document)}.</p>
@@ -236,8 +237,11 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
         ${optionalCount("Clientes em risco", snapshot.at_risk_client_count)}
       </dl>
       ${provenanceBlock(snapshot.provenance)}
-    </section>
-    ${commercialOps(snapshot, surface)}
+    </section>`;
+  return `
+    ${commercialSubnav(current)}
+    ${current === "visao" ? recorte : ""}
+    ${commercialOps(snapshot, current)}
   `;
 }
 
@@ -359,7 +363,7 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
       </dl>
     </section>`;
   }
-  return `${commercialSubnav(current)}${body}`;
+  return body;
 }
 
 export function financeBlock(snapshot: FinanceSnapshot): string {
