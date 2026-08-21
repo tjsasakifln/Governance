@@ -58,9 +58,13 @@ function receipt(kind: WriteReceipt["kind"], id: string): WriteReceipt {
  * Local Context API adapter backed by in-process fixtures.
  * No HTTP and no imports from sibling Control Center services.
  */
+function inheritsCompany(requested: string, recordScope: string): boolean {
+  return requested !== "company" && recordScope === "company";
+}
+
 export class StubContextApi implements ContextApiPort {
   private readonly sessionResults = new Map<string, WriteReceipt>();
-  private readonly blockers: WriteReceipt[] = [];
+  private readonly blockers = new Map<string, WriteReceipt>();
   private seq = 0;
 
   /** Intentionally unused by MCP tools — whole-company dump must never leak. */
@@ -76,8 +80,10 @@ export class StubContextApi implements ContextApiPort {
     if (!isFixtureScope(scope)) {
       throw new UnknownScopeError(scope);
     }
-    const records = contextRecords.filter((row) => row.scope === scope);
-    const first = records[0];
+    const records = contextRecords.filter(
+      (row) => row.scope === scope || inheritsCompany(scope, row.scope),
+    );
+    const first = records.find((row) => row.scope === scope) ?? records[0];
     return {
       scope,
       records: structuredClone(records),
@@ -93,7 +99,10 @@ export class StubContextApi implements ContextApiPort {
       throw new UnknownScopeError(scope);
     }
     return structuredClone(
-      directives.filter((row) => row.scope === scope && row.status === "active"),
+      directives.filter(
+        (row) =>
+          row.status === "active" && (row.scope === scope || inheritsCompany(scope, row.scope)),
+      ),
     );
   }
 
@@ -137,10 +146,14 @@ export class StubContextApi implements ContextApiPort {
   }
 
   async reportBlocker(input: BlockerInput): Promise<WriteReceipt> {
+    const key = `${input.scope}|${input.summary}|${input.severity}|${String(input.blocking)}`;
+    const existing = this.blockers.get(key);
+    if (existing) {
+      return structuredClone(existing);
+    }
     this.seq += 1;
     const saved = receipt("blocker", `bl_${this.seq}`);
-    this.blockers.push(saved);
-    void input;
+    this.blockers.set(key, saved);
     return structuredClone(saved);
   }
 }

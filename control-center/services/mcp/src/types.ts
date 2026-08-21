@@ -166,6 +166,58 @@ export const TOOL_NAMES = [
 
 export type ToolName = (typeof TOOL_NAMES)[number];
 
+/**
+ * Undotted compatibility aliases. Grok 1.0.5 qualifies tools as
+ * `<server>__<tool>` and ignores names that already contain extra dots.
+ * Aliases share the canonical implementation, validation, and audit path.
+ */
+export const TOOL_ALIAS_NAMES = [
+  "get_company_state",
+  "get_context",
+  "get_active_directives",
+  "get_priorities",
+  "get_client_context",
+  "get_decisions",
+  "report_session_result",
+  "report_blocker",
+] as const;
+
+export type ToolAliasName = (typeof TOOL_ALIAS_NAMES)[number];
+
+export const TOOL_ALIAS_TO_CANONICAL = {
+  get_company_state: "confenge.get_company_state",
+  get_context: "confenge.get_context",
+  get_active_directives: "confenge.get_active_directives",
+  get_priorities: "confenge.get_priorities",
+  get_client_context: "confenge.get_client_context",
+  get_decisions: "confenge.get_decisions",
+  report_session_result: "confenge.report_session_result",
+  report_blocker: "confenge.report_blocker",
+} as const satisfies Record<ToolAliasName, ToolName>;
+
+export const ADVERTISED_TOOL_NAMES = [...TOOL_NAMES, ...TOOL_ALIAS_NAMES] as const;
+
+export type AdvertisedToolName = (typeof ADVERTISED_TOOL_NAMES)[number];
+
+export function isCanonicalToolName(name: string): name is ToolName {
+  return (TOOL_NAMES as readonly string[]).includes(name);
+}
+
+export function isCompatibilityAlias(name: string): name is ToolAliasName {
+  return (TOOL_ALIAS_NAMES as readonly string[]).includes(name);
+}
+
+/** Resolve an advertised name onto the single canonical implementation. */
+export function canonicalToolName(name: string): ToolName | undefined {
+  if (isCanonicalToolName(name)) {
+    return name;
+  }
+  if (isCompatibilityAlias(name)) {
+    return TOOL_ALIAS_TO_CANONICAL[name];
+  }
+  return undefined;
+}
+
 export const RESOURCE_URIS = {
   checklist: "confenge://preflight/checklist",
   scopes: "confenge://preflight/scopes",

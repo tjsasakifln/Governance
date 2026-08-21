@@ -15,9 +15,11 @@ export const MARKERS = {
   finance: "SCOPE_FINANCE_MARKER",
   acme: "CLIENT_ACME_MARKER",
   beta: "CLIENT_BETA_MARKER",
+  hypothesis: "HYPOTHESIS_NOT_A_DECISION",
+  repoGovernance: "REPO_GOVERNANCE_MARKER",
 } as const;
 
-export const FIXTURE_SCOPES = ["company", "ops.commercial", "ops.finance"] as const;
+export const FIXTURE_SCOPES = ["company", "ops.commercial", "ops.finance", "repo:Governance"] as const;
 export const FIXTURE_CLIENTS = ["acme-ltda", "beta-industria"] as const;
 
 const OBSERVED = "2026-08-20T15:00:00.000Z";
@@ -120,6 +122,22 @@ export const contextRecords: ContextRecord[] = [
     body: `${MARKERS.finance}: Asaas is the payment provider; MCP tools must not charge, refund, checkout, or cancel. Open Diagnóstico receivable is 150000 cents BRL.`,
     scope: "ops.finance",
     ...prov({ source: "finance.ledger.read-model", freshness_status: "STALE", confidence: 0.7 }),
+  },
+  {
+    id: "ctx-comm-hyp-1",
+    kind: "hypothesis",
+    title: "Unconfirmed hallway expansion note",
+    body: `${MARKERS.hypothesis}: maybe ACME will expand next quarter. This is not a fact or a decision.`,
+    scope: "ops.commercial",
+    ...prov({ source: "governance.memory", freshness_status: "UNKNOWN", confidence: 0.3 }),
+  },
+  {
+    id: "ctx-repo-gov-1",
+    kind: "fact",
+    title: "Governance repository is strategic authority",
+    body: `${MARKERS.repoGovernance}: this repository remains the strategic/canonical plane. Agents read by scope and report session result or blocker only.`,
+    scope: "repo:Governance",
+    ...prov({ source: "governance.git", confidence: 0.95 }),
   },
 ];
 

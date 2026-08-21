@@ -12,13 +12,15 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "cc-governance-import": "./src/cli.ts"
+    "cc-governance-import": "./src/cli.ts",
+    "cc-governance-bootstrap": "./src/bootstrap.ts"
   },
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "import": "tsx src/cli.ts",
-    "dry-run": "tsx src/cli.ts"
+    "bootstrap": "tsx src/bootstrap.ts",
+    "dry-run": "tsx src/bootstrap.ts --dry-run"
   },
   "dependencies": {
     "@confenge/control-center-contracts": "*",

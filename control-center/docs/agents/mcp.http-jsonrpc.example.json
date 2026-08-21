@@ -1,0 +1,47 @@
+{
+  "description": "HTTP JSON-RPC / stdio shape for other MCP-capable clients. Token comes from the environment, never from this file. Bind loopback or VPN only. Do not create mcp.confenge.com.br.",
+  "stdio": {
+    "command": "npx",
+    "args": ["tsx", "control-center/services/mcp/src/index.ts"],
+    "env": {
+      "CONFENGE_MCP_AUTH_TOKEN": "${CONFENGE_MCP_AUTH_TOKEN}"
+    }
+  },
+  "http": {
+    "method": "POST",
+    "url": "http://127.0.0.1:8787/mcp",
+    "headers": {
+      "Authorization": "Bearer ${CONFENGE_MCP_AUTH_TOKEN}",
+      "Content-Type": "application/json"
+    },
+    "initialize": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {
+        "protocolVersion": "2025-03-26",
+        "capabilities": {},
+        "clientInfo": { "name": "other-mcp-client", "version": "0.0.0" }
+      }
+    },
+    "toolsCall": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "tools/call",
+      "params": {
+        "name": "get_context",
+        "arguments": { "scope": "repo:Governance" }
+      }
+    }
+  },
+  "aliases": [
+    "get_company_state",
+    "get_context",
+    "get_active_directives",
+    "get_priorities",
+    "get_client_context",
+    "get_decisions",
+    "report_session_result",
+    "report_blocker"
+  ]
+}

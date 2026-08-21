@@ -5,9 +5,9 @@ READ-ONLY projector of Git authority already stored in this repository
 **memory candidates**. This package is not chat, not a second catalog, not an
 ERP, and not a writer of origin systems.
 
-Dry-run is **mandatory and the default**. Persistence, MCP, and cockpit UI
-wiring belong to a later **convergence campaign**. This workstream does not
-import or edit sibling `control-center/` trees.
+Dry-run is **mandatory and the default**. The productive command is
+`cc-governance-bootstrap`. Apply writes **only** the Control Center database
+when both `--apply` and `--allow-control-center-db-write` are present.
 
 ## Decisions
 
@@ -40,8 +40,22 @@ import or edit sibling `control-center/` trees.
    not absorbed. Extra historical / legal packages are not copied into
    fixtures. Live walks may project whatever is already in Git as
    fact/hypothesis with provenance; they do not rewrite the catalog.
-10. `--persist` is refused. The local `PersistPort` exists only as a documented
-    adapter for later convergence.
+10. `--persist` is refused. `--apply --allow-control-center-db-write` is the
+    opt-in Control Center DB write. Git and providers are never written.
+    Partner-program / PR Governance #8 paths are reported, not absorbed.
+
+## Run (bootstrap)
+
+```bash
+cd control-center/importers/governance
+npx tsx src/bootstrap.ts --dry-run --root ../../..
+npx tsx src/bootstrap.ts --apply --allow-control-center-db-write --root ../../..
+```
+
+Dry-run is the default (the `--dry-run` flag is accepted and is equivalent to
+omitting `--apply`). Apply is explicit. Candidate count is recomputed from the
+observed commit; staging RC 74 is evidence, not a contract. The JSON report
+includes `bootstrap.staging_delta` explaining any difference.
 
 ## Run (dry-run)
 
@@ -75,7 +89,9 @@ read-only and never writes `decisions/`, `commercial/`, or origin Git.
 | `CC_GOVERNANCE_IMPORTER_ROOT` | Repo or fixture root (default: cwd) |
 | `CC_GOVERNANCE_IMPORTER_NOW` | Pin `observed_at` (UTC RFC3339 with `Z`) |
 | `CC_GOVERNANCE_IMPORTER_COMMIT_SHA` | Injected commit SHA for virtual/uncommitted trees |
-| `CC_GOVERNANCE_IMPORTER_ALLOW_PERSIST` | Must stay unset. Persist is disabled in this campaign. |
+| `CC_GOVERNANCE_IMPORTER_ALLOW_PERSIST` | Must stay unset. `--persist` is refused. |
+| `CC_GOVERNANCE_IMPORTER_ALLOW_APPLY` | Equivalent to `--allow-control-center-db-write`. |
+| `CONTROL_CENTER_DATABASE_URL` | Postgres URL for opt-in `--apply`. |
 
 No GitHub token, Asaas key, or human password is used or required.
 

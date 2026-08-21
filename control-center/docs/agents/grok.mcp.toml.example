@@ -1,0 +1,21 @@
+# Native Grok MCP client config (no scratch proxy).
+# Copy into ~/.grok/config.toml or a trusted project .grok/config.toml.
+# Expand CONFENGE_MCP_AUTH_TOKEN from the environment. Never commit a live token.
+#
+# Server name `confenge` has no extra dots. Call the undotted aliases so Grok
+# 1.0.5 qualifies them as confenge__get_context (not confenge__confenge.get_context).
+#
+# Loopback / VPN only. Do not point this at mcp.confenge.com.br.
+
+[mcp_servers.confenge]
+command = "npx"
+args = ["tsx", "control-center/services/mcp/src/index.ts"]
+env = { CONFENGE_MCP_AUTH_TOKEN = "${CONFENGE_MCP_AUTH_TOKEN}" }
+startup_timeout_sec = 60
+enabled = true
+
+# HTTP JSON-RPC alternative (still loopback). Do not combine with command.
+# [mcp_servers.confenge]
+# url = "http://127.0.0.1:8787/mcp"
+# headers = { Authorization = "Bearer ${CONFENGE_MCP_AUTH_TOKEN}" }
+# enabled = true

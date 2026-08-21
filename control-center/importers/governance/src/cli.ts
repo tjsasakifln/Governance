@@ -7,7 +7,10 @@ import { createControlCenterPersistPort } from "./cc-db.js";
 import { importGovernance } from "./import.js";
 import { createLogger, redactValue } from "./log.js";
 import { DEFAULT_RELATIVE_ROOTS } from "./tree.js";
-import type { GitMetadataProvider, ImportResult } from "./types.js";
+import type { GitMetadataProvider, ImportResult, PersistPort } from "./types.js";
+
+/** Staging RC evidence. Not a bootstrap candidate-count contract. */
+export const STAGING_RC_CANDIDATE_COUNT = 74;
 
 export type CliArgs = {
   help: boolean;
@@ -17,6 +20,8 @@ export type CliArgs = {
   out: string | null;
   persist: boolean;
   apply: boolean;
+  dryRun: boolean;
+  allowControlCenterDbWrite: boolean;
   relativeRoots: string[] | null;
 };
 
@@ -29,6 +34,8 @@ export function parseArgv(argv: string[]): CliArgs {
     out: null,
     persist: false,
     apply: false,
+    dryRun: false,
+    allowControlCenterDbWrite: false,
     relativeRoots: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -43,6 +50,14 @@ export function parseArgv(argv: string[]): CliArgs {
     }
     if (token === "--apply") {
       args.apply = true;
+      continue;
+    }
+    if (token === "--dry-run") {
+      args.dryRun = true;
+      continue;
+    }
+    if (token === "--allow-control-center-db-write") {
+      args.allowControlCenterDbWrite = true;
       continue;
     }
     const next = argv[i + 1];
@@ -77,27 +92,37 @@ export function parseArgv(argv: string[]): CliArgs {
 }
 
 export function helpText(): string {
-  return `Confenge Control Center Governance importer (READ-ONLY, dry-run default)
+  return `Confenge Control Center Governance bootstrap (dry-run default)
 
 Usage:
-  npm run dry-run -- --root <repo-or-fixture> [--now ISO-UTC] [--commit-sha SHA] [--out report.json]
-  npm run import -- --apply --root <repo>     # opt-in, Control Center DB only
+  cc-governance-bootstrap --dry-run
+  cc-governance-bootstrap --apply --allow-control-center-db-write
+
+  npm run bootstrap -- --dry-run --root <repo-or-fixture> [--now ISO-UTC] [--commit-sha SHA] [--out report.json]
+  npm run bootstrap -- --apply --allow-control-center-db-write --root <repo>
 
 Dry-run is the default. It prints candidates and does not write origin Git,
 Warmbly, Asaas, or the Control Center database.
 
---apply is opt-in and requires CC_GOVERNANCE_IMPORTER_ALLOW_APPLY=1 plus
+--apply is explicit and requires --allow-control-center-db-write plus
 CONTROL_CENTER_DATABASE_URL. Apply is idempotent and writes only the Control
-Center database. --persist remains refused.
+Center database. --persist remains refused. Git and providers are never written.
+PR Governance #8 / partner-program paths are reported, not absorbed.
+
+Classification is conservative: ambiguous prose is hypothesis; decision requires
+an explicit heading or JSON kind. Unclassifiable items are listed, never upgraded.
+Missing commit SHA is fail-closed (unclassifiable, freshness ERROR). SHA is never fabricated.
+
+Candidate count is recomputed from the observed tree. Staging RC observed 74
+candidates; that number is evidence, not a contract. The JSON report includes
+bootstrap.staging_delta explaining any difference.
 
 Env:
   CC_GOVERNANCE_IMPORTER_ROOT         Repository or fixture root
   CC_GOVERNANCE_IMPORTER_NOW          Pin observed_at (UTC RFC3339)
   CC_GOVERNANCE_IMPORTER_COMMIT_SHA   Injected commit SHA for virtual trees
-  CC_GOVERNANCE_IMPORTER_ALLOW_APPLY  Must be 1 to enable --apply
+  CC_GOVERNANCE_IMPORTER_ALLOW_APPLY  Equivalent to --allow-control-center-db-write
   CONTROL_CENTER_DATABASE_URL         Postgres URL for opt-in apply
-
-Missing commit SHA is fail-closed (unclassifiable, freshness ERROR). SHA is never fabricated.
 `;
 }
 
@@ -105,6 +130,10 @@ export type CliIo = {
   stdout: (line: string) => void;
   stderr: (line: string) => void;
   writeFile?: (path: string, body: string) => void;
+};
+
+export type CliDeps = {
+  createPersist?: (env: NodeJS.Dict<string>) => PersistPort;
 };
 
 export type CliOutcome = {
@@ -119,6 +148,7 @@ export async function runCli(
     stdout: (line) => process.stdout.write(`${line}\n`),
     stderr: (line) => process.stderr.write(`${line}\n`),
   },
+  deps: CliDeps = {},
 ): Promise<CliOutcome> {
   let args: CliArgs;
   try {
@@ -145,12 +175,25 @@ export async function runCli(
   }
 
   const applyRequested = args.apply || env.CC_GOVERNANCE_IMPORTER_APPLY === "1";
-  if (applyRequested && env.CC_GOVERNANCE_IMPORTER_ALLOW_APPLY !== "1") {
+  const applyAllowed =
+    args.allowControlCenterDbWrite || env.CC_GOVERNANCE_IMPORTER_ALLOW_APPLY === "1";
+  if (args.dryRun && applyRequested) {
+    io.stderr(
+      JSON.stringify({
+        event: "apply_refused",
+        code: "CC_GOVERNANCE_BOOTSTRAP_CONFLICTING_FLAGS",
+        message: "conflicting --dry-run and --apply; apply is explicit and dry-run is the default",
+      }),
+    );
+    return { code: 2 };
+  }
+  if (applyRequested && !applyAllowed) {
     io.stderr(
       JSON.stringify({
         event: "apply_refused",
         code: "CC_GOVERNANCE_IMPORTER_APPLY_NOT_ALLOWED",
-        message: "--apply requires CC_GOVERNANCE_IMPORTER_ALLOW_APPLY=1",
+        message:
+          "--apply requires --allow-control-center-db-write (Control Center DB only; no Git or provider write)",
       }),
     );
     return { code: 2 };
@@ -186,17 +229,24 @@ export async function runCli(
   const log = createLogger((line) => io.stderr(line), () => now);
 
   try {
+    const persist = applyRequested
+      ? (deps.createPersist ?? createControlCenterPersistPort)(env)
+      : undefined;
     const result = await importGovernance({
       root,
       now,
       git,
       dryRun: !applyRequested,
       persistEnabled: applyRequested,
-      persist: applyRequested ? createControlCenterPersistPort(env) : undefined,
+      persist,
       relativeRoots: args.relativeRoots ?? [...DEFAULT_RELATIVE_ROOTS],
       log,
     });
-    const body = JSON.stringify(redactValue(result), null, 2);
+    const payload = {
+      ...(redactValue(result) as ImportResult),
+      bootstrap: describeBootstrap(result, applyRequested),
+    };
+    const body = JSON.stringify(payload, null, 2);
     io.stdout(body);
     if (args.out) {
       const outPath = resolve(args.out);
@@ -217,6 +267,52 @@ export async function runCli(
     io.stderr(error instanceof Error ? error.message : String(error));
     return { code: 1 };
   }
+}
+
+export function describeBootstrap(
+  result: ImportResult,
+  applyRequested: boolean,
+): {
+  command: "cc-governance-bootstrap";
+  write_target: "control-center-db" | "none";
+  git_write: false;
+  provider_write: false;
+  observed_candidate_count: number;
+  staging_reference: {
+    candidate_count: number;
+    contract: false;
+    note: string;
+  };
+  staging_delta: {
+    candidate_count_delta: number;
+    explanation: string;
+    observed_commit_shas: string[];
+  };
+} {
+  const observed = result.stats.candidate_count;
+  const delta = observed - STAGING_RC_CANDIDATE_COUNT;
+  const shas = [...new Set(result.candidates.map((candidate) => candidate.commit_sha))].sort();
+  const explanation =
+    observed === STAGING_RC_CANDIDATE_COUNT
+      ? `Recomputed ${observed} candidates over ${result.repo_root} (files_scanned=${result.files_scanned}). Matches staging RC 74. 74 is staging evidence, not a contract.`
+      : `Recomputed ${observed} candidates over ${result.repo_root} (files_scanned=${result.files_scanned}, by_kind=${JSON.stringify(result.stats.by_kind)}, unclassifiable=${result.stats.unclassifiable_count}). Staging RC observed 74. Delta ${delta >= 0 ? "+" : ""}${delta}. Count is derived from the current tree and conservative classifier; 74 is not a contract.`;
+  return {
+    command: "cc-governance-bootstrap",
+    write_target: applyRequested ? "control-center-db" : "none",
+    git_write: false,
+    provider_write: false,
+    observed_candidate_count: observed,
+    staging_reference: {
+      candidate_count: STAGING_RC_CANDIDATE_COUNT,
+      contract: false,
+      note: "Staging RC evidence from CONFENGE-CC-MCP-CLIENT-COMPATIBILITY-01. Do not treat 74 as the candidate-count contract.",
+    },
+    staging_delta: {
+      candidate_count_delta: delta,
+      explanation,
+      observed_commit_shas: shas,
+    },
+  };
 }
 
 function isForbiddenOutPath(outPath: string, root: string): string | null {

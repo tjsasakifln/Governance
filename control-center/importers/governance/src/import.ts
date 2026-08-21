@@ -1,9 +1,10 @@
 import { classifyFile } from "./classify.js";
 import { buildCandidate } from "./candidate.js";
 import { resolveCommitSha } from "./git.js";
-import { contentHash } from "./hash.js";
+import { contentHash, toUtf8 } from "./hash.js";
 import { createLogger, type StructuredLogger } from "./log.js";
 import { refusePersistPort } from "./persist.js";
+import { contentSecretReason } from "./secrets.js";
 import {
   DEFAULT_RELATIVE_ROOTS,
   fromVirtual,
@@ -98,6 +99,22 @@ export async function importGovernance(options: ImportOptions): Promise<ImportRe
       continue;
     }
 
+    const decoded = toUtf8(file.bytes);
+    if (decoded !== null) {
+      const secretReason = contentSecretReason(decoded);
+      if (secretReason) {
+        unclassifiable.push({
+          source_path: file.path,
+          content_hash: hash,
+          commit_sha: commitSha,
+          reason: secretReason,
+          observed_at: observedAt,
+          freshness_status: "ERROR",
+        });
+        continue;
+      }
+    }
+
     const classification = classifyFile(file.path, file.bytes);
     if (!classification.classifiable) {
       unclassifiable.push({
@@ -160,7 +177,12 @@ export async function importGovernance(options: ImportOptions): Promise<ImportRe
 
   if (!dryRun && persistEnabled) {
     const persist = options.persist ?? refusePersistPort();
-    await persist.persistCandidates(result);
+    const outcome = await persist.persistCandidates(result);
+    result.persist = {
+      inserted: outcome.inserted,
+      skipped: outcome.skipped,
+      target: "control-center-db",
+    };
   }
 
   return result;
