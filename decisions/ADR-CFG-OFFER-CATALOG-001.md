@@ -46,3 +46,7 @@ This repository's root README remains a personal portfolio. This ADR and `commer
 - Publication, production checkout, production webhook, NFS-e and real money stay blocked until named gates leave `UNKNOWN` with evidence.
 - Governance #1 remains open until go-live gates are actually approved.
 - Changing Extra, prices or terms is a new version plus explicit authority — not an edit-in-place of v1.
+
+## Addendum 2026-08-20 — field-complete consumer contract
+
+Campaign `CONFENGE-GOVERNANCE-OFFER-AUTHORITY-CONVERGENCE-01` adds the named registry fields (`offer_id`, `internal_code`, descriptions, capacity, `checkout_mode`, mapping status, effective dates, `approval_state`, `change_reason`) without changing v1 prices, names or scopes. Asaas IDs live only in the mapping table and may be null. The Diagnóstico founder-approved overlay is recorded separately and does not flip portfolio gates or replace `CFG-TERMS-B2B-2026-08-17-v1`. See `commercial/CONSUMER-CONTRACT.md` and `commercial/DECISIONS-CHANGELOG.md`.

@@ -204,23 +204,46 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "offer_id",
         "offer_code",
         "offer_version",
         "public_name",
+        "internal_code",
+        "description_short",
+        "description_asaas",
         "status",
         "public",
         "billing_mode",
         "currency",
         "amount_cents",
+        "cycle",
+        "commitment_months",
+        "max_payments",
+        "total_commitment_cents",
+        "notice_days",
         "silent_renewal",
         "consumes_recurring_slot",
         "kill_switch",
-        "terms_version"
+        "scope_version",
+        "terms_version",
+        "capacity_required",
+        "capacity_units",
+        "checkout_mode",
+        "provider_mapping_status",
+        "sold_out",
+        "effective_from",
+        "effective_to",
+        "approval_state",
+        "change_reason"
       ],
       "properties": {
+        "offer_id": { "type": "string", "pattern": "^CFG-[A-Z0-9]+-[A-Z0-9]+-v[0-9]+$" },
         "offer_code": { "type": "string", "pattern": "^CFG-[A-Z0-9]+-[A-Z0-9]+-v[0-9]+$" },
         "offer_version": { "type": "string", "pattern": "^v[0-9]+$" },
         "public_name": { "type": "string", "minLength": 1 },
+        "internal_code": { "type": "string", "pattern": "^CFG-[A-Z0-9]+-[A-Z0-9]+$" },
+        "description_short": { "type": "string", "minLength": 1 },
+        "description_asaas": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/offer_status" },
         "public": { "type": "boolean" },
         "billing_mode": { "type": "string", "enum": ["ONE_TIME", "RECURRING"] },
@@ -236,7 +259,31 @@
         "consumes_recurring_slot": { "type": "boolean" },
         "kill_switch": { "const": true },
         "scope_ref": { "type": "string" },
+        "scope_version": { "type": "string", "minLength": 1 },
         "terms_version": { "const": "CFG-TERMS-B2B-2026-08-17-v1" },
+        "capacity_required": { "type": "boolean" },
+        "capacity_units": { "type": "integer", "minimum": 0 },
+        "checkout_mode": { "type": "string", "enum": ["DETACHED", "SUBSCRIPTION"] },
+        "provider_mapping_status": {
+          "type": "string",
+          "enum": ["PENDING", "MAPPED", "VERIFIED"]
+        },
+        "sold_out": { "type": "boolean" },
+        "effective_from": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "effective_to": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "approval_state": {
+          "type": "string",
+          "enum": ["DRAFT", "APPROVED", "ACTIVE", "PAUSED", "RETIRED"]
+        },
+        "change_reason": { "type": "string", "minLength": 1 },
+        "funnel_role": { "type": "string", "enum": ["ENTRY_ONE_OFF", "RECURRING_CORE"] },
+        "upsell_policy": { "const": "NEXT_ACTION_NOT_PROMISE" },
         "delivery_business_days_min": { "type": "integer", "minimum": 1 },
         "delivery_business_days_max": { "type": "integer", "minimum": 1 },
         "commercial_credit": { "$ref": "#/$defs/commercial_credit" },
@@ -255,7 +302,10 @@
               "commitment_months": { "type": "null" },
               "max_payments": { "type": "null" },
               "total_commitment_cents": { "type": "null" },
-              "consumes_recurring_slot": { "const": false }
+              "consumes_recurring_slot": { "const": false },
+              "capacity_required": { "const": false },
+              "capacity_units": { "const": 0 },
+              "checkout_mode": { "const": "DETACHED" }
             }
           }
         },
@@ -268,7 +318,9 @@
             "required": ["cycle", "commitment_months", "max_payments", "total_commitment_cents", "notice_days"],
             "properties": {
               "cycle": { "const": "MONTHLY" },
-              "consumes_recurring_slot": { "const": true }
+              "consumes_recurring_slot": { "const": true },
+              "capacity_required": { "const": true },
+              "checkout_mode": { "const": "SUBSCRIPTION" }
             }
           }
         },

@@ -1,0 +1,50 @@
+{
+  "schema_version": "provider-mapping.v1",
+  "registry_id": "CFG-ASAAS-MAPPING-v1",
+  "provider": "asaas",
+  "authority": "Governance defines the offer. Asaas only receives mapping after founder manual cadastro.",
+  "external_reference_policy": "cfg:{offer_id}:{correlation_id}",
+  "secrets_forbidden": true,
+  "mappings": [
+    {
+      "offer_id": "CFG-DIAG-EXP-v1",
+      "asaas_product_id": null,
+      "checkout_id": null,
+      "subscription_mapping": null,
+      "environment": "PRODUCTION",
+      "status": "PENDING_MANUAL_CADASTRO",
+      "created_at": null,
+      "verified_at": null
+    },
+    {
+      "offer_id": "CFG-DIRB2G-FLEX-v1",
+      "asaas_product_id": null,
+      "checkout_id": null,
+      "subscription_mapping": null,
+      "environment": "PRODUCTION",
+      "status": "PENDING_MANUAL_CADASTRO",
+      "created_at": null,
+      "verified_at": null
+    },
+    {
+      "offer_id": "CFG-DIRB2G-180-v1",
+      "asaas_product_id": null,
+      "checkout_id": null,
+      "subscription_mapping": null,
+      "environment": "PRODUCTION",
+      "status": "PENDING_MANUAL_CADASTRO",
+      "created_at": null,
+      "verified_at": null
+    },
+    {
+      "offer_id": "CFG-DIRB2G-365-v1",
+      "asaas_product_id": null,
+      "checkout_id": null,
+      "subscription_mapping": null,
+      "environment": "PRODUCTION",
+      "status": "PENDING_MANUAL_CADASTRO",
+      "created_at": null,
+      "verified_at": null
+    }
+  ]
+}

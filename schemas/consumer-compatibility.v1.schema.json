@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/consumer-compatibility.v1.schema.json",
+  "title": "CONFENGE consumer compatibility contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "rule",
+    "consumers",
+    "canonical_catalog",
+    "pin_command",
+    "exact_hash_rule",
+    "canonical_representation",
+    "accepted_consumer_aliases",
+    "forbidden_silent_coercions",
+    "migration_notes"
+  ],
+  "properties": {
+    "schema_version": { "const": "consumer-compatibility.v1" },
+    "contract_id": { "const": "CFG-CONSUMER-COMPAT-v1" },
+    "rule": { "const": "GOVERNANCE_WINS" },
+    "consumers": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "canonical_catalog": { "const": "commercial/offers/catalog.v1.json" },
+    "pin_command": { "const": "python scripts/validate_commercial_authority.py" },
+    "exact_hash_rule": { "type": "string", "minLength": 1 },
+    "canonical_representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["billing_mode", "one_off_null_fields", "scope_version_by_offer"],
+      "properties": {
+        "billing_mode": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "string", "enum": ["ONE_TIME", "RECURRING"] }
+        },
+        "one_off_null_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scope_version_by_offer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "CFG-DIAG-EXP-v1",
+            "CFG-DIRB2G-FLEX-v1",
+            "CFG-DIRB2G-180-v1",
+            "CFG-DIRB2G-365-v1"
+          ],
+          "properties": {
+            "CFG-DIAG-EXP-v1": { "const": "CFG-SCOPE-DIAG-EXP-v1" },
+            "CFG-DIRB2G-FLEX-v1": { "const": "CFG-SCOPE-DIRB2G-STD-v1" },
+            "CFG-DIRB2G-180-v1": { "const": "CFG-SCOPE-DIRB2G-STD-v1" },
+            "CFG-DIRB2G-365-v1": { "const": "CFG-SCOPE-DIRB2G-STD-v1" }
+          }
+        }
+      }
+    },
+    "accepted_consumer_aliases": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/drift" }
+    },
+    "forbidden_silent_coercions": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "migration_notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drift_id", "aliases", "alias_only"],
+      "properties": {
+        "drift_id": {
+          "type": "string",
+          "enum": [
+            "one_off_null_vs_0_1",
+            "billing_enum_casing",
+            "scope_version_local_freeze"
+          ]
+        },
+        "applies_to": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "canonical": { "type": "object" },
+        "canonical_by_offer": { "type": "object" },
+        "aliases": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object" }
+        },
+        "alias_only": { "const": true }
+      }
+    }
+  }
+}
