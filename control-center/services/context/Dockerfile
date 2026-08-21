@@ -8,8 +8,12 @@ WORKDIR /src
 COPY package.json package-lock.json .npmrc ./
 COPY contracts ./contracts
 COPY persistence ./persistence
+COPY intelligence/attention ./intelligence/attention
 COPY services/context ./services/context
-RUN npm install --omit=dev --ignore-scripts --workspace=@confenge/control-center-context --include-workspace-root \
+RUN npm install --omit=dev --ignore-scripts \
+  --workspace=@confenge/control-center-context \
+  --workspace=@confenge/control-center-attention \
+  --include-workspace-root \
   && npm install tsx@4.20.5 --no-save --ignore-scripts \
   && npm cache clean --force
 
