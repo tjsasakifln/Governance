@@ -12,11 +12,14 @@
     ".": "./src/index.ts"
   },
   "bin": {
-    "warmbly-collect": "./src/cli.ts"
+    "warmbly-collect": "./src/cli.ts",
+    "cc-connector-canary": "./src/canary.ts"
   },
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "collect": "tsx src/cli.ts",
+    "canary": "tsx src/canary.ts",
+    "cc-connector-canary": "tsx src/canary.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

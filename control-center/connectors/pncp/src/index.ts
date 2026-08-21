@@ -57,3 +57,13 @@ export type {
   StatusMapping,
   UpstreamStatus,
 } from "./types.js";
+export { parseCanaryArgs, runCli as runCanaryCli, runPncpCanary } from "./canary.js";
+export { CAPABILITIES, CANARY_COLLECTORS, buildEnvelope } from "./envelope.js";
+export type { Capability, CanaryReport } from "./envelope.js";
+export {
+  PNCP_BINDING_SECRETS,
+  argvLooksForbidden,
+  isFixtureLocator,
+  loadPncpProductionConfig,
+  resolvePncpProductionBinding,
+} from "./production-config.js";

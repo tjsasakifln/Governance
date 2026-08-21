@@ -29,7 +29,10 @@ export class RecordingTransport implements HttpTransport {
 }
 
 export class DefaultFetchTransport implements HttpTransport {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(
+    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly timeoutMs: number = 8_000,
+  ) {}
 
   async request(req: HttpRequest): Promise<HttpResponse> {
     if (req.method.toUpperCase() !== "GET" || isMutationMethod(req.method)) {
@@ -43,6 +46,7 @@ export class DefaultFetchTransport implements HttpTransport {
       method: "GET",
       headers: req.headers,
       redirect: "error",
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
     const bodyText = await res.text();
     const headers: Record<string, string> = {};

@@ -7,11 +7,16 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "cc-connector-canary": "./dist/src/canary.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json --pretty false",
     "typecheck": "tsc -p tsconfig.json --pretty false --noEmit",
     "test": "tsc -p tsconfig.json --pretty false && node --test dist/tests/*.test.js",
-    "collect": "tsc -p tsconfig.json --pretty false && node dist/src/cli.js"
+    "collect": "tsc -p tsconfig.json --pretty false && node dist/src/cli.js",
+    "canary": "tsc -p tsconfig.json --pretty false && node dist/src/canary.js",
+    "cc-connector-canary": "tsc -p tsconfig.json --pretty false && node dist/src/canary.js"
   },
   "exports": {
     ".": "./dist/src/index.js"
