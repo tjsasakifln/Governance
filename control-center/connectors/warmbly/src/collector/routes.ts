@@ -46,6 +46,30 @@ export const COLLECT_ROUTES: CollectRoute[] = [
   },
   { key: "confenge_today", method: "GET", path: "/v1/confenge/today", required: false },
   { key: "confenge_inbound", method: "GET", path: "/v1/confenge/inbound", required: false },
+  {
+    key: "confenge_intel_scoreboard",
+    method: "GET",
+    path: "/v1/confenge/intel/scoreboard?include_synthetic=0",
+    required: false,
+  },
+  {
+    key: "confenge_intel_executive",
+    method: "GET",
+    path: "/v1/confenge/intel/executive?include_synthetic=0",
+    required: false,
+  },
+  {
+    key: "confenge_intel_exceptions",
+    method: "GET",
+    path: "/v1/confenge/intel/exceptions",
+    required: false,
+  },
+  {
+    key: "confenge_intel_organic_scoreboard",
+    method: "GET",
+    path: "/v1/confenge/intel/organic-scoreboard",
+    required: false,
+  },
 ];
 
 export const MAPPED_READ_ROUTES = COLLECT_ROUTES.map((r) => `${r.method} ${r.path.split("?")[0]}`);

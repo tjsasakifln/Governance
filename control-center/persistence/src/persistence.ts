@@ -49,6 +49,7 @@ import {
   recordSnapshot,
   reviseSnapshot,
 } from './repositories/snapshots.js';
+import { listOperatorActionsByScope, recordOperatorAction } from './repositories/operator-actions.js';
 import type {
   AppendAuditEventInput,
   CreateAttentionItemInput,
@@ -56,6 +57,7 @@ import type {
   FinishCollectorRunInput,
   RecordAgentActivityInput,
   RecordObservationInput,
+  RecordOperatorActionInput,
   RecordSnapshotInput,
   RetentionPolicyInput,
   ReviseSnapshotInput,
@@ -193,6 +195,14 @@ export class Persistence {
 
   async countSnapshotsByIdempotencyKey(idempotencyKey: string) {
     return withTransaction(this.pool, (tx) => countSnapshotsByIdempotencyKey(tx, idempotencyKey));
+  }
+
+  async recordOperatorAction(input: RecordOperatorActionInput) {
+    return withTransaction(this.pool, (tx) => recordOperatorAction(tx, input));
+  }
+
+  async listOperatorActionsByScope(scope: string) {
+    return withTransaction(this.pool, (tx) => listOperatorActionsByScope(tx, scope));
   }
 
   async createAttentionItem(input: CreateAttentionItemInput) {

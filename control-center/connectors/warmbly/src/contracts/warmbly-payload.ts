@@ -231,6 +231,10 @@ export type WarmblyPayload = {
   confenge_attention?: WarmblyAttentionItem[] | WarmblyList<WarmblyAttentionItem>;
   confenge_today?: WarmblyTodayView | { data: WarmblyTodayView };
   confenge_inbound?: WarmblyInboundItem[] | WarmblyList<WarmblyInboundItem>;
+  confenge_intel_scoreboard?: Record<string, unknown>;
+  confenge_intel_executive?: Record<string, unknown>;
+  confenge_intel_exceptions?: unknown;
+  confenge_intel_organic_scoreboard?: Record<string, unknown>;
   unavailable?: EndpointFailure[];
 };
 

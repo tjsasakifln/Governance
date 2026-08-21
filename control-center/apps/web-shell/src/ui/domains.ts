@@ -30,7 +30,40 @@ function listFact(label: string, items: string[] | undefined): string {
   return fact(label, escapeHtml(items.join(", ")));
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot): string {
+function operationsOf(snapshot: CommercialSnapshot): Record<string, unknown> {
+  return snapshot.operations && typeof snapshot.operations === "object" ? snapshot.operations : {};
+}
+
+function metricRate(value: unknown): string {
+  const rec = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!rec) return "—";
+  const num = rec.numerator;
+  const den = rec.denominator;
+  if (typeof num !== "number" || typeof den !== "number") return "—";
+  if (den === 0) return `${num}/${den} (sem denominador)`;
+  const pct = rec.ratio === null || rec.ratio === undefined ? "—" : `${Math.round(Number(rec.ratio) * 1000) / 10}%`;
+  const tiny = rec.tiny_denominator === true ? " · amostra pequena, não é evidência estatística" : "";
+  return `${pct} (${num}/${den})${tiny}`;
+}
+
+export function commercialSubnav(surface: string | null): string {
+  const items = [
+    ["visao", "Visão"],
+    ["cohorts", "Coortes"],
+    ["atividade", "Atividade"],
+    ["pipeline", "Pipeline"],
+    ["excecoes", "Exceções"],
+  ] as const;
+  const current = surface && surface.length > 0 ? surface : "visao";
+  return `<nav class="subnav" aria-label="Superfícies comerciais">${items
+    .map(
+      ([id, label]) =>
+        `<a href="#/comercial/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${label}</a>`,
+    )
+    .join("")}</nav>`;
+}
+
+export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -75,7 +108,127 @@ export function commercialBlock(snapshot: CommercialSnapshot): string {
       </dl>
       ${provenanceBlock(snapshot.provenance)}
     </section>
+    ${commercialOps(snapshot, surface)}
   `;
+}
+
+function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+  const ops = operationsOf(snapshot);
+  const current = surface && surface.length > 0 ? surface : "visao";
+  const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
+  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
+  const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
+  const activity = Array.isArray(ops.activity) ? ops.activity : [];
+  const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
+  const exceptions = Array.isArray(ops.exceptions) ? ops.exceptions : [];
+  const availability = snapshot.availability ?? "UNKNOWN";
+  let body = "";
+  if (current === "cohorts") {
+    const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];
+    const inbound = cohorts.inbound_truth && typeof cohorts.inbound_truth === "object" ? (cohorts.inbound_truth as Record<string, unknown>) : {};
+    body = `
+      <section class="stack" aria-labelledby="cohorts-title">
+        <h2 id="cohorts-title">Coortes</h2>
+        <p class="constraint">${escapeHtml(String(cohorts.mixing_rule ?? "Coortes de aquisição e métricas de período são rotuladas em separado."))}</p>
+        <div class="cards">${acquisition
+          .map((item) => {
+            const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}">
+              <h3>Janela ${escapeHtml(String(row.window))} · ${escapeHtml(String(row.kind))}</h3>
+              <p>${escapeHtml(String(row.anchor_label ?? row.anchor_event ?? ""))}</p>
+              <dl class="facts">
+                ${fact("População", String(row.population ?? "—"))}
+                ${fact("Contactados", String(row.contacted ?? "—"))}
+                ${fact("Reply rate", metricRate(row.reply_rate))}
+                ${fact("Qualified-reply rate", metricRate(row.qualified_reply_rate))}
+                ${fact("Opportunity conversion", metricRate(row.opportunity_conversion))}
+                ${fact("Win conversion", metricRate(row.win_conversion))}
+              </dl>
+            </article>`;
+          })
+          .join("")}</div>
+        <article class="card">
+          <h3>Inbound truth (Warmbly)</h3>
+          <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
+          <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
+        </article>
+      </section>`;
+  } else if (current === "atividade") {
+    body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
+      activity.length === 0
+        ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
+        : activity
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              return `<article class="card">
+                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
+                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+                <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
+                <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
+                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+                  <button type="submit">Validar atividade</button>
+                </form>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else if (current === "pipeline") {
+    body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
+      pipeline.length === 0
+        ? `<p class="banner empty">Sem negócios observados. Ausência não é zero.</p>`
+        : pipeline
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              const value = row.value && typeof row.value === "object" ? (row.value as { amount_cents?: number; currency?: string }) : null;
+              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
+                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
+                <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
+                ${value && typeof value.amount_cents === "number" ? `<p class="money">${escapeHtml(formatMoney({ amount_cents: value.amount_cents, currency: value.currency ?? "BRL" }))}</p>` : ""}
+                <dl class="facts">
+                  ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
+                  ${fact("Idade (s)", String(row.age_seconds ?? "—"))}
+                </dl>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else if (current === "excecoes") {
+    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2><div class="stack">${
+      exceptions.length === 0
+        ? `<p class="banner empty">Nenhuma exceção observada.</p>`
+        : exceptions
+            .map((item) => {
+              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              return `<article class="card">
+                <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
+                <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+                <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
+                <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
+                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
+                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
+                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+                  <button type="submit">Reconhecer</button>
+                </form>
+              </article>`;
+            })
+            .join("")
+    }</div></section>`;
+  } else {
+    body = `<section aria-labelledby="comercial-ops-title">
+      <h2 id="comercial-ops-title">Operação agora</h2>
+      <dl class="facts">
+        ${fact("Disponibilidade da origem", escapeHtml(String(availability)))}
+        ${fact("Auto-send", auto.enabled === true ? "OBSERVADO LIGADO — Control Center não liga envio" : "desligado")}
+        ${fact("Exceções", String(overview.exceptions ?? "—"))}
+        ${fact("Overdue", String(overview.overdue_work ?? "—"))}
+        ${fact("Inbound a tratar", String(overview.inbound_requiring_attention ?? "—"))}
+        ${fact("Oportunidades a agir", String(overview.opportunities_requiring_action ?? "—"))}
+      </dl>
+    </section>`;
+  }
+  return `${commercialSubnav(current)}${body}`;
 }
 
 export function financeBlock(snapshot: FinanceSnapshot): string {
@@ -133,7 +286,27 @@ export function engineeringBlock(snapshot: EngineeringSnapshot): string {
         ${hypo}
         <div><dt>Checks falhando</dt><dd>${snapshot.failing_check_count}</dd></div>
         <div><dt>Incidentes abertos</dt><dd>${snapshot.open_incident_count}</dd></div>
+        ${listFact("Allowlist", snapshot.allowlist)}
       </dl>
+      ${
+        snapshot.repos && snapshot.repos.length > 0
+          ? `<div class="stack">${snapshot.repos
+              .map((repo) => {
+                const name = String(repo.repository ?? repo.full_name ?? "repo");
+                return `<article class="card">
+                  <h3>${escapeHtml(name)}</h3>
+                  <dl class="facts">
+                    ${fact("PRs abertos", String(repo.open_pr_count ?? "—"))}
+                    ${fact("Draft/ready", `${repo.draft_pr_count ?? "—"} / ${repo.ready_pr_count ?? "—"}`)}
+                    ${fact("CI falhando", String(repo.failing_check_count ?? "—"))}
+                    ${fact("Última atividade", String(repo.last_activity_at ?? "—"))}
+                  </dl>
+                  <p><a href="https://github.com/${escapeHtml(name)}" rel="noreferrer">Abrir no GitHub</a></p>
+                </article>`;
+              })
+              .join("")}</div>`
+          : ""
+      }
       ${provenanceBlock(snapshot.provenance)}
     </section>
   `;

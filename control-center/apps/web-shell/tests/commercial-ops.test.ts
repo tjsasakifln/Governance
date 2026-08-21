@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { paintShell, createMemoryRuntime } from "../src/app";
+import { createMockAdapter } from "../src/adapters/index";
+import { parseHash } from "../src/destinations";
+
+test("commercial surfaces render cohort, pipeline, activity and exception operator forms", () => {
+  const adapter = createMockAdapter();
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/comercial/cohorts");
+  assert.match(root.innerHTML, /data-surface="cohorts"/);
+  assert.match(root.innerHTML, /Coortes/);
+  paintShell(root, adapter, "#/comercial/excecoes");
+  assert.match(root.innerHTML, /data-operator-form="ACKNOWLEDGE_EXCEPTION"|Exceções comerciais/);
+  paintShell(root, adapter, "#/comercial/pipeline");
+  assert.match(root.innerHTML, /Pipeline ativo/);
+  paintShell(root, adapter, "#/crescimento");
+  assert.match(root.innerHTML, /Crescimento|inbound|PNCP|comercial/i);
+});
+
+test("parseHash keeps commercial surfaces and client resources", () => {
+  assert.equal(parseHash("#/comercial/atividade").surface, "atividade");
+  assert.equal(parseHash("#/clientes/acme-industria").resource, "acme-industria");
+});
+
+test("memory runtime can navigate commercial surfaces", () => {
+  const runtime = createMemoryRuntime("#/comercial");
+  assert.equal(runtime.getHash(), "#/comercial");
+  runtime.setHash("#/comercial/cohorts");
+  assert.equal(runtime.getHash(), "#/comercial/cohorts");
+});

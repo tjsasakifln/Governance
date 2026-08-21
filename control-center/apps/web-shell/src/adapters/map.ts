@@ -274,6 +274,11 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
       ...(typeof drift.detail === "string" ? { detail: drift.detail } : {}),
     };
   }
+  if (typeof row.availability === "string") snap.availability = row.availability;
+  if (row.operations && typeof row.operations === "object") {
+    const ops = asRecord(row.operations);
+    if (ops) snap.operations = ops;
+  }
   return snap;
 }
 
@@ -401,6 +406,10 @@ export function engineeringFrom(row: Record<string, unknown>, fallback: Provenan
       ...(typeof hypo.detail === "string" ? { detail: hypo.detail } : {}),
     };
   }
+  if (Array.isArray(row.repos)) {
+    snap.repos = row.repos.map((item) => asRecord(item) ?? {});
+  }
+  if (Array.isArray(row.allowlist)) snap.allowlist = row.allowlist.map(String);
   return snap;
 }
 

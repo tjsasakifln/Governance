@@ -34,7 +34,7 @@ Live GitHub (still GET-only) uses env tokens and `GITHUB_REPOS`. Do not run live
 | `GITHUB_TOKEN` / `GITHUB_PAT` / `GH_TOKEN` | PAT bearer token |
 | `GITHUB_APP_INSTALLATION_TOKEN` | Pre-minted GitHub App installation token |
 | `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_INSTALLATION_ID` | Documented for operators. If present without `GITHUB_APP_INSTALLATION_TOKEN`, collect fails closed. Minting requires POST and is out of band. |
-| `GITHUB_REPOS` | Comma-separated allowlist `owner/name,owner/name` |
+| `GITHUB_REPOS` | Comma-separated allowlist `owner/name,owner/name`. Recommended CONFENGE operational set: `tjsasakifln/Governance,tjsasakifln/warmbly,tjsasakifln/extra-cli,tjsasakifln/web-cfg`. Required; never implied. |
 | `GITHUB_API_BASE` | Default `https://api.github.com` |
 | `GITHUB_RECENT_COMMIT_LIMIT` | 1–100, default 10 |
 | `GITHUB_COMPARE_HEADS` | JSON map `{"owner/name":{"base":"main","head":"develop"}}` |

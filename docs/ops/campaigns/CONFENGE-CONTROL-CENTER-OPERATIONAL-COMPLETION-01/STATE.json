@@ -1,0 +1,10 @@
+{
+  "campaign": "CONFENGE-CONTROL-CENTER-OPERATIONAL-COMPLETION-01",
+  "base_sha": "c5c7a3010fe8278df4fb18ca07a7d37215c33a22",
+  "deployed_sha_observed": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "production_mutated": false,
+  "governance_pr_8_touched": false,
+  "companion_prs": [],
+  "real_money_mutation_approved": false,
+  "warmbly_auto_send_enabled": false
+}

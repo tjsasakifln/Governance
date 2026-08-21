@@ -32,6 +32,7 @@ export async function startServer(
   const listener = createRequestListener({
     service: boot.service,
     operational: boot.operational,
+    operatorActions: boot.operatorActions,
     logger,
   });
   const server = createServer(listener);

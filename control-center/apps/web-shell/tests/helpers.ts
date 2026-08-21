@@ -91,6 +91,7 @@ export function operationalRouter(): (url: string) => unknown {
     if (path.endsWith("/v1/domains/finance")) return finance;
     if (path.endsWith("/v1/domains/engineering")) return engineering;
     if (path.endsWith("/v1/domains/infrastructure")) return { items: [health] };
+    if (path.endsWith("/v1/domains/pncp")) return health;
     if (path.endsWith("/v1/context")) return context;
     if (path.endsWith("/v1/directives")) return { ok: true };
     return undefined;

@@ -81,6 +81,59 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     return result.page.priorities;
   }
 
+  async operatorAction(input: {
+    action_type: string;
+    target_canonical_id: string;
+    target_source_id: string;
+    note: string;
+    idempotency_key?: string;
+  }): Promise<AdapterWriteResult> {
+    const forbidden = [
+      "SEND_CAMPAIGN",
+      "SEND_EMAIL",
+      "SEND_WHATSAPP",
+      "AUTO_SEND_ENABLE",
+      "CHARGE",
+      "REFUND",
+      "PAYMENT",
+    ];
+    if (forbidden.includes(input.action_type)) {
+      return { ok: false, path: "/v1/operator-actions", kind: "nota", message: "ação comercial proibida" };
+    }
+    try {
+      const idempotency = input.idempotency_key ?? `${input.action_type}:${input.target_canonical_id}:${input.note}`;
+      const response = await this.fetchImpl(`${this.baseUrl}/v1/operator-actions`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "x-actor-id": this.operator.id,
+          "x-actor-kind": this.operator.kind,
+        },
+        body: JSON.stringify({
+          action_type: input.action_type,
+          target_canonical_id: input.target_canonical_id,
+          target_source_id: input.target_source_id,
+          note: input.note,
+          idempotency_key: idempotency,
+          correlation_id: idempotency,
+          scope: "commercial",
+        }),
+      });
+      if (!response.ok) {
+        return { ok: false, path: "/v1/operator-actions", kind: "nota", message: `recusado (${response.status})` };
+      }
+      return { ok: true, path: "/v1/operator-actions", kind: "nota", message: "ação registrada no Control Center" };
+    } catch (err) {
+      return {
+        ok: false,
+        path: "/v1/operator-actions",
+        kind: "nota",
+        message: err instanceof Error ? err.message : "gravação indisponível",
+      };
+    }
+  }
+
   async writeShortcut(kind: WriteShortcutKind, draft: { title: string; body: string }): Promise<AdapterWriteResult> {
     if (!(WRITE_SHORTCUT_KINDS as readonly string[]).includes(kind)) {
       return { ok: false, path: AUTHORIZED_WRITE_PATH, kind, message: "atalho não autorizado" };
@@ -215,12 +268,32 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     };
   }
 
+  private domainBody(payload: unknown, fallback: Provenance): Record<string, unknown> {
+    const rec = asRecord(payload) ?? {};
+    const slot = asRecord(rec.snapshot) ?? rec;
+    const nested = asRecord(slot.snapshot);
+    const body = { ...(nested ?? slot) };
+    if (!body.freshness_status) body.freshness_status = slot.freshness_status ?? rec.freshness_status ?? fallback.freshness_status;
+    if (!body.observed_at) body.observed_at = slot.observed_at ?? rec.generated_at ?? fallback.observed_at;
+    if (!asRecord(body.source) && asRecord(slot.source)) body.source = slot.source;
+    if (!asRecord(body.provenance)) {
+      body.provenance = {
+        source: body.source ?? slot.source ?? fallback.source,
+        observed_at: body.observed_at,
+        freshness_status: body.freshness_status,
+        confidence: body.confidence ?? slot.confidence ?? fallback.confidence,
+      };
+    }
+    return body;
+  }
+
   private async loadDomain(id: DestinationId, fallback: Provenance): Promise<DestinationPage> {
-    const [path] = readPathsFor(id);
-    const payload = await this.getJson(path!);
+    const paths = readPathsFor(id);
+    const payloads = await Promise.all(paths.map((path) => this.getJson(path)));
+    const payload = payloads[0];
     const dest = getDestination(id);
     const rec = asRecord(payload) ?? {};
-    const inner = asRecord(rec.snapshot) ?? rec;
+    const inner = this.domainBody(payload, fallback);
     const page: DestinationPage = {
       id,
       label: dest.label,
@@ -231,19 +304,23 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       attention: [],
       priorities: [],
     };
-    if (id === "comercial") {
+    if (id === "comercial" || id === "crescimento") {
       page.commercial = commercialFrom(inner, fallback);
+    }
+    if (id === "crescimento" && payloads[1]) {
+      const pncp = this.domainBody(payloads[1], fallback);
+      page.health = [healthFrom(pncp, fallback)];
     } else if (id === "financeiro") {
       page.finance = financeFrom(inner, fallback);
     } else if (id === "engenharia") {
       page.engineering = engineeringFrom(inner, fallback);
     } else if (id === "clientes") {
-      const rows = itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.clients);
-      page.clients = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
-        clientFrom(asRecord(row) ?? {}, fallback),
-      );
+      const list = itemsOf(inner.clients);
+      const rows = list.length > 0 ? list : itemsOf(payload).length > 0 ? itemsOf(payload) : inner.schema_version ? [inner] : [];
+      page.clients = rows.map((row) => clientFrom(asRecord(row) ?? {}, fallback));
     } else if (id === "infra") {
-      const rows = itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.health);
+      const list = itemsOf(inner.services);
+      const rows = list.length > 0 ? list : itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.health);
       page.health = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
         healthFrom(asRecord(row) ?? {}, fallback),
       );

@@ -37,8 +37,11 @@ export function applicableDomains(query: Scope): readonly OperationalDomain[] {
   if (query === "company") {
     return OPERATIONAL_DOMAINS;
   }
-  if (query === "commercial" || query === "inbound") {
+  if (query === "commercial") {
     return ["commercial"];
+  }
+  if (query === "inbound") {
+    return ["commercial", "pncp"];
   }
   if (query === "finance") {
     return ["finance"];
@@ -68,6 +71,24 @@ export function snapshotKindToDomain(kind: string): OperationalDomain | null {
   }
   if (normalized === "founder-override" || normalized === "founder_override") {
     return null;
+  }
+  if (normalized.includes("warmbly") || normalized.includes("commercial")) {
+    return "commercial";
+  }
+  if (normalized.includes("asaas") || normalized.includes("finance")) {
+    return "finance";
+  }
+  if (normalized.includes("github") || normalized.includes("engineering") || normalized.includes("repo")) {
+    return "engineering";
+  }
+  if (normalized.includes("infra")) {
+    return "infrastructure";
+  }
+  if (normalized.includes("pncp")) {
+    return "pncp";
+  }
+  if (normalized.includes("client")) {
+    return "clients";
   }
   return null;
 }

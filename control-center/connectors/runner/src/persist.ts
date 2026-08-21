@@ -1,8 +1,10 @@
 import {
   canonicalObservationIdempotencyKey,
   canonicalSnapshotIdempotencyKey,
+  stripSecretOrPiiKeys,
   type Persistence,
 } from "@confenge/control-center-persistence";
+import { projectCollector } from "./projectors/project.ts";
 import type { CollectorEnvelope, CollectorName } from "./run.ts";
 
 export type PersistSourceResult = {
@@ -13,6 +15,7 @@ export type PersistSourceResult = {
   observedAt: string;
   errorCode: string | null;
   errorMessage: string | null;
+  projected: number;
 };
 
 function scopeFor(collector: CollectorName): string {
@@ -32,10 +35,11 @@ function scopeFor(collector: CollectorName): string {
 }
 
 function payloadObject(payload: unknown): Record<string, unknown> {
-  if (payload !== null && typeof payload === "object" && !Array.isArray(payload)) {
-    return payload as Record<string, unknown>;
+  const stripped = stripSecretOrPiiKeys(payload);
+  if (stripped !== null && typeof stripped === "object" && !Array.isArray(stripped)) {
+    return stripped as Record<string, unknown>;
   }
-  return { value: payload ?? null };
+  return { value: stripped ?? null };
 }
 
 export async function persistSourceResult(
@@ -61,6 +65,7 @@ export async function persistSourceResult(
   });
   let observationFailed = false;
   let snapshotFailed = false;
+  let projected = 0;
   try {
     await persistence.recordObservation({
       scope,
@@ -80,25 +85,31 @@ export async function persistSourceResult(
   } catch {
     observationFailed = true;
   }
-  try {
-    await persistence.recordSnapshot({
-      scope,
-      snapshotKind: `${envelope.collector}-snapshot`,
-      payload: payloadObject(envelope.payload),
-      idempotencyKey: canonicalSnapshotIdempotencyKey({
-        scope,
-        snapshotKind: `${envelope.collector}-snapshot`,
-        source,
+
+  const projections = projectCollector(envelope);
+  for (const projectedSnapshot of projections) {
+    try {
+      await persistence.recordSnapshot({
+        scope: projectedSnapshot.scope,
+        snapshotKind: projectedSnapshot.snapshot_kind,
+        payload: payloadObject(projectedSnapshot.payload),
+        idempotencyKey: canonicalSnapshotIdempotencyKey({
+          scope: projectedSnapshot.scope,
+          snapshotKind: projectedSnapshot.snapshot_kind,
+          source: projectedSnapshot.source,
+          observedAt,
+        }),
+        source: projectedSnapshot.source,
         observedAt,
-      }),
-      source,
-      observedAt,
-      freshnessStatus: envelope.freshness_status,
-      confidence: envelope.confidence,
-    });
-  } catch {
-    snapshotFailed = true;
+        freshnessStatus: projectedSnapshot.freshness_status,
+        confidence: projectedSnapshot.confidence,
+      });
+      projected += 1;
+    } catch {
+      snapshotFailed = true;
+    }
   }
+
   const collectFailed = Boolean(envelope.error);
   let status: PersistSourceResult["status"] = "DONE";
   if (collectFailed) {
@@ -115,6 +126,7 @@ export async function persistSourceResult(
       observationFailed,
       snapshotFailed,
       collectFailed,
+      projected,
     },
     observedAt,
     freshnessStatus: envelope.freshness_status,
@@ -128,5 +140,6 @@ export async function persistSourceResult(
     observedAt: finished.observedAt.toISOString(),
     errorCode: finished.errorCode,
     errorMessage: finished.errorMessage,
+    projected,
   };
 }

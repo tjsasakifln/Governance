@@ -123,6 +123,18 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
     case "confenge_inbound":
       payload.confenge_inbound = json as WarmblyPayload["confenge_inbound"];
       break;
+    case "confenge_intel_scoreboard":
+      payload.confenge_intel_scoreboard = asRecord(json);
+      break;
+    case "confenge_intel_executive":
+      payload.confenge_intel_executive = asRecord(json);
+      break;
+    case "confenge_intel_exceptions":
+      payload.confenge_intel_exceptions = json;
+      break;
+    case "confenge_intel_organic_scoreboard":
+      payload.confenge_intel_organic_scoreboard = asRecord(json);
+      break;
     default:
       break;
   }

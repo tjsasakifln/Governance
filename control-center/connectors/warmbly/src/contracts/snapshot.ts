@@ -115,4 +115,6 @@ export type CommercialSnapshot = {
   attention: CommercialAttentionItem[];
   observations: SourceObservation[];
   required_upstream_contract: RequiredUpstreamContract[];
+  /** Capped operational slice for Control Center projection. Not a CRM replica. */
+  operations?: Record<string, unknown>;
 };

@@ -85,7 +85,7 @@ export CC_SECRET_DIR=/etc/confenge/control-center/secrets
 # 1. datastores
 docker compose -f docker-compose.production-edge.yml up -d postgres redis nats
 # confirm alias cc-postgres on cc_internal
-# 2. migrations (schema control_center): 001_init, 002_current_state, 003_durable_operational_data_plane
+# 2. migrations (schema control_center): 001_init, 002_current_state, 003_durable_operational_data_plane, 004_operator_actions
 # 3. Authelia (own DB/role, Redis sessions, default deny, operators require 2FA)
 docker compose -f docker-compose.production-edge.yml up -d authelia
 # 4. context, MCP, collector, web, Caddy

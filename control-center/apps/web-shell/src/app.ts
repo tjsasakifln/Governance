@@ -102,10 +102,44 @@ function applyPaint(
     view,
     mockScenario: adapter.getScenario?.() ?? adapter.mode,
     adapterMode: adapter.mode,
+    surface: parsed.surface,
+    resource: parsed.resource,
   });
   bindWriteShortcuts(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}`);
   });
+  bindOperatorActions(root, adapter, () => {
+    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+  });
+}
+
+function bindOperatorActions(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.operatorAction || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-operator-form]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const actionType = form.getAttribute("data-operator-form");
+      if (!actionType) return;
+      const targetCanonical = form.querySelector('[name="target_canonical_id"]')?.value ?? "";
+      const targetSource = form.querySelector('[name="target_source_id"]')?.value ?? "";
+      const note = form.querySelector('[name="note"]')?.value ?? "";
+      void Promise.resolve(
+        adapter.operatorAction?.({
+          action_type: actionType,
+          target_canonical_id: targetCanonical,
+          target_source_id: targetSource,
+          note,
+        }),
+      ).then(onDone);
+    });
+  }
 }
 
 function bindWriteShortcuts(

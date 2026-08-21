@@ -45,6 +45,8 @@ export {
   DIRECTIVE_KINDS,
   DIRECTIVE_STATUSES,
   FRESHNESS_STATUSES,
+  FORBIDDEN_OPERATOR_ACTION_TYPES,
+  OPERATOR_ACTION_TYPES,
   SCOPE_LITERALS,
 } from './types.js';
 export {
@@ -85,6 +87,8 @@ export type {
   Provenance,
   RecordAgentActivityInput,
   RecordObservationInput,
+  OperatorAction,
+  RecordOperatorActionInput,
   RecordSnapshotInput,
   RetentionPolicyInput,
   ReviseSnapshotInput,

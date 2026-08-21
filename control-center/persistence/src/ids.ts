@@ -17,6 +17,7 @@ export const PUBLIC_ID_TYPES = [
   'agent-activity',
   'agent-activity-revision',
   'audit-event',
+  'operator-action',
 ] as const;
 export type PublicIdType = (typeof PUBLIC_ID_TYPES)[number];
 

@@ -134,7 +134,7 @@ test("GET /ready is 503 when expected migrations are missing and 200 when store 
     const readyOk = await fetch(`${base}/ready`);
     assert.equal(readyOk.status, 200);
     await ctx.pool.query(`DELETE FROM control_center.schema_migrations WHERE id = $1`, [
-      "003_durable_operational_data_plane",
+      "004_operator_actions",
     ]);
     const readyMissing = await fetch(`${base}/ready`);
     assert.equal(readyMissing.status, 503);
@@ -143,7 +143,7 @@ test("GET /ready is 503 when expected migrations are missing and 200 when store 
   } finally {
     await ctx.pool.query(
       `INSERT INTO control_center.schema_migrations (id, applied_at) VALUES ($1, now()) ON CONFLICT DO NOTHING`,
-      ["003_durable_operational_data_plane"],
+      ["004_operator_actions"],
     );
     await stopCollectorServer(server);
   }

@@ -18,6 +18,7 @@ import {
   DIRECTIVE_KINDS,
   DIRECTIVE_STATUSES,
   FRESHNESS_STATUSES,
+  OPERATOR_ACTION_TYPES,
 } from './types.js';
 import { COLLECTOR_RUN_STATUSES, LEGACY_COLLECTOR_RUN_STATUSES } from './run-status.js';
 import { assertSanitizedJson } from './sanitize.js';
@@ -130,6 +131,22 @@ export const finishCollectorRunInputSchema = z.object({
   observedAt: z.date(),
   freshnessStatus: freshnessSchema,
   confidence: confidenceSchema,
+});
+
+export const recordOperatorActionInputSchema = provenanceSchema.extend({
+  actionType: z.enum(OPERATOR_ACTION_TYPES),
+  targetCanonicalId: z.string().trim().min(1).max(128),
+  targetSourceId: z.string().trim().min(1).max(128),
+  actorId: z.string().trim().min(1).max(128),
+  occurredAt: z.date(),
+  correlationId: z.string().trim().min(1).max(128),
+  idempotencyKey: z.string().trim().min(1).max(512),
+  scope: scopeSchema,
+  resultingStatus: z.enum(['accepted', 'rejected', 'duplicate']).optional().default('accepted'),
+  beforeJson: sanitizedObjectSchema.optional().default({}),
+  afterJson: sanitizedObjectSchema.optional().default({}),
+  evidenceRef: z.string().trim().min(1).max(512).nullable().optional().default(null),
+  note: z.string().min(1).max(4000).nullable().optional().default(null),
 });
 
 export const recordSnapshotInputSchema = provenanceSchema.extend({

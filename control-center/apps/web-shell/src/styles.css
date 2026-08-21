@@ -107,6 +107,61 @@ a {
   border-top: 1px solid var(--line);
 }
 
+.subnav {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 0 0.85rem;
+}
+
+.subnav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.subnav a[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--bg-card);
+}
+
+.operator-form {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.operator-form textarea,
+.operator-form button {
+  min-height: 44px;
+  font: inherit;
+}
+
+.operator-form button {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+}
+
+.cards {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .nav a {
   flex: 0 0 auto;
   min-height: 44px;

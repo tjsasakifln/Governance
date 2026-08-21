@@ -238,6 +238,70 @@ export type FinishCollectorRunInput = {
   confidence: number;
 };
 
+export const OPERATOR_ACTION_TYPES = [
+  'REVIEW_ACTIVITY',
+  'ACKNOWLEDGE_EXCEPTION',
+  'REOPEN_EXCEPTION',
+  'CONFIRM_NEXT_ACTION',
+  'REJECT_NEXT_ACTION',
+  'RECORD_NOTE',
+  'MARK_REVIEWED',
+] as const;
+export type OperatorActionType = (typeof OPERATOR_ACTION_TYPES)[number];
+
+export const FORBIDDEN_OPERATOR_ACTION_TYPES = [
+  'SEND_CAMPAIGN',
+  'SEND_EMAIL',
+  'SEND_WHATSAPP',
+  'AUTO_SEND_ENABLE',
+  'BULK_RECIPIENT_MUTATION',
+  'BILLING',
+  'CHARGE',
+  'REFUND',
+  'PAYMENT',
+  'SILENT_STAGE_MANIPULATION',
+  'DELETE_EVIDENCE',
+  'DESTRUCTIVE_BULK',
+] as const;
+export type ForbiddenOperatorActionType = (typeof FORBIDDEN_OPERATOR_ACTION_TYPES)[number];
+
+export const OPERATOR_ACTION_STATUSES = ['accepted', 'rejected', 'duplicate'] as const;
+export type OperatorActionStatus = (typeof OPERATOR_ACTION_STATUSES)[number];
+
+export type OperatorAction = {
+  id: string;
+  actionType: OperatorActionType;
+  targetCanonicalId: string;
+  targetSourceId: string;
+  actorKind: 'human';
+  actorId: string;
+  occurredAt: Date;
+  correlationId: string;
+  idempotencyKey: string;
+  scope: string;
+  resultingStatus: OperatorActionStatus;
+  beforeJson: Record<string, unknown>;
+  afterJson: Record<string, unknown>;
+  evidenceRef: string | null;
+  note: string | null;
+} & Provenance;
+
+export type RecordOperatorActionInput = {
+  actionType: OperatorActionType;
+  targetCanonicalId: string;
+  targetSourceId: string;
+  actorId: string;
+  occurredAt: Date;
+  correlationId: string;
+  idempotencyKey: string;
+  scope: string;
+  resultingStatus?: OperatorActionStatus;
+  beforeJson?: Record<string, unknown>;
+  afterJson?: Record<string, unknown>;
+  evidenceRef?: string | null;
+  note?: string | null;
+} & Provenance;
+
 export type RecordSnapshotInput = {
   scope: string;
   snapshotKind: string;

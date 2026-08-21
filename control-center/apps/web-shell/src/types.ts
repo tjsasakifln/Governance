@@ -240,6 +240,8 @@ export interface CommercialSnapshot {
   missing_next_action_count?: number;
   extra_historical?: ExtraHistorical;
   offer_version_drift?: OfferVersionDrift;
+  availability?: string;
+  operations?: Record<string, unknown>;
 }
 
 export interface EvidencedCashIn extends Money {
@@ -306,6 +308,8 @@ export interface EngineeringSnapshot {
   blockers?: string[];
   last_evidence?: string;
   active_work_without_evidence?: { remains: "hypothesis"; detail?: string };
+  repos?: Array<Record<string, unknown>>;
+  allowlist?: string[];
 }
 
 export interface ServiceHealthCheck {

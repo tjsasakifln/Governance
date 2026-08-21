@@ -850,6 +850,13 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       priorities: [],
       health: HEALTH_FIXTURES,
     }),
+    crescimento: pageFor("crescimento", {
+      headline: "Inbound e visibilidade. Sem atribuição inventada entre sistemas.",
+      attention: attentionByScope((item) => item.scope === "inbound"),
+      priorities: [],
+      commercial: COMMERCIAL_SNAPSHOT,
+      health: HEALTH_FIXTURES,
+    }),
     memoria: pageFor("memoria", {
       headline: "Diretivas humanas por kind, escopo, vigência e trilha de auditoria.",
       attention: [],
