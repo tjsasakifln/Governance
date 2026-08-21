@@ -2,17 +2,17 @@
 
 Campaign `CONFENGE-CONTROL-CENTER-INTERNAL-PRODUCTION-LAUNCH-01`.
 
-**FINAL_VERDICT=HUMAN_GATE_MFA_ENROLLMENT**
+**FINAL_VERDICT=INTERNAL_PRODUCTION_LIVE**
 
-Control Center is deployed, authenticated at the edge, persistent, and usable after founder MFA enrollment. Authelia policy requires 2FA. No TOTP or WebAuthn credential is enrolled yet. MFA was not disabled.
+Control Center is deployed, edge-authenticated with founder MFA enrolled, persistent, and serving real cockpit HTTP. `/intranet` is a live 302 to ops. MFA was not disabled.
 
 ## SHA
 
 - `PRE_RELEASE_SHA` / `RELEASE_SHA` / `DEPLOYED_SHA`: `3d5e21c344be95549cca1e9f0b5073a8efb9ff08`
-- `origin/main` matched the expected freeze SHA (no silent drift).
+- Host checkout remains that freeze SHA. Origin `main` advanced to `b57ff508f865375825c0e104a46f10c05dea719e` via PR #41 (founder actor compose wiring). Runtime web already has the equivalent host overlay `/etc/confenge/control-center/docker-compose.web-actor.yml`. This evidence commit does not change `DEPLOYED_SHA`.
 - Governance PR #8 remains open and was not absorbed.
 
-CI on that SHA: control-center, control-center-image-scan, commercial-authority all **success**.
+CI on the freeze SHA: control-center, control-center-image-scan, commercial-authority all **success**. PR #41 CI was green before merge.
 
 ## Topology
 
@@ -29,16 +29,11 @@ nginx `:443` → `127.0.0.1:18080` Caddy → Authelia `forward_auth` → web/con
 
 - Unauthenticated `https://ops.confenge.com.br/` → 302 to Authelia.
 - `https://auth.ops.confenge.com.br/` 200, TLS Let's Encrypt through 2026-11-19.
-- Operators require 2FA (policy). `totp_configurations=0`, `webauthn_credentials=0`.
-- Operator user enabled. Recover bootstrap password only from `/root/.confenge/control-center/bootstrap-operator-password` (mode 0600). Never git/logs.
-
-Enrollment:
-
-1. Open https://auth.ops.confenge.com.br/
-2. Authenticate with bootstrap operator user/password from that path.
-3. Register TOTP or WebAuthn/passkey.
-4. Validate login to https://ops.confenge.com.br/
-5. Return to this campaign / re-run the goal.
+- Operators require 2FA. Enrolled: `totp_configurations=1`, `webauthn_credentials=1`.
+- Authentication logs (counts only): `1FA/false=2`, `1FA/true=1`, `TOTP/true=1`. Last success `2026-08-21T18:44:06Z`.
+- Founder actor: `CC_ACTOR_KIND=human`, 32-hex id matching `CONTROL_CENTER_FOUNDER_ACTOR_ID`, not `human:operator`. HTML meta matches. `GET /v1/today?scope=company` HTTP 200 as founder.
+- `OPS_HOST_AUTHENTICATED_AND_HEALTHY=true`. MFA was not disabled.
+- Recover bootstrap password only from `/root/.confenge/control-center/bootstrap-operator-password` (mode 0600). Never git/logs.
 
 ## Data plane
 
@@ -65,19 +60,23 @@ Collectors (honest):
 
 ## Warmbly / API
 
-- Warmbly SHA `93dd039d7b9b310458beff8a6bd8819a61da6399`, backend `92e98e3217ad…`, restarts=0.
+- Warmbly SHA `93dd039d7b9b310458beff8a6bd8819a61da6399`, backend `92e98e3217ad…`.
 - `/ready` live=true ready=true. `CONFENGE_AUTO_SEND_ENABLED=false`.
 - `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health` READY, `auto_send_enabled=false`.
 - `WARMBLY_REGRESSION=false`. `ASAAS_MUTATIONS=0`. `COMMERCIAL_SENDS=0`.
 
 ## Intranet
 
-Not activated. Convenience residual until `OPS_HOST_AUTHENTICATED_AND_HEALTHY=true` (MFA).
+Activated after `OPS_HOST_AUTHENTICATED_AND_HEALTHY=true`. web-cfg PR #218 merged as `bfbd4e16`.
+
+- `https://confenge.com.br/intranet` → **302** `https://ops.confenge.com.br/` (not 301, not 200 proxy; `content-type: text/plain`).
+- `x-robots-tag: noindex, nofollow`. `robots.txt` disallows `/intranet`. Sitemap count for intranet = 0.
+- Splat: `/intranet/hoje` → 302 `https://ops.confenge.com.br/hoje`.
+- Follow: intranet 302 → ops 302 Authelia → auth.ops 200.
 
 ## Residuals
 
-- HUMAN_GATE_MFA_ENROLLMENT
-- Asaas read / Warmbly read BLOCKED_BY_SECRET (shown as ERROR, not FRESH)
+- Asaas read / Warmbly collector read BLOCKED_BY_SECRET (shown as ERROR, not FRESH)
 - Infra allowlist UNKNOWN
 - PNCP ERROR honest
 - Codex MCP client NOT_TESTED_CLIENT_MISSING

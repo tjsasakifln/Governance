@@ -1,12 +1,17 @@
 {
   "schema_version": "control-center.internal-production-evidence.v1",
   "campaign": "CONFENGE-CONTROL-CENTER-INTERNAL-PRODUCTION-LAUNCH-01",
-  "FINAL_VERDICT": "HUMAN_GATE_MFA_ENROLLMENT",
+  "FINAL_VERDICT": "INTERNAL_PRODUCTION_LIVE",
   "RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
   "DEPLOYED_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
   "PRE_RELEASE_SHA": "3d5e21c344be95549cca1e9f0b5073a8efb9ff08",
+  "origin_main_sha": "b57ff508f865375825c0e104a46f10c05dea719e",
+  "main_includes_founder_actor_pr": 41,
+  "deployed_runtime_note": "Host checkout remains freeze SHA 3d5e21c. Founder actor env is live via /etc/confenge/control-center/docker-compose.web-actor.yml (equivalent to PR #41 compose wiring). Docs-only evidence commit does not change DEPLOYED_SHA.",
   "main_matched_expected": true,
   "pr_8_untouched": true,
+  "pr_8_state": "OPEN",
+  "OPS_HOST_AUTHENTICATED_AND_HEALTHY": true,
   "topology": {
     "project": "confenge-control-center",
     "host": "v2202607385716487230",
@@ -35,11 +40,32 @@
   "auth": {
     "authelia_enforced": true,
     "ops_unauthenticated": "302 to https://auth.ops.confenge.com.br/",
-    "mfa": "ENFORCED_POLICY_UNENROLLED",
-    "totp_configurations": 0,
-    "webauthn_credentials": 0,
+    "mfa": "ENFORCED",
+    "totp_configurations": 1,
+    "webauthn_credentials": 1,
+    "totp_history_count": 2,
+    "authentication_logs": {
+      "count": 4,
+      "success_true": 2,
+      "success_false": 2,
+      "by_type": { "1FA/true": 1, "1FA/false": 2, "TOTP/true": 1 },
+      "last_success_at": "2026-08-21T18:44:06.2086Z"
+    },
     "operator_enabled": true,
-    "bootstrap_operator_password_path": "/root/.confenge/control-center/bootstrap-operator-password"
+    "bootstrap_operator_password_path": "/root/.confenge/control-center/bootstrap-operator-password",
+    "mfa_disabled": false
+  },
+  "founder_actor": {
+    "CC_ACTOR_KIND": "human",
+    "CC_ACTOR_ID_HEX32": true,
+    "CC_ACTOR_ID_IS_HUMAN_OPERATOR": false,
+    "matches_founder_secret": true,
+    "web_html_meta_kind": "human",
+    "web_html_hex32_matches_founder": true,
+    "context_today_http": 200,
+    "context_today_keys": ["confidence", "freshness_status", "generated_at", "schema_version", "scope", "today"],
+    "host_overlay": "/etc/confenge/control-center/docker-compose.web-actor.yml",
+    "governance_pr": 41
   },
   "migrations": ["001_init", "002_current_state", "003_durable_operational_data_plane"],
   "governance_bootstrap": {
@@ -95,8 +121,29 @@
     "auto_send_enabled": false
   },
   "intranet": {
-    "state": "convenience_residual_until_mfa",
-    "reason": "OPS_HOST_AUTHENTICATED_AND_HEALTHY is false until founder MFA enrollment"
+    "state": "live_302",
+    "url": "https://confenge.com.br/intranet",
+    "http": 302,
+    "location": "https://ops.confenge.com.br/",
+    "not_301": true,
+    "not_200_proxy": true,
+    "content_type": "text/plain; charset=utf-8",
+    "x_robots_tag": "noindex, nofollow",
+    "robots_txt_disallow": "/intranet",
+    "sitemap_intranet_count": 0,
+    "splat_example": {
+      "from": "https://confenge.com.br/intranet/hoje",
+      "http": 302,
+      "location": "https://ops.confenge.com.br/hoje"
+    },
+    "follow": [
+      "302 https://ops.confenge.com.br/",
+      "302 https://auth.ops.confenge.com.br/?rd=https%3A%2F%2Fops.confenge.com.br%2F",
+      "200 auth.ops"
+    ],
+    "web_cfg_pr": 218,
+    "web_cfg_merge_sha": "bfbd4e16d07fcf124b23f19f70db49b5b240ef97",
+    "activation_gate": "OPS_HOST_AUTHENTICATED_AND_HEALTHY=true"
   },
   "ci_on_release_sha": {
     "control-center": "https://github.com/tjsasakifln/Governance/actions/runs/32498571671",
@@ -113,12 +160,10 @@
   "asaas_mutations": 0,
   "commercial_sends": 0,
   "residuals": [
-    "HUMAN_GATE_MFA_ENROLLMENT",
     "ASAAS_READ=BLOCKED_BY_SECRET",
     "WARMBLY_READ=BLOCKED_BY_SECRET",
     "INFRA_ALLOWLIST=UNKNOWN",
     "PNCP_FRESHNESS=ERROR (extra-cli timers failed; shown honestly)",
-    "INTRANET_302=convenience residual until MFA",
     "CODEX_MCP=NOT_TESTED_CLIENT_MISSING"
   ]
 }
