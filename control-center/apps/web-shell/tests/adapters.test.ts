@@ -9,6 +9,7 @@ import {
   createMockAdapter,
   isForbiddenAdapterAction,
 } from "../src/adapters/index";
+import { paintShell } from "../src/app";
 import { DESTINATION_IDS } from "../src/destinations";
 import { FRESHNESS_STATUSES } from "../src/types";
 
@@ -148,6 +149,21 @@ test("production HTTP adapter is not mock and maps context provenance", async ()
   assert.equal(page.page.attention.length > 0, true);
   assert.ok(["FRESH", "STALE", "UNKNOWN", "ERROR"].includes(page.page.attention[0]?.provenance.freshness_status ?? ""));
   assert.equal(seenHeaders.includes("founder-local:human"), true);
+});
+
+test("async HTTP destination read paints loading before the promise settles", () => {
+  const adapter = {
+    mode: "http" as const,
+    actions: ADAPTER_ACTIONS,
+    readOperator: () => ({ kind: "human" as const, id: "founder-local" }),
+    readDestination: () => new Promise<never>(() => undefined),
+    readAttention: async () => [],
+    readPriorities: async () => [],
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/hoje");
+  assert.match(root.innerHTML, /data-view-state="loading"/);
+  assert.match(root.innerHTML, /Carregando observações/);
 });
 
 test("production HTTP adapter calls globalThis.fetch through a bound wrapper", async () => {

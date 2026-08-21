@@ -14,19 +14,23 @@ import {
 } from "../../../connectors/github/src/index.ts";
 import { classifyRequest, WarmblyClient } from "../../../connectors/warmbly/src/index.ts";
 import { evaluatePncpContractPayload, evaluatePncpFreshness } from "../../../connectors/pncp/src/index.ts";
-import { collect as collectInfra, parseFixture, createFixturePorts } from "../../../connectors/infrastructure/src/index.ts";
-import { aggregateFinanceReadModel } from "../../../domains/finance/src/index.ts";
-import { createAgentLedger, frozenClock as ledgerClock } from "../../../domains/agent-activity/src/index.ts";
+import {
+  collect as collectInfra,
+  parseFixture,
+  createFixturePorts,
+} from "../../../connectors/infrastructure/src/index.ts";
+import { aggregateFinanceReadModel, toContractsStub } from "../../../domains/finance/src/index.ts";
 import { parseForwardAuthIdentity, defaultTrustedHopPolicy } from "../../../security/src/identity.ts";
 import { COOKIE_POLICY, CORS_POLICY, CSRF_STRATEGY } from "../../../security/src/constants.ts";
 import { analyzeCaddyfile } from "../../../security/src/caddy.ts";
-import { AGENT, FOUNDER, LIVE_AS_OF, LIVE_NOW } from "./seed.ts";
+import { createHttpAdapter } from "../../../apps/web-shell/src/adapters/http.ts";
+import { collectProvenance } from "../../../apps/web-shell/src/page.ts";
+import { FOUNDER, LIVE_AS_OF, LIVE_NOW } from "./seed.ts";
 import {
   bootLiveRuntime,
   httpJson,
   mcpCall,
   mcpInitialize,
-  MCP_TOKEN,
   type LiveRuntime,
 } from "./harness.ts";
 
@@ -39,17 +43,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function presentFreshness(status: string): { presented_as: string; health_status: string } {
-  if (status === "FRESH") {
-    return { presented_as: "healthy", health_status: "healthy" };
-  }
-  if (status === "STALE") {
-    return { presented_as: "stale", health_status: "degraded" };
-  }
-  if (status === "ERROR") {
-    return { presented_as: "error", health_status: "error" };
-  }
-  return { presented_as: "unknown", health_status: "unknown" };
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function observedAt(value: unknown): string {
+  const raw = typeof value === "string" ? value : LIVE_NOW;
+  return raw.endsWith("Z") ? raw : `${raw}Z`;
 }
 
 async function githubCollect(name: string) {
@@ -70,14 +70,9 @@ async function githubCollect(name: string) {
 }
 
 function financeEvents() {
-  const src = (locator: string) => ({
-    system: "asaas",
-    kind: "receivable",
-    locator,
-  });
+  const src = (locator: string) => ({ system: "asaas", kind: "receivable", locator });
   const base = {
-    currency: "BRL",
-    client_id: "client:acme",
+    currency: "BRL" as const,
     billing_mode: "ONE_TIME" as const,
     billing_cycle: "NONE" as const,
     observed_at: LIVE_NOW,
@@ -93,6 +88,7 @@ function financeEvents() {
       kind: "contract_signed" as const,
       occurred_at: "2026-08-02T09:00:00.000Z",
       amount_cents: 100000,
+      client_id: "client:acme",
       obligation_id: "ob:live-acme",
       source: src("pay_live_1"),
     },
@@ -103,6 +99,7 @@ function financeEvents() {
       kind: "invoice_issued" as const,
       occurred_at: "2026-08-03T09:00:00.000Z",
       amount_cents: 100000,
+      client_id: "client:acme",
       obligation_id: "ob:live-acme",
       invoice_id: "inv:live-acme",
       due_at: "2026-08-25T00:00:00.000Z",
@@ -115,6 +112,7 @@ function financeEvents() {
       kind: "payment_confirmed" as const,
       occurred_at: "2026-08-06T09:00:00.000Z",
       amount_cents: 40000,
+      client_id: "client:acme",
       obligation_id: "ob:live-acme",
       source: src("pay_live_1"),
     },
@@ -125,6 +123,7 @@ function financeEvents() {
       kind: "settlement_received" as const,
       occurred_at: "2026-08-07T09:00:00.000Z",
       amount_cents: 40000,
+      client_id: "client:acme",
       obligation_id: "ob:live-acme",
       settlement_proven: true,
       source: src("pay_live_1"),
@@ -136,6 +135,7 @@ function financeEvents() {
       kind: "refund" as const,
       occurred_at: "2026-08-08T09:00:00.000Z",
       amount_cents: 10000,
+      client_id: "client:acme",
       obligation_id: "ob:live-acme",
       source: src("pay_live_refund"),
     },
@@ -146,8 +146,8 @@ function financeEvents() {
       kind: "contract_signed" as const,
       occurred_at: "2026-07-01T09:00:00.000Z",
       amount_cents: 20000,
-      obligation_id: "ob:live-overdue",
       client_id: "client:beta",
+      obligation_id: "ob:live-overdue",
       source: src("pay_live_2"),
     },
     {
@@ -157,8 +157,8 @@ function financeEvents() {
       kind: "invoice_issued" as const,
       occurred_at: "2026-07-02T09:00:00.000Z",
       amount_cents: 20000,
-      obligation_id: "ob:live-overdue",
       client_id: "client:beta",
+      obligation_id: "ob:live-overdue",
       invoice_id: "inv:live-overdue",
       due_at: "2026-07-10T00:00:00.000Z",
       source: src("pay_live_2"),
@@ -166,16 +166,59 @@ function financeEvents() {
   ];
 }
 
+function directiveFromHttp(row: unknown): Record<string, unknown> | null {
+  const rec = asRecord(row);
+  if (!rec) {
+    return null;
+  }
+  const created = asRecord(rec.created_by);
+  const kind = String(rec.kind ?? "fact");
+  return {
+    id: String(rec.id ?? ""),
+    kind,
+    origin_kind: kind,
+    scope: String(rec.scope ?? ""),
+    status: String(rec.status ?? ""),
+    title: String(rec.title ?? ""),
+    conflict_key: String(rec.title ?? rec.id ?? ""),
+    supersedes: Array.isArray(rec.supersedes) ? rec.supersedes : rec.supersedes ? [rec.supersedes] : [],
+    created_by: {
+      kind: String(created?.kind ?? "human"),
+      id: String(created?.id ?? rec.created_by ?? ""),
+      role: created?.kind === "human" ? "founder" : created?.kind,
+    },
+    presented_as: kind,
+    source: rec.source,
+    observed_at: rec.observed_at,
+    freshness_status: rec.freshness_status,
+    confidence: rec.confidence,
+    audit: [],
+  };
+}
+
 export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSnapshot> {
   const founder = runtime.founderHeaders;
-  const company = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=company`, {
-    headers: founder,
+  const scopes = ["company", "commercial", "infrastructure", "finance", "client:acme"] as const;
+  const scoped = new Map<string, Record<string, unknown>>();
+  for (const scope of scopes) {
+    const res = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=${encodeURIComponent(scope)}`, {
+      headers: founder,
+    });
+    scoped.set(scope, asRecord(res.body) ?? {});
+  }
+  const companyBody = scoped.get("company") ?? {};
+  const commercialBody = scoped.get("commercial") ?? {};
+  const infraBody = scoped.get("infrastructure") ?? {};
+  const acmeBody = scoped.get("client:acme") ?? {};
+
+  const adapter = createHttpAdapter(runtime.contextBaseUrl, fetch, {
+    kind: "human",
+    id: FOUNDER.id,
   });
-  const acme = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=client:acme`, {
-    headers: founder,
-  });
-  const companyBody = asRecord(company.body) ?? {};
-  const acmeBody = asRecord(acme.body) ?? {};
+  const hoje = await adapter.readDestination("hoje");
+  const comercialPage = await adapter.readDestination("comercial");
+  const infraPage = await adapter.readDestination("infra");
+  const financeiroPage = await adapter.readDestination("financeiro");
 
   await mcpInitialize(runtime.mcp);
   const mcpRead = await mcpCall(runtime.mcp, "confenge.get_context", { scope: "company" });
@@ -203,6 +246,13 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
   void mcpBlocker;
 
   const activities = await httpJson(`${runtime.contextBaseUrl}/v1/agent-activities?scope=company`, {
+    headers: founder,
+  });
+  const unauthHttp = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=company`);
+  const spoofHttp = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=company`, {
+    headers: { "x-actor-id": "not-the-founder", "x-actor-kind": "human" },
+  });
+  const founderHttp = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=company`, {
     headers: founder,
   });
 
@@ -250,10 +300,8 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     });
   }
 
-  const githubEmpty = await githubCollect("empty-issues");
-  const githubError = await githubCollect("error-403");
-  void githubEmpty;
-  void githubError;
+  await githubCollect("empty-issues");
+  await githubCollect("error-403");
 
   let asaasDenied = false;
   try {
@@ -261,7 +309,6 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
   } catch (err) {
     asaasDenied = err instanceof AsaasMutationForbiddenError;
   }
-
   const warmblyClassified = classifyRequest("POST", "/v1/contacts");
   const warmbly = new WarmblyClient({
     baseUrl: "http://127.0.0.1:9",
@@ -283,22 +330,19 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     locator: "connectors/pncp/fixtures",
     collectedAt: new Date(LIVE_NOW),
   };
-  const pncpFresh = evaluatePncpContractPayload(
+  evaluatePncpContractPayload(
     JSON.parse(readFileSync(join(ccRoot, "connectors/pncp/fixtures/contract-fresh.json"), "utf8")),
     pncpCtx,
   );
-  const pncpDegraded = evaluatePncpContractPayload(
+  evaluatePncpContractPayload(
     JSON.parse(readFileSync(join(ccRoot, "connectors/pncp/fixtures/contract-degraded.json"), "utf8")),
     pncpCtx,
   );
-  const pncpError = await evaluatePncpFreshness({
+  await evaluatePncpFreshness({
     kind: "file",
     filePath: join(ccRoot, "connectors/pncp/fixtures/contract-malformed.json"),
     now: new Date(LIVE_NOW),
   });
-  void pncpFresh;
-  void pncpDegraded;
-  void pncpError;
 
   const infraRaw = JSON.parse(
     readFileSync(join(ccRoot, "connectors/infrastructure/fixtures/partial-outage.json"), "utf8"),
@@ -308,68 +352,26 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     allowlist: infraFixture.allowlist,
     ports: createFixturePorts(infraFixture),
   });
-  const unhealthy = infra.service_health.filter((h) => h.status !== "healthy");
-  const overall =
-    unhealthy.length > 0
-      ? infra.service_health.some((h) => h.status === "unhealthy")
-        ? "degraded"
-        : "degraded"
-      : "healthy";
 
   const finance = aggregateFinanceReadModel(financeEvents(), {
     as_of: LIVE_AS_OF,
     cash_in_window: { from: "2026-08-01T00:00:00.000Z", to: "2026-08-31T23:59:59.000Z" },
   });
+  const financeStub = toContractsStub(finance);
 
-  const ledger = createAgentLedger({
-    now: ledgerClock(new Date(LIVE_AS_OF)),
-    idleThresholdSeconds: 7200,
-  });
-  ledger.startSession({
-    correlation_id: "sess.live-fresh",
-    agent: { id: "agent:live-qa", provider: "xai" },
-    repo: "tjsasakifln/Governance",
-    goal: "live qa",
-    campaign: "CONFENGE-CONTROL-CENTER-RELEASE-TO-PRODUCTION-2026-08-20",
-    started_at: "2026-08-20T14:00:00.000Z",
-    refs: { branch: "campaign/live", commit: "e2b0498a68092c1bdbf64aa31854d652c07afdc0", pr: null, issues: [] },
-    summary: "fresh session",
-    evidence: [],
-    blockers: [],
-    residual_work: [],
-    context_consulted: { context_version: "control-center.context.v1", directive_ids: [] },
-    actor: { kind: "agent", id: "agent:live-qa" },
-    source: { system: "agent", kind: "start", locator: "sess.live-fresh" },
-    observed_at: "2026-08-20T14:00:00.000Z",
-    freshness_status: "FRESH",
-    confidence: 0.9,
-  });
-  const staleLedger = createAgentLedger({
-    now: ledgerClock(new Date(LIVE_AS_OF)),
-    idleThresholdSeconds: 60,
-  });
-  staleLedger.startSession({
-    correlation_id: "sess.live-stale",
-    agent: { id: "agent:live-qa", provider: "xai" },
-    repo: "tjsasakifln/Governance",
-    goal: "stale running",
-    campaign: "CONFENGE-CONTROL-CENTER-RELEASE-TO-PRODUCTION-2026-08-20",
-    started_at: "2026-08-20T10:00:00.000Z",
-    refs: { branch: "campaign/live", commit: "e2b0498a68092c1bdbf64aa31854d652c07afdc0", pr: null, issues: [] },
-    summary: "will go stale",
-    evidence: [],
-    blockers: [],
-    residual_work: [],
-    context_consulted: { context_version: "control-center.context.v1", directive_ids: [] },
-    actor: { kind: "agent", id: "agent:live-qa" },
-    source: { system: "agent", kind: "start", locator: "sess.live-stale" },
-    observed_at: "2026-08-20T10:00:00.000Z",
-    freshness_status: "FRESH",
-    confidence: 0.9,
-  });
-  const reconciled = staleLedger.reconcileStale();
-
-  const identity = parseForwardAuthIdentity(
+  const spoofIdentity = parseForwardAuthIdentity(
+    {
+      remoteAddress: "203.0.113.9",
+      headers: {
+        "Remote-User": "founder-local",
+        "Remote-Groups": "operators",
+        "Remote-Name": "Founder",
+        "Remote-Email": "founder@confenge.invalid",
+      },
+    },
+    defaultTrustedHopPolicy(["10.89.0.0/24", "127.0.0.1/32"]),
+  );
+  const founderIdentity = parseForwardAuthIdentity(
     {
       remoteAddress: "127.0.0.1",
       headers: {
@@ -386,144 +388,144 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     readFileSync(join(ccRoot, "security/examples/valid/Caddyfile"), "utf8"),
   );
 
-  const allCurrent = [
-    ...runtime.service.getActiveDirectives(FOUNDER, "company"),
-    ...runtime.service.getActiveDirectives(FOUNDER, "finance"),
-    ...runtime.service.getActiveDirectives(FOUNDER, "commercial"),
-    ...runtime.service.getDecisions(FOUNDER, "finance"),
-    ...runtime.service.getDecisions(FOUNDER, "company"),
+  const httpDirectives = [
+    ...asArray(companyBody.active_directives),
+    ...asArray(commercialBody.active_directives),
+    ...asArray(infraBody.active_directives),
+    ...asArray(acmeBody.active_directives),
   ];
-  const uniqueDirectives = new Map(allCurrent.map((d) => [d.id, d]));
-  uniqueDirectives.set(
-    runtime.seeded.supersededDecisionId,
-    runtime.service.getDirective(FOUNDER, runtime.seeded.supersededDecisionId),
+  const superseded = await httpJson(
+    `${runtime.contextBaseUrl}/v1/directives/${encodeURIComponent(runtime.seeded.supersededDecisionId)}`,
+    { headers: founder },
   );
+  const uniqueDirectives = new Map<string, Record<string, unknown>>();
+  for (const row of httpDirectives) {
+    const mapped = directiveFromHttp(row);
+    if (mapped && typeof mapped.id === "string" && mapped.id) {
+      uniqueDirectives.set(mapped.id, mapped);
+    }
+  }
+  const supersededMapped = directiveFromHttp(superseded.body);
+  if (supersededMapped && typeof supersededMapped.id === "string") {
+    uniqueDirectives.set(supersededMapped.id, supersededMapped);
+  }
 
-  const directivePayload = {
-    directives: [...uniqueDirectives.values()].map((d) => {
-      const created = d.created_by;
-      const isFounder = created.kind === "human" && created.id === FOUNDER.id;
-      return {
-        id: d.id,
-        kind: d.kind,
-        origin_kind: d.kind,
-        scope: d.scope,
-        status: d.status,
-        title: d.title,
-        conflict_key: d.title,
-        supersedes: d.supersedes ?? [],
-        created_by: {
-          kind: created.kind,
-          id: created.id,
-          role: isFounder ? "founder" : created.kind,
-        },
-        presented_as: d.kind,
-        audit: [],
-      };
-    }),
-  };
-
-  const companyRecords = Array.isArray(companyBody.active_directives)
-    ? companyBody.active_directives
-    : [];
-  const acmeRecords = Array.isArray(acmeBody.active_directives) ? acmeBody.active_directives : [];
-  const granted = [...expandInheritedScopes("client:acme", { "tjsasakifln/Governance": "commercial" })];
-
-  const freshnessRecords = [...companyRecords, ...acmeRecords].map((row, index) => {
-    const rec = asRecord(row) ?? {};
-    const freshness = String(rec.freshness_status ?? "UNKNOWN");
-    const presented = presentFreshness(freshness);
-    return {
-      id: String(rec.id ?? `row-${index}`),
-      freshness_status: freshness,
-      observed_at: String(rec.observed_at ?? LIVE_NOW),
-      freshness_window_seconds: 86400,
-      ...presented,
-    };
-  });
+  const freshnessRecords: Array<Record<string, unknown>> = [];
+  for (const [scope, body] of scoped.entries()) {
+    for (const row of asArray(body.active_directives)) {
+      const rec = asRecord(row) ?? {};
+      const freshness = String(rec.freshness_status ?? body.freshness_status ?? "UNKNOWN");
+      freshnessRecords.push({
+        id: String(rec.id ?? `${scope}-row`),
+        scope: String(rec.scope ?? scope),
+        freshness_status: freshness,
+        observed_at: observedAt(rec.observed_at ?? body.observed_at),
+        freshness_window_seconds: 86400,
+        presented_as: freshness,
+        health_status: freshness,
+      });
+    }
+  }
+  for (const pageResult of [hoje, comercialPage, infraPage, financeiroPage]) {
+    if (!pageResult.ok || pageResult.loading) {
+      continue;
+    }
+    for (const prov of collectProvenance(pageResult.page)) {
+      freshnessRecords.push({
+        id: `ui:${prov.source.locator}`,
+        freshness_status: prov.freshness_status,
+        observed_at: observedAt(prov.observed_at),
+        freshness_window_seconds: 86400,
+        presented_as: prov.freshness_status,
+        health_status: prov.freshness_status,
+      });
+    }
+  }
 
   const instants = freshnessRecords.map((row) => ({
-    id: row.id,
-    observed_at: row.observed_at.endsWith("Z") ? row.observed_at : `${row.observed_at}Z`,
-    presented_calendar_date: saoPauloCalendarDate(
-      row.observed_at.endsWith("Z") ? row.observed_at : `${row.observed_at}Z`,
-    ),
+    id: String(row.id),
+    observed_at: String(row.observed_at),
+    presented_calendar_date: saoPauloCalendarDate(String(row.observed_at)),
     classified_using_utc_calendar: false,
   }));
 
   const provenanceRecords = freshnessRecords.map((row) => {
-    const src = companyRecords.concat(acmeRecords)
+    const src = httpDirectives
       .map((item) => asRecord(item) ?? {})
-      .find((item) => String(item.id) === row.id);
-    const source = asRecord(src?.source) ?? { system: "control-center", kind: "context", locator: "live" };
+      .find((item) => String(item.id) === String(row.id));
+    const source =
+      asRecord(src?.source) ??
+      asRecord(asRecord(scoped.get(String(row.scope ?? "company")))?.source) ?? {
+        system: "control-center",
+        kind: "context",
+        locator: String(row.scope ?? "company"),
+      };
     return {
       id: row.id,
       provenance: {
         source,
         observed_at: row.observed_at,
         freshness_status: row.freshness_status,
-        confidence: typeof src?.confidence === "number" ? src.confidence : 1,
+        confidence:
+          typeof src?.confidence === "number"
+            ? src.confidence
+            : typeof asRecord(scoped.get(String(row.scope ?? "company")))?.confidence === "number"
+              ? asRecord(scoped.get(String(row.scope ?? "company")))?.confidence
+              : 1,
       },
     };
   });
 
-  const activityItems = asRecord(activities.body);
-  const activityList = Array.isArray(activityItems?.items) ? activityItems.items : [];
-
-  const sessions = [
-    {
-      id: "sess.live-fresh",
-      agent_id: "agent:live-qa",
-      status: "open",
-      started_at: "2026-08-20T14:00:00.000Z",
-      ended_at: null,
+  const activityList = asArray(asRecord(activities.body)?.items);
+  const sessions = activityList.map((row) => {
+    const rec = asRecord(row) ?? {};
+    return {
+      id: String(rec.id ?? rec.correlation_id ?? ""),
+      agent_id: String(rec.agent_id ?? rec.actor ?? "agent"),
+      status: String(rec.status ?? "done"),
+      started_at: observedAt(rec.started_at ?? rec.observed_at),
+      ended_at: rec.finished_at ?? rec.ended_at ?? null,
       ttl_seconds: 14400,
       granted_scopes: ["company"],
-    },
-    ...reconciled.map((session) => ({
-      id: session.correlation_id,
-      agent_id: session.agent.id,
-      status: session.status === "UNKNOWN" ? "UNKNOWN" : session.status,
-      started_at: session.started_at,
-      ended_at: session.finished_at,
-      ttl_seconds: 60,
-      granted_scopes: ["company"],
-    })),
-  ];
+    };
+  });
 
-  const overdueCents = finance.figures.vencida.amount_cents;
-  const openCents = finance.figures.a_receber.amount_cents - overdueCents;
-  const financeLines = [
-    {
-      source_payment_id: "pay_live_1",
-      amount_cents: openCents,
-      currency: "BRL",
-      bucket: "open",
-    },
-    {
-      source_payment_id: "pay_live_2",
-      amount_cents: overdueCents,
-      currency: "BRL",
-      bucket: "overdue",
-    },
-  ].filter((line) => line.amount_cents > 0);
+  const overallHealthy = infra.service_health.every((h) => h.status === "healthy");
+  const mcpMutationDenied =
+    (mcpMutation.error as { data?: { error?: { code?: string } } } | undefined)?.data?.error?.code ===
+    "FORBIDDEN_MUTATION";
 
   return {
     as_of: LIVE_AS_OF,
     freshness: { as_of: LIVE_AS_OF, records: freshnessRecords },
     ledger: {
-      currency: finance.currency,
+      currency: financeStub.receivables_open.currency,
       reported_totals: {
-        receivables_open_cents: openCents,
-        receivables_overdue_cents: overdueCents,
+        receivables_open_cents: financeStub.receivables_open.amount_cents,
+        receivables_overdue_cents: financeStub.receivables_overdue.amount_cents,
       },
-      lines: financeLines,
+      lines: [
+        {
+          source_payment_id: `${finance.id}:receivables_open`,
+          amount_cents: financeStub.receivables_open.amount_cents,
+          currency: financeStub.receivables_open.currency,
+          bucket: "open",
+        },
+        {
+          source_payment_id: `${finance.id}:receivables_overdue`,
+          amount_cents: financeStub.receivables_overdue.amount_cents,
+          currency: financeStub.receivables_overdue.currency,
+          bucket: "overdue",
+        },
+      ].filter((line) => line.amount_cents > 0),
     },
-    directives: directivePayload,
+    directives: { directives: [...uniqueDirectives.values()] },
     scopes: {
       requested_scopes: ["client:acme"],
-      granted_scopes: granted,
-      resources: acmeRecords.map((row) => {
+      granted_scopes: [
+        ...expandInheritedScopes("client:acme", { "tjsasakifln/Governance": "commercial" }),
+      ],
+      resources: asArray(acmeBody.active_directives).map((row) => {
         const rec = asRecord(row) ?? {};
         return { id: String(rec.id ?? ""), scope: String(rec.scope ?? "") };
       }),
@@ -569,6 +571,7 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
         asaas_mutation: asaasDenied,
         warmbly_mutation: warmblyDenied && warmblyClassified.allowed === false,
         agent_directive: agentOverwrite.status === 403,
+        mcp_decision_mutation: mcpMutationDenied,
       },
     },
     surfaces: {
@@ -579,6 +582,8 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
           actor_id: FOUNDER.id,
           idempotency_key: collectorKey,
           activity_count: activityList.length,
+          unauth_status: unauthHttp.status,
+          spoof_status: spoofHttp.status,
         },
         cors: CORS_POLICY.mode,
         csrf: CSRF_STRATEGY,
@@ -588,34 +593,40 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     },
     instants: { instants },
     health: {
-      overall_status: overall,
+      overall_status: overallHealthy ? "healthy" : "degraded",
       checks: infra.service_health.map((h) => ({
         name: h.display_name,
-        status: h.status === "healthy" ? "healthy" : "down",
+        status: h.status,
       })),
       required_sources: infra.observations.map((obs) => ({
+        name: obs.target_id,
         system: obs.source,
         status: obs.freshness_status,
         freshness_status: obs.freshness_status,
       })),
       collector_runs: [
         {
-          collector_name: "infrastructure",
-          status: unhealthy.length > 0 ? "failed" : "succeeded",
-          error: unhealthy.length > 0 ? { code: "partial_outage" } : null,
+          collector_name: infra.collector_run.collector_id,
+          status: infra.exceptions.length > 0 ? "failed" : "succeeded",
+          error: infra.exceptions[0] ?? null,
         },
       ],
     },
     sessions: { as_of: LIVE_AS_OF, sessions },
     auth: {
-      authenticated: identity.ok === true,
+      authenticated: founderHttp.status === 200 && unauthHttp.status >= 400 && spoofHttp.status >= 400,
       action: "get_context",
       identity_source: "session",
       assume_founder: false,
       empty_scopes_mean: "deny",
       empty_scopes_policy: "deny",
-      granted_scopes: ["company"],
-      actor: { kind: "human", id: FOUNDER.id, role: "founder" },
+      granted_scopes: founderHttp.status === 200 ? ["company"] : [],
+      actor:
+        founderHttp.status === 200
+          ? { kind: "human", id: FOUNDER.id, role: "founder" }
+          : { kind: "human", id: "" },
+      spoof_denied: spoofIdentity.ok === false,
+      founder_identity_ok: founderIdentity.ok === true,
     },
     aggregates: { records: provenanceRecords },
   };

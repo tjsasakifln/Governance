@@ -112,19 +112,9 @@ export function paintShell(
   const parsed = parseHash(hash || "#/hoje");
   const override = parseViewKind(parsed.view);
   adapter.setScenario?.(scenarioFromView(override));
-  if (override === "loading") {
-    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
-  } else if (override === "error") {
-    applyPaint(root, adapter, parsed, override, {
-      ok: false,
-      loading: false,
-      error: { code: "VIEW_ERROR", message: "Falha ao montar o recorte." },
-    });
-  } else if (override === "empty") {
-    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
-  }
   const result = adapter.readDestination(parsed.destination);
   if (isPromise(result)) {
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
     void result.then((resolved) => {
       if (!isCurrent(generation)) return;
       applyPaint(root, adapter, parsed, override, resolved);

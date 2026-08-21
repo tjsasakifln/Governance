@@ -42,6 +42,22 @@ test("14 named attacks run once against the integrated runtime and grant READY o
   assert.equal(report.forbidden_side_effects.commercial_send, false);
 });
 
+test("live snapshot observes HTTP STALE and ERROR as those statuses, not healthy", async () => {
+  const snapshot = await collectLiveSnapshot(runtime);
+  const rec = snapshot.freshness as { records?: Array<Record<string, unknown>> };
+  const records = Array.isArray(rec.records) ? rec.records : [];
+  const stale = records.filter((row) => row.freshness_status === "STALE");
+  const error = records.filter((row) => row.freshness_status === "ERROR");
+  assert.ok(stale.length > 0, "commercial STALE must be observed on HTTP");
+  assert.ok(error.length > 0, "infrastructure ERROR must be observed on HTTP");
+  assert.ok(stale.every((row) => row.presented_as === "STALE"));
+  assert.ok(error.every((row) => row.presented_as === "ERROR"));
+  assert.equal(
+    records.some((row) => row.freshness_status === "STALE" && row.presented_as === "healthy"),
+    false,
+  );
+});
+
 test("production context HTTP carries provenance on scoped responses", async () => {
   const res = await httpJson(`${runtime.contextBaseUrl}/v1/context?scope=company`, {
     headers: runtime.founderHeaders,
