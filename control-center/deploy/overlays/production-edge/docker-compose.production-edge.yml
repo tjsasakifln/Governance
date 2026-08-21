@@ -53,6 +53,7 @@ services:
       POSTGRES_USER: control_center
       POSTGRES_DB: control_center
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      AUTHELIA_POSTGRES_PASSWORD: "${AUTHELIA_POSTGRES_PASSWORD}"
       TZ: UTC
       PGTZ: UTC
     secrets:
