@@ -19,6 +19,7 @@ function run(cmd, args, extraEnv = {}) {
 run("npx", [
   "tsx",
   "--test",
+  "--test-concurrency=1",
   "tests/convergence/contracts.test.ts",
   "tests/convergence/dockerfiles.test.ts",
   "tests/convergence/importer-apply.test.ts",

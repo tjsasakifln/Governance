@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { startTestPostgres } from "../../../persistence/tests/helpers/postgres.ts";
+import { startIsolatedTestPostgres } from "../../../persistence/tests/helpers/postgres.ts";
 import { AGENT, FOUNDER, createInput, NOW } from "./helpers.ts";
 import { frozenClock } from "../src/clock.ts";
 import { sequentialIds } from "../src/ids.ts";
@@ -23,7 +23,7 @@ function makeService(store: PersistencePort) {
 
 describe("postgres adapter", { concurrency: 1 }, () => {
 test("postgres adapter round-trips a directive with provenance and rejects silent agent mutation", async () => {
-  const pg = await startTestPostgres();
+  const pg = await startIsolatedTestPostgres();
   try {
     const store = await createPostgresStoreFromPool(pg.pool);
     const service = makeService(store);

@@ -7,12 +7,12 @@ import {
   migrateUp,
   seedSynthetic,
 } from '../src/index.js';
-import { startTestPostgres, type TestPostgres } from './helpers/postgres.js';
+import { startIsolatedTestPostgres, type TestPostgres } from './helpers/postgres.js';
 
 let ctx: TestPostgres;
 
 before(async () => {
-  ctx = await startTestPostgres();
+  ctx = await startIsolatedTestPostgres();
 });
 
 after(async () => {
