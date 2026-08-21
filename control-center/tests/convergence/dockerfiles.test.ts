@@ -250,7 +250,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
   assert.ok(redisRef.includes("redis:7-alpine@sha256:"));
   assert.ok(pins.images["caddy-2.9-alpine"]?.ref.includes("caddy:2.9-alpine@sha256:"));
 
-  const natsRef = pins.images["nats-2.12.1-alpine"]?.ref;
+  const natsRef = pins.images["nats-2.12.5-alpine"]?.ref;
   assert.ok(natsRef && natsRef.includes("nats:2.12.1-alpine@sha256:"));
   const prodOverlay = read("deploy/overlays/production-edge/docker-compose.production-edge.yml");
   assert.match(prodOverlay, new RegExp(escapeRegExp(natsRef)));

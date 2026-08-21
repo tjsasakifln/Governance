@@ -109,7 +109,7 @@ services:
       - no-new-privileges:true
 
   nats:
-    image: nats:2.12.1-alpine@sha256:b3f2bd84176ae7bd0afa9c48a00f06d7d0818ff4aaee898e4172e0b8340e5816
+    image: nats:2.12.5-alpine@sha256:c1379a8588df47244a4789ede85e8ae7490bd37006bde837e4d6fb6f559cb0ce
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m
