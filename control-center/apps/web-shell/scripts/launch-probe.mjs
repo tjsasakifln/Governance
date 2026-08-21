@@ -143,8 +143,8 @@ try {
   if (priorities < 1 || priorities > 3) {
     throw new Error(`Hoje priorities out of range: ${priorities}`);
   }
-  const priorityHeading = await page.locator("#prioridades-title").innerText();
-  const exceptionsHeading = await page.locator("#excecoes-title").innerText();
+  const priorityHeading = await page.locator("#hoje-top3").innerText();
+  const exceptionsHeading = await page.locator("#hoje-incidents").innerText();
   console.log(`hoje_priority_heading=${priorityHeading}`);
   console.log(`hoje_exceptions_heading=${exceptionsHeading}`);
   if (!priorityHeading.trim()) {
