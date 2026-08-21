@@ -105,6 +105,36 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     assert.ok(snapshot.attention.some((a) => a.id.includes("task-overdue-1")));
     assert.equal(snapshot.attention.some((a) => a.kind === "confenge_attention"), false);
   });
+
+  it("campaigns list 500 is a gap and does not ERROR required CRM freshness", () => {
+    const payload = loadFixture("commercial-runtime.json");
+    payload.campaigns = undefined;
+    payload.unavailable = [
+      ...(payload.unavailable ?? []),
+      {
+        method: "GET",
+        path: "/v1/campaigns",
+        status: 500,
+        reason: "Warmbly returned 500 for GET /v1/campaigns",
+      },
+    ];
+    const snapshot = collectFromWarmblyPayload(payload, { now: NOW });
+    assert.equal(snapshot.freshness_status, "FRESH");
+    const camp = snapshot.observations.find((o) => o.http_path === "/v1/campaigns");
+    assert.ok(camp);
+    assert.equal(camp.provenance.freshness_status, "UNKNOWN");
+    const exceptions = Array.from({ length: 60 }, (_, i) => ({
+      id: `ex-${i}`,
+      code: "orphan_chain",
+      reason: "lead without deal",
+    }));
+    payload.confenge_intel_exceptions = exceptions;
+    const capped = collectFromWarmblyPayload(payload, { now: NOW });
+    const stored = capped.operations?.intel_exceptions;
+    assert.ok(Array.isArray(stored));
+    assert.equal(stored.length, 50);
+    assert.equal(capped.operations?.intel_exceptions_total, 60);
+  });
 });
 
 describe("collect() against a local Warmbly-shaped stub", () => {

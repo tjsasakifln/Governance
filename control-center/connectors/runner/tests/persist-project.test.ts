@@ -51,3 +51,40 @@ test("collector envelope projects to commercial snapshot_kind consumed by latest
   });
   assert.equal(replay.status, "DONE");
 });
+
+test("oversized Warmbly observation still persists a commercial snapshot", async () => {
+  const observedAt = "2026-08-21T16:00:00.000Z";
+  const intelExceptions = Array.from({ length: 400 }, (_, i) => ({
+    id: `ex-${i}`,
+    code: "orphan_chain",
+    reason: "lead without deal ".repeat(40),
+    next_action: "review",
+    status: "open",
+  }));
+  const result = await persistSourceResult(ctx.persistence, {
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: observedAt,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly-large" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: { intel_exceptions: intelExceptions, deals: [{ id: "d-large", name: "Acme", status: "open" }] },
+      confenge_today: { lanes: { blob: "n".repeat(200_000) }, actions: intelExceptions },
+    },
+  });
+  assert.equal(result.status, "DONE");
+  assert.equal(result.errorCode, null);
+  const latest = await ctx.pool.query<{ snapshot_type: string }>(
+    `SELECT snapshot_type FROM control_center.v_latest_operational_snapshots
+     WHERE snapshot_type = 'commercial' AND source_locator = 'warmbly-large'`,
+  );
+  assert.equal(latest.rowCount, 1);
+  const observation = await ctx.pool.query<{ payload: { _persist_truncation?: { reason?: string } } }>(
+    `SELECT payload FROM control_center.source_observations
+     WHERE observation_kind = 'warmbly-collect' AND source_locator = 'warmbly-large'
+     ORDER BY observed_at DESC LIMIT 1`,
+  );
+  assert.equal(observation.rowCount, 1);
+  assert.equal(observation.rows[0]?.payload._persist_truncation?.reason, "payload_exceeds_persist_limit");
+});

@@ -1,9 +1,9 @@
 import {
   canonicalObservationIdempotencyKey,
   canonicalSnapshotIdempotencyKey,
-  stripSecretOrPiiKeys,
   type Persistence,
 } from "@confenge/control-center-persistence";
+import { fitPersistPayload } from "./persist-payload.ts";
 import { projectCollector } from "./projectors/project.ts";
 import type { CollectorEnvelope, CollectorName } from "./run.ts";
 
@@ -35,11 +35,20 @@ function scopeFor(collector: CollectorName): string {
 }
 
 function payloadObject(payload: unknown): Record<string, unknown> {
-  const stripped = stripSecretOrPiiKeys(payload);
-  if (stripped !== null && typeof stripped === "object" && !Array.isArray(stripped)) {
-    return stripped as Record<string, unknown>;
-  }
-  return { value: stripped ?? null };
+  return fitPersistPayload(payload);
+}
+
+function logPersistFailure(stage: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(
+    `${JSON.stringify({
+      ts: new Date().toISOString(),
+      component: "control-center-collector",
+      event: "persist_failed",
+      stage,
+      error: message.slice(0, 512),
+    })}\n`,
+  );
 }
 
 export async function persistSourceResult(
@@ -82,8 +91,9 @@ export async function persistSourceResult(
       freshnessStatus: envelope.freshness_status,
       confidence: envelope.confidence,
     });
-  } catch {
+  } catch (error) {
     observationFailed = true;
+    logPersistFailure("observation", error);
   }
 
   const projections = projectCollector(envelope);
@@ -105,8 +115,9 @@ export async function persistSourceResult(
         confidence: projectedSnapshot.confidence,
       });
       projected += 1;
-    } catch {
+    } catch (error) {
       snapshotFailed = true;
+      logPersistFailure(`snapshot:${projectedSnapshot.snapshot_kind}`, error);
     }
   }
 
