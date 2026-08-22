@@ -159,8 +159,9 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
   const intelExceptions = asArray(
     nested.intel_exceptions ?? payload.intel_exceptions ?? payload.confenge_intel_exceptions,
   );
+  const intelExceptionsTotal = declaredIntelExceptionsTotal(nested, payload, intelExceptions.length);
   const mergedExceptions = mergeExceptions(intelExceptions, attention, observedAt);
-  const exceptionsTotal = mergedExceptions.length;
+  const exceptionsTotal = Math.max(intelExceptionsTotal, mergedExceptions.length);
   const exceptions = capList(mergedExceptions);
 
   const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
@@ -208,12 +209,25 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       scoreboard: scoreboardPresent(scoreboard) ? scoreboard : null,
       executive: asRecord(executive) ? stripIdentity(asRecord(executive) as Record<string, unknown>) : null,
       exceptions: intelExceptionsPresent ? capList(intelExceptions) : null,
-      exceptions_total: intelExceptionsPresent ? intelExceptions.length : 0,
-      exceptions_capped: intelExceptionsPresent && intelExceptions.length > LIST_CAP,
+      exceptions_total: intelExceptionsPresent ? intelExceptionsTotal : 0,
+      exceptions_capped: intelExceptionsPresent && intelExceptionsTotal > LIST_CAP,
       organic_scoreboard: organicPresent(organic) ? organic : null,
     },
     growth: growthFromIntel(scoreboard, executive, organic, observedAt),
   };
+}
+
+function declaredIntelExceptionsTotal(
+  nested: Record<string, unknown>,
+  payload: Record<string, unknown>,
+  listed: number,
+): number {
+  const declared =
+    integerOrUndefined(nested.intel_exceptions_total) ?? integerOrUndefined(payload.intel_exceptions_total);
+  if (declared !== undefined && declared >= 0) {
+    return Math.max(declared, listed);
+  }
+  return listed;
 }
 
 function intelExceptionsSourcePresent(nested: Record<string, unknown>, payload: Record<string, unknown>): boolean {

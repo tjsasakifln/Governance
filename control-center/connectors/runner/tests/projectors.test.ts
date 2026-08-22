@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { collectFromWarmblyPayload } from "../../warmbly/src/mapper/normalize.ts";
 import { availabilityFromEnvelope } from "../src/projectors/availability.ts";
 import { projectCollector } from "../src/projectors/project.ts";
 import { CONFENGE_OPERATIONAL_REPOS } from "../src/projectors/types.ts";
@@ -210,6 +211,87 @@ test("intel exceptions above LIST_CAP stay capped and keep an honest total", () 
   assert.equal(ops.intel.exceptions_capped, true);
   const serialized = JSON.stringify(commercial.payload);
   assert.ok(serialized.length < 512 * 1024, `commercial snapshot is ${serialized.length} bytes`);
+});
+
+test("mapper-capped intel_exceptions keep the declared upstream total", () => {
+  const intelExceptions = Array.from({ length: 50 }, (_, i) => ({
+    id: `ex-intel-${i}`,
+    code: "orphan_chain",
+    reason: `lead without deal ${i}`,
+    next_action: "review",
+    status: "open",
+  }));
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: {
+        cap: 50,
+        intel_exceptions: intelExceptions,
+        intel_exceptions_total: 362,
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    overview: { exceptions: number; exceptions_shown: number };
+    exceptions: unknown[];
+    intel: { exceptions: unknown[]; exceptions_total: number; exceptions_capped: boolean };
+  };
+  assert.equal(ops.intel.exceptions.length, 50);
+  assert.equal(ops.intel.exceptions_total, 362);
+  assert.equal(ops.intel.exceptions_capped, true);
+  assert.equal(ops.overview.exceptions, 362);
+  assert.equal(ops.overview.exceptions_shown, 50);
+  assert.equal(ops.exceptions.length, 50);
+});
+
+test("shipped mapper cap then projector preserves intel_exceptions_total", () => {
+  const exceptions = Array.from({ length: 62 }, (_, i) => ({
+    id: `ex-${i}`,
+    organization_id: "org",
+    code: "orphan_chain",
+    reason: "lead without deal",
+    next_action: "review",
+    status: "open",
+  }));
+  const snapshot = collectFromWarmblyPayload(
+    {
+      health: { status: "ok" },
+      pipelines: [],
+      deals: { data: [] },
+      tasks: { data: [] },
+      contacts: { data: [] },
+      confenge_intel_exceptions: exceptions,
+    },
+    { now: new Date(now) },
+  );
+  assert.equal(snapshot.operations?.intel_exceptions_total, 62);
+  assert.equal(Array.isArray(snapshot.operations?.intel_exceptions) && snapshot.operations.intel_exceptions.length, 50);
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: snapshot,
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    overview: { exceptions: number; exceptions_shown: number };
+    intel: { exceptions: unknown[]; exceptions_total: number; exceptions_capped: boolean };
+  };
+  assert.equal(ops.intel.exceptions.length, 50);
+  assert.equal(ops.intel.exceptions_total, 62);
+  assert.equal(ops.intel.exceptions_capped, true);
+  assert.equal(ops.overview.exceptions, 62);
+  assert.equal(ops.overview.exceptions_shown, 50);
 });
 
 test("intel exceptions feed Commercial Exceptions and organic scoreboard feeds Crescimento", () => {
