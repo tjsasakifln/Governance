@@ -71,6 +71,11 @@ export interface AdapterWriteResult {
   path: string;
   kind: WriteShortcutKind;
   message: string;
+  /**
+   * Returned only by `resume_confirm`. The caller replays it on `resume`; it is
+   * single-use, bound to the issuing operator, and never re-armed.
+   */
+  confirmationToken?: string;
 }
 
 /**
@@ -97,6 +102,30 @@ export interface ControlCenterReadAdapter {
     note: string;
     idempotency_key?: string;
   }): AdapterWriteResult | Promise<AdapterWriteResult>;
+  /**
+   * Warmbly dispatch control. Deliberately separate from `operatorAction`:
+   * that one authenticates with `x-actor-id`, a header the browser sets, and a
+   * client-settable actor must never be able to restart outbound email. These
+   * routes authenticate at the edge with Authelia, so the adapter sends no
+   * actor header at all and relies on the session cookie.
+   *
+   * `resume` is two-step by contract: `resume_confirm` returns a token that
+   * `resume` must replay. There is no single-call resume.
+   */
+  warmblyDispatch?(input: WarmblyDispatchInput): AdapterWriteResult | Promise<AdapterWriteResult>;
+}
+
+export const WARMBLY_DISPATCH_ACTIONS = ["pause", "resume_confirm", "resume", "acknowledge"] as const;
+export type WarmblyDispatchAction = (typeof WARMBLY_DISPATCH_ACTIONS)[number];
+
+export interface WarmblyDispatchInput {
+  action: WarmblyDispatchAction;
+  /** Audit reason. Required: the channel refuses a write without one. */
+  reason: string;
+  /** Only for `resume`, replayed from the `resume_confirm` response. */
+  confirmation_token?: string;
+  /** Only for `acknowledge`. */
+  target_id?: string;
 }
 
 export function adapterAllows(action: string): action is AdapterAction {

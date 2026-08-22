@@ -76,3 +76,15 @@ export function isAuthorizedWritePath(path: string): boolean {
   const pathname = path.split("?")[0] ?? path;
   return pathname === AUTHORIZED_WRITE_PATH;
 }
+
+/**
+ * Warmbly dispatch control routes, mounted by the context service ahead of its
+ * own `x-actor-id` actor resolution. Kept here so a test can assert the set is
+ * exactly these four and nothing wider.
+ */
+export const WARMBLY_DISPATCH_PATHS = {
+  pause: "/v1/warmbly/operator/dispatch/pause",
+  resume_confirm: "/v1/warmbly/operator/dispatch/resume/confirm",
+  resume: "/v1/warmbly/operator/dispatch/resume",
+  acknowledge: "/v1/warmbly/operator/inbound/acknowledge",
+} as const;

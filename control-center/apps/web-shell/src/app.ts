@@ -112,6 +112,9 @@ function applyPaint(
   bindOperatorActions(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
   });
+  bindWarmblyDispatch(root, adapter, () => {
+    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+  });
 }
 
 function bindOperatorActions(
@@ -140,6 +143,53 @@ function bindOperatorActions(
         }),
       ).then((result) => {
         if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
+    });
+  }
+}
+
+/**
+ * Binds the Warmbly dispatch control.
+ *
+ * Pause is one click. Resume is two by contract: the first call mints a
+ * single-use token, the second replays it. The token is held only for the life
+ * of this interaction and never persisted, so a reload forces a fresh
+ * confirmation — restarting outbound email should cost a deliberate act.
+ */
+function bindWarmblyDispatch(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.warmblyDispatch || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-warmbly-dispatch]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    let pendingToken: string | undefined;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const requested = form.getAttribute("data-warmbly-dispatch");
+      if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
+      const reason = form.querySelector('[name="reason"]')?.value ?? "";
+      const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
+      // A resume with no token yet is the confirmation step, not the resume.
+      const action =
+        requested === "resume" && !pendingToken ? "resume_confirm" : requested;
+      void Promise.resolve(
+        adapter.warmblyDispatch?.({
+          action,
+          reason,
+          ...(action === "resume" && pendingToken ? { confirmation_token: pendingToken } : {}),
+          ...(requested === "acknowledge" ? { target_id: targetId } : {}),
+        }),
+      ).then((result) => {
+        if (result) {
+          adapter.lastOperatorResult = result;
+          // Carry the token forward only for the immediately following resume.
+          pendingToken = action === "resume_confirm" ? result.confirmationToken : undefined;
+        }
         onDone();
       });
     });

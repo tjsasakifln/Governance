@@ -6,6 +6,7 @@ import {
   type AdapterAction,
   type AdapterReadResult,
   type AdapterWriteResult,
+  type WarmblyDispatchInput,
   type ControlCenterReadAdapter,
   type DestinationPage,
 } from "./contract";
@@ -25,6 +26,7 @@ import {
 } from "./map";
 import {
   AUTHORIZED_WRITE_PATH,
+  WARMBLY_DISPATCH_PATHS,
   WRITE_SHORTCUT_DIRECTIVE_KIND,
   WRITE_SHORTCUT_KINDS,
   destinationUsesContext,
@@ -80,6 +82,59 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     const result = await this.readDestination("hoje");
     if (!result.ok || result.loading) return [];
     return result.page.priorities;
+  }
+
+  async warmblyDispatch(input: WarmblyDispatchInput): Promise<AdapterWriteResult> {
+    const path = WARMBLY_DISPATCH_PATHS[input.action];
+    const fail = (message: string): AdapterWriteResult => {
+      const denied: AdapterWriteResult = { ok: false, path: path ?? "/v1/warmbly/operator", kind: "nota", message };
+      this.lastOperatorResult = denied;
+      return denied;
+    };
+    if (!path) {
+      return fail("ação de dispatch desconhecida");
+    }
+    // The channel refuses a write with no audit reason, and with paused_by
+    // missing upstream this ledger is the only record of who did it.
+    if (input.reason.trim() === "") {
+      return fail("motivo é obrigatório");
+    }
+    if (input.action === "resume" && !input.confirmation_token) {
+      return fail("resume exige o token de confirmação do passo anterior");
+    }
+    if (input.action === "acknowledge" && !input.target_id) {
+      return fail("acknowledge exige o id do alerta");
+    }
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: "POST",
+        // No x-actor-id: identity is Authelia's, resolved at the edge from the
+        // session. Sending an actor header here would invite trusting it.
+        headers: { accept: "application/json", "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          reason: input.reason,
+          ...(input.confirmation_token ? { confirmation_token: input.confirmation_token } : {}),
+          ...(input.target_id ? { target_id: input.target_id } : {}),
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const result: AdapterWriteResult = {
+        ok: response.ok,
+        path,
+        kind: "nota",
+        message: typeof body.reason === "string" ? body.reason : `HTTP ${response.status}`,
+        ...(typeof body.confirmation_token === "string"
+          ? { confirmationToken: body.confirmation_token }
+          : {}),
+      };
+      this.lastOperatorResult = result;
+      return result;
+    } catch (err) {
+      // A transport failure here says nothing about whether Warmbly applied the
+      // change; the channel reports `unknown` for exactly this reason.
+      return fail(`falha de transporte: ${err instanceof Error ? err.name : "erro"}`);
+    }
   }
 
   async operatorAction(input: {
