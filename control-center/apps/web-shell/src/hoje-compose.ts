@@ -21,8 +21,15 @@ import {
   WRITE_SHORTCUT_LABELS,
   type WriteShortcutKind,
 } from "./adapters/paths";
+import {
+  absenceNoteFor,
+  assertNoHealthyOnUntrusted,
+  summarizeDomains,
+  type HojeDomainSummary,
+} from "./hoje-domains";
 
 export const HOJE_SECTION_IDS = [
+  "domains",
   "top3",
   "incidents",
   "clients",
@@ -35,6 +42,7 @@ export const HOJE_SECTION_IDS = [
 export type HojeSectionId = (typeof HOJE_SECTION_IDS)[number];
 
 export const HOJE_SECTION_TITLES = [
+  "Panorama por domínio.",
   "Se eu só puder fazer 3 coisas hoje.",
   "Incidentes, blockers e riscos.",
   "Clientes que exigem atenção.",
@@ -75,6 +83,8 @@ export interface HojeSection {
   compressed_summary: string | null;
   rows: HojeRow[];
   shortcuts: HojeShortcut[];
+  /** Only the "domains" section carries the consolidated per-domain read. */
+  summary?: HojeDomainSummary;
 }
 
 export interface HojeViewModel {
@@ -96,6 +106,13 @@ export interface HojeComposeInput {
   engineering: EngineeringSnapshot | null;
   infra: readonly ServiceHealth[];
   activities: readonly AgentActivity[];
+  /**
+   * Raw `GET /v1/operational-snapshots` body (an
+   * `control-center.operational-envelope.v1` document). Left out only by
+   * fixture callers that predate the per-domain panorama; when it is missing
+   * the panorama says so instead of painting six healthy cards.
+   */
+  operational_envelope?: unknown;
 }
 
 const CLIENT_NEEDS = new Set(["churn_risk", "paused", "churned"]);
@@ -143,20 +160,45 @@ function rowFrom(
 }
 
 function section(
-  index: number,
+  id: HojeSectionId,
   rows: HojeRow[],
   compressed: boolean,
   compressed_summary: string | null,
   shortcuts: HojeShortcut[] = [],
 ): HojeSection {
+  const index = HOJE_SECTION_IDS.indexOf(id);
   return {
-    id: HOJE_SECTION_IDS[index]!,
+    id,
     title: HOJE_SECTION_TITLES[index]!,
     compressed,
     compressed_summary,
     rows,
     shortcuts,
   };
+}
+
+/**
+ * "Ignorar" is not a state. Every compressed band has to say which of the two
+ * it is: the slice was read and had nothing (`sem ocorrências`), or the slice
+ * never arrived (`faltam dados`, with the contract's absence reason). The
+ * envelope is what knows the difference.
+ */
+function emptyNote(input: HojeComposeInput, domain: string, noOccurrences: string): string {
+  const missing = absenceNoteFor(input.operational_envelope, domain);
+  return missing ?? noOccurrences;
+}
+
+/**
+ * Consolidated per-domain read (issue #61). This is the only section that is
+ * built straight from the operational envelope, because `presence`,
+ * `absence_reason` and `healthy` live there and nowhere else in the payloads
+ * the Hoje page reads.
+ */
+function composeDomains(input: HojeComposeInput): HojeSection {
+  const summary = summarizeDomains(input.operational_envelope);
+  assertNoHealthyOnUntrusted(summary);
+  const base = section("domains", [], false, null);
+  return { ...base, summary };
 }
 
 function composeTop3(input: HojeComposeInput): HojeSection {
@@ -174,10 +216,12 @@ function composeTop3(input: HojeComposeInput): HojeSection {
   );
   const compressed = rows.length === 0;
   return section(
-    0,
+    "top3",
     rows,
     compressed,
-    compressed ? "Nenhuma ação recomendada — não inventar trabalho" : null,
+    compressed
+      ? "A leitura de prioridades chegou e não recomendou nenhuma ação. Não é trabalho a inventar."
+      : null,
   );
 }
 
@@ -197,10 +241,12 @@ function composeIncidents(input: HojeComposeInput): HojeSection {
   );
   const compressed = rows.length === 0;
   return section(
-    1,
+    "incidents",
     rows,
     compressed,
-    compressed ? "Nenhum incidente, blocker ou risco aberto — ignorar" : null,
+    compressed
+      ? "Sem ocorrências: a leitura de atenção chegou e não trouxe incidente, blocker ou risco aberto."
+      : null,
   );
 }
 
@@ -227,7 +273,18 @@ function composeClients(input: HojeComposeInput): HojeSection {
     ),
   );
   const compressed = rows.length === 0;
-  return section(2, rows, compressed, compressed ? "Nenhum cliente exige atenção — ignorar" : null);
+  return section(
+    "clients",
+    rows,
+    compressed,
+    compressed
+      ? emptyNote(
+          input,
+          "clients",
+          "Sem ocorrências: o recorte de clientes foi lido e nenhum cliente exige atenção.",
+        )
+      : null,
+  );
 }
 
 function commercialInException(snap: CommercialSnapshot): boolean {
@@ -245,7 +302,16 @@ function commercialInException(snap: CommercialSnapshot): boolean {
 function composeCommercial(input: HojeComposeInput): HojeSection {
   const snap = input.commercial;
   if (!snap) {
-    return section(3, [], true, "Sem recorte comercial — ignorar");
+    return section(
+      "commercial",
+      [],
+      true,
+      emptyNote(
+        input,
+        "commercial",
+        "Faltam dados: o recorte comercial não chegou nesta leitura.",
+      ),
+    );
   }
   const funnel = snap.funnel
     ? `leads ${snap.funnel.new_leads ?? "ausente"} · qualificados ${snap.funnel.qualified ?? "ausente"} · oportunidades ${snap.funnel.opportunities ?? "ausente"}`
@@ -253,7 +319,12 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       ? `pipeline ${snap.pipeline_open_count} aberto`
       : "funil ausente";
   if (!commercialInException(snap)) {
-    return section(3, [], true, `${funnel} — ignorar`);
+    return section(
+      "commercial",
+      [],
+      true,
+      `${funnel} — ${emptyNote(input, "commercial", "sem exceção comercial nesta coleta; a leitura chegou e veio limpa")}`,
+    );
   }
   const rows: HojeRow[] = [];
   if ((snap.inbound_unread_count ?? 0) > 0) {
@@ -337,7 +408,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       ),
     );
   }
-  return section(3, rows, false, null);
+  return section("commercial", rows, false, null);
 }
 
 function financeInException(snap: FinanceSnapshot): boolean {
@@ -352,13 +423,23 @@ function financeInException(snap: FinanceSnapshot): boolean {
 function composeFinance(input: HojeComposeInput): HojeSection {
   const snap = input.finance;
   if (!snap) {
-    return section(4, [], true, "Sem recorte financeiro — ignorar");
+    return section(
+      "finance",
+      [],
+      true,
+      emptyNote(input, "finance", "Faltam dados: o recorte financeiro não chegou nesta leitura."),
+    );
   }
   const overdue = snap.overdue ?? snap.receivables_overdue;
   const receivable = snap.receivable ?? snap.receivables_open;
   const kpi = `a receber ${receivable ? `${receivable.currency} ${receivable.amount_cents}¢` : "ausente"} · vencido ${overdue ? `${overdue.amount_cents}¢` : "ausente"}`;
   if (!financeInException(snap)) {
-    return section(4, [], true, `${kpi} — ignorar (somente leitura; sem cobrança neste cockpit)`);
+    return section(
+      "finance",
+      [],
+      true,
+      `${kpi} — ${emptyNote(input, "finance", "sem exceção financeira nesta coleta; a leitura chegou e veio limpa")} (somente leitura; sem cobrança neste cockpit)`,
+    );
   }
   const rows: HojeRow[] = [];
   if (overdue && overdue.amount_cents > 0) {
@@ -403,7 +484,7 @@ function composeFinance(input: HojeComposeInput): HojeSection {
       ),
     );
   }
-  return section(4, rows, false, null);
+  return section("finance", rows, false, null);
 }
 
 function engineeringInException(snap: EngineeringSnapshot): boolean {
@@ -511,7 +592,7 @@ function composeEngineering(input: HojeComposeInput): HojeSection {
     );
   }
   const compressed = rows.length === 0;
-  if (!compressed) return section(5, rows, false, null);
+  if (!compressed) return section("engineering", rows, false, null);
   const parts: string[] = [];
   if (snap && !engineeringInException(snap)) {
     parts.push(`PRs ${snap.open_pr_count} · CI ok · incidentes 0`);
@@ -520,7 +601,17 @@ function composeEngineering(input: HojeComposeInput): HojeSection {
     parts.push("infra saudável");
   }
   if (!snap && infra.length === 0) parts.push("Sem recorte de engenharia/infra");
-  return section(5, [], true, `${parts.join(" · ") || "Sem recorte de engenharia/infra"} — ignorar`);
+  const engineeringNote = emptyNote(
+    input,
+    "engineering",
+    "sem exceção de engenharia/infra nesta coleta; as leituras chegaram e vieram limpas",
+  );
+  return section(
+    "engineering",
+    [],
+    true,
+    `${parts.join(" · ") || "Sem recorte de engenharia/infra"} — ${engineeringNote}`,
+  );
 }
 
 function agentNeedsAttention(item: AgentActivity): boolean {
@@ -534,11 +625,21 @@ function agentNeedsAttention(item: AgentActivity): boolean {
 function composeAgents(input: HojeComposeInput): HojeSection {
   const items = input.activities.slice();
   if (items.length === 0) {
-    return section(6, [], true, "Zero atividade de agentes — não inventar trabalho");
+    return section(
+      "agents",
+      [],
+      true,
+      "A leitura de atividades chegou e veio vazia: nenhuma sessão de agente observada. Não é trabalho a inventar.",
+    );
   }
   const actionable = items.filter(agentNeedsAttention);
   if (actionable.length === 0) {
-    return section(6, [], true, `${items.length} sessão(ões) concluída(s) sem leftover — ignorar`);
+    return section(
+      "agents",
+      [],
+      true,
+      `${items.length} sessão(ões) concluída(s) sem trabalho residual — leitura presente, nenhuma pendência.`,
+    );
   }
   const rows = actionable.map((item) =>
     rowFrom(
@@ -551,7 +652,7 @@ function composeAgents(input: HojeComposeInput): HojeSection {
       item.provenance,
     ),
   );
-  return section(6, rows, false, null);
+  return section("agents", rows, false, null);
 }
 
 function composeShortcuts(): HojeSection {
@@ -562,7 +663,7 @@ function composeShortcuts(): HojeSection {
   }));
   return {
     id: "shortcuts",
-    title: HOJE_SECTION_TITLES[7]!,
+    title: HOJE_SECTION_TITLES[HOJE_SECTION_IDS.indexOf("shortcuts")]!,
     compressed: false,
     compressed_summary: null,
     rows: [],
@@ -572,6 +673,7 @@ function composeShortcuts(): HojeSection {
 
 export function composeHoje(input: HojeComposeInput): HojeViewModel {
   const sections = [
+    composeDomains(input),
     composeTop3(input),
     composeIncidents(input),
     composeClients(input),

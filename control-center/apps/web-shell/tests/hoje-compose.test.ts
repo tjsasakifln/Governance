@@ -37,9 +37,9 @@ function sampleInput() {
   };
 }
 
-test("Hoje compose emits the eight section titles in criterion-2 order with ≤3 priorities", () => {
+test("Hoje compose emits the nine section titles in criterion-2 order with ≤3 priorities", () => {
   const view = composeHoje(sampleInput());
-  assert.equal(view.sections.length, 8);
+  assert.equal(view.sections.length, 9);
   assert.deepEqual(
     view.sections.map((s) => s.title),
     [...HOJE_SECTION_TITLES],
@@ -48,7 +48,8 @@ test("Hoje compose emits the eight section titles in criterion-2 order with ≤3
     view.sections.map((s) => s.id),
     [...HOJE_SECTION_IDS],
   );
-  assert.ok(view.sections[0]!.rows.length <= 3);
+  assert.equal(view.sections[0]!.id, "domains");
+  assert.ok(view.sections[1]!.rows.length <= 3);
   assert.equal(view.charts_emitted, false);
   assert.equal(hojeHasUntrustedGreen(view), false);
   assertNoGreenForUntrusted(view);
@@ -97,10 +98,13 @@ test("exceptions are expanded and healthy KPIs are compressed", () => {
   assert.equal(healthy.sections.find((s) => s.id === "commercial")?.compressed, true);
   assert.equal(healthy.sections.find((s) => s.id === "finance")?.compressed, true);
   assert.equal(healthy.sections.find((s) => s.id === "engineering")?.compressed, true);
-  assert.match(healthy.sections.find((s) => s.id === "commercial")?.compressed_summary ?? "", /ignorar/);
+  const commercialSummary =
+    healthy.sections.find((s) => s.id === "commercial")?.compressed_summary ?? "";
+  assert.doesNotMatch(commercialSummary, /ignorar/);
+  assert.match(commercialSummary, /sem exceção comercial|Faltam dados|Erro de coleta/);
 });
 
-test("mounted Hoje HTML has the eight titles in order, no chart/KPI wall/MCP/intranet", () => {
+test("mounted Hoje HTML has the nine titles in order, no chart/KPI wall/MCP/intranet", () => {
   const root = { innerHTML: "" };
   const runtime = createMemoryRuntime("#/hoje");
   const handle = mount(root, createMockAdapter(), runtime);

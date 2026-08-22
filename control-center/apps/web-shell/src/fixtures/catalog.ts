@@ -3,6 +3,7 @@ import { DESTINATIONS, getDestination } from "../destinations";
 import { selectHomepageAttention, selectHomepagePriorities } from "../homepage";
 import type { DestinationPage } from "../adapters/contract";
 import { composeHoje } from "../hoje-compose";
+import { OPERATIONAL_ENVELOPE_FIXTURE } from "./operational-envelope";
 import type {
   ActorRef,
   AgentActivity,
@@ -820,6 +821,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
         engineering: ENGINEERING_SNAPSHOT,
         infra: HEALTH_FIXTURES,
         activities: AGENT_ACTIVITY_FIXTURES,
+        operational_envelope: OPERATIONAL_ENVELOPE_FIXTURE,
       }),
     }),
     comercial: pageFor("comercial", {
@@ -938,6 +940,7 @@ export function stalePages(): Record<DestinationId, DestinationPage> {
       engineering: page.engineering ?? null,
       infra: page.health ?? [],
       activities: page.activities ?? [],
+      operational_envelope: OPERATIONAL_ENVELOPE_FIXTURE,
     });
   }
   return pages;

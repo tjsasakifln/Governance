@@ -608,3 +608,116 @@ h2 {
     padding: 0.75rem 0.75rem 1.1rem;
   }
 }
+
+/* Panorama por domínio (Hoje) — issue #61 */
+.domain-total {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+.domain-total .hint,
+.domain-integrations .prov-inline {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+}
+
+.domain-unmapped {
+  margin: 0 0 0.6rem;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.domain-card[data-tone="green"] {
+  border-left: 3px solid var(--ok);
+}
+
+.domain-card[data-tone="amber"] {
+  border-left: 3px solid var(--high);
+}
+
+.domain-card[data-tone="red"] {
+  border-left: 3px solid var(--crit);
+}
+
+.domain-card[data-tone="slate"] {
+  border-left: 3px solid var(--low);
+}
+
+.domain-card,
+.domain-reason,
+.domain-indicator,
+.domain-pending li {
+  overflow-wrap: anywhere;
+}
+
+.domain-reason,
+.domain-indicator {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.domain-empty {
+  margin: 0 0 0.5rem;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.domain-pending {
+  margin: 0 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.domain-link {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.pill-state-saudavel {
+  border-color: var(--ok);
+}
+
+.pill-state-atencao {
+  border-color: var(--high);
+}
+
+.pill-state-critico,
+.pill-state-erro_coleta {
+  border-color: var(--crit);
+}
+
+.pill-state-desconhecido {
+  border-color: var(--low);
+}
+
+.pill-outbound {
+  border-color: var(--accent);
+}
+
+.domain-outbound,
+.domain-integrations-block {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+.domain-outbound h3,
+.domain-integrations-block h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.98rem;
+}
+
+.domain-integrations {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.domain-integrations li {
+  overflow-wrap: anywhere;
+}
