@@ -38,6 +38,7 @@ import {
 import {
   defaultOperatorIdentityPolicy,
   resolveOperatorActor,
+  type OperatorIdentityResult,
   type IdentityRequest,
   type OperatorActor,
   type TrustedHopPolicy,
@@ -143,6 +144,12 @@ export interface WarmblyOperatorChannel {
   readonly actions: readonly OperatorActionName[];
   readonly ledger: OperatorActionLedger;
   circuitState(): CircuitState;
+  /**
+   * Resolves the founder from a raw request, for read-backs that must sit
+   * behind the same gate as a write without performing one. It records nothing:
+   * only calls that attempt an action write to the ledger.
+   */
+  resolveActor(request: IdentityRequest | undefined): OperatorIdentityResult;
   /** Step 1 of the two-step release. Only `resume_dispatch` accepts it. */
   requestConfirmation(input: OperatorActionInput): Promise<OperatorActionResult>;
   requestResumeConfirmation(input: NamedOperatorActionInput): Promise<OperatorActionResult>;
@@ -728,6 +735,7 @@ export function createWarmblyOperatorChannel(
     actions: OPERATOR_ACTION_NAMES,
     ledger,
     circuitState: safeCircuitState,
+    resolveActor: (request) => resolveOperatorActor(request, identityPolicy),
     requestConfirmation,
     requestResumeConfirmation: (input) =>
       requestConfirmation({ ...input, action: "resume_dispatch", target_id: DISPATCH_TARGET_ID }),

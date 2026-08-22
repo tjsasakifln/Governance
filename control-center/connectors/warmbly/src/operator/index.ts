@@ -99,11 +99,17 @@ export type {
   WarmblyOperatorChannelOptions,
 } from "./channel.ts";
 
-export { OPERATOR_HTTP_ROUTES, createOperatorHttpHandler } from "./http.ts";
+export {
+  OPERATOR_HTTP_ROUTES,
+  OPERATOR_LEDGER_MAX,
+  OPERATOR_LEDGER_ROUTE,
+  createOperatorHttpHandler,
+} from "./http.ts";
 export type {
   OperatorHttpRequest,
   OperatorHttpResponse,
   OperatorHttpRoute,
+  OperatorLedgerView,
 } from "./http.ts";
 
 export {

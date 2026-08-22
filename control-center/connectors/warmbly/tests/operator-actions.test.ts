@@ -17,6 +17,7 @@ import {
   createFanOutOperatorActionLedger,
   createMemoryOperatorActionLedger,
   createOperatorHttpHandler,
+  OPERATOR_LEDGER_ROUTE,
   createWarmblyOperatorChannel,
   defaultOperatorIdentityPolicy,
   defaultOperatorSinkErrorHandler,
@@ -840,6 +841,79 @@ describe("ledger recording", () => {
       const blocked = timeline.find((row) => row.status === "BLOCKED")!;
       assert.ok(blocked.evidence.includes("refusal_code=confirmation_required"));
       assert.equal(blocked.blockers.length, 1);
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe("operator ledger read-back", () => {
+  it("is gated by the same founder identity as a write, and never leaks a token", async () => {
+    const h = await harness();
+    const handle = createOperatorHttpHandler(h.channel);
+    try {
+      // An unauthenticated read is refused before it can disclose who acted.
+      const anon = await handle({
+        method: "GET",
+        url: OPERATOR_LEDGER_ROUTE,
+        headers: {},
+        remoteAddress: TRUSTED_HOP,
+        body: undefined,
+      });
+      assert.equal(anon.status, 401);
+      assert.equal((anon.body as { entries?: unknown }).entries, undefined);
+
+      // A spoofed hop is refused too: Authelia headers only count from a
+      // trusted reverse-proxy hop.
+      const spoofed = await handle({
+        method: "GET",
+        url: OPERATOR_LEDGER_ROUTE,
+        headers: AUTHELIA_HEADERS,
+        remoteAddress: "203.0.113.9",
+        body: undefined,
+      });
+      assert.equal(spoofed.status, 401);
+
+      await h.channel.pauseDispatch({ request: founderRequest(), reason: "pico de bounce" });
+      const read = await handle({
+        method: "GET",
+        url: OPERATOR_LEDGER_ROUTE,
+        headers: AUTHELIA_HEADERS,
+        remoteAddress: TRUSTED_HOP,
+        body: undefined,
+      });
+      assert.equal(read.status, 200);
+      const entries = (read.body as { entries: Array<Record<string, unknown>> }).entries;
+      assert.equal(entries.length, 1);
+      assert.equal(entries[0]!.action, "pause_dispatch");
+      assert.equal(entries[0]!.outcome, "executed");
+      assert.equal(entries[0]!.actor_id, "founder");
+      assert.equal(entries[0]!.reason, "pico de bounce");
+      // The projection carries no token and no raw header material.
+      const serialized = JSON.stringify(read.body);
+      assert.ok(!serialized.includes(TOKEN), "the Warmbly bearer token must never appear");
+      assert.ok(!serialized.includes("wcnf_"), "a confirmation token must never appear");
+      assert.ok(!serialized.includes("founder@confenge.invalid"), "Remote-Email must never appear");
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("is read-only: a write verb on the ledger route is refused", async () => {
+    const h = await harness();
+    const handle = createOperatorHttpHandler(h.channel);
+    try {
+      for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+        const wrong = await handle({
+          method,
+          url: OPERATOR_LEDGER_ROUTE,
+          headers: AUTHELIA_HEADERS,
+          remoteAddress: TRUSTED_HOP,
+          body: {},
+        });
+        assert.equal(wrong.status, 405, method);
+      }
+      assert.equal(h.stub.operatorCalls.length, 0);
     } finally {
       await h.close();
     }

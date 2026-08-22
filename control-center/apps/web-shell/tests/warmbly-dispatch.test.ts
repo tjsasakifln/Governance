@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { WARMBLY_DISPATCH_PATHS } from "../src/adapters/paths";
 import { WARMBLY_DISPATCH_ACTIONS } from "../src/adapters/contract";
 import { HttpControlCenterAdapter } from "../src/adapters/http";
+import { clearPendingResumeConfirmation, paintShell } from "../src/app";
+import type { WarmblyDispatchInput } from "../src/adapters/contract";
 
 type Call = { url: string; init: RequestInit };
 
@@ -103,3 +105,164 @@ test("a transport failure is reported as a failure, never as a silent success", 
   assert.equal(result.ok, false);
   assert.match(result.message, /transporte/);
 });
+
+/**
+ * The two-step resume must survive the repaint that its own first step causes.
+ *
+ * Every dispatch call ends in `onDone()`, which repaints the shell by replacing
+ * `root.innerHTML` wholesale. A confirmation token parked in the closure of the
+ * form that minted it dies with that form, so the next submit would mint a
+ * second challenge instead of spending the first — a resume that can never
+ * complete, dressed up as a stricter two-step.
+ */
+test("a resume confirmation survives the repaint it triggers and the second submit executes", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  const adapter = {
+    mode: "http" as const,
+    lastOperatorResult: undefined as unknown,
+    readDestination: () => ({
+      ok: true as const,
+      loading: false as const,
+      page: null as never,
+    }),
+    warmblyDispatch: async (input: WarmblyDispatchInput) => {
+      seen.push({ ...input });
+      return input.action === "resume_confirm"
+        ? { ok: true, path: "/x", kind: "nota" as const, message: "confirme", confirmationToken: "wcnf_abc" }
+        : { ok: true, path: "/x", kind: "nota" as const, message: "ok" };
+    },
+  };
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/comercial/cohorts");
+
+  dom.submit("resume");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]!.action, "resume_confirm", "first submit mints the challenge");
+  assert.ok(dom.paints > 1, "the first step must have repainted, destroying the original form");
+
+  // Second submit lands on a form object that did not exist when the token was
+  // minted. It must still spend that token.
+  dom.submit("resume");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1]!.action, "resume", "second submit must execute, not re-challenge");
+  assert.equal(seen[1]!.confirmation_token, "wcnf_abc");
+});
+
+test("a spent confirmation is not replayed: the next resume challenges again", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  const adapter = {
+    mode: "http" as const,
+    lastOperatorResult: undefined as unknown,
+    readDestination: () => ({ ok: true as const, loading: false as const, page: null as never }),
+    warmblyDispatch: async (input: WarmblyDispatchInput) => {
+      seen.push({ ...input });
+      return input.action === "resume_confirm"
+        ? { ok: true, path: "/x", kind: "nota" as const, message: "confirme", confirmationToken: "wcnf_once" }
+        : { ok: true, path: "/x", kind: "nota" as const, message: "ok" };
+    },
+  };
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/comercial/cohorts");
+  for (let i = 0; i < 3; i += 1) {
+    dom.submit("resume");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.deepEqual(
+    seen.map((s) => s.action),
+    ["resume_confirm", "resume", "resume_confirm"],
+    "each execution costs a fresh confirmation",
+  );
+});
+
+test("a refused confirmation arms nothing", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  const adapter = {
+    mode: "http" as const,
+    lastOperatorResult: undefined as unknown,
+    readDestination: () => ({ ok: true as const, loading: false as const, page: null as never }),
+    warmblyDispatch: async (input: WarmblyDispatchInput) => {
+      seen.push({ ...input });
+      // A refusal that still carries a token must never arm the next submit.
+      return { ok: false, path: "/x", kind: "nota" as const, message: "recusado", confirmationToken: "wcnf_leak" };
+    },
+  };
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/comercial/cohorts");
+  dom.submit("resume");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  dom.submit("resume");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(seen.map((s) => s.action), ["resume_confirm", "resume_confirm"]);
+});
+
+/**
+ * A repainting root. Every `innerHTML` write throws away the previous form
+ * objects and hands out new ones on the next query — exactly what
+ * `root.innerHTML = renderShell(...)` does in the browser.
+ */
+function repaintingRoot(): {
+  root: { innerHTML: string; querySelectorAll(sel: string): FakeForm[] };
+  submit(action: string): void;
+  paints: number;
+} {
+  let forms: FakeForm[] = [];
+  let paints = 0;
+  const rebuild = (): void => {
+    paints += 1;
+    forms = [new FakeForm("pause"), new FakeForm("resume"), new FakeForm("acknowledge")];
+  };
+  rebuild();
+  const root = {
+    get innerHTML(): string {
+      return "";
+    },
+    set innerHTML(_next: string) {
+      rebuild();
+    },
+    querySelectorAll(_sel: string): FakeForm[] {
+      return forms;
+    },
+  };
+  return {
+    root,
+    submit(action: string): void {
+      const form = forms.find((f) => f.action === action);
+      if (!form) throw new Error(`no form for ${action}`);
+      form.submit();
+    },
+    get paints(): number {
+      return paints;
+    },
+  };
+}
+
+class FakeForm {
+  readonly action: string;
+  private listener: ((event: Event) => void) | null = null;
+  private readonly fields: Record<string, { value: string }> = {
+    reason: { value: "incidente resolvido" },
+    target_id: { value: "lead-1" },
+  };
+  constructor(action: string) {
+    this.action = action;
+  }
+  addEventListener(_type: string, listener: (event: Event) => void): void {
+    this.listener = listener;
+  }
+  getAttribute(name: string): string | null {
+    return name === "data-warmbly-dispatch" ? this.action : null;
+  }
+  querySelector(selector: string): { value: string } | null {
+    const name = selector.replace(/[[\]'"]/g, "").replace("name=", "");
+    return this.fields[name] ?? null;
+  }
+  submit(): void {
+    if (!this.listener) throw new Error("form was never bound");
+    this.listener({ preventDefault(): void {} } as unknown as Event);
+  }
+}

@@ -27,6 +27,7 @@ import {
 import {
   AUTHORIZED_WRITE_PATH,
   WARMBLY_DISPATCH_PATHS,
+  WARMBLY_OPERATOR_LEDGER_PATH,
   WRITE_SHORTCUT_DIRECTIVE_KIND,
   WRITE_SHORTCUT_KINDS,
   destinationUsesContext,
@@ -386,6 +387,9 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     if (id === "comercial" || id === "crescimento") {
       page.commercial = commercialFrom(inner, fallback);
     }
+    if (id === "comercial" && page.commercial) {
+      await this.attachLastOperatorAction(page.commercial);
+    }
     if (id === "crescimento" && payloads[1]) {
       const pncp = this.domainBody(payloads[1], fallback);
       page.health = [healthFrom(pncp, fallback)];
@@ -405,6 +409,32 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       );
     }
     return page;
+  }
+
+  /**
+   * Attaches the last operator action to the commercial snapshot.
+   *
+   * Best effort on purpose: the channel is off by default and answers 404, and
+   * a cockpit that cannot read its own audit trail must still render the
+   * dispatch state. A miss leaves the field absent — which the surface renders
+   * as "no action recorded in this instance", never as "nobody acted".
+   */
+  private async attachLastOperatorAction(commercial: { operations?: Record<string, unknown> }): Promise<void> {
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${WARMBLY_OPERATOR_LEDGER_PATH}`, {
+        headers: { accept: "application/json" },
+        credentials: "include",
+      });
+      if (!response.ok) return;
+      const body = (await response.json()) as { entries?: unknown };
+      const entries = Array.isArray(body.entries) ? body.entries : [];
+      const latest = entries[0];
+      if (!latest || typeof latest !== "object") return;
+      const ops = (commercial.operations ??= {});
+      ops.last_operator_action = latest;
+    } catch {
+      // Same reason as above: unreadable is not empty.
+    }
   }
 
   private async getJson(path: string): Promise<unknown> {

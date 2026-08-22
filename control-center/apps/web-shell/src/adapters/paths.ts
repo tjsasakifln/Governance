@@ -82,6 +82,9 @@ export function isAuthorizedWritePath(path: string): boolean {
  * own `x-actor-id` actor resolution. Kept here so a test can assert the set is
  * exactly these four and nothing wider.
  */
+/** Read-back of the operator channel's own audit record. GET, same Authelia gate. */
+export const WARMBLY_OPERATOR_LEDGER_PATH = "/v1/warmbly/operator/ledger/recent";
+
 export const WARMBLY_DISPATCH_PATHS = {
   pause: "/v1/warmbly/operator/dispatch/pause",
   resume_confirm: "/v1/warmbly/operator/dispatch/resume/confirm",

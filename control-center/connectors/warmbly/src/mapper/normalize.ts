@@ -14,6 +14,7 @@ import {
   unwrapData,
   unwrapList,
   type EndpointFailure,
+  type WarmblyDispatchStatus,
   type WarmblyPayload,
   type WarmblyTask,
 } from "../contracts/warmbly-payload.ts";
@@ -233,6 +234,13 @@ export function collectFromWarmblyPayload(
     "GET",
   );
   mark(
+    "confenge_dispatch_status",
+    payload.confenge_dispatch_status !== undefined,
+    fail("GET", "/v1/confenge/dispatch/status"),
+    "/v1/confenge/dispatch/status",
+    "GET",
+  );
+  mark(
     "confenge_intel_scoreboard",
     payload.confenge_intel_scoreboard !== undefined,
     fail("GET", "/v1/confenge/intel/scoreboard"),
@@ -362,6 +370,7 @@ export function collectFromWarmblyPayload(
   snapshot.operations = {
     authority: "warmbly",
     this_document: "read_model",
+    dispatch: dispatchOf(payload),
     cap: OPERATIONS_CAP,
     deals: deals.slice(0, OPERATIONS_CAP).map((d) => ({
       id: d.id,
@@ -424,6 +433,47 @@ export function collectFromWarmblyPayload(
   void pipelines;
 
   return snapshot;
+}
+
+/**
+ * Projects GET /v1/confenge/dispatch/status for the operator cockpit.
+ *
+ * `state` is the only field the surface reads to decide what it tells the
+ * founder, and it is a tri-state on purpose. Warmbly reports `paused` as a
+ * plain boolean, so an endpoint that is absent, 404, or malformed leaves us
+ * with no reading at all — and rendering that as ACTIVE would tell the founder
+ * outbound is running when nobody knows. Absent is UNKNOWN.
+ */
+function dispatchOf(payload: WarmblyPayload): Record<string, unknown> {
+  const raw = unwrapData(payload.confenge_dispatch_status);
+  if (!raw || typeof raw !== "object") {
+    return {
+      state: "UNKNOWN",
+      observed: false,
+      why: "GET /v1/confenge/dispatch/status did not answer; the kill-switch state is not known",
+    };
+  }
+  const st = raw as WarmblyDispatchStatus;
+  const state = st.paused === true ? "PAUSED" : st.paused === false ? "ACTIVE" : "UNKNOWN";
+  const out: Record<string, unknown> = { state, observed: true };
+  if (state === "UNKNOWN") {
+    out.why = "Warmbly answered without a `paused` field; absence is not evidence that dispatch is running";
+  }
+  // Every field below is omitted rather than defaulted: the cockpit renders
+  // "—" for what was not observed instead of inventing a window or a cap.
+  if (typeof st.pause_reason === "string" && st.pause_reason.trim() !== "") {
+    out.pause_reason = st.pause_reason.trim();
+  }
+  if (typeof st.in_send_window === "boolean") out.in_send_window = st.in_send_window;
+  if (typeof st.timezone === "string" && st.timezone !== "") out.timezone = st.timezone;
+  if (typeof st.window_start === "string" && st.window_start !== "") out.window_start = st.window_start;
+  if (typeof st.window_end === "string" && st.window_end !== "") out.window_end = st.window_end;
+  if (typeof st.next_slot_at === "string" && st.next_slot_at !== "") out.next_slot_at = st.next_slot_at;
+  if (typeof st.sent_last_hour === "number") out.sent_last_hour = st.sent_last_hour;
+  if (typeof st.cap === "number") out.cap = st.cap;
+  if (typeof st.queued_approved === "number") out.queued_approved = st.queued_approved;
+  if (typeof st.active_leases === "number") out.active_leases = st.active_leases;
+  return out;
 }
 
 /** Stable attention slice for idempotency comparisons (ignores observed_at). */
