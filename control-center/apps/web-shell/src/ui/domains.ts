@@ -78,12 +78,17 @@ function pipelineNominalFact(snapshot: CommercialSnapshot): string {
  * amount whose currency is missing or unreadable reads "sem dados" rather than
  * borrowing BRL from the catalog and looking like a confirmed figure.
  */
-function dealMoneyLine(value: unknown): string {
-  if (value === undefined || value === null) return "";
+function dealMoneyLine(value: unknown, withheld: unknown): string {
   const money = readableMoney(value);
-  return money
-    ? `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`
-    : `<p class="money" data-no-data="true">sem dados</p>`;
+  if (money) {
+    return `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`;
+  }
+  // Only when the read model says an amount existed and could not be
+  // denominated. A deal that simply never named a value shows no money line.
+  if (withheld !== undefined && withheld !== null) {
+    return `<p class="money" data-no-data="true" data-withheld="${escapeHtml(String(withheld))}">sem dados</p>`;
+  }
+  return value === undefined || value === null ? "" : `<p class="money" data-no-data="true">sem dados</p>`;
 }
 
 function listFact(label: string, items: string[] | undefined): string {
@@ -248,7 +253,7 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
       ? moneyFact("Pipeline ponderado (probabilidade confiável)", snapshot.pipeline_weighted)
-      : fact("Pipeline ponderado", "omitido — probabilidade não confiável");
+      : fact("Pipeline ponderado", "omitido — sem base confiável para ponderar");
   const extra = snapshot.extra_historical
     ? fact(
         snapshot.extra_historical.label ?? "Extra histórica",
@@ -452,7 +457,7 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
               return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
                 <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
-                ${dealMoneyLine(row.value)}
+                ${dealMoneyLine(row.value, row.value_unavailable)}
                 <dl class="facts">
                   ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
                   ${fact("Idade (s)", String(row.age_seconds ?? "—"))}

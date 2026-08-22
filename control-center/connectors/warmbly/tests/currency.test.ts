@@ -156,8 +156,13 @@ describe("multi-currency pipeline", () => {
       { amount_cents: 5_000, currency: "USD" },
     ]);
     const raised = snapshot.attention.filter((item) => item.id.startsWith("warmbly:currency:"));
-    assert.ok(raised.length >= 1);
     assert.ok(raised.some((item) => /no explicit conversion rate/.test(item.why)));
+    // Ids are keyed by anomaly, not by position, so an operator acknowledgement
+    // survives a sibling note appearing or disappearing.
+    assert.deepEqual(raised.map((item) => item.id).sort(), [
+      "warmbly:currency:pipeline:foreign_currency",
+      "warmbly:currency:pipeline:mixed_currencies",
+    ]);
   });
 
   it("leaves a single-currency BRL pipeline as one total with no split", () => {
@@ -173,5 +178,113 @@ describe("multi-currency pipeline", () => {
       snapshot.attention.filter((item) => item.id.startsWith("warmbly:currency:")).length,
       0,
     );
+  });
+});
+
+describe("a summary-only mixed-currency pipeline (the incident shape)", () => {
+  it("separates the totals when the summary declares a per-currency breakdown", () => {
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({
+        deals: [],
+        deals_summary: {
+          open_count: 3,
+          open_value: 150,
+          mixed_currency: true,
+          open_value_by_currency: [
+            { currency: "USD", value: 50 },
+            { currency: "BRL", value: 100 },
+          ],
+        },
+      }),
+      { now: NOW },
+    );
+    assert.equal(snapshot.deal_value_open, undefined);
+    assert.deepEqual(snapshot.deal_value_open_by_currency, [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 5_000, currency: "USD" },
+    ]);
+  });
+
+  it("declares the gap as an upstream contract when the summary gives no breakdown", () => {
+    // Empty deals[] plus a mixed summary is exactly the payload the incident
+    // arrived in. Nothing here can be separated and nothing may be converted,
+    // so the missing breakdown is named rather than guessed around.
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({
+        deals: [],
+        deals_summary: { open_count: 3, open_value: 150, currency: "BRL", mixed_currency: true },
+      }),
+      { now: NOW },
+    );
+    assert.equal(snapshot.deal_value_open, undefined);
+    assert.equal(snapshot.deal_value_open_by_currency, undefined);
+    assert.ok(
+      snapshot.required_upstream_contract.some(
+        (c) => c.id === "POST /v1/crm/deals/summary#open_value_by_currency",
+      ),
+    );
+    const raised = snapshot.attention.filter((item) => item.id.startsWith("warmbly:currency:"));
+    assert.deepEqual(raised.map((item) => item.id), [
+      "warmbly:currency:pipeline:summary_mixed_without_breakdown",
+    ]);
+  });
+
+  it("drops an unreadable code from the declared breakdown without losing the rest", () => {
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({
+        deals: [],
+        deals_summary: {
+          mixed_currency: true,
+          open_value_by_currency: [
+            { currency: "BRL", value: 100 },
+            { currency: "R$", value: 50 },
+          ],
+        },
+      }),
+      { now: NOW },
+    );
+    // One readable currency left is a total, not a split, and not absence.
+    assert.deepEqual(snapshot.deal_value_open, { amount_cents: 10_000, currency: "BRL" });
+    assert.equal(snapshot.deal_value_open_by_currency, undefined);
+  });
+});
+
+describe("a zero bucket does not take its siblings down with it", () => {
+  it("keeps a real BRL total alongside a zero USD one", () => {
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({
+        deals: [
+          deal({ id: "d1", value: 100, currency: "BRL" }),
+          deal({ id: "d2", value: 0, currency: "USD" }),
+        ],
+      }),
+      { now: NOW },
+    );
+    assert.deepEqual(snapshot.deal_value_open_by_currency, [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 0, currency: "USD" },
+    ]);
+  });
+
+  it("promotes the readable total when the only sibling had an unreadable code", () => {
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({
+        deals: [
+          deal({ id: "d1", value: 100, currency: "BRL" }),
+          deal({ id: "d2", value: 5000, currency: "reais" }),
+        ],
+      }),
+      { now: NOW },
+    );
+    assert.deepEqual(snapshot.deal_value_open, { amount_cents: 10_000, currency: "BRL" });
+    assert.equal(snapshot.deal_value_open_by_currency, undefined);
+  });
+
+  it("still withholds a lone zero total, which has no denominated contributor", () => {
+    const snapshot = collectFromWarmblyPayload(
+      payloadWith({ deals: [deal({ id: "d1", value: 0, currency: "USD" })] }),
+      { now: NOW },
+    );
+    assert.equal(snapshot.deal_value_open, undefined);
   });
 });

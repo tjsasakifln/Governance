@@ -111,6 +111,35 @@ export function openDealTotals(deals: readonly OpenDealInput[]): OpenDealTotals 
 }
 
 /**
+ * Per-currency totals a `deals_summary` declared for itself.
+ *
+ * Only used when there are no per-deal rows to group. Entries whose currency
+ * is not ISO-4217 are dropped rather than folded into the catalog currency.
+ */
+export function summaryTotalsByCurrency(summary: {
+  open_value_by_currency?: Array<{ currency?: string; value?: number }>;
+}): Money[] {
+  const rows = summary.open_value_by_currency;
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  const byCurrency = new Map<string, number>();
+  for (const row of rows) {
+    if (!row || typeof row.value !== "number" || !Number.isFinite(row.value)) {
+      continue;
+    }
+    const currency = resolveCurrency(row.currency);
+    if (!currency) {
+      continue;
+    }
+    byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + Math.round(row.value * 100));
+  }
+  return [...byCurrency.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([currency, amount_cents]) => ({ amount_cents, currency }));
+}
+
+/**
  * Single-currency open pipeline total, or `undefined` when the deals mix
  * currencies (see `openDealTotals` for the per-currency breakdown).
  */

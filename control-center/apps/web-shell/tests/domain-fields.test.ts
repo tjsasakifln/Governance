@@ -216,5 +216,5 @@ test("weighted pipeline without reliable probability is omitted", () => {
       },
     },
   });
-  assert.match(html, /omitido — probabilidade não confiável/);
+  assert.match(html, /omitido — sem base confiável para ponderar/);
 });

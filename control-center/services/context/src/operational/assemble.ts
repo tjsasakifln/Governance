@@ -134,16 +134,25 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
       out.funnel = derived;
     }
   }
-  // Read side, not just write side: snapshots persisted before the currency
-  // policy landed still carry a zero total stamped with whatever code the
-  // upstream summary happened to report. They are withheld here too.
+  // Read side, not just write side: a snapshot persisted with a zero total
+  // stamped with whatever code the upstream summary reported is withheld here
+  // too, not only at the moment it was collected.
   const nominal = nominalPipeline(payload.pipeline_nominal, seed);
+  const split = pipelineByCurrency(payload.pipeline_nominal_by_currency);
   if (nominal) {
     out.pipeline_nominal = nominal;
+  } else if (split.length === 1) {
+    // A split that filtered down to a single readable currency is not a split
+    // any more, but it is not absence either: the surviving total is a real
+    // denominated figure. Promote it rather than dropping real money on the
+    // floor because its unreadable sibling was rejected.
+    const promoted = nominalPipeline(split[0], seed);
+    if (promoted) {
+      out.pipeline_nominal = promoted;
+    }
   }
-  const nominalByCurrency = pipelineByCurrency(payload.pipeline_nominal_by_currency, seed);
-  if (nominalByCurrency.length > 1) {
-    out.pipeline_nominal_by_currency = nominalByCurrency;
+  if (split.length > 1) {
+    out.pipeline_nominal_by_currency = split;
   }
   const weighted = reliableWeightedPipeline(payload, seed);
   if (weighted) {

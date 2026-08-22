@@ -273,7 +273,13 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
     const split = row.pipeline_nominal_by_currency
       .map((item) => moneyOf(item))
       .filter((money): money is Money => money !== undefined);
-    if (split.length > 1) snap.pipeline_nominal_by_currency = split;
+    if (split.length > 1) {
+      snap.pipeline_nominal_by_currency = split;
+    } else if (split.length === 1 && !snap.pipeline_nominal) {
+      // One readable currency left is a total, not a split, and not absence.
+      const only = split[0];
+      if (only) snap.pipeline_nominal = only;
+    }
   }
   if (weighted && weighted.probability_reliable === true) {
     const money = moneyOf(weighted);

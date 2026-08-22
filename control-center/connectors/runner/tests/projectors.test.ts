@@ -532,6 +532,8 @@ function commercialPayload(payload: Record<string, unknown>): Record<string, unk
   return commercial.payload;
 }
 
+// Guard, not a regression test: this passed before the fix too. It pins the
+// contractual default so a later change cannot quietly move it off BRL.
 test("commercial projector denominates an undenominated pipeline in the BRL catalog currency", () => {
   const body = commercialPayload({ deal_value_open: { amount_cents: 480_000 } });
   assert.deepEqual(body.pipeline_nominal, {
@@ -565,30 +567,86 @@ test("commercial projector forwards per-currency totals without merging them", (
       { amount_cents: 5_000, currency: "USD" },
     ],
   });
-  const split = body.pipeline_nominal_by_currency as Array<{ amount_cents: number; currency: string }>;
-  assert.equal(split.length, 2);
-  assert.deepEqual(
-    split.map((m) => [m.currency, m.amount_cents]),
-    [
-      ["BRL", 10_000],
-      ["USD", 5_000],
-    ],
-  );
+  assert.deepEqual(body.pipeline_nominal_by_currency, [
+    { amount_cents: 10_000, currency: "BRL" },
+    { amount_cents: 5_000, currency: "USD" },
+  ]);
   assert.equal(body.pipeline_nominal, undefined);
 });
 
-test("commercial projector keeps a deal value undenominated rather than guessing when the code is unreadable", () => {
-  const body = commercialPayload({
-    operations: {
+test("commercial projector denominates each deal by its own currency, not by BRL", () => {
+  // Warmbly sends `value` as a bare major-unit number with `currency` beside
+  // it. Reading only the number stamped every card BRL, so a USD deal and a
+  // deal the total had refused to denominate both rendered "BRL 100,00".
+  const snapshot = collectFromWarmblyPayload(
+    {
+      health: { status: "ok" },
+      api_version: "v1",
       deals: [
-        { id: "d1", status: "open", value: { amount_cents: 100, currency: "BRL" }, updated_at: now },
-        { id: "d2", status: "open", value: { amount_cents: 100, currency: "reais" }, updated_at: now },
+        { id: "brl", name: "BRL", status: "open", value: 100, currency: "BRL", created_at: now, updated_at: now },
+        { id: "usd", name: "USD", status: "open", value: 50, currency: "USD", created_at: now, updated_at: now },
+        { id: "bad", name: "Bad", status: "open", value: 100, currency: "R$", created_at: now, updated_at: now },
+        { id: "none", name: "None", status: "open", value: 25, created_at: now, updated_at: now },
       ],
-    },
+    } as never,
+    { now: new Date(now) },
+  );
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: CURRENCY_SOURCE,
+    confidence: 0.8,
+    payload: snapshot as unknown as Record<string, unknown>,
   });
-  const ops = body.operations as { pipeline: Array<Record<string, unknown>> };
-  assert.deepEqual(ops.pipeline[0]?.value, { amount_cents: 100, currency: "BRL" });
-  assert.equal(ops.pipeline[1]?.value, undefined);
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    pipeline: Array<{ id: string; value?: { amount_cents: number; currency: string }; value_unavailable?: string }>;
+  };
+  const byId = new Map(ops.pipeline.map((row) => [row.id, row]));
+  assert.deepEqual(byId.get("brl")?.value, { amount_cents: 10_000, currency: "BRL" });
+  assert.deepEqual(byId.get("usd")?.value, { amount_cents: 5_000, currency: "USD" });
+  // Unreadable code: withheld, and marked so the card can say "sem dados"
+  // instead of the amount silently disappearing.
+  assert.equal(byId.get("bad")?.value, undefined);
+  assert.equal(byId.get("bad")?.value_unavailable, "unreadable_currency");
+  // No code stated at all: the contractual catalog currency.
+  assert.deepEqual(byId.get("none")?.value, { amount_cents: 2_500, currency: "BRL" });
+});
+
+test("a readable total is not destroyed by an unreadable sibling currency", () => {
+  // The split filters down to one entry; that entry is a real denominated
+  // total and must be promoted, not discarded as "not a split".
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 5_000, currency: "reais" },
+    ],
+  });
+  assert.deepEqual(body.pipeline_nominal, {
+    amount_cents: 10_000,
+    currency: "BRL",
+    source: CURRENCY_SOURCE,
+    observed_at: now,
+    freshness_status: "FRESH",
+    confidence: 0.8,
+  });
+  assert.equal(body.pipeline_nominal_by_currency, undefined);
+});
+
+test("a zero bucket keeps its siblings: the currency had a denominated contributor", () => {
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 0, currency: "USD" },
+    ],
+  });
+  const split = body.pipeline_nominal_by_currency as Array<{ amount_cents: number; currency: string }>;
+  assert.deepEqual(split, [
+    { amount_cents: 10_000, currency: "BRL" },
+    { amount_cents: 0, currency: "USD" },
+  ]);
 });
 
 test("finance projector fails closed on an unreadable bucket currency and defaults an absent one to BRL", () => {

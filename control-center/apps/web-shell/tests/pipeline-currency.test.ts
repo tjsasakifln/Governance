@@ -60,6 +60,33 @@ test("an absent pipeline reads sem dados, never 0,00", () => {
   assert.doesNotMatch(html, /Pipeline nominal[\s\S]{0,200}0,00/);
 });
 
+test("a single readable currency left in a split is shown, not dropped", () => {
+  // A split whose unreadable sibling was rejected still holds real money.
+  const snap = commercialFrom(
+    {
+      id: "cc:commercial-snapshot:promote",
+      scope: "commercial",
+      generated_at: "2026-08-20T18:00:00Z",
+      provenance: {
+        source: { system: "warmbly", kind: "crm-read-model", locator: "x" },
+        observed_at: "2026-08-20T18:00:00Z",
+        freshness_status: "FRESH",
+        confidence: 1,
+      },
+      authority: {
+        catalog_authority: "governance",
+        commercial_runtime: "warmbly",
+        this_document: "read_model",
+      },
+      pipeline_nominal_by_currency: [{ amount_cents: 10_000, currency: "BRL" }],
+    },
+    FALLBACK,
+  );
+  assert.deepEqual(snap.pipeline_nominal, { amount_cents: 10_000, currency: "BRL" });
+  assert.equal(snap.pipeline_nominal_by_currency, undefined);
+  assert.match(comercial({ pipeline_nominal: snap.pipeline_nominal }), /BRL 100,00/);
+});
+
 test("a multi-currency pipeline shows a total per currency and never a merged one", () => {
   const html = comercial({
     pipeline_nominal_by_currency: [
@@ -80,7 +107,10 @@ test("a pipeline whose currency the read model could not parse is not painted", 
   assert.doesNotMatch(html, /reais/);
 });
 
-test("an open deal with no readable currency reads sem dados instead of borrowing BRL", () => {
+test("deal cards use each deal's own currency and mark a withheld amount", () => {
+  // These are the three shapes the commercial projector actually emits for
+  // `operations.pipeline[].value`: a denominated amount, no amount at all, and
+  // an amount it refused to denominate (flagged with `value_unavailable`).
   const html = commercialBlock(
     {
       schema_version: "control-center.commercial-snapshot.v1",
@@ -100,17 +130,22 @@ test("an open deal with no readable currency reads sem dados instead of borrowin
       },
       operations: {
         pipeline: [
-          { id: "d1", display_name: "Com moeda", status: "open", value: { amount_cents: 100, currency: "BRL" } },
-          { id: "d2", display_name: "Sem moeda", status: "open", value: { amount_cents: 100 } },
-          { id: "d3", display_name: "Moeda ilegível", status: "open", value: { amount_cents: 100, currency: "reais" } },
+          { id: "d1", display_name: "Em BRL", status: "open", value: { amount_cents: 100, currency: "BRL" } },
+          { id: "d2", display_name: "Em USD", status: "open", value: { amount_cents: 5000, currency: "USD" } },
+          { id: "d3", display_name: "Retido", status: "open", value_unavailable: "unreadable_currency" },
+          { id: "d4", display_name: "Sem valor", status: "open" },
         ],
       },
     } as unknown as CommercialSnapshot,
     "pipeline",
   );
+  // Each card carries the currency of its own deal, not a blanket BRL.
   assert.match(html, /BRL 1,00/);
-  assert.equal([...html.matchAll(/data-no-data="true">sem dados/g)].length, 2);
-  assert.doesNotMatch(html, /reais/);
+  assert.match(html, /USD 50,00/);
+  assert.doesNotMatch(html, /BRL 50,00/);
+  // The withheld amount says so; the deal that never named one stays silent.
+  assert.equal([...html.matchAll(/data-withheld="unreadable_currency">sem dados/g)].length, 1);
+  assert.equal([...html.matchAll(/class="money"/g)].length, 3);
 });
 
 test("commercialFrom carries per-currency totals through only when there is more than one", () => {

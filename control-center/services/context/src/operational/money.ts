@@ -38,6 +38,12 @@ function integerCents(value: unknown): number | undefined {
 /**
  * Resolve the currency of one observed amount.
  *
+ * This is a read boundary: values reaching it have already been through a
+ * collector's normalizer, so a stated code must already be exact ISO-4217. It
+ * is deliberately not lenient — no trimming, no case folding. Accepting "usd"
+ * here would *widen* what this shared helper admits (it used to fall through
+ * to BRL), and widening is the wrong direction for a fail-closed rule.
+ *
  * Absent (or blank) resolves to the contractual catalog currency, which
  * Governance owns. Present-but-unreadable fails closed as `undefined` — the
  * caller then withholds the amount instead of relabelling a code it could not
@@ -50,9 +56,8 @@ function currencyOf(value: unknown, fallback?: string): string | undefined {
     if (typeof raw !== "string") {
       return undefined;
     }
-    const code = raw.trim().toUpperCase();
-    if (code !== "") {
-      return CURRENCY_RE.test(code) ? code : undefined;
+    if (raw.trim() !== "") {
+      return CURRENCY_RE.test(raw) ? raw : undefined;
     }
   }
   if (fallback && CURRENCY_RE.test(fallback)) {
@@ -208,16 +213,26 @@ export function financeStages(
   return out;
 }
 
+/** A per-currency bucket. Plain money: the snapshot already carries provenance. */
+export type CurrencyTotal = { amount_cents: number; currency: string };
+
+/** At most this many currency buckets, matching `unsigned_money` maxItems in the schema. */
+const MAX_CURRENCY_BUCKETS = 8;
+
 /**
  * Nominal pipeline total for the commercial read model.
  *
  * Two rules the plain `evidencedMoney` path cannot express:
  *  - provenance always comes from the reading seed, not from whatever the
  *    stored payload claims about itself;
- *  - a total of exactly zero is absence, not a measured zero. Nothing
- *    denominated contributed to it, so it has no currency to be stated in.
- *    Rendering it would print `<currency> 0,00` where the honest answer is
- *    "sem dados".
+ *  - a *scalar aggregate* of exactly zero is absence. Nothing denominated
+ *    contributed to it, so it has no currency to be stated in; rendering it
+ *    would print `<currency> 0,00` where the honest answer is "sem dados".
+ *
+ * The zero rule is scoped to scalar aggregates on purpose. A per-currency
+ * bucket exists only because some denominated amount created it, and a
+ * per-deal amount carries the currency stated on that deal — in both of those
+ * a zero is evidence, not a gap, so `pipelineByCurrency` does not apply it.
  */
 export function nominalPipeline(value: unknown, seed: ProvenanceSeed): EvidencedMoney | undefined {
   const cents = integerCents(value);
@@ -241,22 +256,32 @@ export function nominalPipeline(value: unknown, seed: ProvenanceSeed): Evidenced
 /**
  * Per-currency pipeline totals. Kept apart rather than added: converting would
  * need an explicit rate with a source and a date, and there is none here.
+ *
+ * A zero bucket is kept. The bucket exists because a deal denominated in that
+ * currency contributed to it, so unlike a scalar aggregate it has real currency
+ * evidence behind it. Dropping it here once destroyed the *sibling* totals too,
+ * because a split that filtered down to one entry was then discarded as "not a
+ * split" — see the promotion in `assemble.ts`.
  */
-export function pipelineByCurrency(value: unknown, seed: ProvenanceSeed): EvidencedMoney[] {
+export function pipelineByCurrency(value: unknown): CurrencyTotal[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  const out: EvidencedMoney[] = [];
+  const out: CurrencyTotal[] = [];
   const seen = new Set<string>();
   for (const item of value) {
-    const money = nominalPipeline(item, seed);
-    if (!money || seen.has(money.currency)) {
+    const cents = integerCents(item);
+    if (cents === undefined) {
       continue;
     }
-    seen.add(money.currency);
-    out.push(money);
+    const currency = currencyOf(item, CATALOG_CURRENCY);
+    if (!currency || seen.has(currency)) {
+      continue;
+    }
+    seen.add(currency);
+    out.push({ amount_cents: cents, currency });
   }
-  return out.sort((a, b) => a.currency.localeCompare(b.currency));
+  return out.sort((a, b) => a.currency.localeCompare(b.currency)).slice(0, MAX_CURRENCY_BUCKETS);
 }
 
 export function reliableWeightedPipeline(payload: Record<string, unknown>, seed: ProvenanceSeed): EvidencedMoney | undefined {
@@ -265,6 +290,12 @@ export function reliableWeightedPipeline(payload: Record<string, unknown>, seed:
     return undefined;
   }
   if (weighted.probability_reliable !== true) {
+    return undefined;
+  }
+  // Same scalar-aggregate rule as `nominalPipeline`: a weighted total of zero
+  // has no denominated contributor, so it must not sit under a nominal that
+  // reads "sem dados" claiming to be a measured "BRL 0,00".
+  if (integerCents(weighted) === 0) {
     return undefined;
   }
   return evidencedMoney(weighted, seed);
