@@ -2,6 +2,7 @@ import type { MockScenario } from "./adapters/mock";
 import type { ControlCenterReadAdapter, DestinationPage } from "./adapters/contract";
 import type { WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
+import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
 import { pageIsEmpty, pageIsStale } from "./page";
 import { renderShell } from "./ui/render";
 import {
@@ -84,6 +85,8 @@ function applyPaint(
   parsed: ReturnType<typeof parseHash>,
   override: ReturnType<typeof parseViewKind>,
   result: import("./adapters/contract").AdapterReadResult,
+  hash: string,
+  navigate: Navigate,
 ): void {
   const input: ResolveViewInput<DestinationPage> = {
     loading: result.ok && result.loading,
@@ -104,17 +107,104 @@ function applyPaint(
     adapterMode: adapter.mode,
     surface: parsed.surface,
     resource: parsed.resource,
+    hash,
     ...(adapter.lastOperatorResult ? { operatorResult: adapter.lastOperatorResult } : {}),
   });
-  bindWriteShortcuts(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}`);
-  });
-  bindOperatorActions(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
-  });
-  bindWarmblyDispatch(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
-  });
+  // Repaint the location that is actually on screen. Rebuilding it from
+  // `parsed` alone drops the query string, so an operator action taken inside a
+  // filtered queue used to throw the operator back to the unfiltered page 1.
+  const repaint = (): void => {
+    paintShell(root, adapter, hash, 0, () => true, navigate);
+  };
+  bindWriteShortcuts(root, adapter, repaint);
+  bindOperatorActions(root, adapter, repaint);
+  bindWarmblyDispatch(root, adapter, repaint);
+  bindListFilters(root, hash, navigate);
+}
+
+export type Navigate = (hash: string) => void;
+
+function defaultNavigate(hash: string): void {
+  if (typeof window !== "undefined") {
+    window.location.hash = hash;
+  }
+}
+
+/**
+ * Id of the control that submitted the last filter change, so focus and caret
+ * survive the repaint the change causes.
+ *
+ * Module scope for the same reason `pendingResumeToken` is: the repaint replaces
+ * `root.innerHTML` wholesale, so anything parked in the closure of the form that
+ * set it dies before the next paint can read it.
+ */
+let restoreFocusId: string | null = null;
+
+/**
+ * Binds the search/filter/sort/page-size controls of a long list.
+ *
+ * Filters are URL state, so a change navigates rather than mutating anything in
+ * place: the hash change repaints the shell and the new location renders the new
+ * recorte. Pagination needs no binding at all — it is plain links, which is why
+ * it keeps working after a repaint drops every handler on the page.
+ */
+function bindListFilters(root: MountableRoot, hash: string, navigate: Navigate): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-list-filters]");
+  let bound = 0;
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    // Guard before binding: a root that answers every selector with the same
+    // elements must not have its other handlers overwritten by this one.
+    const listId = form.getAttribute("data-list-filters");
+    if (!listId) continue;
+    const defaults = defaultParamValues(listSpecById(listId));
+    const apply = (event: Event): void => {
+      event.preventDefault();
+      if (typeof document !== "undefined") {
+        const active = document.activeElement;
+        restoreFocusId = active instanceof HTMLElement && active.id ? active.id : null;
+      }
+      const patch: Record<string, string | null> = {};
+      for (const name of LIST_FORM_FIELDS) {
+        const field = form.querySelector(`[name="${name}"]`);
+        if (!field) continue;
+        const value = field.value ?? "";
+        const isDefault = value === "" || value === "all" || value === defaults[name];
+        patch[name] = isDefault ? null : value;
+      }
+      navigate(listHref(hash, patch));
+    };
+    form.addEventListener("submit", apply);
+    form.addEventListener("change", apply);
+    bound += 1;
+  }
+  restoreListFocus(bound > 0);
+}
+
+/**
+ * A navigation repaints twice when the read is async — a loading shell first,
+ * then the data. Only the paint that actually rendered a filter form may consume
+ * the pending focus, or the loading frame swallows it and the caret is lost.
+ */
+function restoreListFocus(painted: boolean): void {
+  if (!painted) return;
+  const id = restoreFocusId;
+  restoreFocusId = null;
+  if (!id || typeof document === "undefined") return;
+  const element = document.getElementById(id);
+  if (element instanceof HTMLInputElement) {
+    element.focus();
+    const end = element.value.length;
+    try {
+      element.setSelectionRange(end, end);
+    } catch {
+      // Some input types refuse selection APIs; focus alone is enough.
+    }
+    return;
+  }
+  if (element instanceof HTMLSelectElement) element.focus();
 }
 
 function bindOperatorActions(
@@ -256,20 +346,22 @@ export function paintShell(
   hash: string,
   generation = 0,
   isCurrent: (generation: number) => boolean = () => true,
+  navigate: Navigate = defaultNavigate,
 ): void {
-  const parsed = parseHash(hash || "#/hoje");
+  const location = hash || "#/hoje";
+  const parsed = parseHash(location);
   const override = parseViewKind(parsed.view);
   adapter.setScenario?.(scenarioFromView(override));
   const result = adapter.readDestination(parsed.destination);
   if (isPromise(result)) {
-    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null }, location, navigate);
     void result.then((resolved) => {
       if (!isCurrent(generation)) return;
-      applyPaint(root, adapter, parsed, override, resolved);
+      applyPaint(root, adapter, parsed, override, resolved, location, navigate);
     });
     return;
   }
-  applyPaint(root, adapter, parsed, override, result);
+  applyPaint(root, adapter, parsed, override, result, location, navigate);
 }
 
 export function mount(
@@ -284,7 +376,9 @@ export function mount(
   const paint = (): void => {
     generation += 1;
     const current = generation;
-    paintShell(root, adapter, runtime.getHash(), current, (g) => g === generation);
+    paintShell(root, adapter, runtime.getHash(), current, (g) => g === generation, (next) => {
+      runtime.setHash(next);
+    });
   };
   const stop = runtime.onHashChange(paint);
   if (!runtime.getHash()) {
