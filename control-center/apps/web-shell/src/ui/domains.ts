@@ -3,6 +3,7 @@ import { formatLocal } from "../datetime";
 import { formatMoney } from "../money";
 import type {
   AgentActivity,
+  ClientIdentityException,
   ClientStatus,
   CommercialSnapshot,
   Directive,
@@ -10,6 +11,7 @@ import type {
   FinanceSnapshot,
   ServiceHealth,
 } from "../types";
+
 import { provenanceBlock } from "./provenance";
 
 function fact(label: string, value: string, extra = ""): string {
@@ -285,7 +287,7 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
         ${extra}
         ${optionalCount("Pipeline aberto", snapshot.pipeline_open_count)}
         ${optionalCount("Inbound sem leitura", snapshot.inbound_unread_count)}
-        ${optionalCount("Clientes em risco", snapshot.at_risk_client_count)}
+        ${optionalCount("Clientes em risco (declarado pelo comercial; identidade não resolvida)", snapshot.at_risk_client_count)}
       </dl>
       ${provenanceBlock(snapshot.provenance)}
     </section>`;
@@ -622,6 +624,37 @@ export function clientCard(item: ClientStatus): string {
         ${sourcePresence("Governance", "governance", sources.governance)}
       </dl>
       ${provenanceBlock(item.provenance)}
+    </article>
+  `;
+}
+
+/**
+ * A record without a usable identity, rendered as a data-quality / join-queue
+ * entry rather than as a client.
+ *
+ * Every field comes from the producer's own queue entry: it is the only party
+ * that knows where the record came from, why it has no identity, and which
+ * correction clears that particular reason. The placeholder card this replaces
+ * offered none of the three.
+ */
+export function clientIdentityQueueCard(entry: ClientIdentityException): string {
+  const origin = `${entry.origin.system} · ${entry.origin.locator}`;
+  const codes = entry.reason_codes.length > 0 ? entry.reason_codes.join(", ") : "não declarado";
+  return `
+    <article class="card data-quality" data-queue="client-identity" data-id="${escapeHtml(entry.id)}" data-operational-client="false" data-status="${escapeHtml(entry.status)}">
+      <header>
+        <p class="kicker"><span class="pill">sem identidade</span> <span class="scope">fila de qualidade de dados</span></p>
+        <h3>Registro sem identidade de cliente</h3>
+      </header>
+      <p class="constraint">Não é um cliente. Não entra em contagens de clientes nem em alertas de risco.</p>
+      <dl class="facts">
+        ${fact("Origem", escapeHtml(origin))}
+        ${entry.source_id ? fact("Registro na origem", escapeHtml(entry.source_id)) : ""}
+        ${fact("Motivo", escapeHtml(entry.why))}
+        ${fact("Código do motivo", escapeHtml(codes))}
+        ${fact("Ação necessária", escapeHtml(entry.recommended_next_action))}
+      </dl>
+      ${entry.provenance ? provenanceBlock(entry.provenance) : ""}
     </article>
   `;
 }

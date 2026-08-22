@@ -9,11 +9,13 @@ import {
   type ViewState,
 } from "../view-state";
 import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
+import { isOperationalClient } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
 import {
   activityCard,
   clientCard,
+  clientIdentityQueueCard,
   commercialBlock,
   engineeringBlock,
   financeBlock,
@@ -132,15 +134,29 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
     }
     return "";
   }
+  // Second gate. The adapter already refuses to mint a client from a row without
+  // an identity; this keeps a hand-built page from doing it either.
+  const operationalClients = (page.clients ?? []).filter(isOperationalClient);
+  // The queue is the producer's, carried on the snapshot. It is filtered by the
+  // same `#/clientes/<slug>` drill-down as the client list, so opening one client
+  // does not show the whole company's join backlog.
+  const identityGaps = (page.client_data_quality ?? []).filter(
+    (entry) => !resource || entry.source_id === resource || entry.id === resource,
+  );
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
     page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
-    page.clients && page.clients.length > 0
-      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${page.clients
+    operationalClients.length > 0
+      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${operationalClients
           .filter((item) => !resource || item.client_slug === resource)
           .map(clientCard)
+          .join("")}</div></section>`
+      : "",
+    identityGaps.length > 0
+      ? `<section class="data-quality" aria-labelledby="qualidade-dados-title"><h2 id="qualidade-dados-title">Qualidade de dados — identidade de cliente (${escapeHtml(String(identityGaps.length))})</h2><p class="constraint">Registros sem identidade de cliente. Não são clientes, não entram em contagens nem em alertas de risco.</p><div class="stack">${identityGaps
+          .map(clientIdentityQueueCard)
           .join("")}</div></section>`
       : "",
     page.health && page.health.length > 0

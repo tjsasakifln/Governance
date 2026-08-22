@@ -12,6 +12,166 @@ export const CURRENCY_PATTERN = "^[A-Z]{3}$";
 
 export const CLIENT_SLUG_PATTERN = "^[a-z0-9]+(?:-[a-z0-9]+)*$";
 
+/**
+ * Minimum length of a client slug. A single character is an initial or a typo,
+ * never a client identity.
+ */
+export const MIN_CLIENT_SLUG_LENGTH = 2;
+
+/**
+ * Slugs that are placeholders rather than identities. A record whose only
+ * available identifier collapses to one of these has no identity at all: it
+ * belongs in the data-quality / join queue, never in the client roll-up.
+ * Fail closed — an unusable identifier is never coerced into a slug that looks
+ * like a real entity (that is how `client:unknown` used to reach the surface).
+ */
+export const RESERVED_CLIENT_SLUGS = [
+  "anonimo",
+  "anonymous",
+  "client",
+  "cliente",
+  "default",
+  "desconhecido",
+  "na",
+  "n-a",
+  "nao-identificado",
+  "nao-informado",
+  "no-name",
+  "none",
+  "null",
+  "placeholder",
+  "sem-identidade",
+  "sem-nome",
+  "tbd",
+  "undefined",
+  "unidentified",
+  "unknown",
+] as const;
+
+export type ReservedClientSlug = (typeof RESERVED_CLIENT_SLUGS)[number];
+
+/** Lockstep source for the JSON Schema `reserved_client_slug` pattern. */
+export const RESERVED_CLIENT_SLUG_PATTERN = `^(?:${RESERVED_CLIENT_SLUGS.join("|")})$`;
+
+/** Lockstep source for the JSON Schema `reserved_client_scope` pattern. */
+export const RESERVED_CLIENT_SCOPE_PATTERN = `^client:(?:${RESERVED_CLIENT_SLUGS.join("|")})$`;
+
+/**
+ * What a client identity may be derived from.
+ *
+ * A client is a company / account / organization. A **deal is not a client**:
+ * two deals for one company are one client, and a deal id is a deal key, not a
+ * client key. There is deliberately no deal-level basis in this vocabulary, so
+ * a producer cannot declare a deal id as a client identity — it has nothing
+ * truthful to write in `identity_basis`.
+ */
+export const CLIENT_IDENTITY_BASES = [
+  "client_key",
+  "account_key",
+  "organization_key",
+  "company_name",
+  "manual",
+  "governance",
+] as const;
+
+export type ClientIdentityBasis = (typeof CLIENT_IDENTITY_BASES)[number];
+
+/**
+ * Source-record fields that may carry a client-level key, most specific first.
+ * A deal id (`id`, `deal_id`, `opportunity_id`) is absent on purpose.
+ */
+export const CLIENT_KEY_FIELDS = [
+  "client_id",
+  "customer_id",
+  "account_id",
+  "organization_id",
+  "org_id",
+  "company_id",
+] as const;
+
+/** Source-record fields that name the company itself (not the deal). */
+export const CLIENT_NAME_FIELDS = [
+  "company",
+  "company_name",
+  "account_name",
+  "organization",
+  "organization_name",
+] as const;
+
+/**
+ * Source kinds that describe a *deal* stream.
+ *
+ * A deal stream cannot identify a client on its own: it knows opportunities, not
+ * companies. Publishing a ClientStatus whose provenance is one of these means
+ * the producer keyed a client on a deal — the substitution that put
+ * `client:<deal>` (and, when the deal had no id, `client:unknown`) on the
+ * Clientes route. Resolve the account first and publish with a client-level
+ * source kind.
+ *
+ * v1 `ClientStatus` is frozen with `additionalProperties: false`, so the
+ * resolved basis cannot be carried on the resource itself (ADR-CC-001: that
+ * would be a v1.1/v2 bump). It travels on the clients snapshot instead, in
+ * `data_quality.resolved_identities`, and this list is what `semanticChecks`
+ * enforces on the resource.
+ */
+export const DEAL_SOURCE_KINDS = [
+  "commercial-deal",
+  "crm-deal",
+  "deal",
+  "deal-record",
+  "opportunity",
+  "pipeline",
+  "commercial-pipeline",
+] as const;
+
+export type DealSourceKind = (typeof DEAL_SOURCE_KINDS)[number];
+
+/** Basis implied by each key field, so the producer never has to guess. */
+export const CLIENT_KEY_FIELD_BASIS: Record<(typeof CLIENT_KEY_FIELDS)[number], ClientIdentityBasis> = {
+  client_id: "client_key",
+  customer_id: "client_key",
+  account_id: "account_key",
+  organization_id: "organization_key",
+  org_id: "organization_key",
+  company_id: "organization_key",
+};
+
+/**
+ * Why a record failed the minimum-identity rule. These codes are the vocabulary
+ * of the data-quality queue; they are not free text.
+ */
+export const CLIENT_IDENTITY_REASON_CODES = [
+  "missing_client_key",
+  "unusable_client_key",
+  "reserved_placeholder_slug",
+  "missing_display_name",
+  "placeholder_display_name",
+] as const;
+
+export type ClientIdentityReasonCode = (typeof CLIENT_IDENTITY_REASON_CODES)[number];
+
+/**
+ * The correction that clears each reason code. One string per code: the
+ * operator fixes a missing account link differently from a placeholder name,
+ * and a queue that says the same sentence five times is not actionable.
+ */
+export const CLIENT_IDENTITY_REQUIRED_ACTIONS: Record<ClientIdentityReasonCode, string> = {
+  missing_client_key:
+    "Vincular o registro a uma conta/empresa na origem (client_id, account_id ou organization_id) e reprocessar. Um id de negócio não identifica um cliente.",
+  unusable_client_key:
+    "Corrigir a chave de cliente na origem: o valor atual não produz um identificador utilizável. Depois reprocessar.",
+  reserved_placeholder_slug:
+    "Substituir o identificador placeholder por uma chave real de cliente na origem e reprocessar.",
+  missing_display_name:
+    "Informar a razão social ou o nome da empresa no cadastro da conta na origem e reprocessar.",
+  placeholder_display_name:
+    "Substituir o nome placeholder pelo nome real da empresa no cadastro da conta na origem e reprocessar.",
+};
+
+/** Umbrella action, for surfaces that summarize the whole queue. */
+export const CLIENT_IDENTITY_REQUIRED_ACTION =
+  "Corrigir o registro na origem: vincular a uma conta/empresa e informar o nome do cliente, depois reprocessar. Enquanto faltar identidade o registro fica na fila de qualidade de dados e não conta como cliente.";
+
 export const REPO_NAME_PATTERN = "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?$";
 
 /**
@@ -45,8 +205,17 @@ export type ScopePrefix = (typeof SCOPE_PREFIXES)[number];
  * Catch-all prefix:id excludes well-known literals and repo/client so those
  * stay on their dedicated grammars.
  */
+/**
+ * `client:` alternative for SCOPE_CORE. The negative lookahead keeps reserved
+ * placeholder slugs out of every scope in the ontology, not just ClientStatus:
+ * `client:unknown` must not be addressable as an AttentionItem scope, a
+ * Directive scope, or an agent grant either. `(?:,|$)` makes the lookahead
+ * correct both anchored and inside the comma-separated query grammar.
+ */
+export const CLIENT_SCOPE_CORE = `client:(?!(?:${RESERVED_CLIENT_SLUGS.join("|")})(?:,|$))[a-z0-9]+(?:-[a-z0-9]+)*`;
+
 export const SCOPE_CORE =
-  "(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)";
+  `(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|${CLIENT_SCOPE_CORE}|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)`;
 
 /**
  * Full scope pattern:

@@ -192,6 +192,27 @@ export interface ClientStatus {
   };
 }
 
+/**
+ * A source record that carries no client identity.
+ *
+ * Produced by the collector's clients projector and carried on the clients
+ * snapshot as `data_quality.entries`. It is deliberately not a `ClientStatus`:
+ * it must never be counted as a client, and the surface renders it as a
+ * data-quality / join-queue entry with its origin, reason and correction.
+ */
+export interface ClientIdentityException {
+  id: string;
+  source_id: string | null;
+  kind: string;
+  why: string;
+  reason_codes: string[];
+  recommended_next_action: string;
+  status: string;
+  origin: SourceRef;
+  observed_at?: UtcDateTime;
+  provenance?: Provenance;
+}
+
 export interface CommercialAuthorityStamp {
   catalog_authority: "governance";
   commercial_runtime: "warmbly";

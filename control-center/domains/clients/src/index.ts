@@ -51,6 +51,9 @@ export { frozenClock, systemClock, toUtcIso, isUtcDateTime, parseUtc } from "./c
 export {
   SCHEMA_VERSION,
   FRESHNESS_STATUSES,
+  MIN_CLIENT_SLUG_LENGTH,
+  RESERVED_CLIENT_SLUGS,
+  isReservedClientSlug,
   COMMITMENT_STATUSES,
   BLOCKER_STATUSES,
   DELIVERABLE_STATUSES,

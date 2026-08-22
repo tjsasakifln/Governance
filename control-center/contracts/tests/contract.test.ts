@@ -5,6 +5,14 @@ import { describe, it } from "node:test";
 import {
   ACTOR_KINDS,
   allowedMcpToolNames,
+  CLIENT_IDENTITY_BASES,
+  CLIENT_IDENTITY_REASON_CODES,
+  CLIENT_IDENTITY_REQUIRED_ACTION,
+  CLIENT_IDENTITY_REQUIRED_ACTIONS,
+  clientSlugFrom,
+  DEAL_SOURCE_KINDS,
+  MIN_CLIENT_SLUG_LENGTH,
+  resolveClientIdentity,
   catalogFixturePath,
   catalogType,
   DIRECTIVE_STATUSES,
@@ -13,11 +21,17 @@ import {
   forbiddenMcpOperationNames,
   HOMEPAGE_PRIORITY_LIMIT,
   isForbiddenMcpOperation,
+  isIdentifiedClientSlug,
+  isPlaceholderDisplayName,
+  isReservedClientSlug,
   isScope,
   listResourceTypes,
   loadCatalog,
   loadMcpContract,
   loadOpenApi,
+  RESERVED_CLIENT_SCOPE_PATTERN,
+  RESERVED_CLIENT_SLUG_PATTERN,
+  RESERVED_CLIENT_SLUGS,
   RESOURCE_ID_PATTERN,
   RESOURCE_TYPE_NAMES,
   SCOPE_CSV_PATTERN,
@@ -273,6 +287,193 @@ describe("ClientStatus scope binding", () => {
     const doc = clone(valid);
     doc.scope = "clients";
     assert.equal(validate("ClientStatus", doc).ok, false);
+  });
+});
+
+describe("ClientStatus minimum identity", () => {
+  const valid = readJson("fixtures/valid/client-status.json") as Record<string, unknown>;
+
+  it("keeps the reserved placeholder rule in lockstep with the JSON Schema", () => {
+    const primitives = readJson("schemas/primitives.v1.schema.json") as {
+      $defs: Record<string, { pattern?: string; minLength?: number; not?: { $ref?: string } }>;
+    };
+    assert.equal(primitives.$defs.reserved_client_slug?.pattern, RESERVED_CLIENT_SLUG_PATTERN);
+    assert.equal(primitives.$defs.reserved_client_scope?.pattern, RESERVED_CLIENT_SCOPE_PATTERN);
+    assert.equal(primitives.$defs.client_slug?.minLength, MIN_CLIENT_SLUG_LENGTH);
+    assert.equal(primitives.$defs.client_scope?.minLength, "client:".length + MIN_CLIENT_SLUG_LENGTH);
+    // The `not` clauses are what actually reject the placeholder. Assert they
+    // are wired, not merely that the defs exist.
+    assert.match(String(primitives.$defs.client_slug?.not?.$ref), /reserved_client_slug$/);
+    assert.match(String(primitives.$defs.client_scope?.not?.$ref), /reserved_client_scope$/);
+    assert.ok(RESERVED_CLIENT_SLUGS.includes("unknown"));
+  });
+
+  it("keeps client:<placeholder> out of the generic scope grammar too", () => {
+    const primitives = readJson("schemas/primitives.v1.schema.json") as {
+      $defs: Record<string, { pattern?: string }>;
+    };
+    assert.equal(primitives.$defs.scope?.pattern, SCOPE_PATTERN);
+    assert.equal(isScope("client:acme-industria"), true);
+    for (const slug of RESERVED_CLIENT_SLUGS) {
+      assert.equal(isScope(`client:${slug}`), false, `client:${slug} must not be a scope`);
+    }
+    // The catch-all prefix:id alternative must not readmit it.
+    assert.equal(new RegExp(SCOPE_CSV_PATTERN).test("commercial,client:unknown"), false);
+    assert.equal(new RegExp(SCOPE_CSV_PATTERN).test("commercial,client:acme-industria"), true);
+  });
+
+  it("keeps the shipped v1 ClientStatus schema frozen — no field was added for this fix", () => {
+    // ADR-CC-001: adding to `required` is a breaking change (v2), and an
+    // additive optional field is a v1.1 const bump. Neither belongs in a P0 UX
+    // fix, so the identity basis travels on the clients snapshot instead.
+    const schema = readJson("schemas/client-status.v1.schema.json") as {
+      required: string[];
+      additionalProperties: boolean;
+      properties: Record<string, unknown>;
+    };
+    assert.equal(schema.additionalProperties, false);
+    assert.deepEqual(schema.required, [
+      "schema_version",
+      "id",
+      "scope",
+      "client_slug",
+      "display_name",
+      "lifecycle",
+      "provenance",
+    ]);
+    assert.deepEqual(Object.keys(schema.properties), [
+      "schema_version",
+      "id",
+      "scope",
+      "client_slug",
+      "display_name",
+      "lifecycle",
+      "provenance",
+      "attention_item_ids",
+      "open_receivables",
+      "notes",
+    ]);
+  });
+
+  it("declares what a client identity may be derived from, and no deal basis", () => {
+    for (const basis of CLIENT_IDENTITY_BASES) {
+      assert.ok(!/deal|opportunity|negocio/i.test(basis), `${basis} must not be a deal-level basis`);
+    }
+  });
+
+  it("rejects a client sourced from a deal stream — a deal key is not a client identity", () => {
+    for (const kind of DEAL_SOURCE_KINDS) {
+      const doc = clone(valid) as Record<string, unknown>;
+      const provenance = doc.provenance as { source: Record<string, unknown> };
+      provenance.source = { ...provenance.source, kind };
+      const result = validate("ClientStatus", doc);
+      assert.equal(result.ok, false, `${kind} must not source a ClientStatus`);
+      assert.ok(result.errors.some((e) => e.keyword === "client_identity_basis"), kind);
+    }
+    // A client-level source kind is what the producer must resolve to first.
+    const ok = clone(valid) as Record<string, unknown>;
+    (ok.provenance as { source: Record<string, unknown> }).source.kind = "client-record";
+    assert.equal(validate("ClientStatus", ok).ok, true);
+  });
+
+  it("resolves identity from a client key, never from the record's own deal key", () => {
+    // The Warmbly deal shape: a deal id, a deal name, and no account link.
+    const deal = { id: "deal-healthy-1", name: "Diagnóstico — Construtora Beta", account_id: null };
+    const unlinked = resolveClientIdentity(deal);
+    assert.equal(unlinked.slug, null, "a deal key is not a client key");
+    assert.deepEqual(unlinked.reasons, ["missing_client_key", "missing_display_name"]);
+
+    const linked = resolveClientIdentity({ ...deal, account_id: "acct-77", company: "Acme Indústria" });
+    assert.equal(linked.slug, "acct-77");
+    assert.equal(linked.display_name, "Acme Indústria");
+    assert.equal(linked.basis, "account_key");
+    assert.deepEqual(linked.reasons, []);
+
+    // Two deals, one company, one identity.
+    const other = resolveClientIdentity({ id: "deal-2", name: "Expansão", account_id: "acct-77", company: "Acme Indústria" });
+    assert.equal(other.slug, linked.slug);
+
+    // Company name alone is still a client-level identifier.
+    const byName = resolveClientIdentity({ id: "deal-3", company: "Construtora Beta" });
+    assert.equal(byName.slug, "construtora-beta");
+    assert.equal(byName.basis, "company_name");
+  });
+
+  it("gives each reason code its own correction", () => {
+    const actions = new Set(Object.values(CLIENT_IDENTITY_REQUIRED_ACTIONS));
+    assert.equal(actions.size, CLIENT_IDENTITY_REASON_CODES.length, "corrections must not be one repeated sentence");
+    for (const code of CLIENT_IDENTITY_REASON_CODES) {
+      assert.ok(CLIENT_IDENTITY_REQUIRED_ACTIONS[code].length > 0, code);
+    }
+  });
+
+  it("rejects client:unknown — the placeholder is not an operational client", () => {
+    const doc = clone(valid) as Record<string, unknown>;
+    doc.id = "cc:client-status:unknown";
+    doc.scope = "client:unknown";
+    doc.client_slug = "unknown";
+    doc.display_name = "Cliente";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_identity"));
+  });
+
+  it("rejects every reserved placeholder slug, not just unknown", () => {
+    for (const slug of RESERVED_CLIENT_SLUGS) {
+      const doc = clone(valid);
+      doc.id = `cc:client-status:${slug}`;
+      doc.scope = `client:${slug}`;
+      doc.client_slug = slug;
+      assert.equal(validate("ClientStatus", doc).ok, false, `expected ${slug} to be rejected`);
+    }
+  });
+
+  it("rejects a one-character slug as an identity", () => {
+    const doc = clone(valid);
+    doc.id = "cc:client-status:a";
+    doc.scope = "client:a";
+    doc.client_slug = "a";
+    assert.equal(validate("ClientStatus", doc).ok, false);
+  });
+
+  it("rejects a placeholder display_name even when the slug is real", () => {
+    const doc = clone(valid);
+    doc.display_name = "unknown";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_identity"));
+  });
+
+  it("rejects an id that is not bound to the client_slug", () => {
+    const doc = clone(valid);
+    doc.id = "cc:client-status:some-other-client";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_id_slug"));
+  });
+
+  it("still accepts a real client identity", () => {
+    assert.equal(validate("ClientStatus", clone(valid)).ok, true);
+  });
+
+  it("derives a slug fail-closed instead of inventing one", () => {
+    assert.equal(clientSlugFrom("Acme Indústria"), "acme-ind-stria");
+    assert.equal(clientSlugFrom(undefined), null);
+    assert.equal(clientSlugFrom(""), null);
+    assert.equal(clientSlugFrom("###"), null);
+    assert.equal(clientSlugFrom("unknown"), null);
+    assert.equal(clientSlugFrom("Unknown"), null);
+    assert.equal(clientSlugFrom("Cliente"), null);
+    assert.equal(isReservedClientSlug("unknown"), true);
+    assert.equal(isIdentifiedClientSlug("acme-industria"), true);
+    assert.equal(isPlaceholderDisplayName("Cliente"), true);
+    assert.equal(isPlaceholderDisplayName("Acme Indústria"), false);
+  });
+
+  it("names the reason codes and the umbrella correction", () => {
+    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("missing_client_key"));
+    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("reserved_placeholder_slug"));
+    assert.ok(CLIENT_IDENTITY_REQUIRED_ACTION.length > 0);
   });
 });
 

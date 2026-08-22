@@ -27,6 +27,44 @@ export const UTC_DATETIME_PATTERN =
 
 export const CLIENT_SLUG_PATTERN = "^[a-z0-9]+(?:-[a-z0-9]+)*$";
 
+/**
+ * Minimum client identity. Mirrors `RESERVED_CLIENT_SLUGS` /
+ * `MIN_CLIENT_SLUG_LENGTH` in `control-center/contracts` (documented, not
+ * imported — see the convergence note above). A record whose only identifier is
+ * one of these tokens has no identity: it belongs in a data-quality queue, not
+ * in this store. Ingesting it would publish a client that does not exist.
+ */
+export const MIN_CLIENT_SLUG_LENGTH = 2;
+
+export const RESERVED_CLIENT_SLUGS = [
+  "anonimo",
+  "anonymous",
+  "client",
+  "cliente",
+  "default",
+  "desconhecido",
+  "na",
+  "n-a",
+  "nao-identificado",
+  "nao-informado",
+  "no-name",
+  "none",
+  "null",
+  "placeholder",
+  "sem-identidade",
+  "sem-nome",
+  "tbd",
+  "undefined",
+  "unidentified",
+  "unknown",
+] as const;
+
+export type ReservedClientSlug = (typeof RESERVED_CLIENT_SLUGS)[number];
+
+export function isReservedClientSlug(value: string): boolean {
+  return (RESERVED_CLIENT_SLUGS as readonly string[]).includes(value.trim().toLowerCase());
+}
+
 export const FACT_ID_PATTERN = "^[a-z0-9]+(?:-[a-z0-9]+)*$";
 
 export const OWNER_PATTERN = "^[a-z][a-z0-9_-]{0,63}$";

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createHttpAdapter } from "../src/adapters/index";
-import { commercialFrom, financeFrom, clientFrom, fallbackProvenance } from "../src/adapters/map";
+import { commercialFrom, financeFrom, maybeClientFrom, fallbackProvenance } from "../src/adapters/map";
 import { paintShell } from "../src/app";
 import { GROWTH_FUNNEL_HOPS } from "../src/ui/domains";
 import { httpAdapterFor, jsonResponse, operationalRouter, pathOf } from "./helpers";
@@ -82,8 +82,8 @@ test("financeFrom leaves omitted overdue and receivables undefined instead of ze
   assert.equal(snap.effectively_received, undefined);
 });
 
-test("clientFrom always exposes per-source presence and defaults omitted sources to UNKNOWN", () => {
-  const mapped = clientFrom(
+test("maybeClientFrom always exposes per-source presence and defaults omitted sources to UNKNOWN", () => {
+  const mapped = maybeClientFrom(
     {
       id: "cc:client-status:no-sources",
       scope: "client:no-sources",
@@ -94,9 +94,25 @@ test("clientFrom always exposes per-source presence and defaults omitted sources
     },
     FALLBACK,
   );
+  assert.ok(mapped, "a real identity must still map to a client");
   assert.equal(mapped.sources?.warmbly, "UNKNOWN");
   assert.equal(mapped.sources?.asaas, "UNKNOWN");
   assert.equal(mapped.sources?.governance, "UNKNOWN");
+});
+
+test("maybeClientFrom refuses to invent an identity for a row that has none", () => {
+  assert.equal(maybeClientFrom({}, FALLBACK), null);
+  assert.equal(
+    maybeClientFrom(
+      { schema_version: "control-center.clients-snapshot.v1", id: "cc:clients-snapshot:roll-up" },
+      FALLBACK,
+    ),
+    null,
+  );
+  assert.equal(
+    maybeClientFrom({ client_slug: "unknown", scope: "client:unknown", display_name: "Cliente" }, FALLBACK),
+    null,
+  );
 });
 
 test("Crescimento HTTP GET uses commercial scope, never inbound, and maps the commercial snapshot", async () => {

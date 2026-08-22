@@ -3,9 +3,10 @@ import path from "node:path";
 import { Ajv2020, type ErrorObject as AjvError } from "ajv/dist/2020.js";
 import { catalogType, loadCatalog, schemaVersionToType } from "./catalog.js";
 import { classifyCompatibility } from "./compatibility.js";
-import { parseResourceId } from "./ids.js";
+import { isIdentifiedClientSlug, isPlaceholderDisplayName, parseResourceId } from "./ids.js";
 import { packageRoot } from "./paths.js";
 import {
+  DEAL_SOURCE_KINDS as DEAL_SOURCE_KIND_LIST,
   FORBIDDEN_SECRET_KEY_REGEX,
   HOMEPAGE_PRIORITY_LIMIT,
   RESOURCE_TYPE_NAMES,
@@ -116,6 +117,9 @@ function collectSecretKeyIssues(value: unknown, pathExpr: string, acc: Validatio
   }
 }
 
+/** Source kinds that describe a deal stream, which cannot identify a client. */
+const DEAL_SOURCE_KINDS = new Set<string>(DEAL_SOURCE_KIND_LIST);
+
 function stringField(rec: Record<string, unknown>, key: string): string | undefined {
   const v = rec[key];
   return typeof v === "string" ? v : undefined;
@@ -163,6 +167,55 @@ function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[
           "client_scope",
         ),
       );
+    }
+    // Minimum client identity. A ClientStatus is an operational entity; a record
+    // whose identifier or name is a placeholder is not one. It is a data-quality
+    // exception and must be routed to the join queue instead of published here.
+    if (slug !== undefined && !isIdentifiedClientSlug(slug)) {
+      errors.push(
+        issue(
+          "/client_slug",
+          `client_slug '${slug}' is a placeholder, not a client identity; route the record to the data-quality queue instead of publishing a client`,
+          "client_identity",
+        ),
+      );
+    }
+    if (isPlaceholderDisplayName(rec.display_name)) {
+      errors.push(
+        issue(
+          "/display_name",
+          "display_name is a placeholder, not a client identity",
+          "client_identity",
+        ),
+      );
+    }
+    // A client is a company/account. A document whose own provenance is a deal
+    // stream was keyed on a deal, and a deal key is not a client identity. The
+    // producer must resolve the account and publish with a client-level source
+    // kind; the basis it resolved travels on the clients snapshot, in
+    // data_quality.resolved_identities, because v1 ClientStatus is frozen.
+    const sourceKind = stringField(asRecord(asRecord(rec.provenance)?.source) ?? {}, "kind");
+    if (sourceKind !== undefined && DEAL_SOURCE_KINDS.has(sourceKind)) {
+      errors.push(
+        issue(
+          "/provenance/source/kind",
+          `a ClientStatus may not be sourced from a deal stream ('${sourceKind}'); a deal key is not a client identity — resolve the account and publish with a client-level source kind`,
+          "client_identity_basis",
+        ),
+      );
+    }
+    const clientId = stringField(rec, "id");
+    if (clientId !== undefined && slug !== undefined) {
+      const parsed = parseResourceId(clientId);
+      if (parsed !== null && parsed.id !== slug) {
+        errors.push(
+          issue(
+            "/id",
+            `id must be bound to the client_slug (expected cc:client-status:${slug})`,
+            "client_id_slug",
+          ),
+        );
+      }
     }
   }
 

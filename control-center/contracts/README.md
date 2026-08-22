@@ -38,6 +38,57 @@ Parameterized:
 - `repo:<name>` — short name or `owner/name`
 - `client:<slug>` — kebab-case; `ClientStatus.scope` MUST equal `client:<client_slug>`
 
+### Minimum client identity
+
+**A client is a company / account / organization. A deal is not a client.** Two
+deals for one company are one client; a deal id is a deal key.
+
+`ClientStatus` v1 is frozen (`additionalProperties: false`), and per ADR-CC-001 a
+new `required` field is a breaking `v2` and a new optional field is a `v1.1`
+const bump. So the rule is **not** carried as a field on the resource. It is
+enforced in `semanticChecks` — the same place reserved slugs are rejected
+independently of the schema's `not` clauses — and the resolved basis travels on
+the clients snapshot, which is not a frozen resource schema.
+
+A `ClientStatus` is an operational entity. A record that cannot be identified is
+**not** a client — it is a data-quality exception that belongs in the join queue.
+The validator therefore rejects (keyword `client_identity`, `client_id_slug`,
+`client_identity_basis`):
+
+- a `client_slug` shorter than two characters;
+- a `client_slug` or `scope` built from a reserved placeholder token
+  (`unknown`, `cliente`, `none`, `tbd`, … — the frozen list is
+  `RESERVED_CLIENT_SLUGS` in `src/taxonomy.ts`, mirrored by the
+  `reserved_client_slug` / `reserved_client_scope` schema `$defs`);
+- a placeholder `display_name` such as `Cliente` or `unknown`;
+- an `id` whose slug is not the `client_slug`;
+- **a `provenance.source.kind` naming a deal stream** (`DEAL_SOURCE_KINDS`:
+  `commercial-deal`, `crm-deal`, `pipeline`, …). A deal stream knows
+  opportunities, not companies: publishing a client from one means the producer
+  keyed a client on a deal. Resolve the account first and publish with a
+  client-level source kind such as `client-record`.
+
+The reserved tokens are also excluded from the generic `scope` grammar, so
+`client:unknown` is not a valid scope on an AttentionItem, a Directive, a
+SourceObservation, or an agent grant either.
+
+Producers resolve identity with `resolveClientIdentity()`, which reads
+client-level fields only (`CLIENT_KEY_FIELDS`, then `CLIENT_NAME_FIELDS`) and
+never the record's own primary key. It returns `slug: null` rather than coercing
+an unusable identifier into a plausible-looking slug. A `null` means "emit a
+data-quality exception with origin, reason code and the correction for that
+reason" (`CLIENT_IDENTITY_REQUIRED_ACTIONS`), never "publish `client:unknown`".
+
+The clients snapshot records the outcome in `data_quality`:
+`identity_bases` (the vocabulary — no deal basis exists in it) and
+`resolved_identities` (`client_slug`, `identity_basis`, `derived_from_deal_count`
+for each published client).
+
+Note on enforcement: `validate.ts` runs in CI and the CLI, not on the serving
+path. The contract is the specification and the gate for new documents; the
+producer (`projectClientsFromCommercial`) and the surface (`maybeClientFrom`)
+are what keep an unidentified record off the Clientes route at runtime.
+
 Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix) that are **not** the reserved literals or `repo`/`client`. `company:foo` and `client:Acme` are invalid. Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
 
 ## Public resource types

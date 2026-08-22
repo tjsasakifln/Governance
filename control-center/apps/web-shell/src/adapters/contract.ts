@@ -5,6 +5,7 @@ import type {
   AgentActivity,
   AgentSession,
   AttentionItem,
+  ClientIdentityException,
   ClientStatus,
   CommercialSnapshot,
   Directive,
@@ -49,6 +50,8 @@ export interface DestinationPage {
   finance?: FinanceSnapshot;
   engineering?: EngineeringSnapshot;
   clients?: ClientStatus[];
+  /** Records the producer could not identify. Never clients; never counted as clients. */
+  client_data_quality?: ClientIdentityException[];
   health?: ServiceHealth[];
   directives?: Directive[];
   sessions?: AgentSession[];

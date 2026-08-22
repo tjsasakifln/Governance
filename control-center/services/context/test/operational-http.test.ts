@@ -11,6 +11,7 @@ import { silentLogger } from "../src/log.ts";
 import { createFixtureOperationalPort, createUnavailableOperationalPort } from "../src/operational/fixture.ts";
 import { representativeOperationalData } from "../src/operational/representative.ts";
 import { createOperationalService } from "../src/operational/service.ts";
+import { signalsFromSlot } from "../src/operational/signals.ts";
 import type { OperationalReadPort } from "../src/operational/port.ts";
 import { REPRESENTATIVE_REPO_DOMAINS } from "../src/representative.ts";
 import { startServer } from "../src/server.ts";
@@ -451,4 +452,93 @@ test("operational source never calls providers and names the frozen views", () =
     }
   }
   assert.ok(views >= 1);
+});
+
+test("an unidentified client record never raises 'Cliente em risco operacional'", () => {
+  const base = {
+    schema_version: "control-center.operational-domain.v1" as const,
+    domain: "clients" as const,
+    scope: "clients",
+    source: { system: "warmbly", kind: "client-ops", locator: "clients/roll-up" },
+    observed_at: NOW,
+    freshness_status: "FRESH" as const,
+    confidence: 0.8,
+    presence: "present" as const,
+    healthy: true,
+  };
+
+  // A snapshot whose only "client" is the identity placeholder. The declared
+  // at-risk count must not survive: the record is a data-quality exception.
+  const placeholderOnly = signalsFromSlot({
+    ...base,
+    snapshot: {
+      schema_version: "control-center.clients-snapshot.v1",
+      at_risk_client_count: 1,
+      open_blocker_count: 0,
+      clients: [{ client_slug: "unknown", scope: "client:unknown", display_name: "Cliente" }],
+      unidentified_record_count: 1,
+    },
+  });
+  assert.equal(
+    placeholderOnly.some((item) => item.title === "Cliente em risco operacional"),
+    false,
+  );
+
+  // A real client at risk still raises the alert.
+  const realClient = signalsFromSlot({
+    ...base,
+    snapshot: {
+      schema_version: "control-center.clients-snapshot.v1",
+      at_risk_client_count: 1,
+      open_blocker_count: 0,
+      clients: [{ client_slug: "acme-industria", scope: "client:acme-industria", display_name: "Acme" }],
+    },
+  });
+  assert.equal(
+    realClient.some((item) => item.title === "Cliente em risco operacional"),
+    true,
+  );
+});
+
+test("the clients mapper forwards the identity queue through a real envelope read", async () => {
+  const data = cloneData();
+  const clients = data.operational_snapshots.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients, "representative data must ship a clients snapshot");
+  const dataQuality = {
+    queue: "client_identity",
+    origin: "warmbly.commercial.pipeline",
+    unidentified_record_count: 2,
+    required_action: "Vincular o registro a uma conta/empresa na origem e reprocessar.",
+    counts_as_client: false,
+    raises_client_risk: false,
+    entries: [
+      {
+        id: "client-identity:deal-7",
+        source_id: "deal-7",
+        kind: "client_identity_missing",
+        why: "sem vínculo com conta/empresa",
+        reason_codes: ["missing_client_key"],
+        recommended_next_action: "Vincular o registro a uma conta/empresa na origem e reprocessar.",
+        status: "open",
+        origin: { system: "warmbly", kind: "commercial-deal", locator: "deal-7" },
+      },
+    ],
+  };
+  clients.payload = {
+    ...clients.payload,
+    clients: [],
+    client_count: 0,
+    unidentified_record_count: 2,
+    data_quality: dataQuality,
+  };
+
+  const service = operationalService(createFixtureOperationalPort(data));
+  const envelope = await service.getEnvelope(FOUNDER, "company");
+  const snapshot = envelope.snapshots.clients?.snapshot as Record<string, unknown> | null | undefined;
+  assert.ok(snapshot, "clients slot must be present");
+  // The correction path has to survive the mapper's allowlist: dropping it here
+  // is what left the placeholder with nowhere to be fixed.
+  assert.deepEqual(snapshot.data_quality, dataQuality);
+  assert.equal(snapshot.unidentified_record_count, 2);
+  assert.equal(snapshot.client_count, 0);
 });

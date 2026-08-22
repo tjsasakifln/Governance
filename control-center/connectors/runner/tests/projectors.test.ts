@@ -516,6 +516,234 @@ test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   assert.equal(commercial.payload.funnel, undefined);
 });
 
+test("deals without a usable identity never become client:unknown", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 4, inbound_now: 0 },
+      operations: {
+        deals: [
+          // the only identifiable record: it is linked to an account
+          { id: "deal-1", name: "Diagnóstico — Acme", account_id: "acct-77", company: "Acme Indústria", status: "open", created_at: now, updated_at: now },
+          // no id and no account at all
+          { status: "open", created_at: now, updated_at: now },
+          // an account key that sanitizes to nothing
+          { id: "deal-2", account_id: "###", company: "Acme Indústria", status: "open", created_at: now, updated_at: now },
+          // an account key that is literally the placeholder token
+          { id: "deal-3", account_id: "unknown", company: "unknown", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.deepEqual(
+    rows.map((row) => row.scope),
+    ["client:acct-77"],
+  );
+  assert.equal(
+    rows.some((row) => String(row.scope).includes("unknown")),
+    false,
+  );
+  assert.equal(clients.payload.client_count, 1);
+});
+
+test("identity-less records land in the data-quality queue with origin, reason and action", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { status: "open", created_at: now, updated_at: now },
+          { id: "deal-9", account_id: "unknown", company: "unknown", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const dq = clients.payload.data_quality as {
+    queue: string;
+    origin: string;
+    unidentified_record_count: number;
+    required_action: string;
+    counts_as_client: boolean;
+    raises_client_risk: boolean;
+    entries: Array<Record<string, unknown>>;
+  };
+  assert.equal(dq.queue, "client_identity");
+  assert.equal(dq.unidentified_record_count, 2);
+  assert.equal(dq.counts_as_client, false);
+  assert.equal(dq.raises_client_risk, false);
+  assert.ok(dq.required_action.length > 0);
+  assert.equal(dq.entries.length, 2);
+  for (const entry of dq.entries) {
+    assert.equal(entry.kind, "client_identity_missing");
+    assert.equal(entry.status, "open");
+    assert.equal(entry.source, "warmbly.commercial.pipeline");
+    assert.ok(String(entry.why).length > 0);
+    assert.ok(Array.isArray(entry.reason_codes) && entry.reason_codes.length > 0);
+    // Per reason code, not one sentence repeated: the operator fixes a missing
+    // account link differently from a placeholder name.
+    assert.ok(String(entry.recommended_next_action).length > 0);
+    assert.notEqual(entry.recommended_next_action, "");
+    const origin = entry.origin as { system: string; locator: string };
+    assert.equal(origin.system, "warmbly");
+    assert.ok(origin.locator.length > 0);
+  }
+  assert.deepEqual((dq.entries[0]?.reason_codes as string[]) ?? [], ["missing_client_key", "missing_display_name"]);
+  assert.deepEqual(
+    (dq.entries[1]?.reason_codes as string[]) ?? [],
+    ["reserved_placeholder_slug", "placeholder_display_name"],
+  );
+  // Different reasons get different corrections.
+  assert.notEqual(dq.entries[0]?.recommended_next_action, dq.entries[1]?.recommended_next_action);
+});
+
+test("the identity queue is kept out of the client counts the risk engine reads", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 3, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "d1", name: "Diagnóstico — Beta", account_id: null, status: "open", updated_at: now },
+          { id: "###", name: "Diagnóstico — Gama", status: "open", updated_at: now },
+          { id: "unknown", name: "unknown", status: "open", updated_at: now },
+        ],
+        intel_exceptions: [{ id: "x1", why: "a" }, { id: "x2", why: "b" }],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  assert.deepEqual(clients.payload.clients, []);
+  assert.equal(clients.payload.client_count, 0);
+  assert.equal(clients.payload.at_risk_client_count, 0);
+  assert.equal(clients.payload.unidentified_record_count, 3);
+  // The commercial exception count stays what it is and is NOT folded into any
+  // client count. Whether it may raise a client alert is the risk engine's
+  // decision and is asserted end-to-end in tests/convergence/domain-gates.test.ts.
+  assert.equal(clients.payload.open_blocker_count, 2);
+});
+
+test("two different deals for one company are one client, keyed on the account", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "deal-1", name: "Diagnóstico — Acme", account_id: "acct-77", company: "Acme Indústria", status: "open", updated_at: now },
+          { id: "deal-2", name: "Expansão — Acme", account_id: "acct-77", company: "Acme Indústria", status: "won", updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.equal(rows.length, 1, "two deals for one company are one client");
+  assert.equal(rows[0]?.client_slug, "acct-77");
+  assert.equal(rows[0]?.scope, "client:acct-77");
+  assert.equal(rows[0]?.display_name, "Acme Indústria");
+  // A won deal makes the company an active client even though a sibling deal is open.
+  assert.equal(rows[0]?.lifecycle, "active");
+  // v1 ClientStatus is frozen (additionalProperties:false), so the published row
+  // carries no new field; how the identity was resolved is recorded on the
+  // snapshot's data_quality block instead.
+  assert.equal("identity_basis" in (rows[0] ?? {}), false);
+  assert.equal("derived_from_deal_count" in (rows[0] ?? {}), false);
+  const dq = clients.payload.data_quality as {
+    identity_bases: string[];
+    resolved_identities: Array<{ client_slug: string; identity_basis: string; derived_from_deal_count: number }>;
+  };
+  assert.deepEqual(dq.resolved_identities, [
+    { client_slug: "acct-77", identity_basis: "account_key", derived_from_deal_count: 2 },
+  ]);
+  assert.ok(dq.identity_bases.includes("account_key"));
+  assert.equal(dq.identity_bases.some((basis) => /deal/i.test(basis)), false);
+});
+
+test("a deal id is never published as a client identity", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        // The shape Warmbly actually ships today: a deal id, a deal name, and
+        // account_id still null. There is no client here, only a deal.
+        deals: [
+          { id: "deal-healthy-1", name: "Diagnóstico — Construtora Beta", account_id: null, status: "open", updated_at: now },
+          { id: "deal-stalled-1", name: "Diagnóstico — Escritório Gama", account_id: null, status: "open", updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.deepEqual(rows, [], "a deal key is not a client key");
+  const dq = clients.payload.data_quality as { entries: Array<Record<string, unknown>> };
+  assert.equal(dq.entries.length, 2);
+  assert.deepEqual(dq.entries[0]?.reason_codes, ["missing_client_key", "missing_display_name"]);
+  // The queue points at the deal that needs linking, by its real source id.
+  assert.equal(dq.entries[0]?.source_id, "deal-healthy-1");
+  assert.match(String(dq.entries[0]?.recommended_next_action), /conta\/empresa/);
+});
+
+test("commercial pipeline reports a null identity instead of the string unknown", () => {
+  const [commercial] = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "deal-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+          { status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as { pipeline: Array<Record<string, unknown>> };
+  const [identified, unidentified] = ops.pipeline;
+  assert.equal(identified?.source_id, "deal-1");
+  assert.equal(identified?.canonical_id, "cc:commercial-deal:deal-1");
+  assert.equal(identified?.identity_status, "identified");
+  assert.equal(unidentified?.id, null);
+  assert.equal(unidentified?.source_id, null);
+  assert.equal(unidentified?.canonical_id, null);
+  assert.equal(unidentified?.display_name, null);
+  assert.equal(unidentified?.identity_status, "unidentified");
+});
+
 const CURRENCY_SOURCE = { system: "warmbly", kind: "collector-runner", locator: "warmbly" };
 
 function commercialPayload(payload: Record<string, unknown>): Record<string, unknown> {
