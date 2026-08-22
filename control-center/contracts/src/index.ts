@@ -38,6 +38,8 @@ export {
   isReservedClientSlug,
   isPlaceholderDisplayName,
   clientSlugFrom,
+  resolveClientIdentity,
+  type ResolvedClientIdentity,
   parseResourceId,
   clientScope,
   repoScope,

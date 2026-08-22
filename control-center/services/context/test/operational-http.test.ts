@@ -500,9 +500,45 @@ test("an unidentified client record never raises 'Cliente em risco operacional'"
   );
 });
 
-test("the clients mapper forwards the identity queue instead of dropping it", () => {
-  const assemble = readFileSync(join(here, "../src/operational/assemble.ts"), "utf8");
-  assert.match(assemble, /"data_quality"/);
-  assert.match(assemble, /"unidentified_record_count"/);
-  assert.match(assemble, /"client_count"/);
+test("the clients mapper forwards the identity queue through a real envelope read", async () => {
+  const data = cloneData();
+  const clients = data.operational_snapshots.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients, "representative data must ship a clients snapshot");
+  const dataQuality = {
+    queue: "client_identity",
+    origin: "warmbly.commercial.pipeline",
+    unidentified_record_count: 2,
+    required_action: "Vincular o registro a uma conta/empresa na origem e reprocessar.",
+    counts_as_client: false,
+    raises_client_risk: false,
+    entries: [
+      {
+        id: "client-identity:deal-7",
+        source_id: "deal-7",
+        kind: "client_identity_missing",
+        why: "sem vínculo com conta/empresa",
+        reason_codes: ["missing_client_key"],
+        recommended_next_action: "Vincular o registro a uma conta/empresa na origem e reprocessar.",
+        status: "open",
+        origin: { system: "warmbly", kind: "commercial-deal", locator: "deal-7" },
+      },
+    ],
+  };
+  clients.payload = {
+    ...clients.payload,
+    clients: [],
+    client_count: 0,
+    unidentified_record_count: 2,
+    data_quality: dataQuality,
+  };
+
+  const service = operationalService(createFixtureOperationalPort(data));
+  const envelope = await service.getEnvelope(FOUNDER, "company");
+  const snapshot = envelope.snapshots.clients?.snapshot as Record<string, unknown> | null | undefined;
+  assert.ok(snapshot, "clients slot must be present");
+  // The correction path has to survive the mapper's allowlist: dropping it here
+  // is what left the placeholder with nowhere to be fixed.
+  assert.deepEqual(snapshot.data_quality, dataQuality);
+  assert.equal(snapshot.unidentified_record_count, 2);
+  assert.equal(snapshot.client_count, 0);
 });

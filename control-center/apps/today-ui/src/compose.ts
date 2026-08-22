@@ -179,8 +179,35 @@ function clientNeedsAttention(client: ClientStatus): boolean {
   return isUntrusted(client.provenance.freshness_status);
 }
 
+/**
+ * Minimum client identity, mirrored from the contracts rule.
+ *
+ * today-ui deliberately does not import the sibling workstream, so the reserved
+ * token list is duplicated and pinned by a drift test in
+ * tests/convergence/domain-gates.test.ts. A record without an identity is a
+ * data-quality exception; it must not be composed as a client that needs
+ * attention on any surface.
+ */
+const RESERVED_CLIENT_SLUGS = new Set([
+  "anonimo", "anonymous", "client", "cliente", "default", "desconhecido", "na", "n-a",
+  "nao-identificado", "nao-informado", "no-name", "none", "null", "placeholder",
+  "sem-identidade", "sem-nome", "tbd", "undefined", "unidentified", "unknown",
+]);
+
+function normalizeSlug(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function isIdentifiedClient(client: ClientStatus): boolean {
+  const slug = client.client_slug;
+  if (typeof slug !== "string" || slug.length < 2 || RESERVED_CLIENT_SLUGS.has(slug)) return false;
+  if (client.scope !== `client:${slug}`) return false;
+  const name = client.display_name;
+  return typeof name === "string" && name.trim().length >= 2 && !RESERVED_CLIENT_SLUGS.has(normalizeSlug(name));
+}
+
 function composeClients(payload: HojePayload): BandView {
-  const clients = payload.clients.filter(clientNeedsAttention);
+  const clients = payload.clients.filter(isIdentifiedClient).filter(clientNeedsAttention);
   const rows = clients.map((client) => {
     const money = client.open_receivables;
     const notes = client.notes ?? client.lifecycle;

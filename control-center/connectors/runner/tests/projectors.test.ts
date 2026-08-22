@@ -527,13 +527,14 @@ test("deals without a usable identity never become client:unknown", () => {
       counts: { deals_open: 4, inbound_now: 0 },
       operations: {
         deals: [
-          { id: "deal-1", name: "Acme", status: "open", created_at: now, updated_at: now },
-          // no id at all
+          // the only identifiable record: it is linked to an account
+          { id: "deal-1", name: "Diagnóstico — Acme", account_id: "acct-77", company: "Acme Indústria", status: "open", created_at: now, updated_at: now },
+          // no id and no account at all
           { status: "open", created_at: now, updated_at: now },
-          // an id that sanitizes to nothing
-          { id: "###", status: "open", created_at: now, updated_at: now },
-          // an id that is literally the placeholder token
-          { id: "unknown", status: "open", created_at: now, updated_at: now },
+          // an account key that sanitizes to nothing
+          { id: "deal-2", account_id: "###", company: "Acme Indústria", status: "open", created_at: now, updated_at: now },
+          // an account key that is literally the placeholder token
+          { id: "deal-3", account_id: "unknown", company: "unknown", status: "open", created_at: now, updated_at: now },
         ],
       },
     },
@@ -543,7 +544,7 @@ test("deals without a usable identity never become client:unknown", () => {
   const rows = clients.payload.clients as Array<Record<string, unknown>>;
   assert.deepEqual(
     rows.map((row) => row.scope),
-    ["client:deal-1"],
+    ["client:acct-77"],
   );
   assert.equal(
     rows.some((row) => String(row.scope).includes("unknown")),
@@ -564,7 +565,7 @@ test("identity-less records land in the data-quality queue with origin, reason a
       operations: {
         deals: [
           { status: "open", created_at: now, updated_at: now },
-          { id: "unknown", status: "open", created_at: now, updated_at: now },
+          { id: "deal-9", account_id: "unknown", company: "unknown", status: "open", created_at: now, updated_at: now },
         ],
       },
     },
@@ -592,19 +593,24 @@ test("identity-less records land in the data-quality queue with origin, reason a
     assert.equal(entry.source, "warmbly.commercial.pipeline");
     assert.ok(String(entry.why).length > 0);
     assert.ok(Array.isArray(entry.reason_codes) && entry.reason_codes.length > 0);
-    assert.equal(entry.recommended_next_action, dq.required_action);
+    // Per reason code, not one sentence repeated: the operator fixes a missing
+    // account link differently from a placeholder name.
+    assert.ok(String(entry.recommended_next_action).length > 0);
+    assert.notEqual(entry.recommended_next_action, "");
     const origin = entry.origin as { system: string; locator: string };
     assert.equal(origin.system, "warmbly");
     assert.ok(origin.locator.length > 0);
   }
-  assert.deepEqual((dq.entries[0]?.reason_codes as string[]) ?? [], ["missing_source_id", "missing_display_name"]);
+  assert.deepEqual((dq.entries[0]?.reason_codes as string[]) ?? [], ["missing_client_key", "missing_display_name"]);
   assert.deepEqual(
     (dq.entries[1]?.reason_codes as string[]) ?? [],
     ["reserved_placeholder_slug", "placeholder_display_name"],
   );
+  // Different reasons get different corrections.
+  assert.notEqual(dq.entries[0]?.recommended_next_action, dq.entries[1]?.recommended_next_action);
 });
 
-test("the identity queue never feeds client counts or the client-risk alert", () => {
+test("the identity queue is kept out of the client counts the risk engine reads", () => {
   const projected = projectCollector({
     collector: "warmbly",
     freshness_status: "FRESH",
@@ -615,10 +621,11 @@ test("the identity queue never feeds client counts or the client-risk alert", ()
       counts: { deals_open: 3, inbound_now: 0 },
       operations: {
         deals: [
-          { status: "open", created_at: now, updated_at: now },
-          { id: "###", status: "open", created_at: now, updated_at: now },
-          { id: "unknown", status: "open", created_at: now, updated_at: now },
+          { id: "d1", name: "Diagnóstico — Beta", account_id: null, status: "open", updated_at: now },
+          { id: "###", name: "Diagnóstico — Gama", status: "open", updated_at: now },
+          { id: "unknown", name: "unknown", status: "open", updated_at: now },
         ],
+        intel_exceptions: [{ id: "x1", why: "a" }, { id: "x2", why: "b" }],
       },
     },
   });
@@ -627,11 +634,14 @@ test("the identity queue never feeds client counts or the client-risk alert", ()
   assert.deepEqual(clients.payload.clients, []);
   assert.equal(clients.payload.client_count, 0);
   assert.equal(clients.payload.at_risk_client_count, 0);
-  assert.equal(clients.payload.open_blocker_count, 0);
   assert.equal(clients.payload.unidentified_record_count, 3);
+  // The commercial exception count stays what it is and is NOT folded into any
+  // client count. Whether it may raise a client alert is the risk engine's
+  // decision and is asserted end-to-end in tests/convergence/domain-gates.test.ts.
+  assert.equal(clients.payload.open_blocker_count, 2);
 });
 
-test("repeated deals for one client collapse into a single client row", () => {
+test("two different deals for one company are one client, keyed on the account", () => {
   const projected = projectCollector({
     collector: "warmbly",
     freshness_status: "FRESH",
@@ -642,8 +652,8 @@ test("repeated deals for one client collapse into a single client row", () => {
       counts: { deals_open: 2, inbound_now: 0 },
       operations: {
         deals: [
-          { id: "acme-1", name: "Acme", status: "open", created_at: now, updated_at: now },
-          { id: "acme-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+          { id: "deal-1", name: "Diagnóstico — Acme", account_id: "acct-77", company: "Acme Indústria", status: "open", updated_at: now },
+          { id: "deal-2", name: "Expansão — Acme", account_id: "acct-77", company: "Acme Indústria", status: "won", updated_at: now },
         ],
       },
     },
@@ -651,8 +661,45 @@ test("repeated deals for one client collapse into a single client row", () => {
   const clients = projected.find((row) => row.snapshot_kind === "clients");
   assert.ok(clients);
   const rows = clients.payload.clients as Array<Record<string, unknown>>;
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.merged_records, 2);
+  assert.equal(rows.length, 1, "two deals for one company are one client");
+  assert.equal(rows[0]?.client_slug, "acct-77");
+  assert.equal(rows[0]?.scope, "client:acct-77");
+  assert.equal(rows[0]?.display_name, "Acme Indústria");
+  assert.equal(rows[0]?.identity_basis, "account_key");
+  assert.equal(rows[0]?.derived_from_deal_count, 2);
+  // A won deal makes the company an active client even though a sibling deal is open.
+  assert.equal(rows[0]?.lifecycle, "active");
+});
+
+test("a deal id is never published as a client identity", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        // The shape Warmbly actually ships today: a deal id, a deal name, and
+        // account_id still null. There is no client here, only a deal.
+        deals: [
+          { id: "deal-healthy-1", name: "Diagnóstico — Construtora Beta", account_id: null, status: "open", updated_at: now },
+          { id: "deal-stalled-1", name: "Diagnóstico — Escritório Gama", account_id: null, status: "open", updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.deepEqual(rows, [], "a deal key is not a client key");
+  const dq = clients.payload.data_quality as { entries: Array<Record<string, unknown>> };
+  assert.equal(dq.entries.length, 2);
+  assert.deepEqual(dq.entries[0]?.reason_codes, ["missing_client_key", "missing_display_name"]);
+  // The queue points at the deal that needs linking, by its real source id.
+  assert.equal(dq.entries[0]?.source_id, "deal-healthy-1");
+  assert.match(String(dq.entries[0]?.recommended_next_action), /conta\/empresa/);
 });
 
 test("commercial pipeline reports a null identity instead of the string unknown", () => {

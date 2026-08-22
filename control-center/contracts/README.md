@@ -40,9 +40,16 @@ Parameterized:
 
 ### Minimum client identity
 
+**A client is a company / account / organization. A deal is not a client.** Two
+deals for one company are one client; a deal id is a deal key. `identity_basis`
+names which client-level key resolved the identity, and the enum contains no
+deal-level basis — a producer that only has a deal id has nothing truthful to
+write there, which is the point.
+
 A `ClientStatus` is an operational entity. A record that cannot be identified is
 **not** a client — it is a data-quality exception that belongs in the join queue.
-The validator therefore rejects (keyword `client_identity` / `client_id_slug`):
+The validator therefore rejects (keyword `client_identity`, `client_id_slug`,
+`client_identity_basis`):
 
 - a `client_slug` shorter than two characters;
 - a `client_slug` or `scope` built from a reserved placeholder token
@@ -50,12 +57,25 @@ The validator therefore rejects (keyword `client_identity` / `client_id_slug`):
   `RESERVED_CLIENT_SLUGS` in `src/taxonomy.ts`, mirrored by the
   `reserved_client_slug` / `reserved_client_scope` schema `$defs`);
 - a placeholder `display_name` such as `Cliente` or `unknown`;
-- an `id` whose slug is not the `client_slug`.
+- an `id` whose slug is not the `client_slug`;
+- a missing `identity_basis`, or a deal roll-up (`derived_from_deal_count`)
+  claiming a basis that is not client-level.
 
-Producers derive slugs with `clientSlugFrom()`, which returns `null` rather than
-coercing an unusable identifier into a plausible-looking slug. A `null` means
-"emit a data-quality exception with origin, reason code and required action",
-never "publish `client:unknown`".
+The reserved tokens are also excluded from the generic `scope` grammar, so
+`client:unknown` is not a valid scope on an AttentionItem, a Directive, a
+SourceObservation, or an agent grant either.
+
+Producers resolve identity with `resolveClientIdentity()`, which reads
+client-level fields only (`CLIENT_KEY_FIELDS`, then `CLIENT_NAME_FIELDS`) and
+never the record's own primary key. It returns `slug: null` rather than coercing
+an unusable identifier into a plausible-looking slug. A `null` means "emit a
+data-quality exception with origin, reason code and the correction for that
+reason" (`CLIENT_IDENTITY_REQUIRED_ACTIONS`), never "publish `client:unknown`".
+
+Note on enforcement: `validate.ts` runs in CI and the CLI, not on the serving
+path. The contract is the specification and the gate for new documents; the
+producer (`projectClientsFromCommercial`) and the surface (`maybeClientFrom`)
+are what keep an unidentified record off the Clientes route at runtime.
 
 Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix) that are **not** the reserved literals or `repo`/`client`. `company:foo` and `client:Acme` are invalid. Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/client-status.v1.schema.json",
   "title": "ClientStatus v1",
-  "description": "Aggregated per-client operational status. scope MUST equal client:<client_slug>.",
+  "description": "Aggregated per-client operational status. scope MUST equal client:<client_slug>. A client is a company/account/organization: a record without a client-level identity is a data-quality exception, not a ClientStatus, and identity_basis states which client-level key resolved it.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,6 +12,7 @@
     "client_slug",
     "display_name",
     "lifecycle",
+    "identity_basis",
     "provenance"
   ],
   "properties": {
@@ -29,6 +30,16 @@
     "lifecycle": {
       "type": "string",
       "enum": ["lead", "active", "paused", "churn_risk", "churned", "unknown"]
+    },
+    "identity_basis": {
+      "description": "How this client identity was resolved. A client is a company/account/organization; there is no deal-level basis, so a deal id can never be declared a client identity. Lockstep with CLIENT_IDENTITY_BASES in taxonomy.ts.",
+      "type": "string",
+      "enum": ["client_key", "account_key", "organization_key", "company_name", "manual", "governance"]
+    },
+    "derived_from_deal_count": {
+      "description": "How many source deals roll up into this client. Present when the producer joined a deal stream; it is evidence of the roll-up, never the identity itself.",
+      "type": "integer",
+      "minimum": 1
     },
     "provenance": {
       "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"

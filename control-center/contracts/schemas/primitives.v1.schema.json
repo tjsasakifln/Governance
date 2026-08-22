@@ -19,7 +19,7 @@
     "scope": {
       "type": "string",
       "description": "Exact v1 literals: company, commercial, finance, clients, infrastructure, inbound. Parameterized: repo:<name>, client:<slug>. Non-breaking extension: additional lowercase prefix:id namespaces that are not those reserved names. New bare literals require an additive schema revision. Agents MUST query by scope; they MUST NOT receive a whole-company dump unless they explicitly requested and were granted `company`.",
-      "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$",
+      "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:(?!(?:anonimo|anonymous|client|cliente|default|desconhecido|na|n-a|nao-identificado|nao-informado|no-name|none|null|placeholder|sem-identidade|sem-nome|tbd|undefined|unidentified|unknown)(?:,|$))[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$",
       "minLength": 2,
       "maxLength": 128
     },

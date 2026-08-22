@@ -116,6 +116,9 @@ function collectSecretKeyIssues(value: unknown, pathExpr: string, acc: Validatio
   }
 }
 
+/** Identity bases that a deal roll-up may legitimately claim. */
+const DEAL_ROLLUP_BASES = new Set<string>(["client_key", "account_key", "organization_key", "company_name"]);
+
 function stringField(rec: Record<string, unknown>, key: string): string | undefined {
   const v = rec[key];
   return typeof v === "string" ? v : undefined;
@@ -184,6 +187,21 @@ function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[
           "client_identity",
         ),
       );
+    }
+    // A deal roll-up must have been keyed on a client-level identifier. manual
+    // and governance are human/canonical entries and cannot be true of a stream
+    // of deals; there is no deal basis at all, which is the point.
+    if (rec.derived_from_deal_count !== undefined) {
+      const basis = stringField(rec, "identity_basis");
+      if (basis !== undefined && !DEAL_ROLLUP_BASES.has(basis)) {
+        errors.push(
+          issue(
+            "/identity_basis",
+            `a client rolled up from deals must be keyed on a client-level identifier, not '${basis}'; a deal key is not a client identity`,
+            "client_identity_basis",
+          ),
+        );
+      }
     }
     const clientId = stringField(rec, "id");
     if (clientId !== undefined && slug !== undefined) {

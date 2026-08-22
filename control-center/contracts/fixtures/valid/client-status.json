@@ -5,6 +5,7 @@
   "client_slug": "acme-industria",
   "display_name": "Acme Indústria",
   "lifecycle": "churn_risk",
+  "identity_basis": "client_key",
   "provenance": {
     "source": {
       "system": "warmbly",
@@ -19,5 +20,7 @@
     "amount_cents": 1500000,
     "currency": "BRL"
   },
-  "attention_item_ids": ["cc:attention-item:01K3CC-OVERDUE-INVOICE"]
+  "attention_item_ids": [
+    "cc:attention-item:01K3CC-OVERDUE-INVOICE"
+  ]
 }

@@ -1,5 +1,5 @@
 import type { AttentionSignal, FounderOverride, SignalDomain } from "@confenge/control-center-attention";
-import { isIdentifiedClientSlug } from "@confenge/control-center-contracts";
+import { CLIENT_IDENTITY_REQUIRED_ACTION, isIdentifiedClientSlug } from "@confenge/control-center-contracts";
 import type { DomainSlot, OperationalDomain, OperationalSnapshotRow, SourceRef } from "./types.ts";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -15,20 +15,35 @@ function intField(rec: Record<string, unknown> | null, key: string): number {
 }
 
 /**
- * Clients the roll-up may count. A record without a usable identity is a
- * data-quality exception, not a client at risk: it must never raise
- * "Cliente em risco operacional". The projector already drops it, and this is
- * the second gate so an older or hand-written snapshot cannot slip one through.
+ * How many clients in this snapshot actually have an identity.
+ *
+ * Prefers the client list, falls back to the producer's own `client_count`, and
+ * returns `null` only when the snapshot says nothing about clients at all. A
+ * record without a usable identity is a data-quality exception, not a client at
+ * risk, and must never reach "Cliente em risco operacional".
  */
 function identifiedClientCount(rec: Record<string, unknown> | null): number | null {
   const rows = rec?.clients;
-  if (!Array.isArray(rows)) {
-    return null;
+  if (Array.isArray(rows)) {
+    return rows.filter((row) => {
+      const client = asRecord(row);
+      return client !== null && isIdentifiedClientSlug(client.client_slug);
+    }).length;
   }
-  return rows.filter((row) => {
-    const client = asRecord(row);
-    return client !== null && isIdentifiedClientSlug(client.client_slug);
-  }).length;
+  const declared = rec?.client_count;
+  if (typeof declared === "number" && Number.isInteger(declared) && declared >= 0) {
+    return declared;
+  }
+  return null;
+}
+
+/** The producer's own correction text for the identity queue, when it declared one. */
+function requiredIdentityAction(rec: Record<string, unknown> | null): string {
+  const dq = asRecord(rec?.data_quality);
+  const declared = dq?.required_action;
+  return typeof declared === "string" && declared.trim() !== ""
+    ? declared
+    : CLIENT_IDENTITY_REQUIRED_ACTION;
 }
 
 function attentionDomain(domain: OperationalDomain): SignalDomain {
@@ -173,13 +188,17 @@ export function signalsFromSlot(slot: DomainSlot): AttentionSignal[] {
     const atRisk = identified === null
       ? intField(snap, "at_risk_client_count")
       : Math.min(intField(snap, "at_risk_client_count"), identified);
+    // open_blocker_count is the *commercial* exception count carried on this
+    // snapshot. It says nothing about any client, so on its own it must not
+    // raise a client alert: with zero identified clients it used to publish
+    // "Cliente em risco operacional", severity critical, about nobody.
     const blockers = intField(snap, "open_blocker_count");
-    if (atRisk > 0 || blockers > 0) {
+    if (atRisk > 0) {
       out.push(
         signal({
           id: "cc:attention-item:client-risk",
           title: "Cliente em risco operacional",
-          summary: `Clientes em risco=${atRisk}; blockers=${blockers}.`,
+          summary: `Clientes em risco=${atRisk}; blockers no recorte comercial=${blockers}.`,
           category: blockers > 0 ? "blocker" : "cliente",
           domain: "clients",
           scope: slot.scope,
@@ -191,6 +210,33 @@ export function signalsFromSlot(slot: DomainSlot): AttentionSignal[] {
           evidence_refs: [{ source: slot.source, note: `at_risk=${atRisk};blockers=${blockers}` }],
           provenance: provenanceOf(slot),
           recommended_action: "Tratar o relacionamento e o blocker do cliente.",
+        }),
+      );
+    }
+    // The join queue gets its own signal, named for what it is. Routing it into
+    // the client-risk alert is what made a data-quality gap look like a client
+    // emergency; leaving it silent would hide the only thing an operator can act on.
+    const unidentified = intField(snap, "unidentified_record_count");
+    if (unidentified > 0) {
+      const required = requiredIdentityAction(snap);
+      out.push(
+        signal({
+          id: "cc:attention-item:client-identity-queue",
+          title: "Registros sem identidade de cliente",
+          summary: `${unidentified} registro(s) sem identidade de cliente na fila de qualidade de dados. Não são clientes e não entram em contagens.`,
+          category: "risco_operacional",
+          domain: "clients",
+          scope: slot.scope,
+          impact: 45,
+          urgency: 35,
+          severity: "medium",
+          status: "open",
+          correlation_key: `clients-identity-queue:${slot.scope}`,
+          evidence_refs: [
+            { source: slot.source, note: `unidentified_record_count=${unidentified};identified_clients=${identified ?? "desconhecido"}` },
+          ],
+          provenance: provenanceOf(slot),
+          recommended_action: required,
         }),
       );
     }

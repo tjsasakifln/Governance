@@ -1,3 +1,8 @@
+import {
+  isIdentifiedClientSlug,
+  isPlaceholderDisplayName,
+} from "@confenge/control-center-contracts/ids";
+import { CLIENT_IDENTITY_REQUIRED_ACTION } from "@confenge/control-center-contracts/taxonomy";
 import { composeHoje, type HojeComposeInput, type HojeViewModel } from "../hoje-compose";
 import { getDestination, type DestinationId } from "../destinations";
 import type {
@@ -5,6 +10,7 @@ import type {
   AgentActivity,
   AgentActivityPresentationStatus,
   AttentionItem,
+  ClientIdentityException,
   ClientStatus,
   CommercialSnapshot,
   Directive,
@@ -178,16 +184,43 @@ function stringList(value: unknown): string[] | undefined {
   return value.map(String);
 }
 
-export function clientFrom(row: Record<string, unknown>, fallback: Provenance): ClientStatus {
+/**
+ * Parse a wire row into a ClientStatus, or `null` when it carries no client identity.
+ *
+ * The previous version defaulted the identity fields — `cc:client-status:unknown`,
+ * `client:unknown`, slug `unknown`, name `Cliente` — so *any* object became a
+ * client. Fed the clients snapshot envelope by the adapter's fallback, it minted
+ * exactly the card reported in issue #70, with every source UNKNOWN. Identity is
+ * now read, never defaulted: a row without one is not a client and is routed to
+ * the data-quality queue by the caller.
+ */
+export function maybeClientFrom(row: Record<string, unknown>, fallback: Provenance): ClientStatus | null {
+  const slug = row.client_slug;
+  if (!isIdentifiedClientSlug(slug)) {
+    return null;
+  }
+  const displayName = row.display_name;
+  if (isPlaceholderDisplayName(displayName)) {
+    return null;
+  }
+  const scope = str(row.scope, `client:${slug}`);
+  if (scope !== `client:${slug}`) {
+    return null;
+  }
+  const id = str(row.id, `cc:client-status:${slug}`);
+  if (!id.endsWith(`:${slug}`)) {
+    return null;
+  }
   const item: ClientStatus = {
     schema_version: "control-center.client-status.v1",
-    id: str(row.id, "cc:client-status:unknown"),
-    scope: str(row.scope, `client:${str(row.client_slug, "unknown")}`),
-    client_slug: str(row.client_slug, "unknown"),
-    display_name: str(row.display_name, str(row.title, "Cliente")),
+    id,
+    scope,
+    client_slug: slug,
+    display_name: displayName as string,
     lifecycle: (row.lifecycle as ClientStatus["lifecycle"]) ?? "unknown",
     provenance: provenanceOf(row, fallback),
   };
+  if (typeof row.identity_basis === "string") item.identity_basis = row.identity_basis;
   if (Array.isArray(row.attention_item_ids)) item.attention_item_ids = row.attention_item_ids.map(String);
   const money = moneyOf(row.open_receivables);
   if (money) item.open_receivables = money;
@@ -210,6 +243,55 @@ export function clientFrom(row: Record<string, unknown>, fallback: Provenance): 
     governance: typeof sources?.governance === "string" ? sources.governance : "UNKNOWN",
   };
   return item;
+}
+
+/**
+ * Parse one entry of the producer's client-identity queue.
+ *
+ * The origin, reason and correction all come from the producer, which is the
+ * only party that knows them. The reader must not substitute its own base URL
+ * for the origin, or its own guess for the reason.
+ */
+export function clientIdentityExceptionFrom(
+  row: Record<string, unknown>,
+  fallback: Provenance,
+): ClientIdentityException {
+  const origin = asRecord(row.origin);
+  const reasons = Array.isArray(row.reason_codes) ? row.reason_codes.map(String) : [];
+  const item: ClientIdentityException = {
+    id: str(row.id, str(row.canonical_id, "client-identity")),
+    source_id: typeof row.source_id === "string" ? row.source_id : null,
+    kind: str(row.kind, "client_identity_missing"),
+    why: str(row.why, "identidade de cliente não comprovada"),
+    reason_codes: reasons,
+    recommended_next_action: str(row.recommended_next_action, CLIENT_IDENTITY_REQUIRED_ACTION),
+    status: str(row.status, "open"),
+    origin: origin
+      ? {
+          system: str(origin.system, fallback.source.system),
+          kind: str(origin.kind, fallback.source.kind),
+          locator: str(origin.locator, fallback.source.locator),
+        }
+      : fallback.source,
+  };
+  if (typeof row.observed_at === "string") item.observed_at = row.observed_at;
+  // Only the entry's own provenance. Falling back to the reader's would print
+  // "control-center · <baseUrl>" — the party that fetched the record, not the
+  // one that produced it and can correct it.
+  if (asRecord(row.provenance) !== null) {
+    item.provenance = provenanceOf(row, fallback);
+  }
+  return item;
+}
+
+/** The producer's identity queue, read off a clients snapshot. */
+export function clientDataQualityFrom(
+  snapshot: Record<string, unknown>,
+  fallback: Provenance,
+): ClientIdentityException[] {
+  const dq = asRecord(snapshot.data_quality);
+  if (dq === null) return [];
+  return asArray(dq.entries).map((row) => clientIdentityExceptionFrom(asRecord(row) ?? {}, fallback));
 }
 
 export function commercialFrom(row: Record<string, unknown>, fallback: Provenance): CommercialSnapshot {
@@ -616,11 +698,15 @@ export function mapHojePayloads(input: {
     ...asArray(today.priorities),
     ...asArray(snapshot.top_priorities),
   ].map((row, index) => priorityFrom(asRecord(row) ?? {}, index, input.fallback));
+  // Rows without a client identity are not clients. They are dropped here and
+  // published separately as the data-quality queue.
   const clients = [
     ...asArray(today.clients),
     ...asArray(snapshot.clients),
     ...itemsOf(snapshot.client_statuses),
-  ].map((row) => clientFrom(asRecord(row) ?? {}, input.fallback));
+  ]
+    .map((row) => maybeClientFrom(asRecord(row) ?? {}, input.fallback))
+    .filter((row): row is ClientStatus => row !== null);
   const commercialRaw = asRecord(today.commercial) ?? asRecord(snapshot.commercial);
   const financeRaw = asRecord(today.finance) ?? asRecord(snapshot.finance);
   const engineeringRaw = asRecord(today.engineering) ?? asRecord(snapshot.engineering);

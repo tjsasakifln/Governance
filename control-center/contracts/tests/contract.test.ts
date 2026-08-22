@@ -5,9 +5,13 @@ import { describe, it } from "node:test";
 import {
   ACTOR_KINDS,
   allowedMcpToolNames,
+  CLIENT_IDENTITY_BASES,
   CLIENT_IDENTITY_REASON_CODES,
   CLIENT_IDENTITY_REQUIRED_ACTION,
+  CLIENT_IDENTITY_REQUIRED_ACTIONS,
   clientSlugFrom,
+  MIN_CLIENT_SLUG_LENGTH,
+  resolveClientIdentity,
   catalogFixturePath,
   catalogType,
   DIRECTIVE_STATUSES,
@@ -288,18 +292,97 @@ describe("ClientStatus scope binding", () => {
 describe("ClientStatus minimum identity", () => {
   const valid = readJson("fixtures/valid/client-status.json") as Record<string, unknown>;
 
-  it("keeps the reserved placeholder patterns in lockstep with the JSON Schema", () => {
+  it("keeps the reserved placeholder rule in lockstep with the JSON Schema", () => {
     const primitives = readJson("schemas/primitives.v1.schema.json") as {
-      $defs: Record<string, { pattern?: string; minLength?: number }>;
+      $defs: Record<string, { pattern?: string; minLength?: number; not?: { $ref?: string } }>;
     };
     assert.equal(primitives.$defs.reserved_client_slug?.pattern, RESERVED_CLIENT_SLUG_PATTERN);
     assert.equal(primitives.$defs.reserved_client_scope?.pattern, RESERVED_CLIENT_SCOPE_PATTERN);
-    assert.equal(primitives.$defs.client_slug?.minLength, 2);
+    assert.equal(primitives.$defs.client_slug?.minLength, MIN_CLIENT_SLUG_LENGTH);
+    assert.equal(primitives.$defs.client_scope?.minLength, "client:".length + MIN_CLIENT_SLUG_LENGTH);
+    // The `not` clauses are what actually reject the placeholder. Assert they
+    // are wired, not merely that the defs exist.
+    assert.match(String(primitives.$defs.client_slug?.not?.$ref), /reserved_client_slug$/);
+    assert.match(String(primitives.$defs.client_scope?.not?.$ref), /reserved_client_scope$/);
     assert.ok(RESERVED_CLIENT_SLUGS.includes("unknown"));
   });
 
+  it("keeps client:<placeholder> out of the generic scope grammar too", () => {
+    const primitives = readJson("schemas/primitives.v1.schema.json") as {
+      $defs: Record<string, { pattern?: string }>;
+    };
+    assert.equal(primitives.$defs.scope?.pattern, SCOPE_PATTERN);
+    assert.equal(isScope("client:acme-industria"), true);
+    for (const slug of RESERVED_CLIENT_SLUGS) {
+      assert.equal(isScope(`client:${slug}`), false, `client:${slug} must not be a scope`);
+    }
+    // The catch-all prefix:id alternative must not readmit it.
+    assert.equal(new RegExp(SCOPE_CSV_PATTERN).test("commercial,client:unknown"), false);
+    assert.equal(new RegExp(SCOPE_CSV_PATTERN).test("commercial,client:acme-industria"), true);
+  });
+
+  it("declares what a client identity may be derived from, and no deal basis", () => {
+    const schema = readJson("schemas/client-status.v1.schema.json") as {
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    assert.ok(schema.required.includes("identity_basis"));
+    assert.deepEqual(schema.properties.identity_basis?.enum, [...CLIENT_IDENTITY_BASES]);
+    for (const basis of CLIENT_IDENTITY_BASES) {
+      assert.ok(!/deal|opportunity|negocio/i.test(basis), `${basis} must not be a deal-level basis`);
+    }
+  });
+
+  it("rejects a client published without stating how its identity was resolved", () => {
+    const doc = clone(valid) as Record<string, unknown>;
+    delete doc.identity_basis;
+    assert.equal(validate("ClientStatus", doc).ok, false);
+  });
+
+  it("rejects a deal roll-up that claims a non-client basis", () => {
+    const doc = clone(valid) as Record<string, unknown>;
+    doc.derived_from_deal_count = 2;
+    doc.identity_basis = "manual";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_identity_basis"));
+    doc.identity_basis = "account_key";
+    assert.equal(validate("ClientStatus", doc).ok, true);
+  });
+
+  it("resolves identity from a client key, never from the record's own deal key", () => {
+    // The Warmbly deal shape: a deal id, a deal name, and no account link.
+    const deal = { id: "deal-healthy-1", name: "Diagnóstico — Construtora Beta", account_id: null };
+    const unlinked = resolveClientIdentity(deal);
+    assert.equal(unlinked.slug, null, "a deal key is not a client key");
+    assert.deepEqual(unlinked.reasons, ["missing_client_key", "missing_display_name"]);
+
+    const linked = resolveClientIdentity({ ...deal, account_id: "acct-77", company: "Acme Indústria" });
+    assert.equal(linked.slug, "acct-77");
+    assert.equal(linked.display_name, "Acme Indústria");
+    assert.equal(linked.basis, "account_key");
+    assert.deepEqual(linked.reasons, []);
+
+    // Two deals, one company, one identity.
+    const other = resolveClientIdentity({ id: "deal-2", name: "Expansão", account_id: "acct-77", company: "Acme Indústria" });
+    assert.equal(other.slug, linked.slug);
+
+    // Company name alone is still a client-level identifier.
+    const byName = resolveClientIdentity({ id: "deal-3", company: "Construtora Beta" });
+    assert.equal(byName.slug, "construtora-beta");
+    assert.equal(byName.basis, "company_name");
+  });
+
+  it("gives each reason code its own correction", () => {
+    const actions = new Set(Object.values(CLIENT_IDENTITY_REQUIRED_ACTIONS));
+    assert.equal(actions.size, CLIENT_IDENTITY_REASON_CODES.length, "corrections must not be one repeated sentence");
+    for (const code of CLIENT_IDENTITY_REASON_CODES) {
+      assert.ok(CLIENT_IDENTITY_REQUIRED_ACTIONS[code].length > 0, code);
+    }
+  });
+
   it("rejects client:unknown — the placeholder is not an operational client", () => {
-    const doc = clone(valid);
+    const doc = clone(valid) as Record<string, unknown>;
     doc.id = "cc:client-status:unknown";
     doc.scope = "client:unknown";
     doc.client_slug = "unknown";
@@ -361,8 +444,8 @@ describe("ClientStatus minimum identity", () => {
     assert.equal(isPlaceholderDisplayName("Acme Indústria"), false);
   });
 
-  it("names the reason codes and the single required correction", () => {
-    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("missing_source_id"));
+  it("names the reason codes and the umbrella correction", () => {
+    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("missing_client_key"));
     assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("reserved_placeholder_slug"));
     assert.ok(CLIENT_IDENTITY_REQUIRED_ACTION.length > 0);
   });

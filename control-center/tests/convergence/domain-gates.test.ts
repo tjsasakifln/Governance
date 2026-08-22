@@ -22,6 +22,19 @@ import { fileURLToPath } from "node:url";
 import { aggregateFinanceReadModel } from "../../domains/finance/src/index.ts";
 import { createAgentLedger, frozenClock } from "../../domains/agent-activity/src/index.ts";
 import { DEFAULT_SCORING_CONFIG, rankAttention } from "../../intelligence/attention/src/index.ts";
+import { SCOPE_PATTERN as ATTENTION_SCOPE_PATTERN } from "../../intelligence/attention/src/taxonomy.ts";
+import {
+  isScope,
+  MIN_CLIENT_SLUG_LENGTH,
+  RESERVED_CLIENT_SLUGS,
+} from "../../contracts/src/index.ts";
+import {
+  MIN_CLIENT_SLUG_LENGTH as CLIENTS_DOMAIN_MIN_SLUG_LENGTH,
+  RESERVED_CLIENT_SLUGS as CLIENTS_DOMAIN_RESERVED_SLUGS,
+} from "../../domains/clients/src/index.ts";
+import { projectCollector } from "../../connectors/runner/src/projectors/project.ts";
+import { signalsFromSlot } from "../../services/context/src/operational/signals.ts";
+import type { DomainSlot } from "../../services/context/src/operational/types.ts";
 import {
   AGENT,
   FOUNDER,
@@ -478,4 +491,127 @@ test("stale RUNNING reconciles to UNKNOWN never DONE; attention is deterministic
   assert.ok(stale);
   assert.ok(fresh.score_milli > stale.score_milli);
   assert.ok(ranked.attention_now.some((i) => i.title.startsWith("Dados stale:")));
+});
+
+/**
+ * Client identity, end to end across the packages that own a piece of it:
+ * the collector projector decides who is a client, the context risk engine
+ * decides what that means for attention. The unit suites cannot see the seam
+ * between them, and that seam is where "Cliente em risco operacional" was being
+ * raised about nobody.
+ */
+const IDENTITY_NOW = "2026-08-21T12:00:00.000Z";
+
+function clientsSlotFrom(payload: Record<string, unknown>): DomainSlot {
+  return {
+    schema_version: "control-center.operational-domain.v1",
+    domain: "clients",
+    scope: "clients",
+    source: { system: "warmbly", kind: "client-ops", locator: "clients/roll-up" },
+    observed_at: IDENTITY_NOW,
+    freshness_status: "FRESH",
+    confidence: 0.8,
+    presence: "present",
+    healthy: true,
+    snapshot: payload,
+  };
+}
+
+function clientsSnapshotOf(deals: Record<string, unknown>[], intelExceptions: Record<string, unknown>[]) {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: IDENTITY_NOW,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: { counts: { deals_open: deals.length }, operations: { deals, intel_exceptions: intelExceptions } },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients, "the collector must project a clients snapshot");
+  return clients.payload;
+}
+
+test("unidentifiable deals plus commercial exceptions never raise a client-risk alert", () => {
+  const payload = clientsSnapshotOf(
+    [
+      { id: "deal-healthy-1", name: "Diagnóstico — Construtora Beta", account_id: null, status: "open", updated_at: IDENTITY_NOW },
+      { id: "deal-stalled-1", name: "Diagnóstico — Escritório Gama", account_id: null, status: "open", updated_at: IDENTITY_NOW },
+    ],
+    [{ id: "x1", why: "a" }, { id: "x2", why: "b" }],
+  );
+  assert.deepEqual(payload.clients, []);
+  assert.equal(payload.client_count, 0);
+  assert.equal(payload.open_blocker_count, 2);
+
+  const signals = signalsFromSlot(clientsSlotFrom(payload));
+  const risk = signals.find((item) => item.title === "Cliente em risco operacional");
+  assert.equal(risk, undefined, "a commercial exception count is not a client at risk");
+  // The queue is not silent either: it gets its own honest, lower-severity signal.
+  const queue = signals.find((item) => item.title === "Registros sem identidade de cliente");
+  assert.ok(queue, "the identity queue must surface as its own signal");
+  assert.equal(queue.severity, "medium");
+  assert.match(String(queue.recommended_action), /conta\/empresa/);
+});
+
+test("a real client at risk still raises the client-risk alert", () => {
+  const payload = clientsSnapshotOf(
+    [
+      {
+        id: "deal-1",
+        name: "Diagnóstico — Acme",
+        account_id: "acct-77",
+        company: "Acme Indústria",
+        status: "open",
+        updated_at: IDENTITY_NOW,
+      },
+    ],
+    [{ id: "x1", source_id: "deal-1", why: "cliente sem retorno" }],
+  );
+  assert.equal(payload.client_count, 1);
+  assert.equal(payload.at_risk_client_count, 1);
+  const risk = signalsFromSlot(clientsSlotFrom(payload)).find(
+    (item) => item.title === "Cliente em risco operacional",
+  );
+  assert.ok(risk, "an identified client with an open exception is real client risk");
+  assert.equal(risk.severity, "critical");
+});
+
+test("a hand-written snapshot cannot smuggle a placeholder client into the risk count", () => {
+  const signals = signalsFromSlot(
+    clientsSlotFrom({
+      schema_version: "control-center.clients-snapshot.v1",
+      at_risk_client_count: 3,
+      open_blocker_count: 0,
+      clients: [{ client_slug: "unknown", scope: "client:unknown", display_name: "Cliente" }],
+    }),
+  );
+  assert.equal(
+    signals.some((item) => item.title === "Cliente em risco operacional"),
+    false,
+  );
+});
+
+test("client identity mirrors do not drift from the contracts taxonomy", () => {
+  // domains/clients and apps/today-ui deliberately do not import the contracts
+  // package. Their copies of the rule are pinned here so a change in one place
+  // cannot silently diverge.
+  assert.deepEqual([...CLIENTS_DOMAIN_RESERVED_SLUGS], [...RESERVED_CLIENT_SLUGS]);
+  assert.equal(CLIENTS_DOMAIN_MIN_SLUG_LENGTH, MIN_CLIENT_SLUG_LENGTH);
+
+  const todayUi = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../../apps/today-ui/src/compose.ts"),
+    "utf8",
+  );
+  for (const slug of RESERVED_CLIENT_SLUGS) {
+    assert.ok(todayUi.includes(`"${slug}"`), `today-ui is missing reserved slug ${slug}`);
+  }
+});
+
+test("a client scope built from a placeholder is not a scope anywhere in the ontology", () => {
+  assert.equal(isScope("client:acme-industria"), true);
+  assert.equal(isScope("client:unknown"), false);
+  assert.equal(isScope("client:cliente"), false);
+  // The attention engine keeps its own copy of the grammar; it must agree.
+  assert.equal(new RegExp(ATTENTION_SCOPE_PATTERN).test("client:acme-industria"), true);
+  assert.equal(new RegExp(ATTENTION_SCOPE_PATTERN).test("client:unknown"), false);
 });

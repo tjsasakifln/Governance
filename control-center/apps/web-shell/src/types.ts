@@ -174,6 +174,12 @@ export interface ClientStatus {
   display_name: string;
   lifecycle: ClientLifecycle;
   provenance: Provenance;
+  /**
+   * How the producer resolved this identity. Required by the contract for new
+   * documents; optional here because the surface must still render a client
+   * that a pre-existing snapshot published without it.
+   */
+  identity_basis?: string;
   attention_item_ids?: ResourceId[];
   open_receivables?: Money;
   notes?: string;
@@ -190,6 +196,27 @@ export interface ClientStatus {
     asaas?: string;
     governance?: string;
   };
+}
+
+/**
+ * A source record that carries no client identity.
+ *
+ * Produced by the collector's clients projector and carried on the clients
+ * snapshot as `data_quality.entries`. It is deliberately not a `ClientStatus`:
+ * it must never be counted as a client, and the surface renders it as a
+ * data-quality / join-queue entry with its origin, reason and correction.
+ */
+export interface ClientIdentityException {
+  id: string;
+  source_id: string | null;
+  kind: string;
+  why: string;
+  reason_codes: string[];
+  recommended_next_action: string;
+  status: string;
+  origin: SourceRef;
+  observed_at?: UtcDateTime;
+  provenance?: Provenance;
 }
 
 export interface CommercialAuthorityStamp {

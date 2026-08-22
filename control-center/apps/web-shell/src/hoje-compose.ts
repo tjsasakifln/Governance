@@ -275,7 +275,10 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
         {
           id: `${snap.id}:at-risk`,
           title: "Clientes em risco no recorte comercial",
-          summary: `${snap.at_risk_client_count} cliente(s) at-risk`,
+          // Declared by the commercial source. It is not identity-resolved and
+          // is not the Clientes roll-up: saying so keeps it from reading as a
+          // count of identified clients at risk.
+          summary: `${snap.at_risk_client_count} cliente(s) at-risk declarados pelo comercial (identidade não resolvida; ver Clientes)`,
           kind: "at-risk",
         },
         snap.provenance,

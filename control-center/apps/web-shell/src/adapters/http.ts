@@ -1,6 +1,14 @@
 import type { DestinationId } from "../destinations";
 import { getDestination } from "../destinations";
-import type { ActorRef, AttentionItem, PriorityRecommendation, Provenance } from "../types";
+import { clientIdentityGapFrom } from "../client-identity";
+import type {
+  ActorRef,
+  AttentionItem,
+  ClientIdentityException,
+  ClientStatus,
+  PriorityRecommendation,
+  Provenance,
+} from "../types";
 import {
   ADAPTER_ACTIONS,
   type AdapterAction,
@@ -13,7 +21,8 @@ import {
 import {
   activityFrom,
   asRecord,
-  clientFrom,
+  clientDataQualityFrom,
+  maybeClientFrom,
   commercialFrom,
   composePageFromHojeInput,
   engineeringFrom,
@@ -398,9 +407,31 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     } else if (id === "engenharia") {
       page.engineering = engineeringFrom(inner, fallback);
     } else if (id === "clientes") {
+      // Only real client rows. The `[inner]` fallback that used to sit at the end
+      // of this chain handed the *snapshot envelope* to the client mapper
+      // whenever `clients` was absent or empty — which the shipped clients
+      // snapshot is — and the mapper defaulted it into `client:unknown` /
+      // "Cliente" / every source UNKNOWN: the card reported in issue #70.
+      // A snapshot with no clients has no clients.
       const list = itemsOf(inner.clients);
-      const rows = list.length > 0 ? list : itemsOf(payload).length > 0 ? itemsOf(payload) : inner.schema_version ? [inner] : [];
-      page.clients = rows.map((row) => clientFrom(asRecord(row) ?? {}, fallback));
+      const rows = list.length > 0 ? list : itemsOf(payload);
+      const clients: ClientStatus[] = [];
+      const gaps: ClientIdentityException[] = [];
+      rows.forEach((row, index) => {
+        const rec = asRecord(row) ?? {};
+        const client = maybeClientFrom(rec, fallback);
+        if (client !== null) {
+          clients.push(client);
+          return;
+        }
+        // A published row that fails the identity rule is not dropped silently:
+        // it joins the queue so the operator can see and correct it.
+        gaps.push(clientIdentityGapFrom(rec, index, fallback));
+      });
+      page.clients = clients;
+      // The producer's own queue is authoritative: it knows the origin, the
+      // reason code and the correction. The reader must never invent them.
+      page.client_data_quality = [...clientDataQualityFrom(inner, fallback), ...gaps];
     } else if (id === "infra") {
       const list = itemsOf(inner.services);
       const rows = list.length > 0 ? list : itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.health);

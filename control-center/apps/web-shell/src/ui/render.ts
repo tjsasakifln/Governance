@@ -9,7 +9,7 @@ import {
   type ViewState,
 } from "../view-state";
 import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
-import { partitionClients } from "../client-identity";
+import { isOperationalClient } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
 import {
@@ -134,9 +134,15 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
     }
     return "";
   }
-  // Records without a usable identity are not clients: they leave the client
-  // list and are published as a data-quality / join queue instead.
-  const { clients: operationalClients, gaps: identityGaps } = partitionClients(page.clients ?? []);
+  // Second gate. The adapter already refuses to mint a client from a row without
+  // an identity; this keeps a hand-built page from doing it either.
+  const operationalClients = (page.clients ?? []).filter(isOperationalClient);
+  // The queue is the producer's, carried on the snapshot. It is filtered by the
+  // same `#/clientes/<slug>` drill-down as the client list, so opening one client
+  // does not show the whole company's join backlog.
+  const identityGaps = (page.client_data_quality ?? []).filter(
+    (entry) => !resource || entry.source_id === resource || entry.id === resource,
+  );
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
     page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
@@ -149,7 +155,7 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
           .join("")}</div></section>`
       : "",
     identityGaps.length > 0
-      ? `<section class="data-quality" aria-labelledby="qualidade-dados-title"><h2 id="qualidade-dados-title">Qualidade de dados — identidade de cliente (${identityGaps.length})</h2><div class="stack">${identityGaps
+      ? `<section class="data-quality" aria-labelledby="qualidade-dados-title"><h2 id="qualidade-dados-title">Qualidade de dados — identidade de cliente (${escapeHtml(String(identityGaps.length))})</h2><p class="constraint">Registros sem identidade de cliente. Não são clientes, não entram em contagens nem em alertas de risco.</p><div class="stack">${identityGaps
           .map(clientIdentityQueueCard)
           .join("")}</div></section>`
       : "",

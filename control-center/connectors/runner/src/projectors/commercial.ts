@@ -1,3 +1,4 @@
+import { resolveClientIdentity } from "@confenge/control-center-contracts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
   JOIN_UNPROVEN,
@@ -137,6 +138,12 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
         const status = typeof row.status === "string" ? row.status.toLowerCase() : "unknown";
         const sourceId = sourceIdOf(row);
         const name = displayName(row);
+        // Resolve the *client* identity here, at the only point where the raw
+        // deal record is still in hand. The projected pipeline row keeps only
+        // deal-level fields, so a downstream consumer that tried to work out who
+        // the client is would have nothing but the deal key to go on — which is
+        // how a deal id came to be published as `client:<deal>`.
+        const client = resolveClientIdentity(row);
         return {
           // Fail closed: a record with no identifier gets null, not a plausible
           // looking id. Downstream must route it to the data-quality queue.
@@ -145,6 +152,10 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
           source_id: sourceId,
           display_name: name,
           identity_status: sourceId !== null && name !== null ? "identified" : "unidentified",
+          client_slug: client.slug,
+          client_display_name: client.display_name,
+          client_identity_basis: client.basis,
+          client_identity_reasons: client.reasons,
           stage: typeof row.stage_name === "string" ? row.stage_name : asRecord(row.stage)?.name ?? status,
           status,
           next_action: typeof row.next_action === "string" ? row.next_action : null,
