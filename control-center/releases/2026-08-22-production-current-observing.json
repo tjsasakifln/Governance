@@ -1,0 +1,110 @@
+{
+  "schema_version": "control-center.production-current-observing.v1",
+  "campaign": "CONFENGE-GOVERNANCE-CONTROL-CENTER-FINAL-PRODUCTION-01",
+  "FINAL_VERDICT": "CONTROL_CENTER_PRODUCTION_CURRENT_AND_OBSERVING",
+  "MAIN_SHA": "e1f9b6920adb080672da4fc68c92f633e1e8322e",
+  "DEPLOYED_SHA": "e1f9b6920adb080672da4fc68c92f633e1e8322e",
+  "operational_code_sha": "e1f9b6920adb080672da4fc68c92f633e1e8322e",
+  "redeploy_this_round": false,
+  "redeploy_reason": "checkout and collector image already on PR 46 SHA; web/context/mcp not in #45/#46 delta",
+  "pr_8_untouched": true,
+  "pr_8_state": "OPEN",
+  "merged_prs": {
+    "44": "6e34f4701e6fe49bd0c077b486f9991e47da24dc",
+    "45": "a5bc8e91a0516e47ae23bdaca54e10a0b204952e",
+    "46": "e1f9b6920adb080672da4fc68c92f633e1e8322e"
+  },
+  "host": {
+    "name": "v2202607385716487230",
+    "public_ip": "159.195.18.88",
+    "checkout": "/opt/confenge-control-center",
+    "compose_project": "confenge-control-center",
+    "database_url_host": "cc-postgres",
+    "caddyfile_host_overlay": "auth_secure_headers on auth.ops (preserved)"
+  },
+  "mfa": {
+    "enforced": true,
+    "totp_configurations": 1,
+    "webauthn_credentials": 1,
+    "ops_unauthenticated": "302 to auth.ops.confenge.com.br",
+    "mfa_disabled": false
+  },
+  "edge": {
+    "nginx_80_443": true,
+    "caddy_loopback_18080": true,
+    "public_ready": 404,
+    "healthz": {"status": "ok"},
+    "ready_twice": true
+  },
+  "images": {
+    "web": "sha256:146ba58d7136a4417a6e8f368cbef75607ebd8da5538663661c270b4b586e30a",
+    "context": "sha256:fb36b6d75cb1ae40c904a32014fccf61ec821b7f0a057514ade5b9f010464191",
+    "mcp": "sha256:cf72a1ae8c8761b392e8f4e5ce46d852c71f854bc1176fd13a1ac2ca222b11cd",
+    "collector": "sha256:de64f55a1ce5016957fdb7fc453b40f2de62b02fef5431ea445ac55301041a0e",
+    "postgres": "sha256:75f5a96988cdf694a215073c3e9c001b706b371e2f94df3967f2efdec2787f6b",
+    "caddy": "sha256:51f0c496a59a692cbf86a9973f1ecdc68ac444c1b97ac0b87e0ea90f0597fe69",
+    "authelia": "sha256:4a87c7d1276f351a9d2b2139a676bb9aba16692825c858523c9c002744d0aa59"
+  },
+  "migrations": [
+    "001_init",
+    "002_current_state",
+    "003_durable_operational_data_plane",
+    "004_operator_actions"
+  ],
+  "tests": {
+    "collector_runner": {"pass": 32, "fail": 0},
+    "warmbly_connector": {"pass": 27, "fail": 0},
+    "web_shell": {"pass": 76, "fail": 0},
+    "context": {"pass": 50, "fail": 0},
+    "persistence": {"pass": 32, "fail": 0},
+    "contracts": {"pass": 99, "fail": 0},
+    "commercial_readmodel": {"pass": 23, "fail": 0},
+    "deploy_including_backup": {"pass": 20, "fail": 0},
+    "image_scan": "skipped_no_rebuild",
+    "playwright_local": "libnspr4_missing_ui_unchanged"
+  },
+  "collector_run": {
+    "id": "cc:collector-run:01M0KJH82KGT6TG319BJ16HDCT",
+    "status": "DONE",
+    "freshness_status": "FRESH",
+    "error_code": null,
+    "persist_partial": false,
+    "persist_truncation": null,
+    "observation_id": "cc:source-observation:01M0KJH832ME7RAWJHSFBHSTDM",
+    "commercial_snapshot_id": "cc:operational-snapshot:01M0KJH83XKGZVEFJ2SEGAHHCV",
+    "clients_snapshot_id": "cc:operational-snapshot:01M0KJH84Z9BT1NGFST7FGC71J",
+    "exceptions_total": 362,
+    "exceptions_shown": 50,
+    "exceptions_capped": true,
+    "auto_send": {"enabled": false, "observed": false},
+    "optional_campaigns_http": 500,
+    "required_crm_freshness": "FRESH"
+  },
+  "historical_persist_partial_pre_fix": 4,
+  "persist_partial_after_collector_rebuild": 0,
+  "no_send_email": true,
+  "send_email_http": {"status": 403, "error": "operator_action_forbidden"},
+  "transport_authority": false,
+  "warmbly": {
+    "production_sha": "c8128f1e9baf8f67d97021530c7d0cbcbc707612",
+    "ready": {"live": true, "ready": true},
+    "auto_send_enabled": false,
+    "green_autorun_enabled": false,
+    "restarted_this_round": false,
+    "inbound_health": "READY"
+  },
+  "first_cohort": {
+    "dispatch_attempted": false,
+    "pilot_cohort_state": "ready",
+    "prepared": 10,
+    "approved": 0,
+    "sent": 0,
+    "events_invented": false,
+    "observation": "ready"
+  },
+  "client_360_complete": false,
+  "client_360": "partial_warmbly_only",
+  "gsc_ga4_proven": false,
+  "asaas_proven": false,
+  "rollback_sha": "e1f9b6920adb080672da4fc68c92f633e1e8322e"
+}

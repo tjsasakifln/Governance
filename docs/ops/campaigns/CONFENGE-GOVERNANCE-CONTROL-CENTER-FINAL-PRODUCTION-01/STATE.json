@@ -1,0 +1,21 @@
+{
+  "campaign": "CONFENGE-GOVERNANCE-CONTROL-CENTER-FINAL-PRODUCTION-01",
+  "final_verdict": "CONTROL_CENTER_PRODUCTION_CURRENT_AND_OBSERVING",
+  "main_sha": "e1f9b6920adb080672da4fc68c92f633e1e8322e",
+  "deployed_sha": "e1f9b6920adb080672da4fc68c92f633e1e8322e",
+  "governance_pr_8_touched": false,
+  "production_mutated_warmbly": false,
+  "real_money_mutation_approved": false,
+  "warmbly_auto_send_enabled": false,
+  "client_360_full_multi_source": false,
+  "gsc_ga4_proven": false,
+  "asaas_proven": false,
+  "send_email_capability": false,
+  "first_cohort_dispatched": false,
+  "first_cohort_observation": "ready",
+  "collector_run_id": "cc:collector-run:01M0KJH82KGT6TG319BJ16HDCT",
+  "commercial_snapshot_id": "cc:operational-snapshot:01M0KJH83XKGZVEFJ2SEGAHHCV",
+  "exceptions_total": 362,
+  "exceptions_shown": 50,
+  "exceptions_capped": true
+}
