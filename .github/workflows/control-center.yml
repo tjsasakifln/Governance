@@ -60,6 +60,9 @@ jobs:
           CONTROL_CENTER_TEST_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
           CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
         run: npm run test:integration
+      - name: Stale-data detector capability proof
+        working-directory: control-center
+        run: npx tsx --test tests/convergence/live-runtime/presented-freshness.test.ts
       - name: Live runtime QA gate
         working-directory: control-center
         env:
@@ -67,9 +70,9 @@ jobs:
           CONTROL_CENTER_DATABASE_URL: postgres://control_center:control_center@127.0.0.1:5432/control_center
         run: |
           set -o pipefail
-          npm run qa:live | tee /tmp/cc-live-qa.log
+          npm run qa:live -- /tmp/cc-live-qa.json | tee /tmp/cc-live-qa.log
           grep -F "stale data mostrado como saudável" /tmp/cc-live-qa.log
-          grep -F "READY_FOR_INTERNAL_PRODUCTION" /tmp/cc-live-qa.log
+          node tests/convergence/live-runtime/assert-ready.mjs /tmp/cc-live-qa.json
 
   e2e:
     runs-on: ubuntu-latest
