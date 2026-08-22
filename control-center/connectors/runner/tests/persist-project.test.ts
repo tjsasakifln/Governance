@@ -88,3 +88,40 @@ test("oversized Warmbly observation still persists a commercial snapshot", async
   assert.equal(observation.rowCount, 1);
   assert.equal(observation.rows[0]?.payload._persist_truncation?.reason, "payload_exceeds_persist_limit");
 });
+
+test("persisted commercial snapshot keeps mapper intel_exceptions_total", async () => {
+  const observedAt = "2026-08-21T17:00:00.000Z";
+  const listed = Array.from({ length: 50 }, (_, i) => ({
+    id: `ex-${i}`,
+    code: "orphan_chain",
+    reason: "lead without deal",
+    next_action: "review",
+    status: "open",
+  }));
+  const result = await persistSourceResult(ctx.persistence, {
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: observedAt,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly-capped-total" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      operations: {
+        cap: 50,
+        intel_exceptions: listed,
+        intel_exceptions_total: 362,
+      },
+    },
+  });
+  assert.equal(result.status, "DONE");
+  const latest = await ctx.pool.query<{ snapshot_json: { operations?: { overview?: { exceptions?: number }; intel?: { exceptions_total?: number; exceptions_capped?: boolean; exceptions?: unknown[] } } } }>(
+    `SELECT snapshot_json FROM control_center.v_latest_operational_snapshots
+     WHERE snapshot_type = 'commercial' AND source_locator = 'warmbly-capped-total'`,
+  );
+  assert.equal(latest.rowCount, 1);
+  const intel = latest.rows[0]?.snapshot_json.operations?.intel;
+  assert.equal(intel?.exceptions_total, 362);
+  assert.equal(intel?.exceptions_capped, true);
+  assert.equal(intel?.exceptions?.length, 50);
+  assert.equal(latest.rows[0]?.snapshot_json.operations?.overview?.exceptions, 362);
+});
