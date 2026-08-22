@@ -608,3 +608,175 @@ h2 {
     padding: 0.75rem 0.75rem 1.1rem;
   }
 }
+
+/* --- Alertas acionáveis (Hoje e recortes) ------------------------------- */
+
+/*
+ * The visual band is driven by `data-alert-class`, not by severity alone: a
+ * cosmetic copy tweak and an open incident must never look the same, even when
+ * both are "open". `incidente` gets the loud left rule, `ajuste` is muted and
+ * carries a dashed rule so it reads as backlog at a glance.
+ */
+.alert-card {
+  border-left: 3px solid var(--line);
+}
+
+.alert-card[data-alert-class="incidente"][data-severity="critical"] {
+  border-left: 4px solid var(--crit);
+}
+
+.alert-card[data-alert-class="incidente"][data-severity="high"] {
+  border-left: 4px solid var(--high);
+}
+
+.alert-card[data-alert-class="acao"] {
+  border-left: 3px solid var(--med);
+}
+
+.alert-card[data-alert-class="ajuste"] {
+  border-left: 3px dashed var(--low);
+  opacity: 0.88;
+}
+
+.pill-severity[data-severity-pill="critical"] {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.pill-severity[data-severity-pill="high"] {
+  border-color: var(--high);
+  color: var(--high);
+}
+
+.pill-severity[data-severity-pill="medium"] {
+  border-color: var(--med);
+}
+
+.pill-severity[data-severity-pill="low"] {
+  border-color: var(--low);
+  color: var(--fg-muted);
+}
+
+.alert-impact {
+  margin: 0 0 0.45rem;
+}
+
+.alert-description {
+  color: var(--fg-muted);
+}
+
+/*
+ * `.facts div` is `1fr auto`, which lets a long value push the card past the
+ * viewport. Alert values are sentences (deadline, owner note), so the value
+ * column is capped and allowed to wrap instead.
+ */
+.alert-facts div {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.alert-facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .alert-facts div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.alert-facts dd .hint {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+}
+
+.locator {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.alert-next {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.alert-next-title {
+  margin: 0 0 0.25rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+.alert-open {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+}
+
+.alert-ack {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.alert-ack textarea {
+  width: 100%;
+  max-width: 100%;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem;
+}
+
+.alert-ack button {
+  min-height: 44px;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  padding: 0 0.8rem;
+  justify-self: start;
+}
+
+.alert-ack .hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+}
+
+details.alert-why {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+}
+
+details.alert-why > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+}
+
+.alert-formula,
+.alert-why-notes,
+.alert-evidence {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.alert-evidence,
+.alert-why-notes {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
+}

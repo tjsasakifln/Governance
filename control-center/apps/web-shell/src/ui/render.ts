@@ -9,6 +9,8 @@ import {
   type ViewState,
 } from "../view-state";
 import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
+import { attentionAlert, priorityAlert } from "../alerts";
+import { alertBody, alertDataAttributes } from "./alert-card";
 import { isOperationalClient } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
@@ -23,7 +25,6 @@ import {
   healthCard,
   memoriaGroups,
 } from "./domains";
-import { provenanceBlock } from "./provenance";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -36,27 +37,26 @@ export interface ShellModel {
   operatorResult?: AdapterWriteResult;
 }
 
-function attentionCard(item: AttentionItem): string {
+function attentionCard(item: AttentionItem, now: string): string {
+  const alert = attentionAlert(item, now);
   return `
-    <article class="card attention" data-severity="${escapeHtml(item.severity)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
+    <article class="card attention alert-card" ${alertDataAttributes(alert)} data-status="${escapeHtml(item.status)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.severity)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
         <h3>${escapeHtml(item.title)}</h3>
       </header>
-      <p>${escapeHtml(item.summary)}</p>
-      ${item.recommended_action ? `<p class="action">Ação sugerida: ${escapeHtml(item.recommended_action)}</p>` : ""}
-      ${provenanceBlock(item.provenance)}
+      ${alertBody(alert, item.provenance)}
     </article>
   `;
 }
 
-function priorityCard(item: PriorityRecommendation): string {
+function priorityCard(item: PriorityRecommendation, now: string): string {
+  const alert = priorityAlert(item, now);
   return `
-    <li class="card priority" data-rank="${item.rank}" data-id="${escapeHtml(item.id)}">
+    <li class="card priority alert-card" data-rank="${item.rank}" ${alertDataAttributes(alert)} data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <p class="kicker">Prioridade ${item.rank} · ${escapeHtml(item.horizon)}</p>
       <h3>${escapeHtml(item.title)}</h3>
-      <p>${escapeHtml(item.rationale)}</p>
-      ${provenanceBlock(item.provenance)}
+      ${alertBody(alert, item.provenance)}
     </li>
   `;
 }
@@ -165,11 +165,11 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
   ].join("");
   const attention =
     page.attention.length > 0
-      ? `<section class="exceptions" aria-labelledby="excecoes-title"><h2 id="excecoes-title">Exceções</h2><div class="stack">${page.attention.map(attentionCard).join("")}</div></section>`
+      ? `<section class="exceptions" aria-labelledby="excecoes-title"><h2 id="excecoes-title">Exceções</h2><div class="stack">${page.attention.map((item) => attentionCard(item, page.generated_at)).join("")}</div></section>`
       : "";
   const priorities =
     page.priorities.length > 0
-      ? `<section class="priorities" aria-labelledby="prioridades-title"><h2 id="prioridades-title">Prioridades deste recorte</h2><ol>${page.priorities.map(priorityCard).join("")}</ol></section>`
+      ? `<section class="priorities" aria-labelledby="prioridades-title"><h2 id="prioridades-title">Prioridades deste recorte</h2><ol>${page.priorities.map((item) => priorityCard(item, page.generated_at)).join("")}</ol></section>`
       : "";
   return `${attention}${priorities}${extras}`;
 }

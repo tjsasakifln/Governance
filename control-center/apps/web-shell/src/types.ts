@@ -121,6 +121,30 @@ export interface Directive {
   related_ids?: ResourceId[];
 }
 
+/**
+ * Attention-engine metadata that travels beside an alert on the operational
+ * wire (`GET /v1/attention`, `GET /v1/today` return `RankedItem`s).
+ *
+ * Kept out of the contract-mirroring bodies below on purpose: neither
+ * `attention-item.v1` nor `priority-recommendation.v1` may grow a property —
+ * both are published v1 schemas with `additionalProperties: false`. This is a
+ * client-side view annotation, never something the shell serializes back.
+ */
+export interface AlertRanking {
+  /** Full engine prose. Carries the scoring arithmetic; belongs behind a disclosure. */
+  reason: string;
+  /** receita | cliente | prazo | risco_operacional | blocker | estetica | refactor */
+  category?: string;
+  /** finance | commercial | clients | infrastructure | engineering | inbound | company */
+  domain?: string;
+  severity?: AttentionSeverity;
+  forced_by_kill_rule?: boolean;
+  merge_count?: number;
+  score?: number;
+  /** `system:kind:locator` for each evidence ref. */
+  evidence: string[];
+}
+
 export interface AttentionItem {
   schema_version: "control-center.attention-item.v1";
   id: ResourceId;
@@ -134,6 +158,7 @@ export interface AttentionItem {
   homepage_eligible: boolean;
   recommended_action?: string;
   related_ids?: ResourceId[];
+  ranking?: AlertRanking;
 }
 
 export interface PriorityRecommendation {
@@ -148,6 +173,8 @@ export interface PriorityRecommendation {
   horizon: PriorityHorizon;
   attention_item_ids?: ResourceId[];
   directive_ids?: ResourceId[];
+  recommended_action?: string;
+  ranking?: AlertRanking;
 }
 
 export interface AgentSession {
