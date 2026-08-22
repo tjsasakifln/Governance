@@ -184,11 +184,17 @@ function resolveAmount(record: WarmblyCommercialRecord): {
   amount_cents: number | null;
   currency: string | null;
 } {
+  // Absent currency is denominated in the contractual catalog currency.
+  // A currency that is present but unreadable is NOT relabelled as BRL: the
+  // amount loses its denomination and fails closed downstream.
+  const stated = record.currency;
+  const hasAmount = record.amount_cents != null || record.value != null;
   const currency =
-    normalizeCurrency(record.currency) ??
-    (record.amount_cents != null || record.value != null
-      ? DEFAULT_CURRENCY
-      : null);
+    stated === undefined || stated === null || (typeof stated === "string" && stated.trim() === "")
+      ? hasAmount
+        ? DEFAULT_CURRENCY
+        : null
+      : normalizeCurrency(stated);
   const fromCents = integerCents(record.amount_cents ?? null);
   if (fromCents !== null) {
     if (typeof record.value === "number" && Number.isFinite(record.value)) {

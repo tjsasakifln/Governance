@@ -8,7 +8,13 @@ import type { RepoDomainMap } from "../scope.ts";
 import type { FreshnessStatus, Scope } from "../types.ts";
 import { isOperationalUnavailableError } from "./errors.ts";
 import { demoteHealthStatus, looksHealthy, minConfidence, worstFreshness } from "./freshness.ts";
-import { financeStages, reliableWeightedPipeline, type ProvenanceSeed } from "./money.ts";
+import {
+  financeStages,
+  nominalPipeline,
+  pipelineByCurrency,
+  reliableWeightedPipeline,
+  type ProvenanceSeed,
+} from "./money.ts";
 import type { OperationalReadPort } from "./port.ts";
 import { stripForbiddenKeys } from "./sanitize.ts";
 import {
@@ -128,18 +134,25 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
       out.funnel = derived;
     }
   }
-  const nominal = payload.pipeline_nominal;
-  if (nominal !== undefined) {
-    const money: Record<string, unknown> = {
-      ...asRecord(nominal),
-      source: seed.source,
-      observed_at: seed.observed_at,
-      freshness_status: seed.freshness_status,
-      confidence: seed.confidence,
-    };
-    if (typeof money.amount_cents === "number") {
-      out.pipeline_nominal = money;
+  // Read side, not just write side: a snapshot persisted with a zero total
+  // stamped with whatever code the upstream summary reported is withheld here
+  // too, not only at the moment it was collected.
+  const nominal = nominalPipeline(payload.pipeline_nominal, seed);
+  const split = pipelineByCurrency(payload.pipeline_nominal_by_currency, seed);
+  if (nominal) {
+    out.pipeline_nominal = nominal;
+  } else if (split.length === 1) {
+    // A split that filtered down to a single readable currency is not a split
+    // any more, but it is not absence either: the surviving total is a real
+    // denominated figure. Promote it rather than dropping real money on the
+    // floor because its unreadable sibling was rejected.
+    const promoted = nominalPipeline(split[0], seed);
+    if (promoted) {
+      out.pipeline_nominal = promoted;
     }
+  }
+  if (split.length > 1) {
+    out.pipeline_nominal_by_currency = split;
   }
   const weighted = reliableWeightedPipeline(payload, seed);
   if (weighted) {

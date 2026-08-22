@@ -515,3 +515,147 @@ test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   assert.equal(commercial.availability, "NO_DATA");
   assert.equal(commercial.payload.funnel, undefined);
 });
+
+const CURRENCY_SOURCE = { system: "warmbly", kind: "collector-runner", locator: "warmbly" };
+
+function commercialPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: CURRENCY_SOURCE,
+    confidence: 0.8,
+    payload: { counts: { deals_open: 0, inbound_now: 0 }, ...payload },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  return commercial.payload;
+}
+
+test("commercial projector omits a zero pipeline instead of stamping it with a currency", () => {
+  // The reported bug: Warmbly's deals_summary reported a zero open value in its
+  // own default currency, and the surface printed "Pipeline nominal USD 0,00".
+  assert.equal(commercialPayload({ deal_value_open: { amount_cents: 0, currency: "USD" } }).pipeline_nominal, undefined);
+  assert.equal(commercialPayload({ deal_value_open: { amount_cents: 0 } }).pipeline_nominal, undefined);
+});
+
+test("commercial projector fails closed on a pipeline currency that is not ISO-4217", () => {
+  assert.equal(
+    commercialPayload({ deal_value_open: { amount_cents: 100, currency: "reais" } }).pipeline_nominal,
+    undefined,
+  );
+});
+
+test("commercial projector forwards per-currency totals without merging them", () => {
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 5_000, currency: "USD" },
+    ],
+  });
+  const split = body.pipeline_nominal_by_currency as Array<{ amount_cents: number; currency: string }>;
+  assert.deepEqual(
+    split.map((m) => [m.currency, m.amount_cents]),
+    [
+      ["BRL", 10_000],
+      ["USD", 5_000],
+    ],
+  );
+  assert.equal(body.pipeline_nominal, undefined);
+});
+
+test("commercial projector denominates each deal by its own currency, not by BRL", () => {
+  // Warmbly sends `value` as a bare major-unit number with `currency` beside
+  // it. Reading only the number stamped every card BRL, so a USD deal and a
+  // deal the total had refused to denominate both rendered "BRL 100,00".
+  const snapshot = collectFromWarmblyPayload(
+    {
+      health: { status: "ok" },
+      api_version: "v1",
+      deals: [
+        { id: "brl", name: "BRL", status: "open", value: 100, currency: "BRL", created_at: now, updated_at: now },
+        { id: "usd", name: "USD", status: "open", value: 50, currency: "USD", created_at: now, updated_at: now },
+        { id: "bad", name: "Bad", status: "open", value: 100, currency: "R$", created_at: now, updated_at: now },
+        { id: "none", name: "None", status: "open", value: 25, created_at: now, updated_at: now },
+      ],
+    } as never,
+    { now: new Date(now) },
+  );
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: CURRENCY_SOURCE,
+    confidence: 0.8,
+    payload: snapshot as unknown as Record<string, unknown>,
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    pipeline: Array<{ id: string; value?: { amount_cents: number; currency: string } }>;
+  };
+  const byId = new Map(ops.pipeline.map((row) => [row.id, row]));
+  assert.deepEqual(byId.get("brl")?.value, { amount_cents: 10_000, currency: "BRL" });
+  assert.deepEqual(byId.get("usd")?.value, { amount_cents: 5_000, currency: "USD" });
+  // Unreadable code: withheld rather than stamped with the catalog currency.
+  assert.equal(byId.get("bad")?.value, undefined);
+  // No code stated at all: the contractual catalog currency.
+  assert.deepEqual(byId.get("none")?.value, { amount_cents: 2_500, currency: "BRL" });
+});
+
+test("a readable total is not destroyed by an unreadable sibling currency", () => {
+  // The split filters down to one entry; that entry is a real denominated
+  // total and must be promoted, not discarded as "not a split".
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 5_000, currency: "reais" },
+    ],
+  });
+  assert.deepEqual(body.pipeline_nominal, {
+    amount_cents: 10_000,
+    currency: "BRL",
+    source: CURRENCY_SOURCE,
+    observed_at: now,
+    freshness_status: "FRESH",
+    confidence: 0.8,
+  });
+  assert.equal(body.pipeline_nominal_by_currency, undefined);
+});
+
+test("a zero bucket keeps its siblings: the currency had a denominated contributor", () => {
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 0, currency: "USD" },
+    ],
+  });
+  const zeroSplit = body.pipeline_nominal_by_currency as Array<{ amount_cents: number; currency: string }>;
+  assert.deepEqual(
+    zeroSplit.map((m) => [m.currency, m.amount_cents]),
+    [
+      ["BRL", 10_000],
+      ["USD", 0],
+    ],
+  );
+});
+
+test("finance projector fails closed on an unreadable bucket currency and defaults an absent one to BRL", () => {
+  const projected = projectCollector({
+    collector: "asaas",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "asaas", kind: "collector-runner", locator: "asaas" },
+    confidence: 0.8,
+    payload: {
+      contracted: { amount_cents: 5_000_000 },
+      billed: { amount_cents: 4_000_000, currency: "reais" },
+      paid: { amount_cents: 2_500_000, currency: "brl" },
+    },
+  });
+  const finance = projected.find((row) => row.snapshot_kind === "finance");
+  assert.ok(finance);
+  assert.deepEqual(finance.payload.contracted, { amount_cents: 5_000_000, currency: "BRL" });
+  assert.equal(finance.payload.billed, undefined);
+  assert.deepEqual(finance.payload.paid, { amount_cents: 2_500_000, currency: "BRL" });
+});

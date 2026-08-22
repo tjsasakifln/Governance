@@ -27,16 +27,60 @@ const WINDOW_MS: Record<Exclude<CohortWindow, "open">, number> = {
   "90d": 90 * 24 * 60 * 60 * 1000,
 };
 
-function centsOf(value: unknown, currencyFallback = "BRL"): { amount_cents: number; currency: string } | undefined {
+/**
+ * The CONFENGE catalog is contracted in BRL and Governance is its authority.
+ * An amount that arrives with no currency is denominated in it; an amount that
+ * arrives with a different code keeps that code and is never converted.
+ */
+const CATALOG_CURRENCY = "BRL";
+const ISO_4217 = /^[A-Z]{3}$/;
+
+/**
+ * Absent currency resolves to the contractual catalog currency.
+ * Present-but-unreadable fails closed, so a payload cannot smuggle a bad code
+ * past the projector by being merely wrong instead of merely missing.
+ */
+function currencyOf(raw: unknown, fallback: string): string | undefined {
+  if (raw === undefined || raw === null) {
+    return fallback;
+  }
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+  const code = raw.trim().toUpperCase();
+  if (code === "") {
+    return fallback;
+  }
+  return ISO_4217.test(code) ? code : undefined;
+}
+
+function centsOf(
+  value: unknown,
+  currencyFallback = CATALOG_CURRENCY,
+): { amount_cents: number; currency: string } | undefined {
   const rec = asRecord(value);
   if (rec && typeof rec.amount_cents === "number" && Number.isInteger(rec.amount_cents)) {
-    const currency = typeof rec.currency === "string" ? rec.currency : currencyFallback;
+    const currency = currencyOf(rec.currency, currencyFallback);
+    if (!currency) return undefined;
     return { amount_cents: rec.amount_cents, currency };
   }
   if (typeof value === "number" && Number.isFinite(value)) {
     return { amount_cents: Math.round(value * 100), currency: currencyFallback };
   }
   return undefined;
+}
+
+function centsListOf(value: unknown): { amount_cents: number; currency: string }[] {
+  if (!Array.isArray(value)) return [];
+  const out: { amount_cents: number; currency: string }[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const money = centsOf(item);
+    if (!money || seen.has(money.currency)) continue;
+    seen.add(money.currency);
+    out.push(money);
+  }
+  return out.sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 function parseTime(value: unknown): number | undefined {
@@ -119,7 +163,16 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       .map((item) => asRecord(item))
       .filter((row): row is Record<string, unknown> => row !== null)
       .map((row) => {
-        const money = centsOf(row.value ?? row.amount_cents ?? row.deal_value);
+        // Warmbly sends a deal's amount as a bare major-unit number with the
+        // currency in a *sibling* field, so the amount alone cannot denominate
+        // itself. Reading only the amount stamped every card BRL — including
+        // cards whose own record said USD, and cards the total had already
+        // refused to denominate. The deal's stated code decides, and an
+        // unreadable one withholds the amount instead of guessing.
+        const dealCurrency = currencyOf(row.currency, CATALOG_CURRENCY);
+        const money = dealCurrency
+          ? centsOf(row.value ?? row.amount_cents ?? row.deal_value, dealCurrency)
+          : undefined;
         const updated = isoOr(row.updated_at, observedAt);
         const ageMs = now - (parseTime(updated) ?? now);
         const status = typeof row.status === "string" ? row.status.toLowerCase() : "unknown";
@@ -519,7 +572,11 @@ export function projectCommercial(envelope: CollectorEnvelope): ProjectedSnapsho
     body.funnel = funnel;
   }
   const nominal = centsOf(inner.deal_value_open ?? inner.pipeline_nominal);
-  if (nominal) {
+  // A nominal pipeline of exactly zero carries no currency evidence: nothing
+  // denominated contributed to it. Emitting it would print `<currency> 0,00`
+  // and make an unknown look like a measured zero, so it is omitted and the
+  // surface reads "sem dados". `pipeline_open_count` still carries the count.
+  if (nominal && nominal.amount_cents !== 0) {
     body.pipeline_nominal = {
       ...nominal,
       source: envelope.source,
@@ -527,6 +584,29 @@ export function projectCommercial(envelope: CollectorEnvelope): ProjectedSnapsho
       freshness_status: freshness,
       confidence: envelope.confidence,
     };
+  }
+  const byCurrency = centsListOf(inner.deal_value_open_by_currency ?? inner.pipeline_nominal_by_currency);
+  if (byCurrency.length > 1) {
+    body.pipeline_nominal_by_currency = byCurrency.map((money) => ({
+      ...money,
+      source: envelope.source,
+      observed_at: envelope.observed_at,
+      freshness_status: freshness,
+      confidence: envelope.confidence,
+    }));
+  } else if (byCurrency.length === 1 && body.pipeline_nominal === undefined) {
+    // Filtering an unreadable sibling out of a split must not take the readable
+    // total with it.
+    const only = byCurrency[0];
+    if (only && only.amount_cents !== 0) {
+      body.pipeline_nominal = {
+        ...only,
+        source: envelope.source,
+        observed_at: envelope.observed_at,
+        freshness_status: freshness,
+        confidence: envelope.confidence,
+      };
+    }
   }
   if (integerOrUndefined(counts.deals_stalled) !== undefined) {
     body.stalled_count = counts.deals_stalled;
