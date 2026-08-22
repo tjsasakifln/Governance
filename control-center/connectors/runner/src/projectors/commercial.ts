@@ -92,7 +92,14 @@ function stripIdentity(row: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function displayName(row: Record<string, unknown>): string {
+/**
+ * Best available name for a record, or `null` when the source carries none.
+ *
+ * It used to end in `return "unknown"`, which made "we have no name" and "the
+ * name is literally unknown" the same string one layer down, where the clients
+ * projector turned it into the `client:unknown` card. Absence is now absence.
+ */
+function displayName(row: Record<string, unknown>): string | null {
   if (typeof row.company === "string" && row.company.trim()) return row.company.trim();
   if (typeof row.company_name === "string" && row.company_name.trim()) return row.company_name.trim();
   if (typeof row.name === "string" && row.name.trim()) return row.name.trim();
@@ -101,8 +108,13 @@ function displayName(row: Record<string, unknown>): string {
   const joined = `${first} ${last}`.trim();
   if (joined) return joined;
   if (typeof row.display_name === "string" && row.display_name.trim()) return row.display_name.trim();
-  if (typeof row.id === "string") return row.id;
-  return "unknown";
+  if (typeof row.id === "string" && row.id.trim()) return row.id.trim();
+  return null;
+}
+
+/** The record's own identifier, or `null`. Never the string "unknown". */
+function sourceIdOf(row: Record<string, unknown>): string | null {
+  return typeof row.id === "string" && row.id.trim() !== "" ? row.id.trim() : null;
 }
 
 function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: string): Record<string, unknown> {
@@ -123,11 +135,16 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
         const updated = isoOr(row.updated_at, observedAt);
         const ageMs = now - (parseTime(updated) ?? now);
         const status = typeof row.status === "string" ? row.status.toLowerCase() : "unknown";
+        const sourceId = sourceIdOf(row);
+        const name = displayName(row);
         return {
-          id: typeof row.id === "string" ? row.id : "unknown",
-          canonical_id: `cc:commercial-deal:${typeof row.id === "string" ? row.id : "unknown"}`,
-          source_id: typeof row.id === "string" ? row.id : "unknown",
-          display_name: displayName(row),
+          // Fail closed: a record with no identifier gets null, not a plausible
+          // looking id. Downstream must route it to the data-quality queue.
+          id: sourceId,
+          canonical_id: sourceId === null ? null : `cc:commercial-deal:${sourceId}`,
+          source_id: sourceId,
+          display_name: name,
+          identity_status: sourceId !== null && name !== null ? "identified" : "unidentified",
           stage: typeof row.stage_name === "string" ? row.stage_name : asRecord(row.stage)?.name ?? status,
           status,
           next_action: typeof row.next_action === "string" ? row.next_action : null,

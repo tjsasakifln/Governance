@@ -1,3 +1,4 @@
+import { isOperationalClient } from "./client-identity";
 import { formatLocal } from "./datetime";
 import { combinedTone, freshnessTone, type FreshnessTone } from "./freshness-tone";
 import { selectHomepageAttention, selectHomepagePriorities } from "./homepage";
@@ -211,7 +212,9 @@ function clientNeedsAttention(client: ClientStatus): boolean {
 }
 
 function composeClients(input: HojeComposeInput): HojeSection {
-  const rows = input.clients.filter(clientNeedsAttention).map((client) =>
+  // A record without a usable identity is a data-quality exception, not a client
+  // that needs attention. It must not raise a client alert on Hoje.
+  const rows = input.clients.filter(isOperationalClient).filter(clientNeedsAttention).map((client) =>
     rowFrom(
       {
         id: client.id,

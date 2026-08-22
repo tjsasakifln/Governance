@@ -12,6 +12,68 @@ export const CURRENCY_PATTERN = "^[A-Z]{3}$";
 
 export const CLIENT_SLUG_PATTERN = "^[a-z0-9]+(?:-[a-z0-9]+)*$";
 
+/**
+ * Minimum length of a client slug. A single character is an initial or a typo,
+ * never a client identity.
+ */
+export const MIN_CLIENT_SLUG_LENGTH = 2;
+
+/**
+ * Slugs that are placeholders rather than identities. A record whose only
+ * available identifier collapses to one of these has no identity at all: it
+ * belongs in the data-quality / join queue, never in the client roll-up.
+ * Fail closed — an unusable identifier is never coerced into a slug that looks
+ * like a real entity (that is how `client:unknown` used to reach the surface).
+ */
+export const RESERVED_CLIENT_SLUGS = [
+  "anonimo",
+  "anonymous",
+  "client",
+  "cliente",
+  "default",
+  "desconhecido",
+  "na",
+  "n-a",
+  "nao-identificado",
+  "nao-informado",
+  "no-name",
+  "none",
+  "null",
+  "placeholder",
+  "sem-identidade",
+  "sem-nome",
+  "tbd",
+  "undefined",
+  "unidentified",
+  "unknown",
+] as const;
+
+export type ReservedClientSlug = (typeof RESERVED_CLIENT_SLUGS)[number];
+
+/** Lockstep source for the JSON Schema `reserved_client_slug` pattern. */
+export const RESERVED_CLIENT_SLUG_PATTERN = `^(?:${RESERVED_CLIENT_SLUGS.join("|")})$`;
+
+/** Lockstep source for the JSON Schema `reserved_client_scope` pattern. */
+export const RESERVED_CLIENT_SCOPE_PATTERN = `^client:(?:${RESERVED_CLIENT_SLUGS.join("|")})$`;
+
+/**
+ * Why a record failed the minimum-identity rule. These codes are the vocabulary
+ * of the data-quality queue; they are not free text.
+ */
+export const CLIENT_IDENTITY_REASON_CODES = [
+  "missing_source_id",
+  "unusable_source_id",
+  "reserved_placeholder_slug",
+  "missing_display_name",
+  "placeholder_display_name",
+] as const;
+
+export type ClientIdentityReasonCode = (typeof CLIENT_IDENTITY_REASON_CODES)[number];
+
+/** The one correction that clears every identity reason code. */
+export const CLIENT_IDENTITY_REQUIRED_ACTION =
+  "Corrigir o registro na origem: informar um identificador estável e o nome do cliente, depois reprocessar. Enquanto faltar identidade o registro fica na fila de qualidade de dados e não conta como cliente.";
+
 export const REPO_NAME_PATTERN = "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?$";
 
 /**

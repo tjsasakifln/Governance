@@ -9,11 +9,13 @@ import {
   type ViewState,
 } from "../view-state";
 import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
+import { partitionClients } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
 import {
   activityCard,
   clientCard,
+  clientIdentityQueueCard,
   commercialBlock,
   engineeringBlock,
   financeBlock,
@@ -132,15 +134,23 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
     }
     return "";
   }
+  // Records without a usable identity are not clients: they leave the client
+  // list and are published as a data-quality / join queue instead.
+  const { clients: operationalClients, gaps: identityGaps } = partitionClients(page.clients ?? []);
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
     page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
-    page.clients && page.clients.length > 0
-      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${page.clients
+    operationalClients.length > 0
+      ? `<section aria-labelledby="clientes-title"><h2 id="clientes-title">Clientes</h2><div class="stack">${operationalClients
           .filter((item) => !resource || item.client_slug === resource)
           .map(clientCard)
+          .join("")}</div></section>`
+      : "",
+    identityGaps.length > 0
+      ? `<section class="data-quality" aria-labelledby="qualidade-dados-title"><h2 id="qualidade-dados-title">Qualidade de dados — identidade de cliente (${identityGaps.length})</h2><div class="stack">${identityGaps
+          .map(clientIdentityQueueCard)
           .join("")}</div></section>`
       : "",
     page.health && page.health.length > 0

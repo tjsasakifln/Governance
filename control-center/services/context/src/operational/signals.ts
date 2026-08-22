@@ -1,4 +1,5 @@
 import type { AttentionSignal, FounderOverride, SignalDomain } from "@confenge/control-center-attention";
+import { isIdentifiedClientSlug } from "@confenge/control-center-contracts";
 import type { DomainSlot, OperationalDomain, OperationalSnapshotRow, SourceRef } from "./types.ts";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -11,6 +12,23 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function intField(rec: Record<string, unknown> | null, key: string): number {
   const value = rec?.[key];
   return typeof value === "number" && Number.isInteger(value) ? value : 0;
+}
+
+/**
+ * Clients the roll-up may count. A record without a usable identity is a
+ * data-quality exception, not a client at risk: it must never raise
+ * "Cliente em risco operacional". The projector already drops it, and this is
+ * the second gate so an older or hand-written snapshot cannot slip one through.
+ */
+function identifiedClientCount(rec: Record<string, unknown> | null): number | null {
+  const rows = rec?.clients;
+  if (!Array.isArray(rows)) {
+    return null;
+  }
+  return rows.filter((row) => {
+    const client = asRecord(row);
+    return client !== null && isIdentifiedClientSlug(client.client_slug);
+  }).length;
 }
 
 function attentionDomain(domain: OperationalDomain): SignalDomain {
@@ -149,7 +167,12 @@ export function signalsFromSlot(slot: DomainSlot): AttentionSignal[] {
     }
   }
   if (slot.domain === "clients") {
-    const atRisk = intField(snap, "at_risk_client_count");
+    const identified = identifiedClientCount(snap);
+    // A declared at-risk count can never exceed the clients that actually have
+    // an identity. Unidentified records belong in the data-quality queue.
+    const atRisk = identified === null
+      ? intField(snap, "at_risk_client_count")
+      : Math.min(intField(snap, "at_risk_client_count"), identified);
     const blockers = intField(snap, "open_blocker_count");
     if (atRisk > 0 || blockers > 0) {
       out.push(

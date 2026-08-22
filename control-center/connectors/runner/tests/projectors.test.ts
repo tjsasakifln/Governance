@@ -515,3 +515,172 @@ test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   assert.equal(commercial.availability, "NO_DATA");
   assert.equal(commercial.payload.funnel, undefined);
 });
+
+test("deals without a usable identity never become client:unknown", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 4, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "deal-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+          // no id at all
+          { status: "open", created_at: now, updated_at: now },
+          // an id that sanitizes to nothing
+          { id: "###", status: "open", created_at: now, updated_at: now },
+          // an id that is literally the placeholder token
+          { id: "unknown", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.deepEqual(
+    rows.map((row) => row.scope),
+    ["client:deal-1"],
+  );
+  assert.equal(
+    rows.some((row) => String(row.scope).includes("unknown")),
+    false,
+  );
+  assert.equal(clients.payload.client_count, 1);
+});
+
+test("identity-less records land in the data-quality queue with origin, reason and action", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { status: "open", created_at: now, updated_at: now },
+          { id: "unknown", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const dq = clients.payload.data_quality as {
+    queue: string;
+    origin: string;
+    unidentified_record_count: number;
+    required_action: string;
+    counts_as_client: boolean;
+    raises_client_risk: boolean;
+    entries: Array<Record<string, unknown>>;
+  };
+  assert.equal(dq.queue, "client_identity");
+  assert.equal(dq.unidentified_record_count, 2);
+  assert.equal(dq.counts_as_client, false);
+  assert.equal(dq.raises_client_risk, false);
+  assert.ok(dq.required_action.length > 0);
+  assert.equal(dq.entries.length, 2);
+  for (const entry of dq.entries) {
+    assert.equal(entry.kind, "client_identity_missing");
+    assert.equal(entry.status, "open");
+    assert.equal(entry.source, "warmbly.commercial.pipeline");
+    assert.ok(String(entry.why).length > 0);
+    assert.ok(Array.isArray(entry.reason_codes) && entry.reason_codes.length > 0);
+    assert.equal(entry.recommended_next_action, dq.required_action);
+    const origin = entry.origin as { system: string; locator: string };
+    assert.equal(origin.system, "warmbly");
+    assert.ok(origin.locator.length > 0);
+  }
+  assert.deepEqual((dq.entries[0]?.reason_codes as string[]) ?? [], ["missing_source_id", "missing_display_name"]);
+  assert.deepEqual(
+    (dq.entries[1]?.reason_codes as string[]) ?? [],
+    ["reserved_placeholder_slug", "placeholder_display_name"],
+  );
+});
+
+test("the identity queue never feeds client counts or the client-risk alert", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 3, inbound_now: 0 },
+      operations: {
+        deals: [
+          { status: "open", created_at: now, updated_at: now },
+          { id: "###", status: "open", created_at: now, updated_at: now },
+          { id: "unknown", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  assert.deepEqual(clients.payload.clients, []);
+  assert.equal(clients.payload.client_count, 0);
+  assert.equal(clients.payload.at_risk_client_count, 0);
+  assert.equal(clients.payload.open_blocker_count, 0);
+  assert.equal(clients.payload.unidentified_record_count, 3);
+});
+
+test("repeated deals for one client collapse into a single client row", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "acme-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+          { id: "acme-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  const clients = projected.find((row) => row.snapshot_kind === "clients");
+  assert.ok(clients);
+  const rows = clients.payload.clients as Array<Record<string, unknown>>;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.merged_records, 2);
+});
+
+test("commercial pipeline reports a null identity instead of the string unknown", () => {
+  const [commercial] = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 2, inbound_now: 0 },
+      operations: {
+        deals: [
+          { id: "deal-1", name: "Acme", status: "open", created_at: now, updated_at: now },
+          { status: "open", created_at: now, updated_at: now },
+        ],
+      },
+    },
+  });
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as { pipeline: Array<Record<string, unknown>> };
+  const [identified, unidentified] = ops.pipeline;
+  assert.equal(identified?.source_id, "deal-1");
+  assert.equal(identified?.canonical_id, "cc:commercial-deal:deal-1");
+  assert.equal(identified?.identity_status, "identified");
+  assert.equal(unidentified?.id, null);
+  assert.equal(unidentified?.source_id, null);
+  assert.equal(unidentified?.canonical_id, null);
+  assert.equal(unidentified?.display_name, null);
+  assert.equal(unidentified?.identity_status, "unidentified");
+});

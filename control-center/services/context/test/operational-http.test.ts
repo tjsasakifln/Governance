@@ -11,6 +11,7 @@ import { silentLogger } from "../src/log.ts";
 import { createFixtureOperationalPort, createUnavailableOperationalPort } from "../src/operational/fixture.ts";
 import { representativeOperationalData } from "../src/operational/representative.ts";
 import { createOperationalService } from "../src/operational/service.ts";
+import { signalsFromSlot } from "../src/operational/signals.ts";
 import type { OperationalReadPort } from "../src/operational/port.ts";
 import { REPRESENTATIVE_REPO_DOMAINS } from "../src/representative.ts";
 import { startServer } from "../src/server.ts";
@@ -451,4 +452,57 @@ test("operational source never calls providers and names the frozen views", () =
     }
   }
   assert.ok(views >= 1);
+});
+
+test("an unidentified client record never raises 'Cliente em risco operacional'", () => {
+  const base = {
+    schema_version: "control-center.operational-domain.v1" as const,
+    domain: "clients" as const,
+    scope: "clients",
+    source: { system: "warmbly", kind: "client-ops", locator: "clients/roll-up" },
+    observed_at: NOW,
+    freshness_status: "FRESH" as const,
+    confidence: 0.8,
+    presence: "present" as const,
+    healthy: true,
+  };
+
+  // A snapshot whose only "client" is the identity placeholder. The declared
+  // at-risk count must not survive: the record is a data-quality exception.
+  const placeholderOnly = signalsFromSlot({
+    ...base,
+    snapshot: {
+      schema_version: "control-center.clients-snapshot.v1",
+      at_risk_client_count: 1,
+      open_blocker_count: 0,
+      clients: [{ client_slug: "unknown", scope: "client:unknown", display_name: "Cliente" }],
+      unidentified_record_count: 1,
+    },
+  });
+  assert.equal(
+    placeholderOnly.some((item) => item.title === "Cliente em risco operacional"),
+    false,
+  );
+
+  // A real client at risk still raises the alert.
+  const realClient = signalsFromSlot({
+    ...base,
+    snapshot: {
+      schema_version: "control-center.clients-snapshot.v1",
+      at_risk_client_count: 1,
+      open_blocker_count: 0,
+      clients: [{ client_slug: "acme-industria", scope: "client:acme-industria", display_name: "Acme" }],
+    },
+  });
+  assert.equal(
+    realClient.some((item) => item.title === "Cliente em risco operacional"),
+    true,
+  );
+});
+
+test("the clients mapper forwards the identity queue instead of dropping it", () => {
+  const assemble = readFileSync(join(here, "../src/operational/assemble.ts"), "utf8");
+  assert.match(assemble, /"data_quality"/);
+  assert.match(assemble, /"unidentified_record_count"/);
+  assert.match(assemble, /"client_count"/);
 });

@@ -38,6 +38,25 @@ Parameterized:
 - `repo:<name>` — short name or `owner/name`
 - `client:<slug>` — kebab-case; `ClientStatus.scope` MUST equal `client:<client_slug>`
 
+### Minimum client identity
+
+A `ClientStatus` is an operational entity. A record that cannot be identified is
+**not** a client — it is a data-quality exception that belongs in the join queue.
+The validator therefore rejects (keyword `client_identity` / `client_id_slug`):
+
+- a `client_slug` shorter than two characters;
+- a `client_slug` or `scope` built from a reserved placeholder token
+  (`unknown`, `cliente`, `none`, `tbd`, … — the frozen list is
+  `RESERVED_CLIENT_SLUGS` in `src/taxonomy.ts`, mirrored by the
+  `reserved_client_slug` / `reserved_client_scope` schema `$defs`);
+- a placeholder `display_name` such as `Cliente` or `unknown`;
+- an `id` whose slug is not the `client_slug`.
+
+Producers derive slugs with `clientSlugFrom()`, which returns `null` rather than
+coercing an unusable identifier into a plausible-looking slug. A `null` means
+"emit a data-quality exception with origin, reason code and required action",
+never "publish `client:unknown`".
+
 Non-breaking extension: additional `<prefix>:<id>` namespaces (lowercase prefix) that are **not** the reserved literals or `repo`/`client`. `company:foo` and `client:Acme` are invalid. Consumers MUST treat unknown namespaced scopes as opaque and MUST NOT grant them by default. New **bare** literals require an additive schema revision.
 
 ## Public resource types

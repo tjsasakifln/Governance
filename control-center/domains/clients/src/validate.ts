@@ -10,6 +10,8 @@ import {
   FACT_ID_PATTERN,
   FRESHNESS_STATUSES,
   INGEST_SOURCE_PATTERN,
+  isReservedClientSlug,
+  MIN_CLIENT_SLUG_LENGTH,
   OWNER_PATTERN,
   RISK_SEVERITIES,
   RISK_STATUSES,
@@ -25,7 +27,16 @@ import { ClientOpsError } from "./errors.js";
 import { findSensitiveHits } from "./sensitive.js";
 
 const utc = z.string().regex(new RegExp(UTC_DATETIME_PATTERN), "must be UTC RFC3339 ending in Z");
-const slug = z.string().regex(new RegExp(CLIENT_SLUG_PATTERN), "must be a kebab-case slug");
+const slug = z
+  .string()
+  .regex(new RegExp(CLIENT_SLUG_PATTERN), "must be a kebab-case slug")
+  .min(MIN_CLIENT_SLUG_LENGTH, "client_slug must be at least two characters")
+  // Fail closed: a placeholder token is not an identity, and a record without an
+  // identity is a data-quality exception, never a client in this store.
+  .refine(
+    (value) => !isReservedClientSlug(value),
+    "client_slug must be a real client identity, not a placeholder such as 'unknown'",
+  );
 const factId = z.string().regex(new RegExp(FACT_ID_PATTERN), "must be a kebab-case id");
 const owner = z.string().regex(new RegExp(OWNER_PATTERN), "must be a role-like owner id, not an email");
 const evidence = z
@@ -115,9 +126,13 @@ const ingestSchema = z
     display_name: z
       .string()
       .trim()
-      .min(1)
+      .min(MIN_CLIENT_SLUG_LENGTH)
       .max(120)
-      .refine((value) => !value.includes("@"), "display_name must not look like an email"),
+      .refine((value) => !value.includes("@"), "display_name must not look like an email")
+      .refine(
+        (value) => !isReservedClientSlug(value.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "")),
+        "display_name must name the client, not a placeholder such as 'Cliente'",
+      ),
     source: ingestSource,
     observed_at: utc,
     freshness_status: z.enum(FRESHNESS_STATUSES),

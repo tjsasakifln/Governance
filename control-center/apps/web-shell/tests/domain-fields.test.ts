@@ -218,3 +218,101 @@ test("weighted pipeline without reliable probability is omitted", () => {
   });
   assert.match(html, /omitido — probabilidade não confiável/);
 });
+
+const IDENTITY_PROVENANCE = {
+  source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+  observed_at: "2026-08-20T18:00:00Z",
+  freshness_status: "FRESH",
+  confidence: 0.8,
+} as const;
+
+function clientesHtml(clients: unknown[]): string {
+  return renderShell({
+    destination: "clientes",
+    viewKind: "ready",
+    mockScenario: "http",
+    adapterMode: "http",
+    view: {
+      kind: "ready",
+      data: {
+        id: "clientes",
+        label: "Clientes",
+        scope: "clients",
+        generated_at: "2026-08-20T18:00:00Z",
+        operator: { kind: "human", id: "human:operator" },
+        headline: "x",
+        attention: [],
+        priorities: [],
+        clients: clients as never,
+      },
+    },
+  });
+}
+
+test("client:unknown is not rendered as an operational client", () => {
+  const html = clientesHtml([
+    {
+      schema_version: "control-center.client-status.v1",
+      id: "cc:client-status:unknown",
+      scope: "client:unknown",
+      client_slug: "unknown",
+      display_name: "Cliente",
+      lifecycle: "unknown",
+      provenance: IDENTITY_PROVENANCE,
+      sources: { warmbly: "UNKNOWN", asaas: "UNKNOWN", governance: "UNKNOWN" },
+    },
+  ]);
+  assert.doesNotMatch(html, /<h2 id="clientes-title">Clientes<\/h2>/);
+  assert.doesNotMatch(html, /class="card client"/);
+});
+
+test("an identity-less record becomes a data-quality queue entry with origin, reason and action", () => {
+  const html = clientesHtml([
+    {
+      schema_version: "control-center.client-status.v1",
+      id: "cc:client-status:unknown",
+      scope: "client:unknown",
+      client_slug: "unknown",
+      display_name: "Cliente",
+      lifecycle: "unknown",
+      provenance: IDENTITY_PROVENANCE,
+      sources: { warmbly: "UNKNOWN", asaas: "UNKNOWN", governance: "UNKNOWN" },
+    },
+  ]);
+  assert.match(html, /data-queue="client-identity"/);
+  assert.match(html, /data-operational-client="false"/);
+  assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
+  assert.match(html, /Origem/);
+  assert.match(html, /warmbly · commercial\/pipeline/);
+  assert.match(html, /Motivo/);
+  assert.match(html, /Ação necessária/);
+  assert.match(html, /identificador ausente ou reservado/);
+});
+
+test("real clients keep rendering next to the identity queue", () => {
+  const html = clientesHtml([
+    {
+      schema_version: "control-center.client-status.v1",
+      id: "cc:client-status:acme-industria",
+      scope: "client:acme-industria",
+      client_slug: "acme-industria",
+      display_name: "Acme Indústria",
+      lifecycle: "active",
+      provenance: IDENTITY_PROVENANCE,
+      sources: { warmbly: "FRESH", asaas: "UNKNOWN", governance: "UNKNOWN" },
+    },
+    {
+      schema_version: "control-center.client-status.v1",
+      id: "cc:client-status:unknown",
+      scope: "client:unknown",
+      client_slug: "unknown",
+      display_name: "Cliente",
+      lifecycle: "unknown",
+      provenance: IDENTITY_PROVENANCE,
+      sources: { warmbly: "UNKNOWN", asaas: "UNKNOWN", governance: "UNKNOWN" },
+    },
+  ]);
+  assert.match(html, /Acme Indústria/);
+  assert.match(html, /class="card client"/);
+  assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
+});

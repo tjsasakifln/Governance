@@ -5,6 +5,9 @@ import { describe, it } from "node:test";
 import {
   ACTOR_KINDS,
   allowedMcpToolNames,
+  CLIENT_IDENTITY_REASON_CODES,
+  CLIENT_IDENTITY_REQUIRED_ACTION,
+  clientSlugFrom,
   catalogFixturePath,
   catalogType,
   DIRECTIVE_STATUSES,
@@ -13,11 +16,17 @@ import {
   forbiddenMcpOperationNames,
   HOMEPAGE_PRIORITY_LIMIT,
   isForbiddenMcpOperation,
+  isIdentifiedClientSlug,
+  isPlaceholderDisplayName,
+  isReservedClientSlug,
   isScope,
   listResourceTypes,
   loadCatalog,
   loadMcpContract,
   loadOpenApi,
+  RESERVED_CLIENT_SCOPE_PATTERN,
+  RESERVED_CLIENT_SLUG_PATTERN,
+  RESERVED_CLIENT_SLUGS,
   RESOURCE_ID_PATTERN,
   RESOURCE_TYPE_NAMES,
   SCOPE_CSV_PATTERN,
@@ -273,6 +282,89 @@ describe("ClientStatus scope binding", () => {
     const doc = clone(valid);
     doc.scope = "clients";
     assert.equal(validate("ClientStatus", doc).ok, false);
+  });
+});
+
+describe("ClientStatus minimum identity", () => {
+  const valid = readJson("fixtures/valid/client-status.json") as Record<string, unknown>;
+
+  it("keeps the reserved placeholder patterns in lockstep with the JSON Schema", () => {
+    const primitives = readJson("schemas/primitives.v1.schema.json") as {
+      $defs: Record<string, { pattern?: string; minLength?: number }>;
+    };
+    assert.equal(primitives.$defs.reserved_client_slug?.pattern, RESERVED_CLIENT_SLUG_PATTERN);
+    assert.equal(primitives.$defs.reserved_client_scope?.pattern, RESERVED_CLIENT_SCOPE_PATTERN);
+    assert.equal(primitives.$defs.client_slug?.minLength, 2);
+    assert.ok(RESERVED_CLIENT_SLUGS.includes("unknown"));
+  });
+
+  it("rejects client:unknown — the placeholder is not an operational client", () => {
+    const doc = clone(valid);
+    doc.id = "cc:client-status:unknown";
+    doc.scope = "client:unknown";
+    doc.client_slug = "unknown";
+    doc.display_name = "Cliente";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_identity"));
+  });
+
+  it("rejects every reserved placeholder slug, not just unknown", () => {
+    for (const slug of RESERVED_CLIENT_SLUGS) {
+      const doc = clone(valid);
+      doc.id = `cc:client-status:${slug}`;
+      doc.scope = `client:${slug}`;
+      doc.client_slug = slug;
+      assert.equal(validate("ClientStatus", doc).ok, false, `expected ${slug} to be rejected`);
+    }
+  });
+
+  it("rejects a one-character slug as an identity", () => {
+    const doc = clone(valid);
+    doc.id = "cc:client-status:a";
+    doc.scope = "client:a";
+    doc.client_slug = "a";
+    assert.equal(validate("ClientStatus", doc).ok, false);
+  });
+
+  it("rejects a placeholder display_name even when the slug is real", () => {
+    const doc = clone(valid);
+    doc.display_name = "unknown";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_identity"));
+  });
+
+  it("rejects an id that is not bound to the client_slug", () => {
+    const doc = clone(valid);
+    doc.id = "cc:client-status:some-other-client";
+    const result = validate("ClientStatus", doc);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((e) => e.keyword === "client_id_slug"));
+  });
+
+  it("still accepts a real client identity", () => {
+    assert.equal(validate("ClientStatus", clone(valid)).ok, true);
+  });
+
+  it("derives a slug fail-closed instead of inventing one", () => {
+    assert.equal(clientSlugFrom("Acme Indústria"), "acme-ind-stria");
+    assert.equal(clientSlugFrom(undefined), null);
+    assert.equal(clientSlugFrom(""), null);
+    assert.equal(clientSlugFrom("###"), null);
+    assert.equal(clientSlugFrom("unknown"), null);
+    assert.equal(clientSlugFrom("Unknown"), null);
+    assert.equal(clientSlugFrom("Cliente"), null);
+    assert.equal(isReservedClientSlug("unknown"), true);
+    assert.equal(isIdentifiedClientSlug("acme-industria"), true);
+    assert.equal(isPlaceholderDisplayName("Cliente"), true);
+    assert.equal(isPlaceholderDisplayName("Acme Indústria"), false);
+  });
+
+  it("names the reason codes and the single required correction", () => {
+    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("missing_source_id"));
+    assert.ok(CLIENT_IDENTITY_REASON_CODES.includes("reserved_placeholder_slug"));
+    assert.ok(CLIENT_IDENTITY_REQUIRED_ACTION.length > 0);
   });
 });
 
