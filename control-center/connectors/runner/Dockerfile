@@ -10,9 +10,13 @@ RUN npm ci --ignore-scripts \
 RUN node scripts/build-runtime-packages.mjs collector
 RUN node scripts/rewrite-runtime-exports.mjs /src
 RUN npm prune --omit=dev --ignore-scripts
+# strip-runtime-tree prunes node_modules/@confenge to exactly this list, so a
+# package left off it loses its workspace symlink even when its directory is
+# copied below. security is on the collector's boot path via the warmbly barrel.
 RUN node scripts/strip-runtime-tree.mjs /src \
   @confenge/control-center-contracts \
   @confenge/control-center-persistence \
+  @confenge/control-center-security \
   @confenge/control-center-collector \
   && test ! -e /src/node_modules/tsx \
   && test ! -e /src/node_modules/esbuild \
@@ -32,6 +36,11 @@ COPY --from=builder --chown=node:node /src/package.json /src/package-lock.json /
 COPY --from=builder --chown=node:node /src/node_modules ./node_modules
 COPY --from=builder --chown=node:node /src/contracts ./contracts
 COPY --from=builder --chown=node:node /src/persistence ./persistence
+# The warmbly connector's barrel re-exports the operator channel, which imports
+# @confenge/control-center-security. That is a STATIC import on the collector's
+# boot path, so the package has to be in the image even though the collector is
+# read-only and never calls the channel.
+COPY --from=builder --chown=node:node /src/security ./security
 COPY --from=builder --chown=node:node /src/connectors ./connectors
 COPY --from=builder --chown=node:node /src/scripts/node-http-probe.mjs ./node-http-probe.mjs
 ENV HOST=0.0.0.0

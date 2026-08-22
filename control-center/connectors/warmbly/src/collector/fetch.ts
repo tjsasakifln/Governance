@@ -140,6 +140,9 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
     case "confenge_inbound":
       payload.confenge_inbound = json as WarmblyPayload["confenge_inbound"];
       break;
+    case "confenge_dispatch_status":
+      payload.confenge_dispatch_status = json as WarmblyPayload["confenge_dispatch_status"];
+      break;
     case "confenge_intel_scoreboard": {
       const rec = asRecordOrUndefined(json);
       if (rec) payload.confenge_intel_scoreboard = rec;
@@ -159,6 +162,10 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
       break;
     }
     default:
+      // A route listed in COLLECT_ROUTES with no case here is fetched, paid
+      // for, and then thrown away. That is how the dispatch reading went
+      // missing after it was added to the route table, so
+      // tests/collector-routes.test.ts asserts every collected key lands.
       break;
   }
 }
