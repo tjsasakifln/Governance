@@ -21,6 +21,7 @@ import {
   WRITE_SHORTCUT_LABELS,
   type WriteShortcutKind,
 } from "./adapters/paths";
+import { agentStatusLabel, healthLabel } from "./ui/labels";
 
 export const HOJE_SECTION_IDS = [
   "top3",
@@ -261,7 +262,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       rowFrom(
         {
           id: `${snap.id}:inbound`,
-          title: "Inbound sem leitura",
+          title: "Mensagens recebidas sem leitura",
           summary: `${snap.inbound_unread_count} item(ns) no inbound Warmbly (somente leitura)`,
           kind: "inbound",
         },
@@ -290,7 +291,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       rowFrom(
         {
           id: `${snap.id}:missing-next`,
-          title: "Missing next action",
+          title: "Sem próxima ação",
           summary: `${snap.missing_next_action_count} oportunidade(s) sem próxima ação`,
           kind: "missing-next-action",
         },
@@ -303,7 +304,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       rowFrom(
         {
           id: `${snap.id}:stalled`,
-          title: "Stalled stage",
+          title: "Estágio parado",
           summary: `${snap.stalled_count} estágio(s) parado(s)`,
           kind: "stalled-stage",
         },
@@ -316,7 +317,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       rowFrom(
         {
           id: `${snap.id}:drift`,
-          title: "Offer/version drift",
+          title: "Divergência de oferta/versão",
           summary: snap.offer_version_drift?.detail ?? `${snap.offer_version_drift?.count} desvio(s)`,
           kind: "offer-version-drift",
         },
@@ -380,8 +381,8 @@ function composeFinance(input: HojeComposeInput): HojeSection {
       rowFrom(
         {
           id: `${snap.id}:chargebacks`,
-          title: "Chargebacks",
-          summary: "Chargebacks observados no recorte somente leitura.",
+          title: "Contestações de pagamento",
+          summary: "Contestações de pagamento observadas no recorte somente leitura.",
           kind: "chargebacks",
           money: snap.chargebacks,
         },
@@ -502,7 +503,9 @@ function composeEngineering(input: HojeComposeInput): HojeSection {
         {
           id: svc.id,
           title: svc.service_name,
-          summary: svc.message ?? `status ${svc.status}${svc.partial_outage ? " · partial outage" : ""}`,
+          summary:
+            svc.message ??
+            `estado ${healthLabel(svc.status)}${svc.partial_outage ? " · indisponibilidade parcial" : ""}`,
           kind: "infra",
           health: svc.status,
         },
@@ -514,7 +517,7 @@ function composeEngineering(input: HojeComposeInput): HojeSection {
   if (!compressed) return section(5, rows, false, null);
   const parts: string[] = [];
   if (snap && !engineeringInException(snap)) {
-    parts.push(`PRs ${snap.open_pr_count} · CI ok · incidentes 0`);
+    parts.push(`${snap.open_pr_count} pull request(s) · integração contínua ok · 0 incidente(s)`);
   }
   if (infra.length > 0 && infra.every((s) => !infraInException(s))) {
     parts.push("infra saudável");
@@ -538,13 +541,13 @@ function composeAgents(input: HojeComposeInput): HojeSection {
   }
   const actionable = items.filter(agentNeedsAttention);
   if (actionable.length === 0) {
-    return section(6, [], true, `${items.length} sessão(ões) concluída(s) sem leftover — ignorar`);
+    return section(6, [], true, `${items.length} sessão(ões) concluída(s) sem pendência — ignorar`);
   }
   const rows = actionable.map((item) =>
     rowFrom(
       {
         id: item.id,
-        title: `${item.agent_id}${item.provider ? ` · ${item.provider}` : ""} · ${item.presentation_status}`,
+        title: `${item.agent_id}${item.provider ? ` · ${item.provider}` : ""} · ${agentStatusLabel(item.presentation_status)}`,
         summary: item.summary,
         kind: item.presentation_status,
       },
@@ -558,7 +561,7 @@ function composeShortcuts(): HojeSection {
   const shortcuts: HojeShortcut[] = WRITE_SHORTCUT_KINDS.map((kind) => ({
     kind,
     label: WRITE_SHORTCUT_LABELS[kind],
-    hint: "Grava no Context Service (POST /v1/directives). Não muta Warmbly, Asaas ou GitHub.",
+    hint: "Grava no serviço de contexto do Control Center. Não altera Warmbly, Asaas nem GitHub.",
   }));
   return {
     id: "shortcuts",

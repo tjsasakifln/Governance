@@ -26,6 +26,32 @@ Hoje is an attention cockpit: open exceptions plus **at most three** current pri
 - Dates are UTC in data (`…Z`). Presentation uses `America/Sao_Paulo`.
 - PWA: a web manifest + SVG icons only. No service worker / offline cache.
 
+## Language: pt-BR on the surface, raw tokens in the data
+
+There is no i18n framework here and there does not need to be one: the shell
+speaks pt-BR and `src/ui/labels.ts` is the single catalogue of visible text for
+every enum and technical code (precedent: `apps/directives-ui/src/ui/labels.ts`).
+
+Three invariants hold together, and `tests/labels.test.ts` enforces all three:
+
+- **Visible text is Portuguese.** No route may show a raw enum (`FRESH`,
+  `BLOCKED`, `RUNNING`), a schema name, or an implementation term in the text an
+  operator reads.
+- **Raw tokens stay in the data.** `data-freshness`, `data-status`,
+  `data-hop-status`, `data-severity`, `data-raw` and friends keep the original
+  token: the Playwright probe and the contract tests read them, and changing
+  them would break the pipeline, not just the copy.
+- **Nothing is deleted.** Identifiers, schema versions, locators and the raw
+  enums live on in a collapsed, selectable `<details class="tech">` block
+  rendered by `technicalDetails()`. Progressive disclosure, not removal.
+
+Concepts an operator cannot avoid — atualização (freshness), confiança
+(confidence), bloqueio (blocked), ausência (absent) — carry their explanation in
+`title`/`data-help` via `helpTerm()`.
+
+A code the backend never enumerated (Warmbly sends free-text exception codes) is
+shown exactly as it arrived rather than guessed at.
+
 ## Run (no env vars required)
 
 ```bash
