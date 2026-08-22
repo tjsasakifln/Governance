@@ -70,9 +70,6 @@ function centsOf(
   return undefined;
 }
 
-/** At most this many currency buckets, matching `maxItems` on the schema field. */
-const MAX_CURRENCY_BUCKETS = 8;
-
 function centsListOf(value: unknown): { amount_cents: number; currency: string }[] {
   if (!Array.isArray(value)) return [];
   const out: { amount_cents: number; currency: string }[] = [];
@@ -83,7 +80,7 @@ function centsListOf(value: unknown): { amount_cents: number; currency: string }
     seen.add(money.currency);
     out.push(money);
   }
-  return out.sort((a, b) => a.currency.localeCompare(b.currency)).slice(0, MAX_CURRENCY_BUCKETS);
+  return out.sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 function parseTime(value: unknown): number | undefined {
@@ -172,14 +169,10 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
         // cards whose own record said USD, and cards the total had already
         // refused to denominate. The deal's stated code decides, and an
         // unreadable one withholds the amount instead of guessing.
-        const rawValue = row.value ?? row.amount_cents ?? row.deal_value;
         const dealCurrency = currencyOf(row.currency, CATALOG_CURRENCY);
-        const money = dealCurrency ? centsOf(rawValue, dealCurrency) : undefined;
-        // "The deal never named an amount" and "the amount could not be
-        // denominated" are different facts. Dropping `value` for both would let
-        // a withheld figure vanish from the card silently; the marker lets the
-        // surface say "sem dados" for the second one.
-        const valueWithheld = !money && rawValue !== undefined && rawValue !== null;
+        const money = dealCurrency
+          ? centsOf(row.value ?? row.amount_cents ?? row.deal_value, dealCurrency)
+          : undefined;
         const updated = isoOr(row.updated_at, observedAt);
         const ageMs = now - (parseTime(updated) ?? now);
         const status = typeof row.status === "string" ? row.status.toLowerCase() : "unknown";
@@ -194,7 +187,6 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
           age_seconds: Math.max(0, Math.floor(ageMs / 1000)),
           stale: ageMs >= 14 * 24 * 60 * 60 * 1000 && status === "open",
           ...(money ? { value: money } : {}),
-          ...(valueWithheld ? { value_unavailable: "unreadable_currency" } : {}),
         };
       }),
   );
@@ -595,9 +587,13 @@ export function projectCommercial(envelope: CollectorEnvelope): ProjectedSnapsho
   }
   const byCurrency = centsListOf(inner.deal_value_open_by_currency ?? inner.pipeline_nominal_by_currency);
   if (byCurrency.length > 1) {
-    // Plain money, no per-entry provenance: the snapshot already carries it,
-    // and the contract types these buckets as `unsigned_money`.
-    body.pipeline_nominal_by_currency = byCurrency;
+    body.pipeline_nominal_by_currency = byCurrency.map((money) => ({
+      ...money,
+      source: envelope.source,
+      observed_at: envelope.observed_at,
+      freshness_status: freshness,
+      confidence: envelope.confidence,
+    }));
   } else if (byCurrency.length === 1 && body.pipeline_nominal === undefined) {
     // Filtering an unreadable sibling out of a split must not take the readable
     // total with it.

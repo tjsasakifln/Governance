@@ -74,23 +74,18 @@ function pipelineNominalFact(snapshot: CommercialSnapshot): string {
 }
 
 /**
- * A deal amount is only shown in a currency the payload actually stated. An
- * amount whose currency is missing or unreadable reads "sem dados" rather than
- * borrowing BRL from the catalog and looking like a confirmed figure.
+ * A deal amount is only shown in a currency the read model actually stated.
+ * It no longer borrows BRL from the catalog, which used to make an
+ * undenominated figure look confirmed. An amount that cannot be read shows no
+ * money line; giving absence a visible word here belongs to the zero/ausente
+ * vocabulary in #62, not to this fix.
  */
-function dealMoneyLine(value: unknown, withheld: unknown): string {
+function dealMoneyLine(value: unknown): string {
   const money = readableMoney(value);
-  if (money) {
-    return `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`;
-  }
-  // Only when the read model says an amount existed and could not be
-  // denominated. A deal that simply never named a value shows no money line.
-  if (withheld !== undefined && withheld !== null) {
-    return `<p class="money" data-no-data="true" data-withheld="${escapeHtml(String(withheld))}">sem dados</p>`;
-  }
-  return value === undefined || value === null ? "" : `<p class="money" data-no-data="true">sem dados</p>`;
+  return money
+    ? `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`
+    : "";
 }
-
 function listFact(label: string, items: string[] | undefined): string {
   if (!items || items.length === 0) return "";
   return fact(label, escapeHtml(items.join(", ")));
@@ -457,7 +452,7 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
               return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
                 <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
-                ${dealMoneyLine(row.value, row.value_unavailable)}
+                ${dealMoneyLine(row.value)}
                 <dl class="facts">
                   ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
                   ${fact("Idade (s)", String(row.age_seconds ?? "—"))}

@@ -58,8 +58,6 @@ export type WarmblyDealsSummary = {
   lost_value?: number;
   currency?: string;
   mixed_currency?: boolean;
-  /** Per-currency open totals in major units. The only honest reading of a mixed-currency pipeline. */
-  open_value_by_currency?: Array<{ currency?: string; value?: number }>;
 };
 
 export type WarmblyTask = {

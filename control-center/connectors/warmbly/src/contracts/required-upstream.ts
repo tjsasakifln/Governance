@@ -32,40 +32,6 @@ export const LEADS_LIST_CONTRACT: RequiredUpstreamContract = {
   },
 };
 
-/**
- * Declared only when the summary says the open pipeline mixes currencies but
- * gives no per-currency breakdown.
- *
- * That is the shape the CONFENGE incident arrived in: an empty `deals[]` and a
- * summary-only reading. With no per-deal rows to group and no breakdown from
- * the summary, per-currency separation is not something the Control Center can
- * derive — and it will not convert. So the gap is named as an upstream
- * contract instead of being papered over with an invented total.
- */
-export const DEALS_SUMMARY_CURRENCY_CONTRACT: RequiredUpstreamContract = {
-  id: "POST /v1/crm/deals/summary#open_value_by_currency",
-  method: "POST",
-  path: "/v1/crm/deals/summary",
-  reason:
-    "When the open pipeline spans more than one currency, the summary must report a per-currency breakdown. A single open_value with mixed_currency=true cannot be separated by currency and must not be converted: the Control Center has no rate source carrying a source and a date. Without the breakdown the nominal pipeline stays withheld.",
-  min_request: {
-    method: "POST",
-    path: "/v1/crm/deals/summary",
-    headers: AUTH_HEADERS,
-    body: { status: "open" },
-  },
-  min_response: {
-    status: 200,
-    body: {
-      open_count: 0,
-      open_value: 0,
-      currency: "BRL",
-      mixed_currency: false,
-      open_value_by_currency: [{ currency: "BRL", value: 0 }],
-    },
-  },
-};
-
 export function contractForUnavailable(path: string, method: string): RequiredUpstreamContract {
   const normalized = path.split("?")[0] ?? path;
   if (normalized === "/v1/confenge/attention") {

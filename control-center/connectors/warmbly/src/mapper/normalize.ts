@@ -10,7 +10,6 @@ import {
 } from "../contracts/snapshot.ts";
 import {
   contractForUnavailable,
-  DEALS_SUMMARY_CURRENCY_CONTRACT,
   LEADS_LIST_CONTRACT,
 } from "../contracts/required-upstream.ts";
 import {
@@ -35,13 +34,7 @@ import {
   type AttentionContext,
 } from "./attention.ts";
 import { provenance, rollupFreshness } from "./freshness.ts";
-import {
-  CATALOG_CURRENCY,
-  majorUnitsToCents,
-  openDealTotals,
-  resolveCurrency,
-  summaryTotalsByCurrency,
-} from "./money.ts";
+import { CATALOG_CURRENCY, majorUnitsToCents, openDealTotals, resolveCurrency } from "./money.ts";
 
 const OPERATIONS_CAP = 50;
 
@@ -326,39 +319,29 @@ export function collectFromWarmblyPayload(
   // codes are kept apart, never summed, because there is no rate source here.
   const openTotals = openDealTotals(deals);
   let dealValueByCurrency: Money[] = openTotals.totals;
-  // Keyed by anomaly, not by position: the same anomaly must keep the same id
-  // whichever siblings happen to fire alongside it, or dedupe and any operator
-  // acknowledgement keyed on the id both break.
-  const currencyNotes = new Map<string, string>();
+  const currencyNotes: string[] = [];
   if (openTotals.unreadable_currency > 0) {
-    currencyNotes.set(
-      "unreadable_deal_currency",
+    currencyNotes.push(
       `${openTotals.unreadable_currency} open deal(s) carry a currency that is not an ISO-4217 code; they are excluded from the nominal pipeline rather than denominated in ${CATALOG_CURRENCY}`,
     );
   }
 
   const summary = payload.deals_summary;
   if (dealValueByCurrency.length === 0 && summary) {
-    const declared = summaryTotalsByCurrency(summary);
-    if (declared.length > 0) {
-      // The summary named its own per-currency totals: use them as given.
-      dealValueByCurrency = declared;
-    } else if (summary.mixed_currency === true) {
-      // The incident shape: summary-only, mixed, no breakdown. Nothing here can
-      // be separated by currency and nothing may be converted, so the gap is
-      // declared as an upstream contract rather than filled with a guess.
-      currencyNotes.set(
-        "summary_mixed_without_breakdown",
-        "deals_summary reports mixed currencies with no per-currency breakdown; the nominal pipeline is withheld rather than summed across currencies (see required upstream contract POST /v1/crm/deals/summary#open_value_by_currency)",
+    if (summary.mixed_currency === true) {
+      // Summary-only and mixed, with no per-currency breakdown to read. Nothing
+      // here can be separated by currency and nothing may be converted, so the
+      // total is withheld. Deriving the split from a summary that does not
+      // carry it needs an upstream contract change: see issue #69 follow-up.
+      currencyNotes.push(
+        "deals_summary reports mixed currencies without per-currency totals; the nominal pipeline is withheld rather than summed across currencies",
       );
-      contracts.push(DEALS_SUMMARY_CURRENCY_CONTRACT);
     } else if (typeof summary.open_value === "number" && summary.open_value > 0) {
       const currency = resolveCurrency(summary.currency);
       if (currency) {
         dealValueByCurrency = [majorUnitsToCents(summary.open_value, currency)];
       } else {
-        currencyNotes.set(
-          "summary_currency_unreadable",
+        currencyNotes.push(
           `deals_summary.currency ${JSON.stringify(summary.currency)} is not an ISO-4217 code; the nominal pipeline is withheld`,
         );
       }
@@ -369,8 +352,7 @@ export function collectFromWarmblyPayload(
   }
 
   if (dealValueByCurrency.length > 1) {
-    currencyNotes.set(
-      "mixed_currencies",
+    currencyNotes.push(
       `open pipeline spans ${dealValueByCurrency.map((m) => m.currency).join(", ")}; totals stay separate because no explicit conversion rate with a source and a date is available`,
     );
   }
@@ -378,8 +360,7 @@ export function collectFromWarmblyPayload(
     (code) => code !== CATALOG_CURRENCY,
   );
   if (foreign.length > 0) {
-    currencyNotes.set(
-      "foreign_currency",
+    currencyNotes.push(
       `pipeline currency ${foreign.join(", ")} is not the contractual catalog currency ${CATALOG_CURRENCY}; reported as observed, never converted`,
     );
   }
@@ -392,16 +373,14 @@ export function collectFromWarmblyPayload(
 
   // A currency the Control Center cannot vouch for is an exception an operator
   // has to see, not something to render quietly.
-  const currencyExceptions: CommercialAttentionItem[] = [...currencyNotes.entries()].map(
-    ([key, note]) => ({
-      id: `warmbly:currency:pipeline:${key}`,
-      kind: "exception_state",
-      title: "Moeda do pipeline não confirmada",
-      why: note,
-      severity: "high",
-      provenance: provenance(now, "FRESH"),
-    }),
-  );
+  const currencyExceptions: CommercialAttentionItem[] = currencyNotes.map((note, index) => ({
+    id: `warmbly:currency:pipeline:${index}`,
+    kind: "exception_state",
+    title: "Moeda do pipeline não confirmada",
+    why: note,
+    severity: "high",
+    provenance: provenance(now, "FRESH"),
+  }));
   const allAttention =
     currencyExceptions.length > 0
       ? sortAttention(dedupeAttention([...attention, ...currencyExceptions]))

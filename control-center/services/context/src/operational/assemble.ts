@@ -138,7 +138,7 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
   // stamped with whatever code the upstream summary reported is withheld here
   // too, not only at the moment it was collected.
   const nominal = nominalPipeline(payload.pipeline_nominal, seed);
-  const split = pipelineByCurrency(payload.pipeline_nominal_by_currency);
+  const split = pipelineByCurrency(payload.pipeline_nominal_by_currency, seed);
   if (nominal) {
     out.pipeline_nominal = nominal;
   } else if (split.length === 1) {

@@ -107,10 +107,9 @@ test("a pipeline whose currency the read model could not parse is not painted", 
   assert.doesNotMatch(html, /reais/);
 });
 
-test("deal cards use each deal's own currency and mark a withheld amount", () => {
-  // These are the three shapes the commercial projector actually emits for
-  // `operations.pipeline[].value`: a denominated amount, no amount at all, and
-  // an amount it refused to denominate (flagged with `value_unavailable`).
+test("deal cards use each deal's own currency instead of a blanket BRL", () => {
+  // The shapes the commercial projector actually emits for
+  // `operations.pipeline[].value`: a denominated amount, or none at all.
   const html = commercialBlock(
     {
       schema_version: "control-center.commercial-snapshot.v1",
@@ -132,20 +131,17 @@ test("deal cards use each deal's own currency and mark a withheld amount", () =>
         pipeline: [
           { id: "d1", display_name: "Em BRL", status: "open", value: { amount_cents: 100, currency: "BRL" } },
           { id: "d2", display_name: "Em USD", status: "open", value: { amount_cents: 5000, currency: "USD" } },
-          { id: "d3", display_name: "Retido", status: "open", value_unavailable: "unreadable_currency" },
-          { id: "d4", display_name: "Sem valor", status: "open" },
+          { id: "d3", display_name: "Sem valor", status: "open" },
         ],
       },
     } as unknown as CommercialSnapshot,
     "pipeline",
   );
-  // Each card carries the currency of its own deal, not a blanket BRL.
   assert.match(html, /BRL 1,00/);
   assert.match(html, /USD 50,00/);
+  // The USD deal must not be restamped in the catalog currency.
   assert.doesNotMatch(html, /BRL 50,00/);
-  // The withheld amount says so; the deal that never named one stays silent.
-  assert.equal([...html.matchAll(/data-withheld="unreadable_currency">sem dados/g)].length, 1);
-  assert.equal([...html.matchAll(/class="money"/g)].length, 3);
+  assert.equal([...html.matchAll(/class="money"/g)].length, 2);
 });
 
 test("commercialFrom carries per-currency totals through only when there is more than one", () => {
