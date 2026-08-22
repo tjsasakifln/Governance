@@ -14,7 +14,6 @@
     "authority",
     "offer_pin",
     "funnel",
-    "pipeline_nominal",
     "aging_count",
     "stalled_count",
     "missing_next_action_count",
@@ -100,7 +99,17 @@
       }
     },
     "pipeline_nominal": {
+      "description": "Nominal open pipeline. Optional on purpose: a pipeline the runtime could not denominate is absent, never a zero stamped with a guessed currency. Absence renders as \"sem dados\"; a zero here would read as a measured amount.",
       "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+    },
+    "pipeline_nominal_by_currency": {
+      "type": "array",
+      "description": "Separate open-pipeline totals, one per observed currency, present only when the pipeline spans more than one. Totals are never added across currencies and never converted: conversion would require an explicit rate carrying a source and a date, which this read model does not have.",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/unsigned_money"
+      }
     },
     "pipeline_weighted": {
       "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/weighted_pipeline"

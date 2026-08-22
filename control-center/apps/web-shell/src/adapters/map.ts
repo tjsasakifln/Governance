@@ -269,6 +269,12 @@ export function commercialFrom(row: Record<string, unknown>, fallback: Provenanc
   }
   const nominal = moneyOf(row.pipeline_nominal);
   if (nominal) snap.pipeline_nominal = nominal;
+  if (Array.isArray(row.pipeline_nominal_by_currency)) {
+    const split = row.pipeline_nominal_by_currency
+      .map((item) => moneyOf(item))
+      .filter((money): money is Money => money !== undefined);
+    if (split.length > 1) snap.pipeline_nominal_by_currency = split;
+  }
   if (weighted && weighted.probability_reliable === true) {
     const money = moneyOf(weighted);
     if (money) snap.pipeline_weighted = { ...money, probability_reliable: true };

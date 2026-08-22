@@ -156,10 +156,12 @@ function buildPipeline(
 
   if (open.length === 0) {
     return {
+      // No open record contributed a denominated amount, so there is nothing to
+      // state a currency in. A zero stamped with the catalog currency would read
+      // as a measured "BRL 0,00"; the honest answer is that there is no data.
       nominal: {
-        treatment: "present",
-        amount_cents: 0,
-        currency: DEFAULT_CURRENCY,
+        treatment: "insufficient_data",
+        reason: "no_open_pipeline",
         provenance: baseProv,
       },
       weighted: {
@@ -171,15 +173,24 @@ function buildPipeline(
   }
 
   const known = open.filter((r) => r.amount_cents !== null);
+  // An amount whose stated currency could not be read is undenominated. It is
+  // not folded into the catalog currency: that would hide a bad code inside a
+  // total that then looks like one clean BRL figure.
+  const undenominated = known.filter((r) => r.currency === null);
   const currencies = new Set(
-    known.map((r) => r.currency ?? DEFAULT_CURRENCY),
+    known.filter((r) => r.currency !== null).map((r) => r.currency as string),
   );
 
   let nominal: PipelineMoney;
-  if (known.length === 0 || currencies.size !== 1) {
+  if (known.length === 0 || undenominated.length > 0 || currencies.size !== 1) {
     nominal = {
       treatment: "insufficient_data",
-      reason: known.length === 0 ? "no_known_amounts" : "mixed_currency",
+      reason:
+        known.length === 0
+          ? "no_known_amounts"
+          : undenominated.length > 0
+            ? "unreadable_currency"
+            : "mixed_currency",
       provenance: baseProv,
     };
   } else {

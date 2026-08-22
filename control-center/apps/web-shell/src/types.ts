@@ -239,6 +239,8 @@ export interface CommercialSnapshot {
   };
   funnel?: CommercialFunnel;
   pipeline_nominal?: Money;
+  /** Separate totals per currency. Present only when the pipeline spans more than one. */
+  pipeline_nominal_by_currency?: Money[];
   pipeline_weighted?: WeightedPipeline;
   aging_count?: number;
   stalled_count?: number;

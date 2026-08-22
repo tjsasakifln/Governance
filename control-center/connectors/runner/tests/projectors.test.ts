@@ -515,3 +515,98 @@ test("empty collector payload is NO_DATA not a healthy zero funnel", () => {
   assert.equal(commercial.availability, "NO_DATA");
   assert.equal(commercial.payload.funnel, undefined);
 });
+
+const CURRENCY_SOURCE = { system: "warmbly", kind: "collector-runner", locator: "warmbly" };
+
+function commercialPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: CURRENCY_SOURCE,
+    confidence: 0.8,
+    payload: { counts: { deals_open: 0, inbound_now: 0 }, ...payload },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  return commercial.payload;
+}
+
+test("commercial projector denominates an undenominated pipeline in the BRL catalog currency", () => {
+  const body = commercialPayload({ deal_value_open: { amount_cents: 480_000 } });
+  assert.deepEqual(body.pipeline_nominal, {
+    amount_cents: 480_000,
+    currency: "BRL",
+    source: CURRENCY_SOURCE,
+    observed_at: now,
+    freshness_status: "FRESH",
+    confidence: 0.8,
+  });
+});
+
+test("commercial projector omits a zero pipeline instead of stamping it with a currency", () => {
+  // The reported bug: Warmbly's deals_summary reported a zero open value in its
+  // own default currency, and the surface printed "Pipeline nominal USD 0,00".
+  assert.equal(commercialPayload({ deal_value_open: { amount_cents: 0, currency: "USD" } }).pipeline_nominal, undefined);
+  assert.equal(commercialPayload({ deal_value_open: { amount_cents: 0 } }).pipeline_nominal, undefined);
+});
+
+test("commercial projector fails closed on a pipeline currency that is not ISO-4217", () => {
+  assert.equal(
+    commercialPayload({ deal_value_open: { amount_cents: 100, currency: "reais" } }).pipeline_nominal,
+    undefined,
+  );
+});
+
+test("commercial projector forwards per-currency totals without merging them", () => {
+  const body = commercialPayload({
+    deal_value_open_by_currency: [
+      { amount_cents: 10_000, currency: "BRL" },
+      { amount_cents: 5_000, currency: "USD" },
+    ],
+  });
+  const split = body.pipeline_nominal_by_currency as Array<{ amount_cents: number; currency: string }>;
+  assert.equal(split.length, 2);
+  assert.deepEqual(
+    split.map((m) => [m.currency, m.amount_cents]),
+    [
+      ["BRL", 10_000],
+      ["USD", 5_000],
+    ],
+  );
+  assert.equal(body.pipeline_nominal, undefined);
+});
+
+test("commercial projector keeps a deal value undenominated rather than guessing when the code is unreadable", () => {
+  const body = commercialPayload({
+    operations: {
+      deals: [
+        { id: "d1", status: "open", value: { amount_cents: 100, currency: "BRL" }, updated_at: now },
+        { id: "d2", status: "open", value: { amount_cents: 100, currency: "reais" }, updated_at: now },
+      ],
+    },
+  });
+  const ops = body.operations as { pipeline: Array<Record<string, unknown>> };
+  assert.deepEqual(ops.pipeline[0]?.value, { amount_cents: 100, currency: "BRL" });
+  assert.equal(ops.pipeline[1]?.value, undefined);
+});
+
+test("finance projector fails closed on an unreadable bucket currency and defaults an absent one to BRL", () => {
+  const projected = projectCollector({
+    collector: "asaas",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "asaas", kind: "collector-runner", locator: "asaas" },
+    confidence: 0.8,
+    payload: {
+      contracted: { amount_cents: 5_000_000 },
+      billed: { amount_cents: 4_000_000, currency: "reais" },
+      paid: { amount_cents: 2_500_000, currency: "brl" },
+    },
+  });
+  const finance = projected.find((row) => row.snapshot_kind === "finance");
+  assert.ok(finance);
+  assert.deepEqual(finance.payload.contracted, { amount_cents: 5_000_000, currency: "BRL" });
+  assert.equal(finance.payload.billed, undefined);
+  assert.deepEqual(finance.payload.paid, { amount_cents: 2_500_000, currency: "BRL" });
+});

@@ -8,7 +8,13 @@ import type { RepoDomainMap } from "../scope.ts";
 import type { FreshnessStatus, Scope } from "../types.ts";
 import { isOperationalUnavailableError } from "./errors.ts";
 import { demoteHealthStatus, looksHealthy, minConfidence, worstFreshness } from "./freshness.ts";
-import { financeStages, reliableWeightedPipeline, type ProvenanceSeed } from "./money.ts";
+import {
+  financeStages,
+  nominalPipeline,
+  pipelineByCurrency,
+  reliableWeightedPipeline,
+  type ProvenanceSeed,
+} from "./money.ts";
 import type { OperationalReadPort } from "./port.ts";
 import { stripForbiddenKeys } from "./sanitize.ts";
 import {
@@ -128,18 +134,16 @@ function mapCommercial(payload: Record<string, unknown>, seed: ProvenanceSeed, i
       out.funnel = derived;
     }
   }
-  const nominal = payload.pipeline_nominal;
-  if (nominal !== undefined) {
-    const money: Record<string, unknown> = {
-      ...asRecord(nominal),
-      source: seed.source,
-      observed_at: seed.observed_at,
-      freshness_status: seed.freshness_status,
-      confidence: seed.confidence,
-    };
-    if (typeof money.amount_cents === "number") {
-      out.pipeline_nominal = money;
-    }
+  // Read side, not just write side: snapshots persisted before the currency
+  // policy landed still carry a zero total stamped with whatever code the
+  // upstream summary happened to report. They are withheld here too.
+  const nominal = nominalPipeline(payload.pipeline_nominal, seed);
+  if (nominal) {
+    out.pipeline_nominal = nominal;
+  }
+  const nominalByCurrency = pipelineByCurrency(payload.pipeline_nominal_by_currency, seed);
+  if (nominalByCurrency.length > 1) {
+    out.pipeline_nominal_by_currency = nominalByCurrency;
   }
   const weighted = reliableWeightedPipeline(payload, seed);
   if (weighted) {

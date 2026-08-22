@@ -1,8 +1,10 @@
 import {
   COMMERCIAL_SNAPSHOT_SCHEMA,
   SNAPSHOT_SOURCE,
+  type CommercialAttentionItem,
   type CommercialSnapshot,
   type FreshnessStatus,
+  type Money,
   type RequiredUpstreamContract,
   type SourceObservation,
 } from "../contracts/snapshot.ts";
@@ -32,7 +34,7 @@ import {
   type AttentionContext,
 } from "./attention.ts";
 import { provenance, rollupFreshness } from "./freshness.ts";
-import { majorUnitsToCents, sumOpenDealValue } from "./money.ts";
+import { CATALOG_CURRENCY, majorUnitsToCents, openDealTotals, resolveCurrency } from "./money.ts";
 
 const OPERATIONS_CAP = 50;
 
@@ -311,13 +313,68 @@ export function collectFromWarmblyPayload(
     return s !== "completed" && s !== "cancelled";
   }).length;
 
-  let dealValue = sumOpenDealValue(deals);
-  if (!dealValue && payload.deals_summary && payload.deals_summary.mixed_currency !== true) {
-    const currency = payload.deals_summary.currency || "BRL";
-    if (typeof payload.deals_summary.open_value === "number") {
-      dealValue = majorUnitsToCents(payload.deals_summary.open_value, currency);
-    }
+  // Currency is evidence, not a default. A total is only denominated in a code
+  // the payload actually justifies: the deals' own codes, or — when the payload
+  // says nothing at all — the contractual catalog currency. Totals in different
+  // codes are kept apart, never summed, because there is no rate source here.
+  const openTotals = openDealTotals(deals);
+  let dealValue: Money | undefined = openTotals.totals.length === 1 ? openTotals.totals[0] : undefined;
+  let dealValueByCurrency: Money[] = openTotals.totals;
+  const currencyNotes: string[] = [];
+  if (openTotals.unreadable_currency > 0) {
+    currencyNotes.push(
+      `${openTotals.unreadable_currency} open deal(s) carry a currency that is not an ISO-4217 code; they are excluded from the nominal pipeline rather than denominated in ${CATALOG_CURRENCY}`,
+    );
   }
+  if (openTotals.totals.length > 1) {
+    currencyNotes.push(
+      `open pipeline spans ${openTotals.totals.map((m) => m.currency).join(", ")}; totals stay separate because no explicit conversion rate with a source and a date is available`,
+    );
+  }
+  const summary = payload.deals_summary;
+  if (dealValueByCurrency.length === 0 && summary) {
+    if (summary.mixed_currency === true) {
+      currencyNotes.push(
+        "deals_summary reports mixed currencies without per-currency totals; the nominal pipeline is withheld rather than summed across currencies",
+      );
+    } else if (typeof summary.open_value === "number" && summary.open_value > 0) {
+      const currency = resolveCurrency(summary.currency);
+      if (currency) {
+        dealValue = majorUnitsToCents(summary.open_value, currency);
+        dealValueByCurrency = [dealValue];
+      } else {
+        currencyNotes.push(
+          `deals_summary.currency ${JSON.stringify(summary.currency)} is not an ISO-4217 code; the nominal pipeline is withheld`,
+        );
+      }
+    }
+    // open_value of 0 (or absent) with no open deal contributing a denominated
+    // amount is absence, not a zero: it carries no currency evidence, so it is
+    // omitted and surfaces as "sem dados" rather than as `<some currency> 0,00`.
+  }
+  const foreign = [...new Set(dealValueByCurrency.map((m) => m.currency))].filter(
+    (code) => code !== CATALOG_CURRENCY,
+  );
+  if (foreign.length > 0) {
+    currencyNotes.push(
+      `pipeline currency ${foreign.join(", ")} is not the contractual catalog currency ${CATALOG_CURRENCY}; reported as observed, never converted`,
+    );
+  }
+
+  // A currency the Control Center cannot vouch for is an exception an operator
+  // has to see, not something to render quietly.
+  const currencyExceptions: CommercialAttentionItem[] = currencyNotes.map((note, index) => ({
+    id: `warmbly:currency:pipeline:${index}`,
+    kind: "exception_state",
+    title: "Moeda do pipeline não confirmada",
+    why: note,
+    severity: "high",
+    provenance: provenance(now, "FRESH"),
+  }));
+  const allAttention =
+    currencyExceptions.length > 0
+      ? sortAttention(dedupeAttention([...attention, ...currencyExceptions]))
+      : attention;
 
   const snapshotFreshness = rollupFreshness(
     freshnessBySurface.length > 0 ? freshnessBySurface : [healthFresh],
@@ -357,14 +414,17 @@ export function collectFromWarmblyPayload(
         return s !== "done" && s !== "handled" && s !== "closed";
       }).length,
       confenge_attention: confengeAttention.length,
-      attention: attention.length,
+      attention: allAttention.length,
     },
-    attention,
+    attention: allAttention,
     observations,
     required_upstream_contract: [...uniqueContracts.values()],
   };
   if (dealValue) {
     snapshot.deal_value_open = dealValue;
+  }
+  if (dealValueByCurrency.length > 1) {
+    snapshot.deal_value_open_by_currency = dealValueByCurrency;
   }
 
   snapshot.operations = {
