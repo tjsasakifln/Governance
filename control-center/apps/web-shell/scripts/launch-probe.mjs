@@ -75,12 +75,32 @@ const extraHashes = [
   "clientes/acme",
 ];
 
+/**
+ * `matrixShots: false` keeps the per-hash overflow/layout assertions but stops
+ * writing a full-page screenshot per hash, so the three desktop resolutions
+ * required by the layout acceptance criteria do not triple the artifact size.
+ */
 const viewports = [
-  { name: "360", width: 360, height: 800 },
-  { name: "390", width: 390, height: 844 },
-  { name: "430", width: 430, height: 932 },
-  { name: "desktop", width: 1280, height: 800 },
+  { name: "360", width: 360, height: 800, matrixShots: true },
+  { name: "390", width: 390, height: 844, matrixShots: true },
+  { name: "430", width: 430, height: 932, matrixShots: true },
+  { name: "desktop", width: 1280, height: 800, matrixShots: true },
+  { name: "desktop-1366", width: 1366, height: 768, matrixShots: false },
+  { name: "desktop-1440", width: 1440, height: 900, matrixShots: false },
+  { name: "desktop-1920", width: 1920, height: 1080, matrixShots: false },
 ];
+
+/** Matches the `--main-gutter` of the >=880px branch in src/styles.css. */
+const DESKTOP_GUTTER_REM = 1.6;
+/** Below this the shell is the single-column mobile layout: nav is a bottom bar. */
+const DESKTOP_MIN_WIDTH = 880;
+/**
+ * Floor for "the main content actually uses the desktop width". The regression
+ * this guards is `main { max-width: 52rem }` with no centering, which parked the
+ * content on the left of a 1fr column and left ~47% of a 1920px viewport empty
+ * (measured content ratio 0.41; the centred column measures 0.63).
+ */
+const MIN_CONTENT_RATIO = 0.55;
 
 const viewStates = ["loading", "error", "stale", "empty"];
 
@@ -103,6 +123,100 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 page.on("crash", () => errors.push("page crashed"));
+
+/**
+ * Geometry of the content column plus every element that currently owns a
+ * vertical scrollbar. `documentScrollRange` is probed by actually scrolling the
+ * window: absolutely positioned descendants of a scroll container whose
+ * containing block is the initial containing block escape that container and
+ * inflate the document scrolling area without changing any element's box, so
+ * box measurements alone do not see the second scrollbar.
+ */
+async function layoutMetrics(page) {
+  return page.evaluate(() => {
+    const de = document.documentElement;
+    const main = document.querySelector("main");
+    if (!main) throw new Error("no <main> rendered");
+    const cs = getComputedStyle(main);
+    const rect = main.getBoundingClientRect();
+    const padLeft = parseFloat(cs.paddingLeft);
+    const padRight = parseFloat(cs.paddingRight);
+    const remPx = parseFloat(getComputedStyle(de).fontSize);
+    const contentMax = getComputedStyle(de).getPropertyValue("--content-max").trim();
+    const owners = [];
+    for (const el of document.querySelectorAll("html, body, *")) {
+      const style = getComputedStyle(el);
+      if (style.overflowY !== "auto" && style.overflowY !== "scroll") continue;
+      if (el.scrollHeight - el.clientHeight <= 1) continue;
+      const tag = el.tagName.toLowerCase();
+      const label = tag + (el.id ? `#${el.id}` : "") + (el.className ? `.${String(el.className).trim().split(/\s+/).join(".")}` : "");
+      owners.push({ label, insideMain: main.contains(el) && el !== main, isMain: el === main, isDocument: tag === "html" || tag === "body" });
+    }
+    const restore = window.scrollY;
+    window.scrollTo(0, 1_000_000);
+    const documentScrollRange = window.scrollY;
+    window.scrollTo(0, restore);
+    return {
+      viewportWidth: window.innerWidth,
+      remPx,
+      contentMaxPx: contentMax.endsWith("rem") ? parseFloat(contentMax) * remPx : parseFloat(contentMax),
+      mainWidth: Math.round(rect.width),
+      contentWidth: Math.round(rect.width - padLeft - padRight),
+      padLeft: Math.round(padLeft),
+      padRight: Math.round(padRight),
+      deadRight: Math.round(window.innerWidth - (rect.right - padRight)),
+      mainOverflowX: main.scrollWidth - main.clientWidth,
+      documentScrollRange,
+      documentScrollHeightRange: de.scrollHeight - de.clientHeight,
+      owners,
+    };
+  });
+}
+
+/**
+ * Acceptance criteria of the desktop layout issue, asserted as geometry:
+ * a single vertical scroll context, no dead right-hand panel, nothing clipped
+ * horizontally inside the content column.
+ */
+function assertSingleScrollContext(m, where) {
+  if (m.documentScrollRange > 1 || m.documentScrollHeightRange > 1) {
+    throw new Error(
+      `${where}: the page itself scrolls ${m.documentScrollRange}px (scrollHeight range ${m.documentScrollHeightRange}px) alongside the content scroller`,
+    );
+  }
+  const stray = m.owners.filter((o) => o.isDocument || o.insideMain);
+  if (stray.length > 0) {
+    throw new Error(`${where}: competing vertical scroll owners ${stray.map((o) => o.label).join(", ")}`);
+  }
+  if (m.mainOverflowX > 1) {
+    throw new Error(`${where}: content column clips ${m.mainOverflowX}px horizontally`);
+  }
+}
+
+function assertContentColumn(m, where) {
+  if (m.viewportWidth < DESKTOP_MIN_WIDTH) return;
+  if (Math.abs(m.padLeft - m.padRight) > 1) {
+    throw new Error(`${where}: content column is not centred (padding ${m.padLeft}/${m.padRight})`);
+  }
+  if (m.deadRight > m.padRight + 1) {
+    throw new Error(
+      `${where}: ${m.deadRight}px of empty panel to the right of the content, but the column gutter is only ${m.padRight}px -- the content column does not reach the right edge of the grid`,
+    );
+  }
+  const cappedByDesign = m.contentWidth >= m.contentMaxPx - 1;
+  const fullBleed = m.padLeft <= DESKTOP_GUTTER_REM * m.remPx + 1;
+  if (!cappedByDesign && !fullBleed) {
+    throw new Error(
+      `${where}: content column neither reaches --content-max (${Math.round(m.contentMaxPx)}px) nor fills the grid column: width ${m.contentWidth}px, gutters ${m.padLeft}px`,
+    );
+  }
+  const ratio = m.contentWidth / m.viewportWidth;
+  if (ratio < MIN_CONTENT_RATIO) {
+    throw new Error(
+      `${where}: content uses only ${(ratio * 100).toFixed(1)}% of the viewport (${m.contentWidth}px of ${m.viewportWidth}px); dead space on the right is ${m.deadRight}px`,
+    );
+  }
+}
 
 async function assertFilled(page, minChars = 80) {
   const box = await page.locator("#root").boundingBox();
@@ -209,9 +323,15 @@ try {
     if (overflow > 1) {
       throw new Error(`viewport ${vp.name} accidental horizontal overflow ${overflow}px`);
     }
+    const metrics = await layoutMetrics(page);
+    assertSingleScrollContext(metrics, `viewport ${vp.name}`);
+    assertContentColumn(metrics, `viewport ${vp.name}`);
     const shot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}$1`);
     await page.screenshot({ path: shot, fullPage: true });
     console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)} overflow=${overflow}`);
+    console.log(
+      `layout viewport=${vp.name} content_width=${metrics.contentWidth} gutters=${metrics.padLeft}/${metrics.padRight} dead_right=${metrics.deadRight} doc_scroll_range=${metrics.documentScrollRange} scroll_owners=${metrics.owners.map((o) => o.label).join("|") || "none"}`,
+    );
     for (const hash of matrixHashes) {
       await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
       const surface = hash.includes("/") ? hash.split("/")[1] : null;
@@ -225,9 +345,17 @@ try {
       if (pageOverflow > 1) {
         throw new Error(`viewport ${vp.name} hash ${hash} accidental horizontal overflow ${pageOverflow}px`);
       }
-      const hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${hash.replaceAll("/", "-")}$1`);
-      await page.screenshot({ path: hashShot, fullPage: true });
-      console.log(`matrix viewport=${vp.name} hash=${hash} overflow=${pageOverflow} screenshot=${hashShot}`);
+      const hashMetrics = await layoutMetrics(page);
+      assertSingleScrollContext(hashMetrics, `viewport ${vp.name} hash ${hash}`);
+      assertContentColumn(hashMetrics, `viewport ${vp.name} hash ${hash}`);
+      let hashShot = "skipped";
+      if (vp.matrixShots) {
+        hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${hash.replaceAll("/", "-")}$1`);
+        await page.screenshot({ path: hashShot, fullPage: true });
+      }
+      console.log(
+        `matrix viewport=${vp.name} hash=${hash} overflow=${pageOverflow} content_width=${hashMetrics.contentWidth} dead_right=${hashMetrics.deadRight} doc_scroll_range=${hashMetrics.documentScrollRange} screenshot=${hashShot}`,
+      );
     }
   }
 
