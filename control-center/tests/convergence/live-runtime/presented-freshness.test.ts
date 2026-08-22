@@ -8,12 +8,17 @@
  * fails, an honestly-labelled page passes.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { evaluateStaleDataShownAsHealthy } from "../../../qa/src/index.ts";
 import type { DestinationPage } from "../../../apps/web-shell/src/adapters/contract.ts";
 import type { HojeViewModel } from "../../../apps/web-shell/src/hoje-compose.ts";
 import type { Provenance, ServiceHealth, SourceRef } from "../../../apps/web-shell/src/types.ts";
 import { collectPresentedFreshness } from "./presented-freshness.ts";
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const AS_OF = "2026-08-20T15:00:00.000Z";
 const SOURCE: SourceRef = { system: "collector", kind: "host-health", locator: "infrastructure/hosts" };
@@ -164,4 +169,15 @@ test("the previous wiring — freshness echoed into both fields — could not fa
     page({ health: [serviceHealth("healthy", provenance("STALE", "2026-08-18T12:00:00.000Z"))] }),
   );
   assert.equal(evaluateStaleDataShownAsHealthy({ as_of: AS_OF, records: wired }).state, "fail");
+});
+
+test("the live snapshot is actually wired to the collector, not to the self-echo", () => {
+  // Everything above proves the collector can make the evaluator fail. It does
+  // not prove the live gate USES the collector: reverting snapshot.ts to
+  // `health_status: prov.freshness_status` would leave all of those green while
+  // the gate went blind again. Pin the wiring itself.
+  const snapshot = readFileSync(join(here, "snapshot.ts"), "utf8");
+  assert.match(snapshot, /collectPresentedFreshness\(pageResult\.page\)/);
+  assert.doesNotMatch(snapshot, /collectProvenance/);
+  assert.doesNotMatch(snapshot, /health_status:\s*prov\.freshness_status/);
 });
