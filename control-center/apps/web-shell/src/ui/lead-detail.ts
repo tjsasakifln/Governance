@@ -239,6 +239,8 @@ export interface LeadAction {
 
 export interface LeadDetailModel {
   resource: string;
+  /** Canonical id the local operator-action record is filed against. */
+  canonicalId: string;
   found: boolean;
   title: string;
   titleFromOrigin: boolean;
@@ -560,8 +562,14 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
       "Este identificador não é um alvo válido do canal de operador do Warmbly (o canal só aceita [A-Za-z0-9_~-], até 128 caracteres). Nenhuma escrita upstream é oferecida aqui.";
   }
 
+  const canonicalId =
+    (deal ? text(deal.canonical_id) : null) ??
+    (firstException ? text(firstException.canonical_id) : null) ??
+    resource;
+
   return {
     resource,
+    canonicalId,
     found,
     title: named ?? UNNAMED,
     titleFromOrigin: named !== null,
@@ -682,8 +690,6 @@ function backLink(model: LeadDetailModel): string {
  */
 export function leadDetailBlock(input: LeadDetailInput): string {
   const model = leadDetailView(input);
-  const canonicalId =
-    model.technicalIds.find((row) => row.label.endsWith("canonical_id"))?.value ?? model.resource;
 
   if (!model.found) {
     return `
@@ -723,7 +729,7 @@ export function leadDetailBlock(input: LeadDetailInput): string {
       <section class="stack lead-actions" aria-labelledby="lead-actions-title" data-action-scope="control-center-only">
         <h3 id="lead-actions-title">Registros no Control Center (não gravam no Warmbly)</h3>
         <p class="constraint" data-operator-scope="control-center-only">Estas ações gravam apenas um registro de auditoria local. Nada muda no Warmbly, e o item continua na fila até a origem mudar.</p>
-        ${model.localActions.map((action) => localActionForm(action, model.resource, canonicalId)).join("")}
+        ${model.localActions.map((action) => localActionForm(action, model.resource, model.canonicalId)).join("")}
       </section>
 
       <section class="stack lead-actions" aria-labelledby="lead-warmbly-title" data-action-scope="warmbly-write">
