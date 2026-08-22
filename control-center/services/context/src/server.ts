@@ -32,7 +32,7 @@ export async function startServer(
   const port = listenPort(env);
   // Off unless CC_WARMBLY_OPERATOR_ENABLED=true. When absent, every operator
   // route 404s rather than falling back to a weaker identity path.
-  const warmblyOperator = createWarmblyOperatorHandlerFromEnv(env, { logger });
+  const warmblyOperator = await createWarmblyOperatorHandlerFromEnv(env, { logger });
   const listener = createRequestListener({
     service: boot.service,
     operational: boot.operational,

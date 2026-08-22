@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { createRequestListener } from "../src/http.ts";
 import type { WarmblyOperatorHttpRequest } from "../src/http.ts";
@@ -89,10 +92,10 @@ test("a non-POST operator route reaches the channel, which owns the 405", async 
   assert.equal(method, "GET");
 });
 
-test("mounting is off by default and stays off when enabled but unconfigured", () => {
-  assert.equal(createWarmblyOperatorHandlerFromEnv({}, { logger: silentLogger }), undefined);
+test("mounting is off by default and stays off when enabled but unconfigured", async () => {
+  assert.equal(await createWarmblyOperatorHandlerFromEnv({}, { logger: silentLogger }), undefined);
   assert.equal(
-    createWarmblyOperatorHandlerFromEnv(
+    await createWarmblyOperatorHandlerFromEnv(
       { CC_WARMBLY_OPERATOR_ENABLED: "true" },
       { logger: silentLogger },
     ),
@@ -100,20 +103,36 @@ test("mounting is off by default and stays off when enabled but unconfigured", (
     "enabled without a base url and token must stay off rather than run half-wired",
   );
   assert.equal(
-    createWarmblyOperatorHandlerFromEnv(
+    await createWarmblyOperatorHandlerFromEnv(
       { CC_WARMBLY_OPERATOR_ENABLED: "false", CC_WARMBLY_BASE_URL: "http://x", CC_WARMBLY_OPERATOR_TOKEN: "t" },
       { logger: silentLogger },
     ),
     undefined,
   );
   assert.notEqual(
-    createWarmblyOperatorHandlerFromEnv(
+    await createWarmblyOperatorHandlerFromEnv(
       { CC_WARMBLY_OPERATOR_ENABLED: "true", CC_WARMBLY_BASE_URL: "http://x", CC_WARMBLY_OPERATOR_TOKEN: "t" },
       { logger: silentLogger },
     ),
     undefined,
     "fully configured must mount",
   );
+});
+
+test("the connector is never a static import, so a disabled feature cannot crash boot", () => {
+  // A static import made an opt-in feature crash the container on any image
+  // without the connector, feature off or not. That is what this pins.
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../src/warmbly-operator/from-env.ts"),
+    "utf8",
+  );
+  const staticImport = /^\s*import\s[^\n]*@confenge\/control-center-warmbly-connector/m;
+  assert.equal(
+    staticImport.test(source),
+    false,
+    "the connector must be reached through a dynamic import inside the enabled branch",
+  );
+  assert.match(source, /await import\("@confenge\/control-center-warmbly-connector"\)|import\("@confenge\/control-center-warmbly-connector"\)/);
 });
 
 test("the mount does not shadow the service's own routes", async () => {

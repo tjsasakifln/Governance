@@ -7,16 +7,6 @@
  * a default.
  */
 
-import {
-  WarmblyOperatorClient,
-  createAgentActivityLedgerSink,
-  createFanOutOperatorActionLedger,
-  createMemoryOperatorActionLedger,
-  createOperatorHttpHandler,
-  createWarmblyOperatorChannel,
-  defaultOperatorSinkErrorHandler,
-} from "@confenge/control-center-warmbly-connector";
-
 import type { Logger } from "../log.ts";
 import type { WarmblyOperatorHttpRequest, WarmblyOperatorHttpResponse } from "../http.ts";
 
@@ -56,7 +46,7 @@ export type WarmblyOperatorHandler = (
 export interface WarmblyOperatorEnvDeps {
   logger: Logger;
   /** Optional agent-activity sink, so operator actions land on the timeline. */
-  agentActivity?: Parameters<typeof createAgentActivityLedgerSink>[0];
+  agentActivity?: unknown;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -64,10 +54,19 @@ function required(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : undefined;
 }
 
-export function createWarmblyOperatorHandlerFromEnv(
+/**
+ * Loaded lazily and only when enabled. A static import would make an opt-in
+ * feature able to crash boot on any image that does not ship the connector,
+ * which is exactly what it did the first time.
+ */
+async function loadConnector(): Promise<typeof import("@confenge/control-center-warmbly-connector")> {
+  return import("@confenge/control-center-warmbly-connector");
+}
+
+export async function createWarmblyOperatorHandlerFromEnv(
   env: NodeJS.ProcessEnv,
   deps: WarmblyOperatorEnvDeps,
-): WarmblyOperatorHandler | undefined {
+): Promise<WarmblyOperatorHandler | undefined> {
   if (required(env, "CC_WARMBLY_OPERATOR_ENABLED") !== "true") {
     return undefined;
   }
@@ -84,6 +83,25 @@ export function createWarmblyOperatorHandlerFromEnv(
     return undefined;
   }
 
+  let connector: Awaited<ReturnType<typeof loadConnector>>;
+  try {
+    connector = await loadConnector();
+  } catch (err) {
+    deps.logger.error("warmbly.operator.connector_unavailable", {
+      msg: "the operator channel is enabled but its connector is not present in this image",
+      error: err instanceof Error ? err.name : "unknown",
+    });
+    return undefined;
+  }
+  const {
+    WarmblyOperatorClient,
+    createAgentActivityLedgerSink,
+    createFanOutOperatorActionLedger,
+    createMemoryOperatorActionLedger,
+    createOperatorHttpHandler,
+    createWarmblyOperatorChannel,
+    defaultOperatorSinkErrorHandler,
+  } = connector;
   const log = connectorLogger(deps.logger);
   const client = new WarmblyOperatorClient({
     baseUrl,
@@ -95,7 +113,9 @@ export function createWarmblyOperatorHandlerFromEnv(
   });
 
   const primary = createMemoryOperatorActionLedger();
-  const sinks = deps.agentActivity ? [createAgentActivityLedgerSink(deps.agentActivity)] : [];
+  const sinks = deps.agentActivity
+    ? [createAgentActivityLedgerSink(deps.agentActivity as never)]
+    : [];
   const ledger = createFanOutOperatorActionLedger(
     primary,
     sinks,
