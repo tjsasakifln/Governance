@@ -665,10 +665,22 @@ test("two different deals for one company are one client, keyed on the account",
   assert.equal(rows[0]?.client_slug, "acct-77");
   assert.equal(rows[0]?.scope, "client:acct-77");
   assert.equal(rows[0]?.display_name, "Acme Indústria");
-  assert.equal(rows[0]?.identity_basis, "account_key");
-  assert.equal(rows[0]?.derived_from_deal_count, 2);
   // A won deal makes the company an active client even though a sibling deal is open.
   assert.equal(rows[0]?.lifecycle, "active");
+  // v1 ClientStatus is frozen (additionalProperties:false), so the published row
+  // carries no new field; how the identity was resolved is recorded on the
+  // snapshot's data_quality block instead.
+  assert.equal("identity_basis" in (rows[0] ?? {}), false);
+  assert.equal("derived_from_deal_count" in (rows[0] ?? {}), false);
+  const dq = clients.payload.data_quality as {
+    identity_bases: string[];
+    resolved_identities: Array<{ client_slug: string; identity_basis: string; derived_from_deal_count: number }>;
+  };
+  assert.deepEqual(dq.resolved_identities, [
+    { client_slug: "acct-77", identity_basis: "account_key", derived_from_deal_count: 2 },
+  ]);
+  assert.ok(dq.identity_bases.includes("account_key"));
+  assert.equal(dq.identity_bases.some((basis) => /deal/i.test(basis)), false);
 });
 
 test("a deal id is never published as a client identity", () => {

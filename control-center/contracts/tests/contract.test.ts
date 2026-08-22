@@ -10,6 +10,7 @@ import {
   CLIENT_IDENTITY_REQUIRED_ACTION,
   CLIENT_IDENTITY_REQUIRED_ACTIONS,
   clientSlugFrom,
+  DEAL_SOURCE_KINDS,
   MIN_CLIENT_SLUG_LENGTH,
   resolveClientIdentity,
   catalogFixturePath,
@@ -321,33 +322,58 @@ describe("ClientStatus minimum identity", () => {
     assert.equal(new RegExp(SCOPE_CSV_PATTERN).test("commercial,client:acme-industria"), true);
   });
 
-  it("declares what a client identity may be derived from, and no deal basis", () => {
+  it("keeps the shipped v1 ClientStatus schema frozen — no field was added for this fix", () => {
+    // ADR-CC-001: adding to `required` is a breaking change (v2), and an
+    // additive optional field is a v1.1 const bump. Neither belongs in a P0 UX
+    // fix, so the identity basis travels on the clients snapshot instead.
     const schema = readJson("schemas/client-status.v1.schema.json") as {
       required: string[];
-      properties: Record<string, { enum?: string[] }>;
+      additionalProperties: boolean;
+      properties: Record<string, unknown>;
     };
-    assert.ok(schema.required.includes("identity_basis"));
-    assert.deepEqual(schema.properties.identity_basis?.enum, [...CLIENT_IDENTITY_BASES]);
+    assert.equal(schema.additionalProperties, false);
+    assert.deepEqual(schema.required, [
+      "schema_version",
+      "id",
+      "scope",
+      "client_slug",
+      "display_name",
+      "lifecycle",
+      "provenance",
+    ]);
+    assert.deepEqual(Object.keys(schema.properties), [
+      "schema_version",
+      "id",
+      "scope",
+      "client_slug",
+      "display_name",
+      "lifecycle",
+      "provenance",
+      "attention_item_ids",
+      "open_receivables",
+      "notes",
+    ]);
+  });
+
+  it("declares what a client identity may be derived from, and no deal basis", () => {
     for (const basis of CLIENT_IDENTITY_BASES) {
       assert.ok(!/deal|opportunity|negocio/i.test(basis), `${basis} must not be a deal-level basis`);
     }
   });
 
-  it("rejects a client published without stating how its identity was resolved", () => {
-    const doc = clone(valid) as Record<string, unknown>;
-    delete doc.identity_basis;
-    assert.equal(validate("ClientStatus", doc).ok, false);
-  });
-
-  it("rejects a deal roll-up that claims a non-client basis", () => {
-    const doc = clone(valid) as Record<string, unknown>;
-    doc.derived_from_deal_count = 2;
-    doc.identity_basis = "manual";
-    const result = validate("ClientStatus", doc);
-    assert.equal(result.ok, false);
-    assert.ok(result.errors.some((e) => e.keyword === "client_identity_basis"));
-    doc.identity_basis = "account_key";
-    assert.equal(validate("ClientStatus", doc).ok, true);
+  it("rejects a client sourced from a deal stream — a deal key is not a client identity", () => {
+    for (const kind of DEAL_SOURCE_KINDS) {
+      const doc = clone(valid) as Record<string, unknown>;
+      const provenance = doc.provenance as { source: Record<string, unknown> };
+      provenance.source = { ...provenance.source, kind };
+      const result = validate("ClientStatus", doc);
+      assert.equal(result.ok, false, `${kind} must not source a ClientStatus`);
+      assert.ok(result.errors.some((e) => e.keyword === "client_identity_basis"), kind);
+    }
+    // A client-level source kind is what the producer must resolve to first.
+    const ok = clone(valid) as Record<string, unknown>;
+    (ok.provenance as { source: Record<string, unknown> }).source.kind = "client-record";
+    assert.equal(validate("ClientStatus", ok).ok, true);
   });
 
   it("resolves identity from a client key, never from the record's own deal key", () => {

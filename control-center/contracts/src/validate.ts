@@ -6,6 +6,7 @@ import { classifyCompatibility } from "./compatibility.js";
 import { isIdentifiedClientSlug, isPlaceholderDisplayName, parseResourceId } from "./ids.js";
 import { packageRoot } from "./paths.js";
 import {
+  DEAL_SOURCE_KINDS as DEAL_SOURCE_KIND_LIST,
   FORBIDDEN_SECRET_KEY_REGEX,
   HOMEPAGE_PRIORITY_LIMIT,
   RESOURCE_TYPE_NAMES,
@@ -116,8 +117,8 @@ function collectSecretKeyIssues(value: unknown, pathExpr: string, acc: Validatio
   }
 }
 
-/** Identity bases that a deal roll-up may legitimately claim. */
-const DEAL_ROLLUP_BASES = new Set<string>(["client_key", "account_key", "organization_key", "company_name"]);
+/** Source kinds that describe a deal stream, which cannot identify a client. */
+const DEAL_SOURCE_KINDS = new Set<string>(DEAL_SOURCE_KIND_LIST);
 
 function stringField(rec: Record<string, unknown>, key: string): string | undefined {
   const v = rec[key];
@@ -188,20 +189,20 @@ function semanticChecks(type: ResourceTypeName, data: unknown): ValidationIssue[
         ),
       );
     }
-    // A deal roll-up must have been keyed on a client-level identifier. manual
-    // and governance are human/canonical entries and cannot be true of a stream
-    // of deals; there is no deal basis at all, which is the point.
-    if (rec.derived_from_deal_count !== undefined) {
-      const basis = stringField(rec, "identity_basis");
-      if (basis !== undefined && !DEAL_ROLLUP_BASES.has(basis)) {
-        errors.push(
-          issue(
-            "/identity_basis",
-            `a client rolled up from deals must be keyed on a client-level identifier, not '${basis}'; a deal key is not a client identity`,
-            "client_identity_basis",
-          ),
-        );
-      }
+    // A client is a company/account. A document whose own provenance is a deal
+    // stream was keyed on a deal, and a deal key is not a client identity. The
+    // producer must resolve the account and publish with a client-level source
+    // kind; the basis it resolved travels on the clients snapshot, in
+    // data_quality.resolved_identities, because v1 ClientStatus is frozen.
+    const sourceKind = stringField(asRecord(asRecord(rec.provenance)?.source) ?? {}, "kind");
+    if (sourceKind !== undefined && DEAL_SOURCE_KINDS.has(sourceKind)) {
+      errors.push(
+        issue(
+          "/provenance/source/kind",
+          `a ClientStatus may not be sourced from a deal stream ('${sourceKind}'); a deal key is not a client identity — resolve the account and publish with a client-level source kind`,
+          "client_identity_basis",
+        ),
+      );
     }
     const clientId = stringField(rec, "id");
     if (clientId !== undefined && slug !== undefined) {

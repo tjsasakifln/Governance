@@ -220,7 +220,6 @@ export function maybeClientFrom(row: Record<string, unknown>, fallback: Provenan
     lifecycle: (row.lifecycle as ClientStatus["lifecycle"]) ?? "unknown",
     provenance: provenanceOf(row, fallback),
   };
-  if (typeof row.identity_basis === "string") item.identity_basis = row.identity_basis;
   if (Array.isArray(row.attention_item_ids)) item.attention_item_ids = row.attention_item_ids.map(String);
   const money = moneyOf(row.open_receivables);
   if (money) item.open_receivables = money;

@@ -180,6 +180,12 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
   // Keyed by client slug, so N deals for one company are one client — the join
   // the deal id could never express.
   const bySlug = new Map<string, Record<string, unknown>>();
+  // How each published identity was resolved. This lives here, not on the
+  // ClientStatus rows: v1 ClientStatus is frozen with additionalProperties:false,
+  // and per ADR-CC-001 adding a field to it would be a v1.1/v2 bump. The clients
+  // snapshot is not a frozen resource schema, so the roll-up is recorded here and
+  // the resource stays exactly v1.
+  const resolvedIdentities = new Map<string, { client_slug: string; identity_basis: ClientIdentityBasis; derived_from_deal_count: number }>();
 
   pipeline.forEach((item, index) => {
     const row = asRecord(item) ?? {};
@@ -235,7 +241,8 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
     const existing = bySlug.get(slug);
     if (existing) {
       existing.active_exceptions = Number(existing.active_exceptions ?? 0) + relatedExceptions.length;
-      existing.derived_from_deal_count = Number(existing.derived_from_deal_count ?? 1) + 1;
+      const rolled = resolvedIdentities.get(slug);
+      if (rolled) rolled.derived_from_deal_count += 1;
       if (existing.next_action === null && typeof row.next_action === "string") {
         existing.next_action = row.next_action;
       }
@@ -252,14 +259,17 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
       return;
     }
 
+    resolvedIdentities.set(slug, {
+      client_slug: slug,
+      identity_basis: identity.basis,
+      derived_from_deal_count: 1,
+    });
     bySlug.set(slug, {
       schema_version: "control-center.client-status.v1",
       id: `cc:client-status:${slug}`,
       scope: `client:${slug}`,
       client_slug: slug,
       display_name: identity.display_name,
-      identity_basis: identity.basis,
-      derived_from_deal_count: 1,
       lifecycle: row.status === "won" ? "active" : row.status === "open" ? "lead" : "unknown",
       next_action: typeof row.next_action === "string" ? row.next_action : null,
       last_interaction: asRecord(last)?.at ?? null,
@@ -306,6 +316,11 @@ export function projectClientsFromCommercial(commercial: ProjectedSnapshot): Pro
         counts_as_client: false,
         raises_client_risk: false,
         entries: capList(dataQualityQueue),
+        // What a client identity may be derived from, and what each published
+        // client was actually keyed on. A deal basis is absent from the
+        // vocabulary on purpose: a deal key is not a client identity.
+        identity_bases: [...CLIENT_IDENTITY_BASES],
+        resolved_identities: capList([...resolvedIdentities.values()]),
       },
       unidentified_record_count: dataQualityQueue.length,
       // Commercial exceptions. Named for what they are: this count is about the

@@ -98,6 +98,34 @@ export const CLIENT_NAME_FIELDS = [
   "organization_name",
 ] as const;
 
+/**
+ * Source kinds that describe a *deal* stream.
+ *
+ * A deal stream cannot identify a client on its own: it knows opportunities, not
+ * companies. Publishing a ClientStatus whose provenance is one of these means
+ * the producer keyed a client on a deal — the substitution that put
+ * `client:<deal>` (and, when the deal had no id, `client:unknown`) on the
+ * Clientes route. Resolve the account first and publish with a client-level
+ * source kind.
+ *
+ * v1 `ClientStatus` is frozen with `additionalProperties: false`, so the
+ * resolved basis cannot be carried on the resource itself (ADR-CC-001: that
+ * would be a v1.1/v2 bump). It travels on the clients snapshot instead, in
+ * `data_quality.resolved_identities`, and this list is what `semanticChecks`
+ * enforces on the resource.
+ */
+export const DEAL_SOURCE_KINDS = [
+  "commercial-deal",
+  "crm-deal",
+  "deal",
+  "deal-record",
+  "opportunity",
+  "pipeline",
+  "commercial-pipeline",
+] as const;
+
+export type DealSourceKind = (typeof DEAL_SOURCE_KINDS)[number];
+
 /** Basis implied by each key field, so the producer never has to guess. */
 export const CLIENT_KEY_FIELD_BASIS: Record<(typeof CLIENT_KEY_FIELDS)[number], ClientIdentityBasis> = {
   client_id: "client_key",

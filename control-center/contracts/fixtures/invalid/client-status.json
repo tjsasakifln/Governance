@@ -5,7 +5,6 @@
   "client_slug": "acme-industria",
   "display_name": "Acme Indústria",
   "lifecycle": "churn_risk",
-  "identity_basis": "client_key",
   "provenance": {
     "source": {
       "system": "warmbly",

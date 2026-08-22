@@ -174,12 +174,6 @@ export interface ClientStatus {
   display_name: string;
   lifecycle: ClientLifecycle;
   provenance: Provenance;
-  /**
-   * How the producer resolved this identity. Required by the contract for new
-   * documents; optional here because the surface must still render a client
-   * that a pre-existing snapshot published without it.
-   */
-  identity_basis?: string;
   attention_item_ids?: ResourceId[];
   open_receivables?: Money;
   notes?: string;

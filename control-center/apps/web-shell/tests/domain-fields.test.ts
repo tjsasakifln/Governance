@@ -263,8 +263,6 @@ const REAL_CLIENT = {
   client_slug: "acct-77",
   display_name: "Acme Indústria",
   lifecycle: "active",
-  identity_basis: "account_key",
-  derived_from_deal_count: 2,
   provenance: {
     source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
     observed_at: "2026-08-20T18:00:00Z",

@@ -41,10 +41,14 @@ Parameterized:
 ### Minimum client identity
 
 **A client is a company / account / organization. A deal is not a client.** Two
-deals for one company are one client; a deal id is a deal key. `identity_basis`
-names which client-level key resolved the identity, and the enum contains no
-deal-level basis — a producer that only has a deal id has nothing truthful to
-write there, which is the point.
+deals for one company are one client; a deal id is a deal key.
+
+`ClientStatus` v1 is frozen (`additionalProperties: false`), and per ADR-CC-001 a
+new `required` field is a breaking `v2` and a new optional field is a `v1.1`
+const bump. So the rule is **not** carried as a field on the resource. It is
+enforced in `semanticChecks` — the same place reserved slugs are rejected
+independently of the schema's `not` clauses — and the resolved basis travels on
+the clients snapshot, which is not a frozen resource schema.
 
 A `ClientStatus` is an operational entity. A record that cannot be identified is
 **not** a client — it is a data-quality exception that belongs in the join queue.
@@ -58,8 +62,11 @@ The validator therefore rejects (keyword `client_identity`, `client_id_slug`,
   `reserved_client_slug` / `reserved_client_scope` schema `$defs`);
 - a placeholder `display_name` such as `Cliente` or `unknown`;
 - an `id` whose slug is not the `client_slug`;
-- a missing `identity_basis`, or a deal roll-up (`derived_from_deal_count`)
-  claiming a basis that is not client-level.
+- **a `provenance.source.kind` naming a deal stream** (`DEAL_SOURCE_KINDS`:
+  `commercial-deal`, `crm-deal`, `pipeline`, …). A deal stream knows
+  opportunities, not companies: publishing a client from one means the producer
+  keyed a client on a deal. Resolve the account first and publish with a
+  client-level source kind such as `client-record`.
 
 The reserved tokens are also excluded from the generic `scope` grammar, so
 `client:unknown` is not a valid scope on an AttentionItem, a Directive, a
@@ -71,6 +78,11 @@ never the record's own primary key. It returns `slug: null` rather than coercing
 an unusable identifier into a plausible-looking slug. A `null` means "emit a
 data-quality exception with origin, reason code and the correction for that
 reason" (`CLIENT_IDENTITY_REQUIRED_ACTIONS`), never "publish `client:unknown`".
+
+The clients snapshot records the outcome in `data_quality`:
+`identity_bases` (the vocabulary — no deal basis exists in it) and
+`resolved_identities` (`client_slug`, `identity_basis`, `derived_from_deal_count`
+for each published client).
 
 Note on enforcement: `validate.ts` runs in CI and the CLI, not on the serving
 path. The contract is the specification and the gate for new documents; the
