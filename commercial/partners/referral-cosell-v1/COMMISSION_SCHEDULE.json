@@ -1,0 +1,82 @@
+{
+  "schema_version": "partner-commission-schedule.v1",
+  "status": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "package_id": "CFG-PARTNER-REFERRAL-COSELL-v1",
+  "package_version": "referral-cosell-v1",
+  "currency": "BRL",
+  "base": "eligible_net_fees_actually_received",
+  "base_definition": "Honorários líquidos efetivamente recebidos pela CONFENGE do cliente atribuído, após taxas de provider, impostos retidos quando destacados, estornos, reembolsos e chargebacks já reconhecidos, exclusivamente na janela de período. Nunca valor de edital, obra, contrato público, economia, pleito, vitória ou honorários advocatícios.",
+  "advance_allowed": false,
+  "guaranteed_minimum_cents": 0,
+  "human_approval_required": true,
+  "automatic_financial_provider_mutation": false,
+  "real_money_mutation_approved": false,
+  "fiscal_document_required_when_applicable": true,
+  "ineligible_bases": [
+    "edital",
+    "obra",
+    "contrato_publico",
+    "economia",
+    "pleito",
+    "vitoria",
+    "valor_publico",
+    "success_fee",
+    "public_contract_value",
+    "attorney_fees"
+  ],
+  "attribution": {
+    "consent_required": true,
+    "decision_business_days": 2,
+    "protection_days_from_acceptance": 90,
+    "protection_is_permanent_account_ownership": false,
+    "preexisting_excluded": true,
+    "retroactive_silent_attribution": false,
+    "list_dump_compensated": false
+  },
+  "modalities": {
+    "REFERRAL_QUALIFIED": {
+      "rate_bps": 1000,
+      "period_months": 6,
+      "cap_cents_total_per_referred_client": 1000000,
+      "cap_kind": "TOTAL_PER_REFERRED_CLIENT_NOT_MONTHLY",
+      "exclusivity": false,
+      "included_in_standard_agreement": true,
+      "requires_addendum": false,
+      "public_value_compensated": false
+    },
+    "COSELL_SPECIALIZED": {
+      "max_rate_bps": 1500,
+      "period_months": 6,
+      "cap_cents_total_per_client": 1500000,
+      "cap_kind": "TOTAL_PER_CLIENT_NOT_MONTHLY",
+      "rate_fixed_at_opportunity_registration": true,
+      "included_in_standard_agreement": false,
+      "requires_addendum": true,
+      "public_value_compensated": false
+    },
+    "DISTRIBUTION_INTEGRATION": {
+      "included_in_standard_agreement": false,
+      "requires_separate_addendum": true,
+      "auto_included": false,
+      "rate_bps": null,
+      "period_months": null,
+      "cap_cents": null
+    },
+    "NOT_ELIGIBLE": {
+      "contracts": false,
+      "commission": false,
+      "included_in_standard_agreement": false
+    }
+  },
+  "professional_rule": {
+    "flag": "PROFESSIONAL_RULE_REVIEW_REQUIRED",
+    "standard_referral_commission_automatically_available": false,
+    "attorney_fees_commission_without_specific_authority": false
+  }
+}
