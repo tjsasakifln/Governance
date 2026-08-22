@@ -672,6 +672,23 @@ const HEALTH_LABELS: Record<ServiceHealth["status"], string> = {
   unknown: "sem conclusão",
 };
 
+/**
+ * Why this row is a defect, per code. A single hardcoded sentence used to claim
+ * the origin gave no identity even for ambiguous_service_id, where it gave two
+ * — and two distinct ids colliding is the entire problem. An unrecognised code
+ * gets no invented cause: the code itself is the whole statement.
+ */
+export function catalogErrorExplanation(code: string): string {
+  switch (code) {
+    case "missing_service_identity":
+      return "A origem não informou identidade para este serviço.";
+    case "ambiguous_service_id":
+      return "Duas entradas distintas do catálogo produzem o mesmo identificador. Os serviços seguem separados; corrigir os ids na origem.";
+    default:
+      return "Código não reconhecido por esta versão do cockpit; nenhuma causa é presumida.";
+  }
+}
+
 interface PresentedHealth {
   readonly status: ServiceHealth["status"];
   readonly conclusive: boolean;
@@ -721,7 +738,7 @@ export function healthCard(item: ServiceHealth): string {
   const catalogError = item.catalog_error
     ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
         item.catalog_error,
-      )}. A origem não informou identidade para este serviço.</p>`
+      )}. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
     : "";
   const duplicates =
     item.duplicate_count && item.duplicate_count > 1

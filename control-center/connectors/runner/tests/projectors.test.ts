@@ -1217,3 +1217,102 @@ test("a runbook URL with a secret-looking query key is refused by the projector 
   assert.ok(ok);
   assert.equal(infraServices(ok)[0]?.runbook_url, "https://runbooks.example/infra?service=api");
 });
+
+test("a malformed percent-escape in a runbook URL drops the link instead of crashing the projector", () => {
+  // parseAllowlist's path branch does no decoding, so this value reaches the
+  // projector through shipped config. A bare decodeURIComponent here threw
+  // URIError past projectCollector and past runSource's try/finally, and the
+  // whole infra snapshot went unpersisted for that run.
+  const base = {
+    service_id: "confenge-api-http",
+    display_name: "Confenge API inbound health",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const malformed of ["/runbooks/infra?%ZZ=1", "/runbooks/infra?a=1&%E0%A4%A=2", "%ZZ"]) {
+    let projected: ReturnType<typeof projectCollector> | undefined;
+    assert.doesNotThrow(() => {
+      projected = projectCollector(infraEnvelope({ service_health: [{ ...base, runbook_url: malformed }] }));
+    }, malformed);
+    const infra = projected?.[0];
+    assert.ok(infra, malformed);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, malformed);
+    // The card itself still ships: a bad link must not cost the snapshot.
+    assert.equal(infraServices(infra)[0]?.service_name, "Confenge API inbound health");
+  }
+});
+
+test("a query key wearing brackets or encoding is still a secret", () => {
+  const base = {
+    service_id: "x",
+    display_name: "X",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const unsafe of [
+    "/runbooks/infra?token[]=abc",
+    "/runbooks/infra?token%5B%5D=abc",
+    "https://runbooks.example/i?token[]=abc",
+    "https://runbooks.example/i?identity=abc",
+    "https://runbooks.example/i?x-api-key=abc",
+  ]) {
+    const [infra] = projectCollector(infraEnvelope({ service_health: [{ ...base, runbook_url: unsafe }] }));
+    assert.ok(infra);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, unsafe);
+  }
+});
+
+test("two byte-identical nameless rows stay two catalog defects", () => {
+  // The discriminating case for keying anonymous rows on their index: under the
+  // old JSON.stringify key these two collapse into one card and a monitored
+  // entry disappears behind duplicate_count.
+  const row = { status: "healthy", freshness_status: "FRESH", confidence: 0.9, checks: [] };
+  const [infra] = projectCollector(infraEnvelope({ service_health: [{ ...row }, { ...row }] }));
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 2);
+  assert.equal(infra.payload.monitored_service_count, 2);
+  assert.equal(infra.payload.duplicate_group_count, 0);
+  assert.equal(new Set(services.map((r) => r.id)).size, 2);
+  for (const service of services) {
+    assert.equal(service.duplicate_count, undefined);
+    assert.equal(service.catalog_error, "missing_service_identity");
+  }
+  assert.equal(infra.payload.catalog_error_count, 2);
+});
+
+test("the surviving latency carries the check that measured it", () => {
+  const base = {
+    service_id: "netcup-vps-1",
+    display_name: "Netcup VPS",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "healthy",
+    confidence: 0.9,
+    checks: [],
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        { ...base, latency_ms: 9, latency_check: "http" },
+        { ...base, latency_ms: 120, latency_check: "reachability" },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const merged = infraServices(infra)[0];
+  assert.ok(merged);
+  assert.equal(merged.duplicate_count, 2);
+  assert.equal(merged.latency_ms, 120);
+  // Not "http" — that was the base row's check, for a number it did not measure.
+  assert.equal(merged.latency_check, "reachability");
+});

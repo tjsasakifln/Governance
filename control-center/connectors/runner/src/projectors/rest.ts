@@ -8,6 +8,9 @@ import {
   type ClientIdentityBasis,
   type ClientIdentityReasonCode,
 } from "@confenge/control-center-contracts";
+// A leaf module with no imports of its own: this does not pull the collector's
+// runtime into the runner's import graph, only the one rule both must obey.
+import { hasSecretQueryKey } from "../../../infrastructure/src/secret-keys.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
   FRESHNESS,
@@ -195,9 +198,13 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
   const confidences = members
     .map((member) => finiteNumber(member.row.confidence))
     .filter((value): value is number => value !== undefined);
-  const latencies = members
-    .map((member) => member.latency)
-    .filter((value): value is number => value !== undefined);
+  // The check that produced the surviving number travels with it. Keeping the
+  // base row's latency_check while taking another member's max reported, for
+  // example, 120 ms "(http)" for a figure measured by reachability.
+  const timed = members
+    .filter((member): member is InfraService & { latency: number } => member.latency !== undefined)
+    .sort((a, b) => b.latency - a.latency);
+  const slowest = timed[0];
   const errors = members
     .map((member) => member.lastError)
     .filter((value): value is string => value !== undefined);
@@ -220,8 +227,14 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
   if (confidences.length > 0) {
     merged.confidence = Math.min(...confidences);
   }
-  if (latencies.length > 0) {
-    merged.latency_ms = Math.max(...latencies);
+  if (slowest) {
+    merged.latency_ms = slowest.latency;
+    const check = slowest.row.latency_check;
+    if (typeof check === "string" && check !== "") {
+      merged.latency_check = check;
+    } else {
+      delete merged.latency_check;
+    }
   }
   const joined = [...new Set(errors)].join(" | ");
   if (joined !== "") {
@@ -292,14 +305,16 @@ function groupServices(services: readonly InfraService[]): GroupedServices {
   };
 }
 
-const SECRET_QUERY_KEY =
-  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem)((_|-).*)?$/i;
-
 /**
  * A runbook link the cockpit may render. Same-origin absolute path, or an
  * http(s) URL with no credentials and no secret-looking query key — the same
- * rule the allowlist parser applies, repeated here because a link the operator
- * cannot trust is worse than no link. Anything else is dropped, not shown.
+ * rule, from the same module, that the allowlist parser applies, because a link
+ * the operator cannot trust is worse than no link. Anything else is dropped.
+ *
+ * The decode lives inside hasSecretQueryKey: a malformed escape such as
+ * `?%ZZ=1` used to throw URIError out of here, past projectCollector and past
+ * runSource's try/finally, so the whole infra snapshot went unpersisted for
+ * that run over a config typo.
  */
 function safeRunbookUrl(value: unknown): string | undefined {
   const raw = textOrUndefined(value);
@@ -308,21 +323,13 @@ function safeRunbookUrl(value: unknown): string | undefined {
   }
   if (raw.startsWith("/")) {
     if (raw.includes("@")) return undefined;
-    const query = raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "";
-    for (const pair of query.split("&")) {
-      if (pair !== "" && SECRET_QUERY_KEY.test(decodeURIComponent(pair.split("=")[0] ?? ""))) {
-        return undefined;
-      }
-    }
-    return raw;
+    return hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "") ? undefined : raw;
   }
   try {
     const url = new URL(raw);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (url.username || url.password) return undefined;
-    for (const key of url.searchParams.keys()) {
-      if (SECRET_QUERY_KEY.test(key)) return undefined;
-    }
+    if (hasSecretQueryKey(url.search)) return undefined;
     return url.toString();
   } catch {
     return undefined;

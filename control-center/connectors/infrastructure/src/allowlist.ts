@@ -1,9 +1,8 @@
+import { hasSecretQueryKey, isSecretKeyName } from "./secret-keys.js";
 import { CHECK_KINDS, type Allowlist, type AllowlistTarget, type CheckKind } from "./types.js";
 
 const TARGET_ID = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 const COLLECTOR_ID = /^[a-z0-9][a-z0-9._-]{0,80}$/;
-const SECRET_KEY =
-  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem|identity)((_|-).*)?$/i;
 const FORBIDDEN_VALUE = /BEGIN [A-Z ]*(PRIVATE KEY|CERTIFICATE)|ssh-rsa |ssh-ed25519 /i;
 
 class AllowlistError extends Error {
@@ -29,7 +28,7 @@ function rejectSecrets(node: unknown, path: string): void {
     return;
   }
   for (const [key, value] of Object.entries(node)) {
-    if (SECRET_KEY.test(key)) {
+    if (isSecretKeyName(key)) {
       throw new AllowlistError(`${path}.${key} is not allowed (secrets stay out of allowlist/config)`);
     }
     rejectSecrets(value, `${path}.${key}`);
@@ -74,10 +73,8 @@ function assertSafeUrl(raw: string, path: string): URL {
   if (url.username || url.password) {
     throw new AllowlistError(`${path} must not embed credentials`);
   }
-  for (const key of url.searchParams.keys()) {
-    if (SECRET_KEY.test(key)) {
-      throw new AllowlistError(`${path} query parameter ${key} looks like a secret`);
-    }
+  if (hasSecretQueryKey(url.search)) {
+    throw new AllowlistError(`${path} has a query parameter that looks like a secret`);
   }
   return url;
 }
@@ -118,6 +115,12 @@ function parseRunbookUrl(value: unknown, path: string): string {
   if (raw.startsWith("/")) {
     if (raw.includes("@")) {
       throw new AllowlistError(`${path} must not embed credentials`);
+    }
+    // The same-origin branch used to skip this: the catalog boundary, the one
+    // that is supposed to be strictest, accepted /runbooks/x?token=abc and left
+    // it to be caught downstream.
+    if (hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "")) {
+      throw new AllowlistError(`${path} has a query parameter that looks like a secret`);
     }
     return raw;
   }

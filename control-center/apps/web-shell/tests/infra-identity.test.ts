@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { createMockAdapter } from "../src/adapters/index";
 import { healthFrom, safeRunbookHref } from "../src/adapters/map";
 import { createMemoryRuntime, mount } from "../src/app";
-import { healthCard, infraCatalogBlock, presentHealth } from "../src/ui/domains";
+import { catalogErrorExplanation, healthCard, infraCatalogBlock, presentHealth } from "../src/ui/domains";
 import { httpAdapterFor } from "./helpers";
 import type { Provenance, ServiceHealth } from "../src/types";
 
@@ -304,4 +307,63 @@ test("a runbook URL carrying a secret-looking query key is refused", () => {
     safeRunbookHref("https://runbooks.example/infra?service=api"),
     "https://runbooks.example/infra?service=api",
   );
+});
+
+test("the credential-name rule is one rule, not three copies that drift", () => {
+  // The collector must not import the contracts tree and the browser bundle
+  // must not import the collector, so the module is duplicated on purpose. It
+  // is duplicated verbatim, and this is what keeps it that way: `?token[]=`
+  // was refused in one copy and rendered by another exactly because the three
+  // regexes had drifted apart.
+  const here = dirname(fileURLToPath(import.meta.url));
+  const shell = readFileSync(join(here, "../src/secret-keys.ts"), "utf8");
+  const collector = readFileSync(
+    join(here, "../../../connectors/infrastructure/src/secret-keys.ts"),
+    "utf8",
+  );
+  assert.equal(shell, collector, "secret-keys.ts copies have drifted");
+  // And no boundary may quietly reintroduce a private list.
+  for (const file of ["../src/adapters/map.ts", "../src/ui/domains.ts"]) {
+    assert.doesNotMatch(readFileSync(join(here, file), "utf8"), /SECRET_QUERY_KEY\s*=/);
+  }
+});
+
+test("a query key wearing brackets or encoding is still refused by the shell", () => {
+  for (const unsafe of [
+    "/runbooks/infra?token[]=abc",
+    "/runbooks/infra?token%5B%5D=abc",
+    "https://runbooks.example/i?token[]=abc",
+    "https://runbooks.example/i?identity=abc",
+    "https://runbooks.example/i?x-api-key=abc",
+    "/runbooks/infra?%ZZ=1",
+  ]) {
+    assert.equal(safeRunbookHref(unsafe), undefined, unsafe);
+    const item = healthFrom(
+      { service_name: "x", status: "down", runbook_url: unsafe, freshness_status: "FRESH", confidence: 0.9 },
+      FALLBACK,
+    );
+    assert.doesNotMatch(healthCard(item), /<a class="wrap-any"/);
+  }
+  assert.equal(safeRunbookHref("/runbooks/infra?service=api"), "/runbooks/infra?service=api");
+});
+
+test("each catalog error explains its own cause and none invents one", () => {
+  assert.match(catalogErrorExplanation("missing_service_identity"), /não informou identidade/);
+  const ambiguous = catalogErrorExplanation("ambiguous_service_id");
+  // The origin DID supply an identity here — two of them. Saying otherwise is
+  // a wrong explanation, which is worse than none.
+  assert.doesNotMatch(ambiguous, /não informou identidade/);
+  assert.match(ambiguous, /mesmo identificador/);
+  assert.match(catalogErrorExplanation("something_new"), /nenhuma causa é presumida/);
+
+  const html = healthCard(service({ status: "degraded", catalog_error: "ambiguous_service_id" }));
+  assert.match(html, /data-catalog-error="ambiguous_service_id"/);
+  assert.match(html, /mesmo identificador/);
+  assert.doesNotMatch(html, /não informou identidade/);
+});
+
+test("latency and the probe that measured it stay together on the card", () => {
+  const html = healthCard(service({ latency_ms: 120, latency_check: "reachability" }));
+  assert.match(html, /Latência observada \(reachability\)/);
+  assert.doesNotMatch(html, /Latência observada \(http\)/);
 });

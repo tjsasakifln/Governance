@@ -4,6 +4,7 @@ import { parseAllowlist } from "../src/allowlist.js";
 import { collect } from "../src/collect.js";
 import { createFixturePorts } from "../src/fixture-ports.js";
 import { logicalEndpoint, roleFor } from "../src/map.js";
+import { hasSecretQueryKey, isSecretKeyName } from "../src/secret-keys.js";
 import type { CollectResult, ServiceHealth } from "../src/types.js";
 import { collectFixture, loadFixtureFile } from "./helpers.js";
 
@@ -90,6 +91,91 @@ test("catalog role and runbook travel from the allowlist to service health", asy
   assert.equal(item.role, "Painel de configuração");
   assert.equal(item.runbook_url, "/runbooks/cfg-health");
   assert.equal(health(result, "extra-contracts").runbook_url, undefined);
+});
+
+test("the credential-name rule sees through punctuation, arrays and encoding", () => {
+  for (const name of [
+    "token",
+    "token[]",
+    "token%5B%5D",
+    "TOKEN[]",
+    "access_token",
+    "api_key",
+    "x-api-key",
+    "apiKey",
+    "authorization",
+    "private-key",
+    "ssh",
+    "credential",
+    "pem",
+    "identity",
+    "password",
+  ]) {
+    assert.equal(isSecretKeyName(decodeURIComponent(name)), true, name);
+  }
+  // Not credentials, and must stay usable: a rule that eats these silently
+  // deletes legitimate runbook links.
+  for (const name of ["service", "sort_key", "bypass", "passenger", "id", "collector_id", "host"]) {
+    assert.equal(isSecretKeyName(name), false, name);
+  }
+});
+
+test("a query string that cannot be decoded is refused, not thrown on", () => {
+  assert.equal(hasSecretQueryKey("%ZZ=1"), true);
+  assert.equal(hasSecretQueryKey("token[]=abc"), true);
+  assert.equal(hasSecretQueryKey("token%5B%5D=abc"), true);
+  assert.equal(hasSecretQueryKey("identity=abc"), true);
+  assert.equal(hasSecretQueryKey("service=api&region=eu"), false);
+  assert.equal(hasSecretQueryKey(""), false);
+});
+
+test("the catalog boundary refuses a secret-looking query key on BOTH runbook branches", () => {
+  const raw = loadFixtureFile("healthy.json").allowlist as Record<string, unknown>;
+  const withRunbook = (value: unknown): unknown => ({
+    ...raw,
+    targets: [
+      {
+        id: "cfg-health",
+        display_name: "cfg-health HTTP",
+        url: "http://127.0.0.1:18081/health",
+        checks: ["http"],
+        runbook_url: value,
+      },
+    ],
+  });
+  for (const unsafe of [
+    // absolute-URL branch
+    "https://runbooks.example/infra?api_key=abc",
+    "https://runbooks.example/infra?token[]=abc",
+    "https://runbooks.example/infra?identity=abc",
+    // same-origin path branch: this one used to be accepted here and only
+    // caught downstream, leaving the strictest boundary the most permissive.
+    "/runbooks/infra?token=abc",
+    "/runbooks/infra?token[]=abc",
+    "/runbooks/infra?password=hunter2",
+  ]) {
+    assert.throws(() => parseAllowlist(withRunbook(unsafe)), /secret/i, unsafe);
+  }
+  assert.throws(() => parseAllowlist(withRunbook("/runbooks/infra?%ZZ=1")), /secret/i);
+  // A benign query key still works on both branches.
+  assert.doesNotThrow(() => parseAllowlist(withRunbook("/runbooks/infra?service=api")));
+  assert.doesNotThrow(() => parseAllowlist(withRunbook("https://runbooks.example/i?service=api")));
+});
+
+test("a probe URL with a secret-looking query key is refused", () => {
+  const raw = loadFixtureFile("healthy.json").allowlist as Record<string, unknown>;
+  const withUrl = (url: string): unknown => ({
+    ...raw,
+    targets: [{ id: "cfg-health", display_name: "cfg-health HTTP", url, checks: ["http"] }],
+  });
+  for (const unsafe of [
+    "http://127.0.0.1:18081/health?api_key=abc",
+    "http://127.0.0.1:18081/health?token[]=abc",
+    "http://127.0.0.1:18081/health?identity=abc",
+  ]) {
+    assert.throws(() => parseAllowlist(withUrl(unsafe)), /secret/i, unsafe);
+  }
+  assert.doesNotThrow(() => parseAllowlist(withUrl("http://127.0.0.1:18081/health?verbose=1")));
 });
 
 test("an unsafe runbook link is refused at the catalog boundary", () => {

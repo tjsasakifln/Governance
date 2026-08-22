@@ -25,6 +25,7 @@ import type {
   SourceRef,
 } from "../types";
 import { AGENT_ACTIVITY_STATUSES } from "../types";
+import { hasSecretQueryKey } from "../secret-keys";
 import type { DestinationPage } from "./contract";
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
@@ -543,24 +544,6 @@ function healthStatusOf(value: unknown): ServiceHealth["status"] {
  * same rule; the shell repeats it because a link it cannot vouch for is worse
  * than no link.
  */
-const SECRET_QUERY_KEY =
-  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem)((_|-).*)?$/i;
-
-function hasSecretQueryKey(query: string): boolean {
-  for (const pair of query.split("&")) {
-    if (pair === "") continue;
-    let key = pair.split("=")[0] ?? "";
-    try {
-      key = decodeURIComponent(key);
-    } catch {
-      // A key that will not decode is not one we can vouch for either.
-      return true;
-    }
-    if (SECRET_QUERY_KEY.test(key)) return true;
-  }
-  return false;
-}
-
 export function safeRunbookHref(value: unknown): string | undefined {
   const raw = typeof value === "string" ? value.trim() : "";
   if (raw === "" || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
@@ -574,9 +557,7 @@ export function safeRunbookHref(value: unknown): string | undefined {
     const url = new URL(raw);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (url.username !== "" || url.password !== "") return undefined;
-    for (const key of url.searchParams.keys()) {
-      if (SECRET_QUERY_KEY.test(key)) return undefined;
-    }
+    if (hasSecretQueryKey(url.search)) return undefined;
     return url.toString();
   } catch {
     return undefined;
