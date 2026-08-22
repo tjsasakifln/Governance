@@ -249,3 +249,36 @@ test("a JSON operator write still reaches the channel", async () => {
   });
   assert.equal(reached, true);
 });
+
+test("a duplicated Remote-Groups cannot smuggle an operator group", async () => {
+  // Node joins duplicate headers into "operators, viewers", which splitGroups
+  // then splits back into a group list — handing the caller whichever group it
+  // appended. Only rawHeaders shows the duplicate, so the mount must forward it.
+  let seen: { rawHeaders?: readonly string[] } | undefined;
+  const handler = async (req: { rawHeaders?: readonly string[] }) => {
+    seen = req;
+    return { status: 401, body: { ok: false, code: "spoofed_identity" } };
+  };
+  await withServer(handler as never, async (base) => {
+    const { request } = await import("node:http");
+    await new Promise<void>((resolve, reject) => {
+      const req = request(
+        `${base}${PAUSE}`,
+        { method: "POST", headers: { "content-type": "application/json" } },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve());
+        },
+      );
+      req.on("error", reject);
+      // Two Remote-Groups on the wire: the client's copy and the proxy's.
+      req.setHeader("Remote-User", "mallory");
+      req.appendHeader?.("Remote-Groups", "operators");
+      req.appendHeader?.("Remote-Groups", "viewers");
+      req.end(JSON.stringify({ reason: "escalation probe" }));
+    });
+  });
+  const raw = seen?.rawHeaders ?? [];
+  const count = raw.filter((_v, i) => i % 2 === 0 && raw[i]?.toLowerCase() === "remote-groups").length;
+  assert.ok(count >= 2, "the mount must forward rawHeaders so the duplicate is visible");
+});

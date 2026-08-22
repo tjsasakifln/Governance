@@ -31,6 +31,8 @@ export interface WarmblyOperatorHttpRequest {
   method: string | undefined;
   url: string | undefined;
   headers: Readonly<Record<string, string | string[] | undefined>>;
+  /** Node joins duplicate headers; only the raw list shows a client copy. */
+  rawHeaders?: readonly string[];
   remoteAddress: string | undefined;
   body: unknown;
 }
@@ -202,6 +204,7 @@ async function handle(
         method,
         url: url.pathname,
         headers: req.headers,
+        rawHeaders: req.rawHeaders,
         remoteAddress: req.socket?.remoteAddress,
         body: method === "POST" ? await readBody(req) : undefined,
       });

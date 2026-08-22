@@ -197,11 +197,23 @@ export class WarmblyClient {
         method,
         headers,
         signal: controller.signal,
+        // Never follow a redirect. A same-origin 3xx keeps the Authorization
+        // header, so a redirect reaches a path the allowlist forbids while the
+        // caller and the log still report the original one. The write client
+        // was fixed for this; the read client shares the token and the breaker.
+        redirect: "manual",
       };
       if (method === "POST") {
         init.body = JSON.stringify(body ?? {});
       }
       const res = await this.fetchImpl(url, init);
+      // With redirect: "manual" a 3xx arrives here instead of being followed.
+      // It is never a valid answer from this API, and reporting it as a normal
+      // response would hand the caller a body from a path the allowlist never
+      // classified.
+      if (res.status >= 300 && res.status < 400) {
+        throw new UpstreamError(res.status, pathnameFromUrl(url));
+      }
       const apiVersion = res.headers.get("API-Version") ?? undefined;
       let json: unknown = null;
       if (method !== "HEAD") {

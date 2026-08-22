@@ -23,9 +23,11 @@ function headerValue(
     }
     if (Array.isArray(raw)) {
       // Fail closed on any duplicate. Taking the first value lets a client-sent
-      // copy of an identity header win over the one the proxy appends; Node's
-      // own http server joins duplicates into one string and denies, and a
-      // mount that hands us arrays must not behave differently.
+      // copy of an identity header win over the one the proxy appends.
+      // Node's http server does NOT deny a duplicate: it joins the values with
+      // ", " into a single string, and for Remote-Groups that string is then
+      // split back into a group list. That case is caught by the rawHeaders
+      // check in parseForwardAuthIdentity, not here.
       if (raw.length !== 1) {
         return undefined;
       }
@@ -46,6 +48,27 @@ function splitGroups(value: string): string[] {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+}
+
+/**
+ * Counts how many times a header name appears in `rawHeaders`. Returns 0 when
+ * the caller supplied no raw list, which means "unknown", not "none".
+ */
+export function rawHeaderOccurrences(
+  rawHeaders: readonly string[] | undefined,
+  name: string,
+): number {
+  if (!rawHeaders) {
+    return 0;
+  }
+  const want = name.toLowerCase();
+  let count = 0;
+  for (let i = 0; i < rawHeaders.length; i += 2) {
+    if ((rawHeaders[i] ?? "").toLowerCase() === want) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 export function extractForwardAuthHeaders(
@@ -76,6 +99,15 @@ export function parseForwardAuthIdentity(
   policy: TrustedHopPolicy,
 ): IdentityResult {
   const trusted = isTrustedHop(request.remoteAddress, policy.trustedHops);
+  // A duplicated identity header is a client copy racing the proxy's. Node joins
+  // them, and for Remote-Groups the join is then split back into a group list,
+  // which hands the caller whichever group it appended. Only rawHeaders can see
+  // it, so when the caller gives us the raw list we fail closed on any repeat.
+  for (const name of FORWARD_AUTH_HEADERS) {
+    if (rawHeaderOccurrences(request.rawHeaders, name) > 1) {
+      return deny("spoofed_identity", `${name} was sent more than once`);
+    }
+  }
   const extracted = extractForwardAuthHeaders(request.headers);
   const hasAny = extracted.presentCount > 0;
 

@@ -15,11 +15,18 @@ After Caddy `forward_auth` to Authelia `/api/authz/forward-auth` succeeds, the p
 
 Trust those headers **only** from `CC_TRUSTED_PROXY_CIDRS` (immediate TCP peer). Deny otherwise.
 
-Duplicated identity headers fail closed. A `Remote-*` header that arrives more
-than once (an array-valued header from a mount that does not join duplicates)
-yields no value at all, so a client-supplied copy can never beat the value the
-proxy appends — Node's own `http` server joins duplicates into one string and is
-denied for the same reason.
+Duplicated identity headers fail closed, but only if the caller passes
+`rawHeaders`. Node's `http` server does **not** deny a duplicate: it joins the
+values with `", "` into one string. For `Remote-Groups` that string is then split
+back into a group list, so a client-sent `Remote-Groups: operators` appended to
+the proxy's `viewers` yields both groups — an escalation `headers` alone cannot
+see, because it is indistinguishable from a legitimate two-group value.
+
+`parseForwardAuthIdentity` therefore counts occurrences in `IdentityRequest.rawHeaders`
+and denies any `Remote-*` sent more than once. An array-valued header (a mount
+that does not join) is denied separately in `headerValue`. **A caller that omits
+`rawHeaders` loses the duplicate check**: forward `req.rawHeaders` wherever
+identity decides a write.
 
 Public unauthenticated paths: `/healthz`, `/livez`. Payload from `healthPayload()` → `{"status":"ok"}`.
 
