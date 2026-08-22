@@ -22,6 +22,16 @@ import {
   memoriaGroups,
 } from "./domains";
 import { provenanceBlock } from "./provenance";
+import {
+  agentSessionStatusLabel,
+  attentionStatusLabel,
+  priorityHorizonLabel,
+  scopeLabel,
+  severityLabel,
+  statusPill,
+  technicalDetails,
+  viewKindLabel,
+} from "./labels";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -38,11 +48,21 @@ function attentionCard(item: AttentionItem): string {
   return `
     <article class="card attention" data-severity="${escapeHtml(item.severity)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.severity)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker">${statusPill(item.severity, severityLabel(item.severity))} ${statusPill(item.status, attentionStatusLabel(item.status))} <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.title)}</h3>
       </header>
       <p>${escapeHtml(item.summary)}</p>
       ${item.recommended_action ? `<p class="action">Ação sugerida: ${escapeHtml(item.recommended_action)}</p>` : ""}
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "severity", value: item.severity },
+          { term: "status", value: item.status },
+          { term: "scope", value: item.scope },
+          { term: "schema_version", value: item.schema_version },
+        ],
+        "attention-item",
+      )}
       ${provenanceBlock(item.provenance)}
     </article>
   `;
@@ -51,7 +71,7 @@ function attentionCard(item: AttentionItem): string {
 function priorityCard(item: PriorityRecommendation): string {
   return `
     <li class="card priority" data-rank="${item.rank}" data-id="${escapeHtml(item.id)}">
-      <p class="kicker">Prioridade ${item.rank} · ${escapeHtml(item.horizon)}</p>
+      <p class="kicker">Prioridade ${item.rank} · ${escapeHtml(priorityHorizonLabel(item.horizon))}</p>
       <h3>${escapeHtml(item.title)}</h3>
       <p>${escapeHtml(item.rationale)}</p>
       ${provenanceBlock(item.provenance)}
@@ -63,13 +83,13 @@ function sessionCard(item: AgentSession): string {
   return `
     <article class="card session" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.agent_id)}</span></p>
+        <p class="kicker">${statusPill(item.status, agentSessionStatusLabel(item.status))} <span class="scope">${escapeHtml(item.agent_id)}</span></p>
         <h3>${escapeHtml(item.agent_id)}</h3>
       </header>
       <p>${escapeHtml(item.purpose)}</p>
       <dl class="facts">
-        <div><dt>Pedidos</dt><dd>${escapeHtml(item.requested_scopes.join(", ") || "—")}</dd></div>
-        <div><dt>Concedidos</dt><dd>${escapeHtml(item.granted_scopes.join(", ") || "nenhum")}</dd></div>
+        <div><dt>Escopos pedidos</dt><dd>${escapeHtml(item.requested_scopes.join(", ") || "—")}</dd></div>
+        <div><dt>Escopos concedidos</dt><dd>${escapeHtml(item.granted_scopes.join(", ") || "nenhum")}</dd></div>
       </dl>
     </article>
   `;
@@ -80,7 +100,7 @@ function viewBanner(view: ViewState<DestinationPage>): string {
     return `<div class="banner loading" role="status">${escapeHtml(DEFAULT_LOADING_LABEL)}</div>`;
   }
   if (view.kind === "error") {
-    return `<div class="banner error" role="alert"><p>${escapeHtml(view.message)}</p><p class="code">${escapeHtml(view.code)}</p></div>`;
+    return `<div class="banner error" role="alert"><p>${escapeHtml(view.message)}</p>${technicalDetails([{ term: "codigo_do_erro", value: view.code }], "view-error")}</div>`;
   }
   if (view.kind === "empty") {
     return `<div class="banner empty" role="status">${escapeHtml(view.message)}</div>`;
@@ -162,7 +182,7 @@ function mockLab(destination: DestinationId, current: ViewKind): string {
   const links = VIEW_KINDS.map((kind) => {
     const href = kind === "ready" ? hashFor(destination) : hashFor(destination, kind);
     const selected = kind === current ? "true" : "false";
-    return `<a href="${href}" data-view="${kind}" aria-current="${selected}">${kind}</a>`;
+    return `<a href="${href}" data-view="${kind}" aria-current="${selected}">${escapeHtml(viewKindLabel(kind))}</a>`;
   }).join("");
   return `
     <div class="mock-lab" role="group" aria-label="Simular estado da vista (somente mock)">

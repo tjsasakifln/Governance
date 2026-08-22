@@ -3,27 +3,54 @@ import { formatMoney } from "../money";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
 import { WRITE_SHORTCUT_LABELS } from "../adapters/paths";
 import { freshnessTone } from "../freshness-tone";
+import {
+  CONFIDENCE_HELP,
+  confidenceWord,
+  freshnessLabel,
+  freshnessPill,
+  helpTerm,
+  severityLabel,
+  statusPill,
+  technicalDetails,
+} from "./labels";
 
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const tone = row.freshness_tone || freshnessTone(row.freshness_status);
   const money = row.money
     ? `<p class="money" data-amount-cents="${row.money.amount_cents}" data-currency="${escapeHtml(row.money.currency)}">${escapeHtml(formatMoney(row.money))}</p>`
     : "";
-  const severity = row.severity ? `<span class="pill">${escapeHtml(row.severity)}</span>` : "";
+  const severity = row.severity ? statusPill(row.severity, severityLabel(row.severity)) : "";
+  const confidence =
+    row.confidence !== undefined
+      ? `${confidenceWord(row.confidence)} (${String(row.confidence).replace(".", ",")})`
+      : "—";
   return `
     <article class="card ${sectionId === "incidents" ? "attention" : "hoje-row"}" data-id="${escapeHtml(row.id)}" data-freshness="${escapeHtml(row.freshness_status)}" data-tone="${escapeHtml(tone)}"${row.severity ? ` data-severity="${escapeHtml(row.severity)}"` : ""}>
       <header>
-        <p class="kicker">${severity}<span class="pill pill-${escapeHtml(row.freshness_status.toLowerCase())}">${escapeHtml(row.freshness_status)}</span> <span class="sr-only">${escapeHtml(row.freshness_status)}</span></p>
+        <p class="kicker">${severity}${freshnessPill(row.freshness_status)} <span class="sr-only">${escapeHtml(freshnessLabel(row.freshness_status))}</span></p>
         <h3>${escapeHtml(row.title)}</h3>
       </header>
       <p>${escapeHtml(row.summary)}</p>
       ${money}
       <p class="prov-inline">
-        <span>${escapeHtml(row.source.system)} · ${escapeHtml(row.source.kind)}</span>
-        · <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
+        <span>Origem: ${escapeHtml(row.source.system)}</span>
+        · Observado <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
         <span class="sr-only">UTC ${escapeHtml(row.observed_at)}</span>
-        · confiança ${row.confidence !== undefined ? String(row.confidence).replace(".", ",") : "—"}
+        · ${helpTerm("confiança", CONFIDENCE_HELP)} ${escapeHtml(confidence)}
       </p>
+      ${technicalDetails(
+        [
+          { term: "id", value: row.id },
+          { term: "sistema", value: row.source.system },
+          { term: "tipo_de_origem", value: row.source.kind },
+          { term: "locator", value: row.source.locator },
+          { term: "freshness_status", value: row.freshness_status },
+          { term: "observed_at_utc", value: row.observed_at },
+          { term: "severity", value: row.severity ?? "" },
+          { term: "kind", value: row.kind ?? "" },
+        ],
+        "hoje-row",
+      )}
     </article>
   `;
 }
@@ -45,6 +72,13 @@ function shortcutForm(section: HojeSection): string {
             <textarea name="body" required maxlength="8000" rows="3"></textarea>
           </label>
           <button type="submit">${escapeHtml(label)}</button>
+          ${technicalDetails(
+            [
+              { term: "endpoint", value: "POST /v1/directives" },
+              { term: "shortcut_kind", value: shortcut.kind },
+            ],
+            "write-shortcut",
+          )}
         </form>
       `;
     })

@@ -70,8 +70,13 @@ test("driving a nav hash changes the visible destination", () => {
     assert.match(root.innerHTML, /data-destination="financeiro"/);
     assert.match(root.innerHTML, /data-amount-cents="1500000"/);
     assert.match(root.innerHTML, /data-currency="BRL"/);
-    assert.match(root.innerHTML, /Mutações de provedor: forbidden/);
+    assert.match(root.innerHTML, /Mutações de provedor: proibidas/);
+    // O identificador não sumiu: desceu para o bloco recolhido e copiável.
     assert.match(root.innerHTML, /read_model_only=true/);
+    assert.match(
+      root.innerHTML,
+      /<details class="tech" data-tech="finance-authority">[\s\S]*?read_model_only[\s\S]*?<\/details>/,
+    );
     runtime.setHash("#/hoje?view=loading");
     assert.match(root.innerHTML, /data-view-state="loading"/);
     runtime.setHash("#/hoje?view=error");
