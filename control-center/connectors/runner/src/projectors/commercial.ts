@@ -188,6 +188,15 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
   return {
     schema_version: "control-center.commercial-operations.v1",
     projector_version: PROJECTOR_VERSION,
+    // Passed through from the connector rather than re-derived. This projector
+    // rebuilds most of `operations` from the raw payload, so a block that only
+    // the connector computes has to be forwarded explicitly or it silently
+    // disappears between the mapper and the surface that renders it.
+    dispatch: asRecord(nested.dispatch) ?? {
+      state: "UNKNOWN",
+      observed: false,
+      why: "the collector produced no dispatch reading; the kill-switch state is not known",
+    },
     authority: {
       catalog_authority: "governance",
       commercial_runtime: "warmbly",

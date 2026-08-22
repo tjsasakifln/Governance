@@ -1,6 +1,12 @@
 import { FRESHNESS_STATUSES, type FreshnessStatus } from "@confenge/control-center-contracts";
 import { failedCollect, parseCollectConfig, collect as collectGithub, liveTransport } from "../../github/src/index.ts";
-import { collect as collectWarmbly } from "../../warmbly/src/index.ts";
+// Import the collect surface directly, not the connector barrel. The barrel
+// also re-exports the operator write channel, which pulls
+// @confenge/control-center-security into this process's static import graph —
+// a package the read-only collector neither declares nor needs, and whose
+// absence crash-looped the container on boot. The read plane must not link the
+// write plane.
+import { collect as collectWarmbly } from "../../warmbly/src/collect.ts";
 import { collectFinanceSnapshot, DefaultFetchTransport, parseAsaasConfig } from "../../asaas/src/index.ts";
 import { evaluatePncpFreshness, loadAdapterConfigFromEnv } from "../../pncp/src/index.ts";
 import { collect as collectInfra, createLivePorts } from "../../infrastructure/src/index.ts";

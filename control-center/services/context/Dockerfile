@@ -10,10 +10,15 @@ RUN npm ci --ignore-scripts
 RUN node scripts/build-runtime-packages.mjs context
 RUN node scripts/rewrite-runtime-exports.mjs /src
 RUN npm prune --omit=dev --ignore-scripts
+# strip-runtime-tree prunes node_modules/@confenge to exactly this list, so a
+# package left off it loses its workspace symlink even when its directory is
+# copied below. The operator channel resolves both of these at runtime.
 RUN node scripts/strip-runtime-tree.mjs /src \
   @confenge/control-center-contracts \
   @confenge/control-center-persistence \
   @confenge/control-center-attention \
+  @confenge/control-center-security \
+  @confenge/control-center-warmbly-connector \
   @confenge/control-center-context \
   && test ! -e /src/node_modules/tsx \
   && test ! -e /src/node_modules/esbuild \
@@ -36,6 +41,11 @@ COPY --from=builder --chown=node:node /src/persistence ./persistence
 COPY --from=builder --chown=node:node /src/intelligence/attention ./intelligence/attention
 # Optional dependency of the operator channel. Loaded lazily and only when
 # CC_WARMBLY_OPERATOR_ENABLED=true, but it has to be present to be loadable.
+# `security` comes with it: node_modules/@confenge/* are workspace symlinks, so
+# shipping the connector without it leaves a dangling link and the lazy import
+# fails with ERR_MODULE_NOT_FOUND. from-env catches that and stays off, which
+# means enabling the channel would have silently done nothing.
+COPY --from=builder --chown=node:node /src/security ./security
 COPY --from=builder --chown=node:node /src/connectors/warmbly ./connectors/warmbly
 COPY --from=builder --chown=node:node /src/services/context ./services/context
 COPY --from=builder --chown=node:node /src/scripts/node-http-probe.mjs ./node-http-probe.mjs
