@@ -1,0 +1,166 @@
+{
+  "note": "Recorded from the real services/context HTTP server with the real Warmbly operator channel mounted. Regenerate only by observing live responses; both services/context/test/warmbly-operator-wire-shapes.test.ts and apps/web-shell/tests/warmbly-operation.test.ts pin this file, so an edit that is not backed by an observed response fails one of them. Fields the channel mints per call (correlation_id, ledger_id, recorded_at, confirmation_token, expires_at) are replaced by \"<volatile>\".",
+  "schema": "control-center.warmbly-operator-http-responses.recording.v1",
+  "cases": [
+    {
+      "name": "executed",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 200,
+      "body": {
+        "action": "pause_dispatch",
+        "client_reference": null,
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": true,
+        "outcome": "executed",
+        "recorded_at": "<volatile>",
+        "target": {
+          "id": "confenge-dispatch",
+          "kind": "dispatch"
+        },
+        "upstream_status": 200
+      }
+    },
+    {
+      "name": "challenged",
+      "route": "/v1/warmbly/operator/dispatch/resume/confirm",
+      "status": 202,
+      "body": {
+        "action": "resume_dispatch",
+        "client_reference": null,
+        "confirmation_token": "<volatile>",
+        "correlation_id": "<volatile>",
+        "expires_at": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": true,
+        "outcome": "challenged",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "confirmation_required",
+      "route": "/v1/warmbly/operator/dispatch/resume",
+      "status": 428,
+      "body": {
+        "client_reference": null,
+        "code": "confirmation_required",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "resume_dispatch is two-step: call requestConfirmation first and replay the token",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "confirmation_invalid",
+      "route": "/v1/warmbly/operator/dispatch/resume",
+      "status": 428,
+      "body": {
+        "client_reference": null,
+        "code": "confirmation_invalid",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "confirmation token is unknown, expired, or already used",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "missing_actor",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 401,
+      "body": {
+        "client_reference": null,
+        "code": "missing_actor",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "authenticated founder identity is required (missing_identity: missing Remote-User from trusted hop)",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "invalid_reason",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 400,
+      "body": {
+        "client_reference": null,
+        "code": "invalid_reason",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "pause_dispatch requires a 1-200 character audit reason without control characters or separators",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "invalid_target",
+      "route": "/v1/warmbly/operator/inbound/acknowledge",
+      "status": 400,
+      "body": {
+        "client_reference": null,
+        "code": "invalid_target",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "acknowledge_inbound_alert requires a safe target id matching ^[A-Za-z0-9_~-]{1,128}$",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "unsupported_media_type",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 415,
+      "body": {
+        "code": "unsupported_media_type",
+        "ok": false,
+        "reason": "operator writes require content-type: application/json"
+      }
+    },
+    {
+      "name": "upstream_error",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 502,
+      "body": {
+        "client_reference": null,
+        "code": "upstream_error",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "Warmbly refused pause_dispatch with HTTP 500",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "circuit_open",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 503,
+      "body": {
+        "client_reference": null,
+        "code": "circuit_open",
+        "correlation_id": "<volatile>",
+        "ledger_id": "<volatile>",
+        "ok": false,
+        "outcome": "refused",
+        "reason": "Warmbly connector circuit breaker is open; the operator action was not attempted. Out-of-band fallback for pause: deploy/confenge-vps/pause.sh on the VPS.",
+        "recorded_at": "<volatile>"
+      }
+    },
+    {
+      "name": "channel_not_configured",
+      "route": "/v1/warmbly/operator/dispatch/pause",
+      "status": 404,
+      "body": {
+        "code": "operator_channel_not_configured",
+        "ok": false,
+        "reason": "the Warmbly operator channel is not wired in this deployment"
+      }
+    }
+  ]
+}

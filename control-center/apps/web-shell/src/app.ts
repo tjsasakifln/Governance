@@ -2,6 +2,11 @@ import type { MockScenario } from "./adapters/mock";
 import type { ControlCenterReadAdapter, DestinationPage } from "./adapters/contract";
 import type { WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
+import {
+  armPendingResumeConfirmation,
+  clearPendingResumeConfirmation as clearPendingResume,
+  pendingResumeConfirmation as readPendingResume,
+} from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
 import { renderShell } from "./ui/render";
 import {
@@ -150,28 +155,11 @@ function bindOperatorActions(
 }
 
 /**
- * Pending `resume_dispatch` confirmation, held across repaints.
- *
- * Deliberately module scope, not a per-binding closure. Every successful action
- * repaints the shell, and a repaint replaces `root.innerHTML` wholesale — so a
- * token parked in the closure of the form that minted it dies with that form,
- * and the following submit would mint a second challenge instead of spending
- * the first. That is not a stricter two-step; it is a resume that can never
- * complete.
- *
- * It is still memory only and never persisted, so a reload loses it and forces
- * a fresh confirmation. A repaint is not a reload.
+ * The pending `resume_dispatch` confirmation lives in its own module so the
+ * renderer can read the same cell this binder writes. Re-exported here because
+ * it has always been part of this module's public surface.
  */
-let pendingResumeToken: string | undefined;
-
-/** Exposed for tests and for an explicit abandon. */
-export function clearPendingResumeConfirmation(): void {
-  pendingResumeToken = undefined;
-}
-
-export function pendingResumeConfirmation(): string | undefined {
-  return pendingResumeToken;
-}
+export { clearPendingResumeConfirmation, pendingResumeConfirmation } from "./warmbly-confirmation";
 
 /**
  * Binds the Warmbly dispatch control.
@@ -198,11 +186,11 @@ function bindWarmblyDispatch(
       const reason = form.querySelector('[name="reason"]')?.value ?? "";
       const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
       // A resume with no token yet is the confirmation step, not the resume.
-      const carried = pendingResumeToken;
+      const carried = readPendingResume();
       const action = requested === "resume" && !carried ? "resume_confirm" : requested;
       // Spend it at most once: whatever happens next, this token is not reused.
       if (requested === "resume") {
-        pendingResumeToken = undefined;
+        clearPendingResume();
       }
       void Promise.resolve(
         adapter.warmblyDispatch?.({
@@ -217,7 +205,7 @@ function bindWarmblyDispatch(
           // Arm the following resume only when this call actually minted a
           // challenge. A refusal arms nothing.
           if (action === "resume_confirm" && result.ok && result.confirmationToken) {
-            pendingResumeToken = result.confirmationToken;
+            armPendingResumeConfirmation(result.confirmationToken);
           }
         }
         onDone();

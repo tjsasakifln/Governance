@@ -298,89 +298,6 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   `;
 }
 
-/**
- * Operator cockpit for the CONFENGE outbound kill switch.
- *
- * Three controls and nothing else: pause, resume, acknowledge. There is no send
- * control here and there must never be one — this surface can stop outbound and
- * let it flow again, and that is the whole of its authority.
- *
- * Every reading is rendered as observed-or-"—". `state` is tri-state because
- * Warmbly reporting nothing is not the same as Warmbly reporting "running", and
- * an operator who is told ACTIVE when nobody knows will make the wrong call.
- */
-function dispatchPanel(ops: Record<string, unknown>): string {
-  const d = ops.dispatch && typeof ops.dispatch === "object" ? (ops.dispatch as Record<string, unknown>) : {};
-  const state = String(d.state ?? "UNKNOWN");
-  const label =
-    state === "PAUSED" ? "PAUSADO" : state === "ACTIVE" ? "ATIVO" : "DESCONHECIDO";
-  const show = (v: unknown): string => (v === undefined || v === null || v === "" ? "—" : String(v));
-  const window =
-    d.window_start && d.window_end
-      ? `${String(d.window_start)}–${String(d.window_end)} ${show(d.timezone)}`
-      : "—";
-  const inWindow =
-    typeof d.in_send_window === "boolean" ? (d.in_send_window ? "dentro da janela" : "fora da janela") : "—";
-  const volume =
-    typeof d.sent_last_hour === "number" || typeof d.cap === "number"
-      ? `${show(d.sent_last_hour)} / ${show(d.cap)}`
-      : "—";
-  const last = ops.last_operator_action && typeof ops.last_operator_action === "object"
-    ? (ops.last_operator_action as Record<string, unknown>)
-    : null;
-  const lastBlock = last
-    ? `<dl class="facts">
-        ${fact("Última ação", show(last.action))}
-        ${fact("Resultado", show(last.outcome))}
-        ${fact("Operador", show(last.actor_id))}
-        ${fact("Quando", show(last.recorded_at))}
-        ${fact("Motivo registrado", show(last.reason))}
-      </dl>`
-    // Absence of a recorded action is not "nobody acted": this ledger is
-    // in-process and a restart empties it.
-    : `<p class="constraint">Nenhuma ação de operador registrada nesta instância do Control Center. Um reinício do serviço esvazia este registro — ausência aqui não prova que ninguém agiu.</p>`;
-
-  return `
-    <section class="stack domain-dispatch" aria-labelledby="dispatch-title" data-domain="dispatch" data-dispatch-state="${escapeHtml(state)}">
-      <h2 id="dispatch-title">Disparo de saída (Warmbly)</h2>
-      <article class="card" data-dispatch-observed="${d.observed === true ? "true" : "false"}">
-        <p class="kicker"><span class="pill">${escapeHtml(label)}</span></p>
-        <dl class="facts">
-          ${fact("Estado do disparo", escapeHtml(label))}
-          ${fact("Motivo da pausa", escapeHtml(show(d.pause_reason)))}
-          ${fact("Janela comercial", escapeHtml(window))}
-          ${fact("Agora", escapeHtml(inWindow))}
-          ${fact("Próximo slot", escapeHtml(show(d.next_slot_at)))}
-          ${fact("Enviados na hora / teto", escapeHtml(volume))}
-          ${fact("Aprovados na fila", escapeHtml(show(d.queued_approved)))}
-        </dl>
-        ${d.why ? `<p class="constraint">${escapeHtml(String(d.why))}</p>` : ""}
-      </article>
-      <article class="card">
-        <h3>Última ação do operador</h3>
-        ${lastBlock}
-      </article>
-      <article class="card">
-        <h3>Controles</h3>
-        <p class="constraint" data-operator-scope="warmbly-write">Estas três ações escrevem no Warmbly. Não existe controle de envio aqui: pausar, retomar e reconhecer é toda a autoridade desta superfície.</p>
-        <form data-warmbly-dispatch="pause" class="operator-form">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">PAUSAR OUTBOUND</button>
-        </form>
-        <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
-          <p class="constraint">Retomar libera e-mail frio para empresas reais. Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>
-          <button type="submit">RETOMAR OUTBOUND (dois passos)</button>
-        </form>
-        <form data-warmbly-dispatch="acknowledge" class="operator-form">
-          <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
-          <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">RECONHECER ALERTA</button>
-        </form>
-      </article>
-    </section>`;
-}
-
 function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
   const ops = operationsOf(snapshot);
   const current = surface && surface.length > 0 ? surface : "visao";
@@ -421,8 +338,11 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
           <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
           <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
         </article>
-      </section>
-      ${dispatchPanel(ops)}`;
+        <article class="card" data-dispatch-moved="true">
+          <h3>Controles de disparo do Warmbly</h3>
+          <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
+        </article>
+      </section>`;
   } else if (current === "atividade") {
     body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
       activity.length === 0

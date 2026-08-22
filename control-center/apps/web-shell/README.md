@@ -4,16 +4,20 @@ Mobile-first cockpit for Confenge Control Center. This workstream is **fixture-b
 
 ## Destinations
 
-Chrome navigation exposes exactly these eight areas:
+Chrome navigation exposes exactly these ten areas:
 
 1. Hoje
 2. Comercial
-3. Clientes
-4. Financeiro
-5. Engenharia
-6. Infra
-7. Memória/Decisões
-8. Agentes
+3. Operação Warmbly
+4. Clientes
+5. Financeiro
+6. Engenharia
+7. Infra
+8. Crescimento
+9. Memória/Decisões
+10. Agentes
+
+“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one.
 
 Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. Financial and commercial-send mutations (cobrança, checkout, refund, cancelamento, Asaas write, commercial send) are not offered.
 

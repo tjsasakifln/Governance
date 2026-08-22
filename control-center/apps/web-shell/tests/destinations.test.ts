@@ -16,6 +16,7 @@ test("registry exposes the product destinations with exact labels", () => {
   assert.deepEqual([...DESTINATION_IDS], [
     "hoje",
     "comercial",
+    "warmbly",
     "clientes",
     "financeiro",
     "engenharia",
@@ -27,6 +28,7 @@ test("registry exposes the product destinations with exact labels", () => {
   assert.deepEqual(destinationLabels(), [
     "Hoje",
     "Comercial",
+    "Operação Warmbly",
     "Clientes",
     "Financeiro",
     "Engenharia",
@@ -35,7 +37,7 @@ test("registry exposes the product destinations with exact labels", () => {
     "Memória/Decisões",
     "Agentes",
   ]);
-  assert.equal(DESTINATIONS.length, 9);
+  assert.equal(DESTINATIONS.length, 10);
   for (const id of DESTINATION_IDS) {
     const def = getDestination(id);
     assert.equal(def.id, id);
@@ -70,6 +72,21 @@ test("parseHash maps unknown paths to Hoje and reads view overrides", () => {
     surface: null,
     resource: "acme-industria",
   });
+  assert.deepEqual(parseHash("#/warmbly/operacao"), {
+    destination: "warmbly",
+    view: null,
+    surface: "operacao",
+    resource: null,
+  });
+  // An unknown sub-surface falls back to the route itself rather than 404ing a
+  // sibling's not-yet-shipped surface into "hoje".
+  assert.deepEqual(parseHash("#/warmbly/nao-existe"), {
+    destination: "warmbly",
+    view: null,
+    surface: null,
+    resource: null,
+  });
+  assert.equal(hashFor("warmbly", null, { surface: "operacao" }), "#/warmbly/operacao");
   assert.equal(hashFor("agentes", "empty"), "#/agentes?view=empty");
   assert.equal(hashFor("hoje"), "#/hoje");
 });

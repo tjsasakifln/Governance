@@ -1,6 +1,7 @@
 export const DESTINATION_IDS = [
   "hoje",
   "comercial",
+  "warmbly",
   "clientes",
   "financeiro",
   "engenharia",
@@ -39,6 +40,14 @@ export const DESTINATIONS: readonly DestinationDef[] = [
     path: "#/comercial",
     scope: "commercial",
     description: "Operação comercial: funil, coortes, atividade, pipeline e exceções. Autoridade operacional permanece no Warmbly.",
+  },
+  {
+    id: "warmbly",
+    label: "Operação Warmbly",
+    path: "#/warmbly",
+    scope: "commercial",
+    description:
+      "Cockpit de operação segura do outbound Warmbly: estado, janela, fila, limites e trilha antes dos controles.",
   },
   {
     id: "clientes",
@@ -121,6 +130,23 @@ export function hasChatDestination(): boolean {
 export const COMMERCIAL_SURFACES = ["visao", "cohorts", "atividade", "pipeline", "excecoes"] as const;
 export type CommercialSurface = (typeof COMMERCIAL_SURFACES)[number];
 
+/**
+ * Sub-surfaces of "Operação Warmbly", in navigation order.
+ *
+ * `operacao` is the safe-operation cockpit itself and is the default. Sibling
+ * surfaces (daily triage, lead/opportunity detail) slot in as one entry here
+ * plus one entry in the renderer registry of `ui/warmbly.ts`; nothing else in
+ * the shell has to change.
+ */
+export const WARMBLY_SURFACES = ["operacao"] as const;
+export type WarmblySurface = (typeof WARMBLY_SURFACES)[number];
+
+export const DEFAULT_WARMBLY_SURFACE: WarmblySurface = "operacao";
+
+export function isWarmblySurface(value: string | null | undefined): value is WarmblySurface {
+  return typeof value === "string" && (WARMBLY_SURFACES as readonly string[]).includes(value);
+}
+
 export interface ParsedLocation {
   destination: DestinationId;
   view: string | null;
@@ -139,6 +165,9 @@ export function parseHash(hash: string): ParsedLocation {
   let surface: string | null = params.get("surface");
   let resource: string | null = params.get("client") ?? params.get("resource");
   if (destination === "comercial" && segments[1] && (COMMERCIAL_SURFACES as readonly string[]).includes(segments[1])) {
+    surface = segments[1];
+  }
+  if (destination === "warmbly" && segments[1] && isWarmblySurface(segments[1])) {
     surface = segments[1];
   }
   if (destination === "clientes" && segments[1]) {

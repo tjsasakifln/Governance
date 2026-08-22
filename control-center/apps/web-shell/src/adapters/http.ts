@@ -45,6 +45,26 @@ import {
   type WriteShortcutKind,
 } from "./paths";
 
+/**
+ * What the operator reads as the detail line.
+ *
+ * The channel writes `reason` only on a refusal; an executed action answers
+ * with `outcome`, `action` and `upstream_status` and nothing else, so the
+ * sentence has to be built from those rather than falling back to the status.
+ */
+function dispatchMessage(body: Record<string, unknown>, status: number): string {
+  if (typeof body.reason === "string" && body.reason !== "") return body.reason;
+  const action = typeof body.action === "string" ? body.action : "a ação";
+  if (body.outcome === "executed") {
+    const upstream = typeof body.upstream_status === "number" ? ` (Warmbly respondeu HTTP ${body.upstream_status})` : "";
+    return `Warmbly aceitou ${action}${upstream}.`;
+  }
+  if (body.outcome === "challenged") {
+    return `Confirmação emitida para ${action}. Ela vence sozinha, vale uma vez só e é ligada a quem a pediu.`;
+  }
+  return `O canal respondeu HTTP ${status} sem explicação legível.`;
+}
+
 export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   readonly mode = "http" as const;
   readonly actions: readonly AdapterAction[] = ADAPTER_ACTIONS;
@@ -96,13 +116,25 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
 
   async warmblyDispatch(input: WarmblyDispatchInput): Promise<AdapterWriteResult> {
     const path = WARMBLY_DISPATCH_PATHS[input.action];
-    const fail = (message: string): AdapterWriteResult => {
-      const denied: AdapterWriteResult = { ok: false, path: path ?? "/v1/warmbly/operator", kind: "nota", message };
+    /**
+     * A refusal this adapter makes on its own, before anything is written. It
+     * carries `outcome: "refused"` because that is provable here: no request
+     * left the browser, so Warmbly cannot have applied anything.
+     */
+    const fail = (message: string, code = "client_precondition"): AdapterWriteResult => {
+      const denied: AdapterWriteResult = {
+        ok: false,
+        path: path ?? "/v1/warmbly/operator",
+        kind: "nota",
+        message,
+        outcome: "refused",
+        code,
+      };
       this.lastOperatorResult = denied;
       return denied;
     };
     if (!path) {
-      return fail("ação de dispatch desconhecida");
+      return fail("ação de dispatch desconhecida", "unknown_action");
     }
     // The channel refuses a write with no audit reason, and with paused_by
     // missing upstream this ledger is the only record of who did it.
@@ -129,11 +161,18 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         }),
       });
       const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      // The channel answers a refusal with `code`+`reason` and a success with
+      // `outcome`+`action` and no prose at all. Both travel: the status alone
+      // cannot separate an open circuit from a lost answer — both are 503 — and
+      // a bare "HTTP 200" is not a sentence an operator can act on.
       const result: AdapterWriteResult = {
         ok: response.ok,
         path,
         kind: "nota",
-        message: typeof body.reason === "string" ? body.reason : `HTTP ${response.status}`,
+        message: dispatchMessage(body, response.status),
+        status: response.status,
+        ...(typeof body.outcome === "string" ? { outcome: body.outcome } : {}),
+        ...(typeof body.code === "string" ? { code: body.code } : {}),
         ...(typeof body.confirmation_token === "string"
           ? { confirmationToken: body.confirmation_token }
           : {}),
@@ -142,8 +181,19 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       return result;
     } catch (err) {
       // A transport failure here says nothing about whether Warmbly applied the
-      // change; the channel reports `unknown` for exactly this reason.
-      return fail(`falha de transporte: ${err instanceof Error ? err.name : "erro"}`);
+      // change; the channel reports `unknown` for exactly this reason. Calling
+      // it "refused" would tell the operator that nothing happened, which this
+      // adapter cannot know.
+      const unresolved: AdapterWriteResult = {
+        ok: false,
+        path,
+        kind: "nota",
+        message: `falha de transporte: ${err instanceof Error ? err.name : "erro"}`,
+        outcome: "unknown",
+        code: "browser_transport",
+      };
+      this.lastOperatorResult = unresolved;
+      return unresolved;
     }
   }
 
@@ -393,11 +443,14 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       attention: [],
       priorities: [],
     };
-    if (id === "comercial" || id === "crescimento") {
+    if (id === "comercial" || id === "crescimento" || id === "warmbly") {
       page.commercial = commercialFrom(inner, fallback);
     }
-    if (id === "comercial" && page.commercial) {
-      await this.attachLastOperatorAction(page.commercial);
+    // Only the operation cockpit renders the audit trail, so only it pays for
+    // the extra GET. Comercial stopped rendering the dispatch controls when
+    // they moved to their own route.
+    if (id === "warmbly" && page.commercial) {
+      await this.attachOperatorLedger(page.commercial);
     }
     if (id === "crescimento" && payloads[1]) {
       const pncp = this.domainBody(payloads[1], fallback);
@@ -443,28 +496,38 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   }
 
   /**
-   * Attaches the last operator action to the commercial snapshot.
+   * Attaches the recent operator audit trail to the commercial snapshot.
    *
    * Best effort on purpose: the channel is off by default and answers 404, and
    * a cockpit that cannot read its own audit trail must still render the
-   * dispatch state. A miss leaves the field absent — which the surface renders
-   * as "no action recorded in this instance", never as "nobody acted".
+   * dispatch state. What it must never do is let "unreadable" look like
+   * "empty", so the read status is recorded explicitly and the surface says
+   * which of the two it is looking at.
    */
-  private async attachLastOperatorAction(commercial: { operations?: Record<string, unknown> }): Promise<void> {
+  private async attachOperatorLedger(commercial: { operations?: Record<string, unknown> }): Promise<void> {
+    const ops = (commercial.operations ??= {});
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${WARMBLY_OPERATOR_LEDGER_PATH}`, {
         headers: { accept: "application/json" },
         credentials: "include",
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        ops.operator_ledger_status = response.status === 404 ? "not_mounted" : "unreadable";
+        ops.operator_ledger_detail = `HTTP ${response.status}`;
+        return;
+      }
       const body = (await response.json()) as { entries?: unknown };
-      const entries = Array.isArray(body.entries) ? body.entries : [];
+      const entries = Array.isArray(body.entries)
+        ? body.entries.filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+        : [];
+      ops.operator_ledger_status = "read";
+      ops.operator_ledger = entries;
       const latest = entries[0];
-      if (!latest || typeof latest !== "object") return;
-      const ops = (commercial.operations ??= {});
-      ops.last_operator_action = latest;
-    } catch {
+      if (latest) ops.last_operator_action = latest;
+    } catch (err) {
       // Same reason as above: unreadable is not empty.
+      ops.operator_ledger_status = "unreadable";
+      ops.operator_ledger_detail = err instanceof Error ? err.name : "erro de transporte";
     }
   }
 

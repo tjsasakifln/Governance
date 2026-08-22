@@ -1,6 +1,6 @@
 /**
  * Headless launch of the previewed shell. Asserts the primary observable:
- * eight nav labels, Hoje attention + ≤3 priorities, nav changes destination.
+ * every nav label, Hoje attention + ≤3 priorities, nav changes destination.
  *
  * Usage: node scripts/launch-probe.mjs <baseUrl> <screenshotPath>
  */
@@ -46,6 +46,7 @@ if (!baseUrl || !screenshotPath) {
 const labels = [
   "Hoje",
   "Comercial",
+  "Operação Warmbly",
   "Clientes",
   "Financeiro",
   "Engenharia",
@@ -58,6 +59,7 @@ const labels = [
 const destinations = [
   "hoje",
   "comercial",
+  "warmbly",
   "clientes",
   "financeiro",
   "engenharia",
@@ -72,6 +74,7 @@ const extraHashes = [
   "comercial/atividade",
   "comercial/pipeline",
   "comercial/excecoes",
+  "warmbly/operacao",
   "clientes/acme",
 ];
 
