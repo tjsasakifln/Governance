@@ -85,10 +85,73 @@ a {
   background: var(--bg-elev);
 }
 
+/* CONFENGE first, "Control Center" second. */
 .brand {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  /* The identity does not give way first: the topbar's other content reflows
+     before the mark or the product name is clipped. `max-width` still caps the
+     brand so a pathological operator string cannot be pushed off-screen. */
+  flex: 0 0 auto;
+  max-width: 62%;
+  align-self: center;
+  color: var(--fg);
+  text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* The official white PNG, never altered: `height` + `width: auto` against the
+   intrinsic width/height attributes keeps the aspect ratio exact, and no
+   filter or opacity is allowed to recolour or fade the mark. */
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  height: 1.6rem;
+  width: auto;
+  max-width: 40vw;
+  object-fit: contain;
+}
+
+.brand-product {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px solid var(--line);
+  padding-left: 0.55rem;
+  color: var(--fg-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Narrow viewport: the mark and the whole product name still read on one line.
+   The pair scales down together, and the room they need comes from letting the
+   topbar's other content drop to its own row — never from clipping either. */
+@media (max-width: 30rem) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+
+  .brand {
+    gap: 0.4rem;
+  }
+
+  .brand-logo {
+    height: 1.35rem;
+  }
+
+  .brand-product {
+    padding-left: 0.4rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
 }
 
 .operator {
