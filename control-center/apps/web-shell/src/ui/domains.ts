@@ -22,6 +22,25 @@ import {
 } from "./lead-detail";
 import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
+import {
+  ABSENT_HELP,
+  BLOCKED_HELP,
+  agentStatusLabel,
+  authorityLabel,
+  availabilityLabel,
+  clientLifecycleLabel,
+  directiveKindLabel,
+  directiveStatusLabel,
+  freshnessLabel,
+  healthLabel,
+  helpTerm,
+  hopStatusLabel,
+  MEMORY_GROUP_TITLES,
+  providerMutationLabel,
+  scopeLabel,
+  statusPill,
+  technicalDetails,
+} from "./labels";
 
 function fact(label: string, value: string, extra = ""): string {
   return `<div${extra}><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`;
@@ -30,11 +49,11 @@ function fact(label: string, value: string, extra = ""): string {
 function optionalCount(label: string, value: number | undefined): string {
   return typeof value === "number"
     ? fact(label, String(value))
-    : fact(label, "ausente", ` data-absent="true"`);
+    : fact(label, helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`);
 }
 
 function optionalMoney(label: string, money: { amount_cents: number; currency: string } | undefined): string {
-  return money ? moneyFact(label, money) : fact(label, "ausente", ` data-absent="true"`);
+  return money ? moneyFact(label, money) : fact(label, helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`);
 }
 
 function moneyFact(label: string, money: { amount_cents: number; currency: string }): string {
@@ -155,7 +174,8 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
     growth.attribution && typeof growth.attribution === "object" ? (growth.attribution as Record<string, unknown>) : {};
   const note = String(
     attribution.note ??
-      "Hops without a durable ID stay UNKNOWN/BLOCKED. No cross-system join is invented. GSC/URL-index hops stay BLOCKED without ingest.",
+      "Etapa sem identificador durável fica como desconhecida ou bloqueada. Nenhum cruzamento entre sistemas é inventado. " +
+        "As etapas de busca e clique seguem bloqueadas enquanto não houver ingestão de dados de busca.",
   );
   const organic =
     growth.organic_scoreboard && typeof growth.organic_scoreboard === "object"
@@ -165,12 +185,19 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
   const organicWindows = Array.isArray(organic.windows) ? organic.windows : [];
   const organicBlock = organicConfigured
     ? `<article class="card" data-organic-scoreboard="true">
-        <h3>Organic scoreboard (Warmbly)</h3>
-        <p>${escapeHtml(String(organic.note ?? "Warmbly-owned organic/growth intelligence."))}</p>
-        <p>schema=${escapeHtml(String(organic.schema ?? "ausente"))} real_empty=${escapeHtml(String(organic.real_empty ?? "—"))}</p>
+        <h3>Placar de crescimento orgânico (Warmbly)</h3>
+        <p>${escapeHtml(String(organic.note ?? "Inteligência de crescimento orgânico mantida pelo Warmbly."))}</p>
+        ${technicalDetails(
+          [
+            { term: "schema", value: String(organic.schema ?? "") },
+            { term: "real_empty", value: organic.real_empty === undefined ? "" : String(organic.real_empty) },
+            { term: "availability", value: String(organic.availability ?? "") },
+          ],
+          "organic-scoreboard",
+        )}
         <div class="stack">${
           organicWindows.length === 0
-            ? `<p class="banner empty">Organic scoreboard presente e vazio.</p>`
+            ? `<p class="banner empty">Placar orgânico presente e vazio.</p>`
             : organicWindows
                 .slice(0, 4)
                 .map((item) => {
@@ -187,7 +214,8 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
                     <ul>${layers
                       .map((layer) => {
                         const ly = layer && typeof layer === "object" ? (layer as Record<string, unknown>) : {};
-                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}">${escapeHtml(String(ly.id ?? "layer"))}: ${escapeHtml(String(ly.status ?? "UNKNOWN"))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
+                        const layerStatus = String(ly.status ?? "UNKNOWN");
+                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}" data-layer-status="${escapeHtml(layerStatus)}">${escapeHtml(String(ly.id ?? "camada"))}: ${escapeHtml(availabilityLabel(layerStatus))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
                       })
                       .join("")}</ul>
                   </article>`;
@@ -195,7 +223,7 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
                 .join("")
         }</div>
       </article>`
-    : `<p class="banner empty" data-organic-scoreboard="false">Organic scoreboard Warmbly ausente nesta observação (${escapeHtml(String(organic.availability ?? "NO_DATA"))}).</p>`;
+    : `<p class="banner empty" data-organic-scoreboard="false" data-availability="${escapeHtml(String(organic.availability ?? "NO_DATA"))}">Placar orgânico do Warmbly ausente nesta observação (${escapeHtml(availabilityLabel(String(organic.availability ?? "NO_DATA")))}).</p>`;
   return `
     <section class="stack domain-crescimento" aria-labelledby="crescimento-funil" data-domain="growth">
       <h2 id="crescimento-funil">Funil de crescimento</h2>
@@ -207,12 +235,23 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
             const row = byId.get(hop);
             const status = hopStatusFor(hop, row);
             const absent = !row;
-            const detail = row && row.observation ? String(row.observation) : absent ? "hop ausente nesta observação" : "";
+            const detail = row && row.observation ? String(row.observation) : absent ? "etapa ausente nesta observação" : "";
             const label =
               hop in GROWTH_HOP_LABELS ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]] : hop;
+            const shown =
+              status === "BLOCKED"
+                ? helpTerm(hopStatusLabel(status), BLOCKED_HELP)
+                : escapeHtml(hopStatusLabel(status));
             return `<li class="card" data-growth-hop="${escapeHtml(hop)}" data-hop-status="${escapeHtml(status)}"${absent ? ` data-absent="true"` : ""}>
               <h3>${escapeHtml(label)}</h3>
-              <p>${escapeHtml(status)}${detail ? ` · ${escapeHtml(detail)}` : ""}</p>
+              <p>${shown}${detail ? ` · ${escapeHtml(detail)}` : ""}</p>
+              ${technicalDetails(
+                [
+                  { term: "hop", value: hop },
+                  { term: "status", value: status },
+                ],
+                "growth-hop",
+              )}
             </li>`;
           })
           .join("")}
@@ -226,7 +265,7 @@ function metricRate(value: unknown): string {
   if (!rec) return "—";
   if (rec.availability === "JOIN_UNPROVEN" || rec.omitted_reason === "durable_contact_to_deal_join_unavailable") {
     const den = typeof rec.denominator === "number" ? rec.denominator : "—";
-    return `join não comprovado (denominador ${den})`;
+    return `${helpTerm("cruzamento entre sistemas não comprovado", BLOCKED_HELP)} (base de ${den})`;
   }
   const num = rec.numerator;
   const den = rec.denominator;
@@ -386,7 +425,7 @@ export function commercialBlock(
     : fact("Extra histórica", "não é oferta pública", ` data-extra-historical="true" data-public-offer="false"`);
   const drift = snapshot.offer_version_drift
     ? fact(
-        "Offer/version drift",
+        "Divergência de oferta/versão",
         escapeHtml(snapshot.offer_version_drift.detail ?? String(snapshot.offer_version_drift.count)),
       )
     : "";
@@ -394,7 +433,7 @@ export function commercialBlock(
   const recorte = `
     <section class="compact domain-comercial" aria-labelledby="comercial-recorte" data-domain="commercial">
       <h2 id="comercial-recorte">Recorte comercial (somente leitura)</h2>
-      <p class="authority">Autoridade do catálogo: ${escapeHtml(snapshot.authority.catalog_authority)}. Runtime comercial: ${escapeHtml(snapshot.authority.commercial_runtime)}. Este documento: ${escapeHtml(snapshot.authority.this_document)}.</p>
+      <p class="authority">Autoridade do catálogo: ${escapeHtml(authorityLabel(snapshot.authority.catalog_authority))}. Operação comercial: ${escapeHtml(authorityLabel(snapshot.authority.commercial_runtime))}. Este recorte: ${escapeHtml(authorityLabel(snapshot.authority.this_document))}.</p>
       <dl class="facts">
         ${optionalCount("Novos leads", funnel?.new_leads)}
         ${optionalCount("Qualificados", funnel?.qualified)}
@@ -403,13 +442,13 @@ export function commercialBlock(
         ${optionalCount("Clientes", funnel?.clients)}
         ${pipelineNominalFact(snapshot)}
         ${weighted}
-        ${typeof snapshot.aging_count === "number" ? fact("Aging", String(snapshot.aging_count)) : ""}
-        ${typeof snapshot.missing_next_action_count === "number" ? fact("Missing next action", String(snapshot.missing_next_action_count)) : ""}
-        ${typeof snapshot.stalled_count === "number" ? fact("Stalled stage", String(snapshot.stalled_count)) : ""}
+        ${typeof snapshot.aging_count === "number" ? fact("Negócios envelhecidos", String(snapshot.aging_count)) : ""}
+        ${typeof snapshot.missing_next_action_count === "number" ? fact("Sem próxima ação", String(snapshot.missing_next_action_count)) : ""}
+        ${typeof snapshot.stalled_count === "number" ? fact("Estágio parado", String(snapshot.stalled_count)) : ""}
         ${drift}
         ${extra}
         ${optionalCount("Pipeline aberto", snapshot.pipeline_open_count)}
-        ${optionalCount("Inbound sem leitura", snapshot.inbound_unread_count)}
+        ${optionalCount("Mensagens recebidas sem leitura", snapshot.inbound_unread_count)}
         ${optionalCount("Clientes em risco (declarado pelo comercial; identidade não resolvida)", snapshot.at_risk_client_count)}
       </dl>
       ${provenanceBlock(snapshot.provenance)}
@@ -510,18 +549,25 @@ function commercialOps(
               <dl class="facts">
                 ${fact("População", String(row.population ?? "—"))}
                 ${fact("Contactados", String(row.contacted ?? "—"))}
-                ${fact("Reply rate", metricRate(row.reply_rate))}
-                ${fact("Qualified-reply rate", metricRate(row.qualified_reply_rate))}
-                ${fact("Opportunity conversion", metricRate(row.opportunity_conversion))}
-                ${fact("Win conversion", metricRate(row.win_conversion))}
+                ${fact("Taxa de resposta", metricRate(row.reply_rate))}
+                ${fact("Taxa de resposta qualificada", metricRate(row.qualified_reply_rate))}
+                ${fact("Conversão em oportunidade", metricRate(row.opportunity_conversion))}
+                ${fact("Conversão em fechamento", metricRate(row.win_conversion))}
               </dl>
             </article>`;
           })
           .join("")}</div>
         <article class="card">
-          <h3>Inbound truth (Warmbly)</h3>
-          <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
-          <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
+          <h3>Origem das mensagens recebidas (Warmbly)</h3>
+          <p>${escapeHtml(String(inbound.anchor_label ?? "Placar do Warmbly, quando presente. Não é coorte de aquisição."))}</p>
+          <p>${inbound.configured === true ? "Configurado no Warmbly." : "Não configurado no Warmbly."}</p>
+          ${technicalDetails(
+            [
+              { term: "configured", value: inbound.configured === undefined ? "" : String(inbound.configured) },
+              { term: "schema", value: String(inbound.schema ?? "") },
+            ],
+            "inbound-truth",
+          )}
         </article>
       </section>
       ${controlledEmailCohort(ops)}
@@ -557,13 +603,21 @@ function commercialOps(
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
               return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
-                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
-                <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
+                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· dado defasado" : ""}</p>
+                <h3>${escapeHtml(String(row.display_name ?? row.id ?? "negócio"))}</h3>
                 ${dealMoneyLine(row.value)}
                 <dl class="facts">
-                  ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
-                  ${fact("Idade (s)", String(row.age_seconds ?? "—"))}
+                  ${fact("Próxima ação", escapeHtml(String(row.next_action ?? "ausente")))}
+                  ${fact("Idade (segundos)", escapeHtml(String(row.age_seconds ?? "—")))}
                 </dl>
+                ${technicalDetails(
+                  [
+                    { term: "id", value: String(row.id ?? "") },
+                    { term: "stage", value: String(row.stage ?? "") },
+                    { term: "status", value: String(row.status ?? "") },
+                  ],
+                  "pipeline-deal",
+                )}
               </article>`;
             })
             .join("")
@@ -588,13 +642,14 @@ function commercialOps(
     body = `<section aria-labelledby="comercial-ops-title">
       <h2 id="comercial-ops-title">Operação agora</h2>
       <dl class="facts">
-        ${fact("Disponibilidade da origem", escapeHtml(String(availability)))}
-        ${fact("Auto-send", auto.enabled === true ? "OBSERVADO LIGADO — Control Center não liga envio" : "desligado")}
-        ${fact("Exceções", String(overview.exceptions ?? "—"))}
-        ${fact("Overdue", String(overview.overdue_work ?? "—"))}
-        ${fact("Inbound a tratar", String(overview.inbound_requiring_attention ?? "—"))}
-        ${fact("Oportunidades a agir", String(overview.opportunities_requiring_action ?? "—"))}
+        ${fact("Disponibilidade da origem", escapeHtml(availabilityLabel(String(availability))), ` data-availability="${escapeHtml(String(availability))}"`)}
+        ${fact("Envio automático", auto.enabled === true ? "observado ligado — o Control Center não liga envio" : "desligado")}
+        ${fact("Exceções", escapeHtml(String(overview.exceptions ?? "—")))}
+        ${fact("Trabalho em atraso", escapeHtml(String(overview.overdue_work ?? "—")))}
+        ${fact("Mensagens recebidas a tratar", escapeHtml(String(overview.inbound_requiring_attention ?? "—")))}
+        ${fact("Oportunidades a agir", escapeHtml(String(overview.opportunities_requiring_action ?? "—")))}
       </dl>
+      ${technicalDetails([{ term: "availability", value: String(availability) }], "commercial-availability")}
     </section>`;
   }
   return body;
@@ -603,25 +658,33 @@ function commercialOps(
 export function financeBlock(snapshot: FinanceSnapshot): string {
   const mrr =
     snapshot.mrr && snapshot.mrr.applicable
-      ? moneyFact("MRR (aplicável)", snapshot.mrr)
-      : fact("MRR", "omitido — não aplicável");
+      ? moneyFact("Receita recorrente mensal (aplicável)", snapshot.mrr)
+      : fact("Receita recorrente mensal", "omitida — não aplicável");
   const runway =
     snapshot.runway && snapshot.runway.cash_reliable && snapshot.runway.expense_reliable
-      ? fact("Runway", `${snapshot.runway.months} mês(es)`)
-      : fact("Runway", "omitido — caixa e despesas não confiáveis");
+      ? fact("Fôlego de caixa", `${snapshot.runway.months} mês(es)`)
+      : fact("Fôlego de caixa", "omitido — caixa e despesas não confiáveis");
   return `
     <section class="compact domain-financeiro" aria-labelledby="financeiro-recorte" data-domain="finance">
       <h2 id="financeiro-recorte">Recorte financeiro (somente leitura)</h2>
-      <p class="constraint" role="note">Mutações de provedor: ${escapeHtml(snapshot.provider_mutations)}. read_model_only=${String(snapshot.read_model_only)}. Sem cobrança, checkout, refund, cancelamento ou escrita Asaas neste cockpit.</p>
+      <p class="constraint" role="note">Mutações de provedor: ${escapeHtml(providerMutationLabel(snapshot.provider_mutations))}. Este recorte é ${escapeHtml(authorityLabel("read_model_only"))}: sem cobrança, checkout, estorno, cancelamento ou escrita no Asaas.</p>
+      ${technicalDetails(
+        [
+          { term: "schema_version", value: snapshot.schema_version },
+          { term: "provider_mutations", value: snapshot.provider_mutations },
+          { term: "read_model_only", value: String(snapshot.read_model_only) },
+        ],
+        "finance-authority",
+      )}
       <dl class="facts">
-        ${snapshot.contracted ? moneyFact("Contratado", snapshot.contracted) : fact("Contratado", "ausente", ` data-absent="true"`)}
-        ${snapshot.billed ? moneyFact("Faturado", snapshot.billed) : fact("Faturado", "ausente", ` data-absent="true"`)}
-        ${snapshot.paid ? moneyFact("Pago", snapshot.paid) : fact("Pago", "ausente", ` data-absent="true"`)}
-        ${snapshot.effectively_received ? moneyFact("Efetivamente recebido", snapshot.effectively_received) : fact("Efetivamente recebido", "ausente", ` data-absent="true"`)}
+        ${snapshot.contracted ? moneyFact("Contratado", snapshot.contracted) : fact("Contratado", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
+        ${snapshot.billed ? moneyFact("Faturado", snapshot.billed) : fact("Faturado", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
+        ${snapshot.paid ? moneyFact("Pago", snapshot.paid) : fact("Pago", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
+        ${snapshot.effectively_received ? moneyFact("Efetivamente recebido", snapshot.effectively_received) : fact("Efetivamente recebido", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
         ${optionalMoney("Vencido", snapshot.overdue ?? snapshot.receivables_overdue)}
         ${optionalMoney("A receber", snapshot.receivable ?? snapshot.receivables_open)}
-        ${snapshot.refunds ? moneyFact("Refunds", snapshot.refunds) : fact("Refunds", "ausente", ` data-absent="true"`)}
-        ${snapshot.chargebacks ? moneyFact("Chargebacks", snapshot.chargebacks) : fact("Chargebacks", "ausente", ` data-absent="true"`)}
+        ${snapshot.refunds ? moneyFact("Estornos", snapshot.refunds) : fact("Estornos", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
+        ${snapshot.chargebacks ? moneyFact("Contestações de pagamento", snapshot.chargebacks) : fact("Contestações de pagamento", helpTerm("ausente", ABSENT_HELP), ` data-absent="true"`)}
         ${mrr}
         ${runway}
         ${optionalMoney("Recebíveis abertos", snapshot.receivables_open)}
@@ -645,17 +708,17 @@ export function engineeringBlock(snapshot: EngineeringSnapshot): string {
       <h2 id="engenharia-recorte">Recorte de engenharia</h2>
       <dl class="facts">
         ${snapshot.repository ? fact("Repositório", escapeHtml(snapshot.repository)) : ""}
-        ${snapshot.default_branch ? fact("Branch/default", escapeHtml(snapshot.default_branch)) : ""}
-        <div><dt>PRs</dt><dd>${snapshot.open_pr_count}</dd></div>
-        <div><dt>CI</dt><dd>${snapshot.failing_check_count} falhando${snapshot.ci?.status ? ` · ${escapeHtml(snapshot.ci.status)}` : ""}</dd></div>
-        ${typeof snapshot.p0_count === "number" || typeof snapshot.p1_count === "number" ? fact("P0/P1", `P0 ${snapshot.p0_count ?? 0} · P1 ${snapshot.p1_count ?? 0}`) : ""}
-        ${snapshot.aging ? fact("Aging", `${snapshot.aging.count ?? 0}${typeof snapshot.aging.oldest_days === "number" ? ` · ${snapshot.aging.oldest_days}d` : ""}`) : ""}
-        ${listFact("Blockers", snapshot.blockers)}
+        ${snapshot.default_branch ? fact("Branch padrão", escapeHtml(snapshot.default_branch)) : ""}
+        <div><dt>Pull requests abertos</dt><dd>${snapshot.open_pr_count}</dd></div>
+        <div><dt>Integração contínua</dt><dd>${snapshot.failing_check_count} falhando${snapshot.ci?.status ? ` · ${escapeHtml(snapshot.ci.status)}` : ""}</dd></div>
+        ${typeof snapshot.p0_count === "number" || typeof snapshot.p1_count === "number" ? fact("Prioridade 0 / prioridade 1", `P0 ${snapshot.p0_count ?? 0} · P1 ${snapshot.p1_count ?? 0}`) : ""}
+        ${snapshot.aging ? fact("Itens envelhecidos", `${snapshot.aging.count ?? 0}${typeof snapshot.aging.oldest_days === "number" ? ` · mais antigo há ${snapshot.aging.oldest_days} dia(s)` : ""}`) : ""}
+        ${listFact("Bloqueios", snapshot.blockers)}
         ${snapshot.last_evidence ? fact("Última evidência", escapeHtml(snapshot.last_evidence)) : ""}
         ${hypo}
-        <div><dt>Checks falhando</dt><dd>${snapshot.failing_check_count}</dd></div>
+        <div><dt>Verificações falhando</dt><dd>${snapshot.failing_check_count}</dd></div>
         <div><dt>Incidentes abertos</dt><dd>${snapshot.open_incident_count}</dd></div>
-        ${listFact("Allowlist", snapshot.allowlist)}
+        ${listFact("Lista de permissões", snapshot.allowlist)}
       </dl>
       ${
         snapshot.repos && snapshot.repos.length > 0
@@ -665,9 +728,9 @@ export function engineeringBlock(snapshot: EngineeringSnapshot): string {
                 return `<article class="card">
                   <h3>${escapeHtml(name)}</h3>
                   <dl class="facts">
-                    ${fact("PRs abertos", String(repo.open_pr_count ?? "—"))}
-                    ${fact("Draft/ready", `${repo.draft_pr_count ?? "—"} / ${repo.ready_pr_count ?? "—"}`)}
-                    ${fact("CI falhando", String(repo.failing_check_count ?? "—"))}
+                    ${fact("Pull requests abertos", String(repo.open_pr_count ?? "—"))}
+                    ${fact("Rascunho / prontos", `${repo.draft_pr_count ?? "—"} / ${repo.ready_pr_count ?? "—"}`)}
+                    ${fact("Verificações falhando", String(repo.failing_check_count ?? "—"))}
                     ${fact("Última atividade", String(repo.last_activity_at ?? "—"))}
                   </dl>
                   <p><a href="https://github.com/${escapeHtml(name)}" rel="noreferrer">Abrir no GitHub</a></p>
@@ -688,7 +751,15 @@ function sourcePresence(label: string, key: string, value: string | undefined): 
     status === "NO_DATA" ||
     status === "NOT_CONFIGURED" ||
     status === "BLOCKED_BY_SECRET";
-  return fact(label, escapeHtml(status), ` data-client-source="${escapeHtml(key)}"${absent ? ` data-absent="true"` : ""}`);
+  // `data-client-source` e `data-absent` seguem com o enum cru; só o texto muda.
+  const shown = absent
+    ? helpTerm(availabilityLabel(status), status === "BLOCKED_BY_SECRET" ? BLOCKED_HELP : ABSENT_HELP)
+    : escapeHtml(availabilityLabel(status));
+  return fact(
+    label,
+    shown,
+    ` data-client-source="${escapeHtml(key)}" data-source-status="${escapeHtml(status)}"${absent ? ` data-absent="true"` : ""}`,
+  );
 }
 
 export function clientCard(item: ClientStatus): string {
@@ -702,25 +773,35 @@ export function clientCard(item: ClientStatus): string {
   return `
     <article class="card client" data-lifecycle="${escapeHtml(item.lifecycle)}" data-id="${escapeHtml(item.id)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.lifecycle)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker">${statusPill(item.lifecycle, clientLifecycleLabel(item.lifecycle))} <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.display_name)}</h3>
       </header>
       ${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ""}
       ${money}
       <dl class="facts">
         <div><dt>Cliente</dt><dd>${escapeHtml(item.display_name)}</dd></div>
-        ${item.health ? fact("Saúde", escapeHtml(item.health)) : fact("Saúde", escapeHtml(item.lifecycle))}
+        ${item.health ? fact("Saúde", escapeHtml(clientLifecycleLabel(item.health))) : fact("Saúde", escapeHtml(clientLifecycleLabel(item.lifecycle)))}
         ${listFact("Compromissos", item.commitments)}
-        ${item.owner ? fact("Owner", escapeHtml(item.owner)) : ""}
-        ${due ? fact("Due date", due) : ""}
+        ${item.owner ? fact("Responsável", escapeHtml(item.owner)) : ""}
+        ${due ? fact("Vencimento", due) : ""}
         ${listFact("Entregáveis", item.deliverables)}
-        ${listFact("Blockers", item.blockers)}
+        ${listFact("Bloqueios", item.blockers)}
         ${item.next_action ? fact("Próxima ação", escapeHtml(item.next_action)) : ""}
         ${item.evidence ? fact("Evidência", escapeHtml(item.evidence)) : ""}
         ${sourcePresence("Warmbly", "warmbly", sources.warmbly)}
         ${sourcePresence("Asaas", "asaas", sources.asaas)}
         ${sourcePresence("Governance", "governance", sources.governance)}
       </dl>
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "client_slug", value: item.client_slug ?? "" },
+          { term: "scope", value: item.scope },
+          { term: "lifecycle", value: item.lifecycle },
+          { term: "schema_version", value: item.schema_version },
+        ],
+        "client",
+      )}
       ${provenanceBlock(item.provenance)}
     </article>
   `;
@@ -759,7 +840,12 @@ export function clientIdentityQueueCard(entry: ClientIdentityException): string 
 
 function checkLine(label: string, value: { status?: string; detail?: string } | undefined): string {
   if (!value) return "";
-  return fact(label, escapeHtml([value.status, value.detail].filter(Boolean).join(" · ")));
+  const status = value.status ? healthLabel(value.status) : "";
+  return fact(
+    label,
+    escapeHtml([status, value.detail].filter(Boolean).join(" · ")),
+    value.status ? ` data-check-status="${escapeHtml(value.status)}"` : "",
+  );
 }
 
 const HEALTH_LABELS: Record<ServiceHealth["status"], string> = {
@@ -852,9 +938,7 @@ export function healthCard(item: ServiceHealth): string {
   return `
     <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(presented.status)}</span> <span class="sr-only">${escapeHtml(
-          HEALTH_LABELS[presented.status],
-        )}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker">${statusPill(presented.status, healthLabel(presented.status))} <span class="sr-only">${escapeHtml(HEALTH_LABELS[presented.status])}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
       ${catalogError}
@@ -862,7 +946,7 @@ export function healthCard(item: ServiceHealth): string {
       ${inconclusive}
       ${duplicates}
       ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
-      ${item.partial_outage ? `<p class="constraint">Partial outage</p>` : ""}
+      ${item.partial_outage ? `<p class="constraint">Indisponibilidade parcial</p>` : ""}
       <dl class="facts">
         ${fact("Função", escapeHtml(item.role ?? "não declarada no catálogo"), item.role ? "" : ` data-absent="true"`)}
         ${fact("Endpoint lógico", `<span class="wrap-any">${escapeHtml(item.endpoint ?? "não declarado no catálogo")}</span>`, item.endpoint ? "" : ` data-absent="true"`)}
@@ -879,15 +963,15 @@ export function healthCard(item: ServiceHealth): string {
             : escapeHtml("não medida (sem sonda de tempo neste serviço)"),
           item.latency_ms === undefined ? ` data-absent="true"` : "",
         )}
-        ${fact("Freshness", escapeHtml(item.provenance.freshness_status))}
+        ${fact("Atualização", escapeHtml(freshnessLabel(item.provenance.freshness_status)))}
         ${fact(
           "Erro recente",
           escapeHtml(item.last_error ?? "nenhum erro registrado nesta coleta"),
           item.last_error ? "" : ` data-absent="true"`,
         )}
-        ${checkLine("HTTP", item.http)}
-        ${checkLine("TLS", item.tls)}
-        ${checkLine("Docker", item.docker)}
+        ${checkLine("Resposta HTTP", item.http)}
+        ${checkLine("Certificado TLS", item.tls)}
+        ${checkLine("Contêiner Docker", item.docker)}
         ${checkLine("Backup", item.backup)}
         ${checkLine("Host", item.host_metrics)}
         ${item.disk ? fact("Disco", escapeHtml(item.disk.detail ?? `${item.disk.used_pct ?? "?"}%`)) : ""}
@@ -896,14 +980,25 @@ export function healthCard(item: ServiceHealth): string {
         ${
           item.pncp_freshness
             ? fact(
-                "PNCP freshness",
+                "Atualização do PNCP",
                 escapeHtml(
-                  `${item.pncp_freshness.freshness_status}${item.pncp_freshness.detail ? ` · ${item.pncp_freshness.detail}` : ""}`,
+                  `${freshnessLabel(item.pncp_freshness.freshness_status)}${item.pncp_freshness.detail ? ` · ${item.pncp_freshness.detail}` : ""}`,
                 ),
+                ` data-pncp-freshness="${escapeHtml(item.pncp_freshness.freshness_status)}"`,
               )
             : ""
         }
       </dl>
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "service_name", value: item.service_name },
+          { term: "status", value: item.status },
+          { term: "scope", value: item.scope },
+          { term: "partial_outage", value: item.partial_outage === undefined ? "" : String(item.partial_outage) },
+        ],
+        "service-health",
+      )}
       ${provenanceBlock(item.provenance)}
     </article>
   `;
@@ -954,11 +1049,12 @@ export function infraCatalogBlock(summary: InfraCatalogSummary): string {
 export function directiveCard(item: Directive): string {
   const expires = item.expires_at ?? "sem expiração";
   const supersedes = item.supersedes?.join(", ") ?? "nenhuma";
+  const kindLabel = directiveKindLabel(item.kind);
   const actor = item.created_by.display_name ?? item.created_by.id;
   return `
     <article class="card directive" data-kind="${escapeHtml(item.kind)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.kind)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker">${statusPill(item.kind, kindLabel)} ${statusPill(item.status, directiveStatusLabel(item.status))} <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.title)}</h3>
       </header>
       <p>${escapeHtml(item.body)}</p>
@@ -966,35 +1062,58 @@ export function directiveCard(item: Directive): string {
         <div><dt>Vigente desde</dt><dd><time datetime="${escapeHtml(item.effective_from)}">${escapeHtml(item.effective_from)}</time></dd></div>
         <div><dt>Expira</dt><dd>${escapeHtml(expires)}</dd></div>
         <div><dt>Substitui</dt><dd>${escapeHtml(supersedes)}</dd></div>
-        <div><dt>Revisões / supersession</dt><dd>${escapeHtml(supersedes)}</dd></div>
+        <div><dt>Revisões / substituições</dt><dd>${escapeHtml(supersedes)}</dd></div>
         <div><dt>Criado por</dt><dd>${escapeHtml(actor)}</dd></div>
       </dl>
-      <p class="audit">Auditoria: ${item.audit.length} evento(s). Provenance no recorte de memória.</p>
+      <p class="audit">Auditoria: ${item.audit.length} evento(s). Origem do dado no recorte de memória.</p>
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "kind", value: item.kind },
+          { term: "status", value: item.status },
+          { term: "scope", value: item.scope },
+          { term: "schema_version", value: item.schema_version },
+          { term: "created_by", value: item.created_by.id },
+        ],
+        "directive",
+      )}
     </article>
   `;
 }
 
 export function activityCard(item: AgentActivity): string {
+  const statusLabel = agentStatusLabel(item.presentation_status);
   const staleRunning =
     item.presentation_status === "RUNNING" && item.provenance.freshness_status === "STALE"
-      ? `<p class="constraint" data-stale-running="true">RUNNING defasado permanece RUNNING — não vira DONE.</p>`
+      ? `<p class="constraint" data-stale-running="true">Em execução com observação defasada continua em execução — não vira concluído.</p>`
       : "";
   return `
     <article class="card session activity" data-status="${escapeHtml(item.presentation_status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.presentation_status)}</span> <span class="sr-only">${escapeHtml(item.presentation_status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker">${statusPill(item.presentation_status, statusLabel)} <span class="sr-only">${escapeHtml(statusLabel)}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.agent_id)}${item.provider ? ` · ${escapeHtml(item.provider)}` : ""}</h3>
       </header>
       <p>${escapeHtml(item.summary)}</p>
       ${staleRunning}
       <dl class="facts">
-        <div><dt>Agent/provider</dt><dd>${escapeHtml(item.agent_id)}${item.provider ? ` / ${escapeHtml(item.provider)}` : ""}</dd></div>
-        <div><dt>Repo/scope</dt><dd>${escapeHtml(item.repo ?? item.scope)}</dd></div>
-        <div><dt>Goal/campaign</dt><dd>${escapeHtml(item.goal)}${item.campaign ? ` · ${escapeHtml(item.campaign)}` : ""}</dd></div>
+        <div><dt>Agente / provedor</dt><dd>${escapeHtml(item.agent_id)}${item.provider ? ` / ${escapeHtml(item.provider)}` : ""}</dd></div>
+        <div><dt>Repositório / escopo</dt><dd>${escapeHtml(item.repo ?? item.scope)}</dd></div>
+        <div><dt>Objetivo / campanha</dt><dd>${escapeHtml(item.goal)}${item.campaign ? ` · ${escapeHtml(item.campaign)}` : ""}</dd></div>
         ${listFact("Evidência", item.evidence_refs)}
-        ${listFact("Blocker", item.blockers)}
-        ${listFact("residual_work", item.residual_work)}
+        ${listFact("Bloqueios", item.blockers)}
+        ${listFact("Trabalho residual", item.residual_work)}
       </dl>
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "agent_id", value: item.agent_id },
+          { term: "presentation_status", value: item.presentation_status },
+          { term: "status", value: item.status },
+          { term: "scope", value: item.scope },
+          { term: "schema_version", value: item.schema_version },
+        ],
+        "agent-activity",
+      )}
       ${provenanceBlock(item.provenance)}
     </article>
   `;
@@ -1010,15 +1129,7 @@ export function memoriaGroups(directives: Directive[]): string {
     "risk",
     "hypothesis",
   ] as const;
-  const labels: Record<(typeof kinds)[number], string> = {
-    decision: "Decisions",
-    directive: "Directives",
-    fact: "Facts",
-    constraint: "Constraints",
-    priority: "Priorities",
-    risk: "Risks",
-    hypothesis: "Hypotheses",
-  };
+  const labels = MEMORY_GROUP_TITLES;
   return kinds
     .map((kind) => {
       const rows = directives.filter((item) => item.kind === kind);
