@@ -186,6 +186,13 @@ test("a detail assembles organisation, stage, next step, history and evidence fr
   assert.equal(model.queuePosition?.index, 4);
   assert.equal(model.queuePosition?.total, 12);
   assert.ok(model.evidence.some((row) => row.value.includes("BRL 48.000,00")));
+  // The local record is filed against the canonical id, not the raw handle.
+  assert.equal(model.canonicalId, `cc:commercial-deal:${DEAL_ID}`);
+  const html = leadDetailBlock({ snapshot: snapshotWith(representativeOperations()), resource: DEAL_ID });
+  assert.match(
+    html,
+    new RegExp(`name="target_canonical_id" value="cc:commercial-deal:${DEAL_ID}"`),
+  );
 });
 
 test("an unnamed item is titled honestly and its handle only exists in the technical block", () => {
