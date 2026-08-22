@@ -12,6 +12,7 @@ import type {
   ServiceHealth,
 } from "../types";
 
+import { leadDetailBlock, leadDetailHash, leadTitleOf } from "./lead-detail";
 import { provenanceBlock } from "./provenance";
 
 function fact(label: string, value: string, extra = ""): string {
@@ -245,7 +246,12 @@ export function commercialSubnav(surface: string | null): string {
     .join("")}</nav>`;
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
+export function commercialBlock(
+  snapshot: CommercialSnapshot,
+  surface: string | null = "visao",
+  resource: string | null = null,
+  query: string | null = null,
+): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -294,7 +300,7 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   return `
     ${commercialSubnav(current)}
     ${current === "visao" ? recorte : ""}
-    ${commercialOps(snapshot, current)}
+    ${commercialOps(snapshot, current, resource, query)}
   `;
 }
 
@@ -381,7 +387,12 @@ function dispatchPanel(ops: Record<string, unknown>): string {
     </section>`;
 }
 
-function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+function commercialOps(
+  snapshot: CommercialSnapshot,
+  surface: string | null,
+  resource: string | null = null,
+  query: string | null = null,
+): string {
   const ops = operationsOf(snapshot);
   const current = surface && surface.length > 0 ? surface : "visao";
   const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
@@ -423,20 +434,27 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         </article>
       </section>
       ${dispatchPanel(ops)}`;
+  } else if (current === "atividade" && resource) {
+    // Detail sub-surface (#66). Owns its own back link, so the queue below is
+    // replaced wholesale rather than rendered underneath it.
+    body = leadDetailBlock({ snapshot, resource, query, surface: current });
   } else if (current === "atividade") {
     body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
       activity.length === 0
         ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
         : activity
-            .map((item) => {
+            .map((item, index) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+              const rowId = String(row.source_id ?? row.id ?? "");
+              const named = leadTitleOf(row);
+              const href = leadDetailHash(current, query, rowId, { index: index + 1, total: activity.length });
               return `<article class="card">
                 <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
-                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+                <h3><a href="${escapeHtml(href)}" data-lead-detail-link="${escapeHtml(rowId)}">${escapeHtml(named ?? "Organização não identificada pela origem")}</a></h3>
                 <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
                 <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />
+                  <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
                   <label>Nota <textarea name="note" required minlength="2"></textarea></label>
                   <button type="submit">Validar atividade</button>
                 </form>

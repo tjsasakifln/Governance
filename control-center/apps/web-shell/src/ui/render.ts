@@ -33,6 +33,8 @@ export interface ShellModel {
   adapterMode?: "mock" | "http";
   surface?: string | null;
   resource?: string | null;
+  /** Raw query string of the current hash. Carries queue filters/position. */
+  query?: string | null;
   operatorResult?: AdapterWriteResult;
 }
 
@@ -118,7 +120,13 @@ function hojeBody(page: DestinationPage): string {
   return renderHoje(view);
 }
 
-function pageBody(page: DestinationPage, destination: DestinationId, surface?: string | null, resource?: string | null): string {
+function pageBody(
+  page: DestinationPage,
+  destination: DestinationId,
+  surface?: string | null,
+  resource?: string | null,
+  query?: string | null,
+): string {
   if (destination === "hoje") {
     return hojeBody(page);
   }
@@ -145,7 +153,14 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
   );
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
-    page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
+    page.commercial
+      ? commercialBlock(
+          page.commercial,
+          destination === "comercial" ? surface ?? "visao" : "visao",
+          destination === "comercial" ? resource ?? null : null,
+          query ?? null,
+        )
+      : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
     operationalClients.length > 0
@@ -210,7 +225,7 @@ export function renderShell(model: ShellModel): string {
 
   const body =
     page && (model.view.kind === "ready" || model.view.kind === "stale")
-      ? pageBody(page, model.destination, model.surface, model.resource)
+      ? pageBody(page, model.destination, model.surface, model.resource, model.query)
       : "";
 
   return `

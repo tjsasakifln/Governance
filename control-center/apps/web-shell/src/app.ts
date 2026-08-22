@@ -84,6 +84,7 @@ function applyPaint(
   parsed: ReturnType<typeof parseHash>,
   override: ReturnType<typeof parseViewKind>,
   result: import("./adapters/contract").AdapterReadResult,
+  hash = "",
 ): void {
   const input: ResolveViewInput<DestinationPage> = {
     loading: result.ok && result.loading,
@@ -104,17 +105,68 @@ function applyPaint(
     adapterMode: adapter.mode,
     surface: parsed.surface,
     resource: parsed.resource,
+    query: queryOf(hash),
     ...(adapter.lastOperatorResult ? { operatorResult: adapter.lastOperatorResult } : {}),
   });
   bindWriteShortcuts(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}`);
   });
+  // Repaint back onto the hash we were painted from, not a rebuilt prefix: a
+  // detail opened at `?resource=...` with queue filters must survive an action
+  // instead of bouncing the operator back to an unfiltered list.
+  const currentHash =
+    hash || `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`;
   bindOperatorActions(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+    paintShell(root, adapter, currentHash);
   });
   bindWarmblyDispatch(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+    paintShell(root, adapter, currentHash);
   });
+  bindCopyControls(root);
+}
+
+/**
+ * Query string of a hash route, without the leading `?`.
+ *
+ * The shell repaints wholesale, so the only durable place for queue state —
+ * filters, sort, page, position — is the hash itself. Surfaces that offer a
+ * back link read it from here rather than from a closure that dies with the
+ * markup that created it.
+ */
+export function queryOf(hash: string): string {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const index = stripped.indexOf("?");
+  return index >= 0 ? stripped.slice(index + 1) : "";
+}
+
+/**
+ * Copy buttons for technical-detail blocks.
+ *
+ * Joins the repaint pass like every other binding, because a handler attached
+ * once would die on the first navigation. The block is a readonly textarea, so
+ * a browser with no clipboard permission still lets the operator select and
+ * copy by hand; this only removes the two keystrokes.
+ */
+function bindCopyControls(root: MountableRoot): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-copy-form]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    // Bind only what is really a copy form. A repaint re-runs every binder over
+    // the same tree, so a binder that attaches to whatever the query hands back
+    // would fight the operator-action binders for the same nodes.
+    if (!form.getAttribute("data-copy-form")) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const payload = form.querySelector('[name="copy_payload"]')?.value ?? "";
+      if (!payload) return;
+      const clipboard = globalThis.navigator?.clipboard;
+      if (clipboard && typeof clipboard.writeText === "function") {
+        void clipboard.writeText(payload).catch(() => undefined);
+      }
+    });
+  }
 }
 
 function bindOperatorActions(
@@ -262,14 +314,14 @@ export function paintShell(
   adapter.setScenario?.(scenarioFromView(override));
   const result = adapter.readDestination(parsed.destination);
   if (isPromise(result)) {
-    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null });
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null }, hash);
     void result.then((resolved) => {
       if (!isCurrent(generation)) return;
-      applyPaint(root, adapter, parsed, override, resolved);
+      applyPaint(root, adapter, parsed, override, resolved, hash);
     });
     return;
   }
-  applyPaint(root, adapter, parsed, override, result);
+  applyPaint(root, adapter, parsed, override, result, hash);
 }
 
 export function mount(
