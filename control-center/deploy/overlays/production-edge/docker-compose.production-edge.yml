@@ -197,6 +197,11 @@ services:
       CONTROL_CENTER_FOUNDER_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
       CONTROL_CENTER_ENV: production
       CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
+      # Narrower than CC_TRUSTED_PROXY_CIDRS on purpose. That one is the whole
+      # cc_edge /24, which holds web, mcp, collector and context beside caddy;
+      # any of them could forge Remote-* and get a resume executed as the
+      # founder. Only caddy terminates Authelia, so only caddy may present it.
+      CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "${CC_WARMBLY_OPERATOR_TRUSTED_HOPS:-10.89.0.2/32}"
     networks:
       cc_edge:
         ipv4_address: 10.89.0.4

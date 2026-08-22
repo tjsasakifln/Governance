@@ -183,6 +183,21 @@ async function handle(
         });
         return;
       }
+      // A cross-origin <form enctype="text/plain"> POST is CORS-simple, so no
+      // preflight runs and Authelia's lax cookie is still sent from any
+      // *.confenge.com.br page. Requiring JSON is what stops it: a form cannot
+      // set this content type.
+      if (method === "POST") {
+        const contentType = String(req.headers["content-type"] ?? "");
+        if (!contentType.toLowerCase().startsWith("application/json")) {
+          send(res, 415, {
+            ok: false,
+            code: "unsupported_media_type",
+            reason: "operator writes require content-type: application/json",
+          });
+          return;
+        }
+      }
       const result = await deps.warmblyOperator({
         method,
         url: url.pathname,

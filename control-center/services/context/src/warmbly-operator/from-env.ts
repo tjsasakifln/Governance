@@ -72,13 +72,32 @@ export async function createWarmblyOperatorHandlerFromEnv(
   }
   const baseUrl = required(env, "CC_WARMBLY_BASE_URL");
   const token = required(env, "CC_WARMBLY_OPERATOR_TOKEN");
+  // The hop that may speak for Authelia must be named explicitly. The library
+  // default is DEFAULT_TRUSTED_HOPS, which contains the whole cc_edge /24 — and
+  // that network holds web, mcp, collector and context alongside caddy. Trusting
+  // it would let any of them forge Remote-* and execute a resume, restarting
+  // outbound email, ledgered as the founder. Reads have lived behind that CIDR
+  // for a while; a write must not.
+  const trustedHops = (required(env, "CC_WARMBLY_OPERATOR_TRUSTED_HOPS") ?? "")
+    .split(",")
+    .map((hop) => hop.trim())
+    .filter((hop) => hop !== "");
+  if (trustedHops.length === 0) {
+    deps.logger.error("warmbly.operator.trusted_hop_required", {
+      msg: "CC_WARMBLY_OPERATOR_TRUSTED_HOPS must name the single proxy that may present Remote-* (for example the caddy address), and it must be narrower than the edge network",
+    });
+    return undefined;
+  }
   if (!baseUrl || !token) {
     // Enabled but not configured is a misconfiguration, not a reason to run
     // half-wired: say so and stay off.
     deps.logger.error("warmbly.operator.not_configured", {
       msg: "CC_WARMBLY_OPERATOR_ENABLED=true requires CC_WARMBLY_BASE_URL and CC_WARMBLY_OPERATOR_TOKEN",
       has_base_url: Boolean(baseUrl),
-      has_token: Boolean(token),
+      // The service logger refuses any field NAME matching /token/i and throws,
+      // so `has_token` — and `token_present` — turn a misconfiguration into a
+      // boot crash loop. The name must not contain the word at all.
+      credential_present: Boolean(token),
     });
     return undefined;
   }
@@ -122,6 +141,11 @@ export async function createWarmblyOperatorHandlerFromEnv(
     defaultOperatorSinkErrorHandler(log),
   );
 
-  const channel = createWarmblyOperatorChannel({ client, ledger, logger: log });
+  const channel = createWarmblyOperatorChannel({
+    client,
+    ledger,
+    logger: log,
+    identityPolicy: connector.defaultOperatorIdentityPolicy(trustedHops),
+  });
   return createOperatorHttpHandler(channel) as WarmblyOperatorHandler;
 }

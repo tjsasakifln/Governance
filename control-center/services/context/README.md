@@ -125,3 +125,39 @@ Fora de escopo aqui: UI, MCP, collectors, Warmbly, Asaas, `commercial/`, PR Gove
 - campos desconhecidos rejeitados
 - `created_by` é sempre o ator autenticado
 - IDs `cc:<type-kebab>:<ulid-or-slug>`
+
+
+## Warmbly operator channel
+
+Off unless every one of these is set. Missing any of them leaves the channel
+unmounted and every `/v1/warmbly/operator/*` route answering `404`.
+
+| Variable | Meaning |
+| --- | --- |
+| `CC_WARMBLY_OPERATOR_ENABLED` | exactly `true`; anything else keeps it off |
+| `CC_WARMBLY_BASE_URL` | Warmbly base URL for the write client |
+| `CC_WARMBLY_OPERATOR_TOKEN` | bearer for those writes |
+| `CC_WARMBLY_OPERATOR_TRUSTED_HOPS` | comma-separated CIDRs allowed to present `Remote-*` |
+
+`CC_WARMBLY_OPERATOR_TRUSTED_HOPS` is deliberately **not** `CC_TRUSTED_PROXY_CIDRS`
+and has no default. The shared value is `10.89.0.0/24`, which is the whole
+`cc_edge` network: `caddy` sits there at `10.89.0.2`, but so do `authelia`,
+`context`, `web`, `mcp` and `collector`. Reads have lived behind that CIDR for a
+while and that is a defensible tradeoff. A write that resumes outbound cold email
+is not: any container on the network could forge `Remote-User: tiago` and get a
+resume executed and ledgered as the founder, without Authelia ever being asked.
+
+In the production-edge overlay the correct value is the caddy address alone:
+
+```
+CC_WARMBLY_OPERATOR_TRUSTED_HOPS=10.89.0.2/32
+```
+
+If it is unset the channel refuses to mount and logs
+`warmbly.operator.trusted_hop_required`. Failing closed is the intended
+behaviour: the hop that may speak for Authelia has to be named on purpose.
+
+Operator writes also require `content-type: application/json`. A cross-origin
+`<form enctype="text/plain">` POST is CORS-simple, so no preflight runs and the
+`same_site: lax` session cookie is still sent from any `*.confenge.com.br` page;
+requiring JSON is what a form cannot satisfy.
