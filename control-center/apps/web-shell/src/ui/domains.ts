@@ -664,24 +664,105 @@ function checkLine(label: string, value: { status?: string; detail?: string } | 
   return fact(label, escapeHtml([value.status, value.detail].filter(Boolean).join(" · ")));
 }
 
+const HEALTH_LABELS: Record<ServiceHealth["status"], string> = {
+  healthy: "saudável",
+  degraded: "degradado",
+  down: "fora do ar",
+  unknown: "sem conclusão",
+};
+
+interface PresentedHealth {
+  readonly status: ServiceHealth["status"];
+  readonly conclusive: boolean;
+}
+
+/**
+ * "Saudável" is a conclusion, and a conclusion needs evidence. A row whose
+ * freshness is not FRESH, or whose confidence is zero — not configured,
+ * blocked, or failed collection — has none, so the card refuses to print the
+ * word and says "sem conclusão" instead. The raw value stays on the element as
+ * data-raw-status so nothing is hidden, only un-asserted.
+ */
+export function presentHealth(item: ServiceHealth): PresentedHealth {
+  const conclusive =
+    item.evidence_conclusive !== false &&
+    item.provenance.freshness_status === "FRESH" &&
+    item.provenance.confidence > 0;
+  if (!conclusive && item.status === "healthy") {
+    return { status: "unknown", conclusive: false };
+  }
+  return { status: item.status, conclusive };
+}
+
 export function healthCard(item: ServiceHealth): string {
-  const tone = item.status === "healthy" && item.provenance.freshness_status === "FRESH" ? "green" : "not-green";
+  const presented = presentHealth(item);
+  const tone = presented.status === "healthy" && presented.conclusive ? "green" : "not-green";
+  const confidence = item.provenance.confidence.toFixed(2).replace(".", ",");
+  const degraded = presented.status !== "healthy";
+  const runbook = degraded ? item.runbook_url : undefined;
+  const inconclusive = presented.conclusive
+    ? ""
+    : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: freshness ${escapeHtml(
+        item.provenance.freshness_status,
+      )}, confiança ${escapeHtml(confidence)}. Nenhum estado conclusivo é afirmado para este serviço.</p>`;
+  const catalogError = item.catalog_error
+    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
+        item.catalog_error,
+      )}. A origem não informou identidade para este serviço.</p>`
+    : "";
+  const duplicates =
+    item.duplicate_count && item.duplicate_count > 1
+      ? `<p class="constraint" data-duplicate-count="${item.duplicate_count}">${item.duplicate_count} entradas idênticas do catálogo agrupadas neste card.</p>`
+      : "";
+  const runbookFact = degraded
+    ? runbook
+      ? fact(
+          "Runbook",
+          `<a class="wrap-any" href="${escapeHtml(runbook)}" rel="noreferrer noopener">${escapeHtml(runbook)}</a>`,
+        )
+      : fact("Runbook", escapeHtml("não cadastrado no catálogo"), ` data-absent="true"`)
+    : "";
   return `
-    <article class="card health" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
+    <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="sr-only">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker"><span class="pill">${escapeHtml(presented.status)}</span> <span class="sr-only">${escapeHtml(
+          HEALTH_LABELS[presented.status],
+        )}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
+      ${catalogError}
+      ${inconclusive}
+      ${duplicates}
       ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
-      ${item.latency_ms !== undefined ? `<p>Latência observada: ${item.latency_ms} ms</p>` : ""}
       ${item.partial_outage ? `<p class="constraint">Partial outage</p>` : ""}
       <dl class="facts">
+        ${fact("Função", escapeHtml(item.role ?? "não declarada no catálogo"), item.role ? "" : ` data-absent="true"`)}
+        ${fact("Endpoint lógico", `<span class="wrap-any">${escapeHtml(item.endpoint ?? "não declarado no catálogo")}</span>`, item.endpoint ? "" : ` data-absent="true"`)}
+        ${item.service_id ? fact("Id no catálogo", escapeHtml(item.service_id)) : ""}
+        ${fact(
+          "Última verificação",
+          `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
+        )}
+        ${fact("Estado avaliado", escapeHtml(`${presented.status} · ${HEALTH_LABELS[presented.status]}`))}
+        ${fact(
+          "Latência observada",
+          item.latency_ms !== undefined ? escapeHtml(`${item.latency_ms} ms`) : escapeHtml("não medida"),
+          item.latency_ms === undefined ? ` data-absent="true"` : "",
+        )}
+        ${fact("Freshness", escapeHtml(item.provenance.freshness_status))}
+        ${fact(
+          "Erro recente",
+          escapeHtml(item.last_error ?? "nenhum erro registrado nesta coleta"),
+          item.last_error ? "" : ` data-absent="true"`,
+        )}
         ${checkLine("HTTP", item.http)}
         ${checkLine("TLS", item.tls)}
         ${checkLine("Docker", item.docker)}
         ${checkLine("Backup", item.backup)}
+        ${checkLine("Host", item.host_metrics)}
         ${item.disk ? fact("Disco", escapeHtml(item.disk.detail ?? `${item.disk.used_pct ?? "?"}%`)) : ""}
         ${item.memory ? fact("Memória", escapeHtml(item.memory.detail ?? `${item.memory.used_pct ?? "?"}%`)) : ""}
+        ${runbookFact}
         ${
           item.pncp_freshness
             ? fact(

@@ -82,6 +82,49 @@ function assertSafeUrl(raw: string, path: string): URL {
   return url;
 }
 
+const ROLE_MAX_LENGTH = 120;
+const RUNBOOK_MAX_LENGTH = 512;
+
+function parseRole(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AllowlistError(`${path} must be a non-empty string`);
+  }
+  const role = value.trim();
+  if (role.length > ROLE_MAX_LENGTH) {
+    throw new AllowlistError(`${path} must be at most ${ROLE_MAX_LENGTH} characters`);
+  }
+  return role;
+}
+
+/**
+ * A runbook the cockpit will render as a link. Either a same-origin absolute
+ * path or a credential-free http(s) URL. Protocol-relative values are refused
+ * because "//host/x" leaves the origin while looking like a path.
+ */
+function parseRunbookUrl(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AllowlistError(`${path} must be a non-empty string`);
+  }
+  const raw = value.trim();
+  if (raw.length > RUNBOOK_MAX_LENGTH) {
+    throw new AllowlistError(`${path} must be at most ${RUNBOOK_MAX_LENGTH} characters`);
+  }
+  if (/[\s<>"'\\]/.test(raw)) {
+    throw new AllowlistError(`${path} must not contain whitespace or markup characters`);
+  }
+  if (raw.startsWith("//")) {
+    throw new AllowlistError(`${path} must not be protocol-relative`);
+  }
+  if (raw.startsWith("/")) {
+    if (raw.includes("@")) {
+      throw new AllowlistError(`${path} must not embed credentials`);
+    }
+    return raw;
+  }
+  assertSafeUrl(raw, path);
+  return raw;
+}
+
 function parseTarget(raw: unknown, index: number): AllowlistTarget {
   const path = `targets[${index}]`;
   if (!isRecord(raw)) {
@@ -108,6 +151,12 @@ function parseTarget(raw: unknown, index: number): AllowlistTarget {
     checks,
   };
 
+  if (raw.role !== undefined) {
+    Object.assign(target, { role: parseRole(raw.role, `${path}.role`) });
+  }
+  if (raw.runbook_url !== undefined) {
+    Object.assign(target, { runbook_url: parseRunbookUrl(raw.runbook_url, `${path}.runbook_url`) });
+  }
   if (raw.host !== undefined) {
     Object.assign(target, { host: parseHostField(raw.host, `${path}.host`) });
   }

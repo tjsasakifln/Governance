@@ -269,6 +269,52 @@ function mapEngineering(payload: Record<string, unknown>, id: string): Record<st
   return out;
 }
 
+function isFreshnessStatus(value: unknown): value is FreshnessStatus {
+  return value === "FRESH" || value === "STALE" || value === "UNKNOWN" || value === "ERROR";
+}
+
+/**
+ * The envelope forbids painting non-FRESH or unevidenced data as healthy, but
+ * that rule was only applied to the slot's own status: the nested services[]
+ * rode through untouched and reached the cockpit still claiming "healthy" with
+ * a confidence of zero. Each row is bounded by its slot — worst-of freshness,
+ * min confidence — and demoted by the same helper as the slot, one level down.
+ */
+function demoteNestedServices(value: unknown, seed: ProvenanceSeed): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  return value.map((item) => {
+    const row = asRecord(item);
+    if (!row) {
+      return item;
+    }
+    const rowFreshness = isFreshnessStatus(row.freshness_status) ? row.freshness_status : seed.freshness_status;
+    const freshness = worstFreshness([seed.freshness_status, rowFreshness]);
+    const rowConfidence = typeof row.confidence === "number" ? row.confidence : seed.confidence;
+    const confidence = minConfidence([seed.confidence, rowConfidence]);
+    const status = demoteHealthStatus(
+      freshness,
+      typeof row.status === "string" ? row.status : undefined,
+      confidence,
+    );
+    const provenance = asRecord(row.provenance);
+    const out: Record<string, unknown> = {
+      ...row,
+      freshness_status: freshness,
+      confidence,
+      evidence_conclusive: freshness === "FRESH" && confidence > 0,
+    };
+    if (status !== undefined) {
+      out.status = status;
+    }
+    if (provenance) {
+      out.provenance = { ...provenance, freshness_status: freshness, confidence };
+    }
+    return out;
+  });
+}
+
 function mapInfraLike(
   payload: Record<string, unknown>,
   seed: ProvenanceSeed,
@@ -276,7 +322,7 @@ function mapInfraLike(
   schema: string,
 ): Record<string, unknown> {
   const rawStatus = typeof payload.status === "string" ? payload.status : undefined;
-  const status = demoteHealthStatus(seed.freshness_status, rawStatus);
+  const status = demoteHealthStatus(seed.freshness_status, rawStatus, seed.confidence);
   const out: Record<string, unknown> = {
     schema_version: schema,
     id,
@@ -287,10 +333,27 @@ function mapInfraLike(
   if (status !== undefined) {
     out.status = status;
   }
-  for (const key of ["services", "partial_outage", "availability", "evidence", "contract_version", "last_update_at", "ingestion_succeeded", "coverage_window", "usable_for_commercial_intelligence_now", "scheduled_job"]) {
+  for (const key of [
+    "partial_outage",
+    "availability",
+    "unavailability_reason",
+    "monitored_service_count",
+    "catalog_error_count",
+    "duplicate_group_count",
+    "evidence",
+    "contract_version",
+    "last_update_at",
+    "ingestion_succeeded",
+    "coverage_window",
+    "usable_for_commercial_intelligence_now",
+    "scheduled_job",
+  ]) {
     if (payload[key] !== undefined) {
       out[key] = payload[key];
     }
+  }
+  if (payload.services !== undefined) {
+    out.services = demoteNestedServices(payload.services, seed);
   }
   return out;
 }

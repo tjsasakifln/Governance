@@ -9,12 +9,14 @@ import { observationId, toUtcIso } from "./ids.js";
 import type {
   Allowlist,
   AllowlistTarget,
+  CheckKind,
   ProbeResult,
   ServiceCheck,
   ServiceHealth,
   ServiceStatus,
   SourceObservation,
 } from "./types.js";
+import { CHECK_KINDS } from "./types.js";
 
 function targetById(allowlist: Allowlist, id: string): AllowlistTarget {
   const found = allowlist.targets.find((t) => t.id === id);
@@ -121,7 +123,7 @@ function serviceStatusForCheck(
             if (item && typeof item === "object" && "name" in item) {
               return String((item as Record<string, unknown>).name);
             }
-            return "unknown-service";
+            return "unnamed-container";
           })
           .join(", ");
         return { status: "unhealthy", summary: `unhealthy Docker/services: ${names}` };
@@ -156,6 +158,93 @@ function serviceStatusForCheck(
     case "uptime":
       return { status: "healthy", summary: probe.summary };
   }
+}
+
+/** What each check kind tells an operator, used when the catalog omits a role. */
+const CHECK_ROLE_LABELS: Record<CheckKind, string> = {
+  reachability: "alcance TCP",
+  host_metrics: "métricas de host",
+  docker: "containers",
+  http: "endpoint HTTP",
+  tls: "certificado TLS",
+  backup: "frescor de backup",
+  uptime: "uptime do host",
+};
+
+/**
+ * The service's function. The catalog wins; otherwise the checks describe it.
+ * Never empty, because two rows that differ only by position are unreadable.
+ */
+export function roleFor(target: AllowlistTarget): string {
+  const declared = target.role?.trim();
+  if (declared) {
+    return declared;
+  }
+  const ordered = CHECK_KINDS.filter((kind) => target.checks.includes(kind));
+  return ordered.length > 0 ? ordered.map((kind) => CHECK_ROLE_LABELS[kind]).join(" + ") : "sem checks";
+}
+
+/**
+ * The logical address the checks address, with any userinfo and query string
+ * removed. This value is rendered in the cockpit, so it must never be able to
+ * carry a credential even if one slipped past the allowlist parser.
+ */
+export function logicalEndpoint(target: AllowlistTarget): string {
+  if (target.url) {
+    try {
+      const url = new URL(target.url);
+      url.username = "";
+      url.password = "";
+      url.search = "";
+      url.hash = "";
+      return url.toString();
+    } catch {
+      // Unparsable URL: fall through to the host/port form rather than echoing it.
+    }
+  }
+  const host = target.http_host ?? target.tls_server_name ?? target.host ?? target.connect_host;
+  if (host && host.trim() !== "") {
+    return target.port ? `${host.trim()}:${target.port}` : host.trim();
+  }
+  if (target.agent_id) {
+    return `agent:${target.agent_id}`;
+  }
+  return `target:${target.id}`;
+}
+
+/** Worst observed round trip across a service's checks. */
+function latencyOf(observations: readonly SourceObservation[]): number | undefined {
+  let worst: number | undefined;
+  for (const obs of observations) {
+    for (const key of ["latency_ms", "elapsed_ms"] as const) {
+      const value = numeric(obs.payload, key);
+      if (value !== undefined && (worst === undefined || value > worst)) {
+        worst = value;
+      }
+    }
+  }
+  return worst;
+}
+
+const STATUS_SEVERITY: Record<ServiceStatus, number> = {
+  unhealthy: 3,
+  degraded: 2,
+  unknown: 1,
+  healthy: 0,
+};
+
+/** The worst non-healthy check summary, so the card can name what broke. */
+function lastErrorOf(checks: readonly ServiceCheck[]): string | undefined {
+  let worst: ServiceCheck | undefined;
+  for (const check of checks) {
+    if (check.status === "healthy") {
+      continue;
+    }
+    if (!worst || STATUS_SEVERITY[check.status] > STATUS_SEVERITY[worst.status]) {
+      worst = check;
+    }
+  }
+  return worst ? `${worst.check}: ${worst.summary}` : undefined;
 }
 
 export function mapObservation(
@@ -227,6 +316,8 @@ export function mapServiceHealth(
   const health: ServiceHealth = {
     service_id: target.id,
     display_name: target.display_name,
+    role: roleFor(target),
+    endpoint: logicalEndpoint(target),
     source: allowlist.source,
     observed_at: owned[0]?.observed_at ?? toUtcIso(now),
     freshness_status: freshness,
@@ -243,6 +334,17 @@ export function mapServiceHealth(
   }
   if (restarts !== undefined) {
     Object.assign(health, { restart_count: restarts });
+  }
+  const latency = latencyOf(owned);
+  if (latency !== undefined) {
+    Object.assign(health, { latency_ms: latency });
+  }
+  const lastError = lastErrorOf(checks);
+  if (lastError !== undefined) {
+    Object.assign(health, { last_error: lastError });
+  }
+  if (target.runbook_url !== undefined) {
+    Object.assign(health, { runbook_url: target.runbook_url });
   }
   return health;
 }

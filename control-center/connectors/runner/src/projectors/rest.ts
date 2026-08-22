@@ -10,13 +10,197 @@ import {
 } from "@confenge/control-center-contracts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
+  FRESHNESS,
   PROJECTOR_VERSION,
   asArray,
   asRecord,
   capList,
+  finiteNumber,
+  isoOr,
   type CollectorEnvelope,
+  type FreshnessStatus,
   type ProjectedSnapshot,
 } from "./types.ts";
+
+const HEALTH_STATUS = ["healthy", "degraded", "down", "unknown"] as const;
+type HealthStatus = (typeof HEALTH_STATUS)[number];
+
+/**
+ * The collector speaks healthy/degraded/unhealthy/unknown; the contract and the
+ * cockpit speak healthy/degraded/down/unknown. Anything unrecognised is
+ * unknown, never healthy.
+ */
+function normalizeHealthStatus(value: unknown): HealthStatus {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (raw === "unhealthy" || raw === "down") return "down";
+  if (raw === "healthy" || raw === "degraded" || raw === "unknown") return raw;
+  return "unknown";
+}
+
+const STATUS_SEVERITY: Record<HealthStatus, number> = { down: 3, degraded: 2, unknown: 1, healthy: 0 };
+const FRESHNESS_SEVERITY: Record<FreshnessStatus, number> = { ERROR: 3, STALE: 2, UNKNOWN: 1, FRESH: 0 };
+
+function asFreshness(value: unknown, fallback: FreshnessStatus): FreshnessStatus {
+  return typeof value === "string" && (FRESHNESS as readonly string[]).includes(value)
+    ? (value as FreshnessStatus)
+    : fallback;
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "sem-identidade"
+  );
+}
+
+function textOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/** A ServiceCheck from the collector, shaped as the cockpit's {status, detail}. */
+function checkSlot(checks: readonly Record<string, unknown>[], kind: string): Record<string, unknown> | undefined {
+  const found = checks.find((check) => check.check === kind || check.name === kind);
+  if (!found) return undefined;
+  const detail = textOrUndefined(found.summary) ?? textOrUndefined(found.detail);
+  return {
+    status: normalizeHealthStatus(found.status),
+    ...(detail ? { detail } : {}),
+  };
+}
+
+interface InfraService {
+  readonly key: string;
+  readonly row: Record<string, unknown>;
+  readonly status: HealthStatus;
+  readonly freshness: FreshnessStatus;
+  readonly anonymous: boolean;
+}
+
+/**
+ * One monitored dependency, named. The collector emits service_id/display_name
+ * (connectors/infrastructure ServiceHealth); older payloads used id/service_name.
+ * A row that carries neither is a catalog defect and is labelled as one instead
+ * of being rendered as yet another nameless "service" card.
+ */
+function projectService(
+  item: unknown,
+  envelope: CollectorEnvelope,
+  fallbackFreshness: FreshnessStatus,
+): InfraService {
+  const raw = asRecord(item) ?? {};
+  const checks = asArray(raw.checks)
+    .map((check) => asRecord(check))
+    .filter((check): check is Record<string, unknown> => check !== null);
+  const serviceId = textOrUndefined(raw.service_id) ?? textOrUndefined(raw.id);
+  const displayName = textOrUndefined(raw.display_name) ?? textOrUndefined(raw.service_name);
+  const anonymous = serviceId === undefined && displayName === undefined;
+  const slug = slugify(serviceId ?? displayName ?? "");
+  const freshness = asFreshness(raw.freshness_status, fallbackFreshness);
+  const status = normalizeHealthStatus(raw.status);
+  const observedAt = isoOr(raw.observed_at, envelope.observed_at);
+  const confidence = finiteNumber(raw.confidence) ?? envelope.confidence;
+  const latency = finiteNumber(raw.latency_ms);
+  const lastError = textOrUndefined(raw.last_error);
+  const runbook = safeRunbookUrl(raw.runbook_url);
+  const http = checkSlot(checks, "http");
+  const tls = checkSlot(checks, "tls");
+  const docker = checkSlot(checks, "docker");
+  const backup = checkSlot(checks, "backup");
+  const hostMetrics = checkSlot(checks, "host_metrics");
+  const row: Record<string, unknown> = {
+    schema_version: "control-center.service-health.v1",
+    id: `cc:service-health:${slug}`,
+    scope: "infrastructure",
+    service_id: serviceId ?? null,
+    service_name: displayName ?? serviceId ?? "serviço sem identidade no catálogo",
+    role: textOrUndefined(raw.role) ?? "função não declarada no catálogo",
+    endpoint: textOrUndefined(raw.endpoint) ?? "endpoint não declarado no catálogo",
+    status,
+    freshness_status: freshness,
+    observed_at: observedAt,
+    checked_at: observedAt,
+    confidence,
+    partial_outage: raw.partial_outage === true,
+    checks: capList(
+      checks.map((check) => ({
+        name: String(check.check ?? check.name ?? "check"),
+        status: normalizeHealthStatus(check.status),
+        ...(textOrUndefined(check.summary) ? { detail: textOrUndefined(check.summary) } : {}),
+      })),
+    ),
+    provenance: {
+      source: envelope.source,
+      observed_at: observedAt,
+      freshness_status: freshness,
+      confidence,
+    },
+    ...(latency !== undefined ? { latency_ms: latency } : {}),
+    ...(lastError ? { last_error: lastError, message: lastError } : {}),
+    ...(runbook ? { runbook_url: runbook } : {}),
+    ...(http ? { http } : {}),
+    ...(tls ? { tls } : {}),
+    ...(docker ? { docker } : {}),
+    ...(backup ? { backup } : {}),
+    ...(hostMetrics ? { host_metrics: hostMetrics } : {}),
+    ...(anonymous ? { catalog_error: "missing_service_identity" } : {}),
+  };
+  return {
+    key: anonymous ? `anonymous:${JSON.stringify(raw)}` : slug,
+    row,
+    status,
+    freshness,
+    anonymous,
+  };
+}
+
+/**
+ * Equivalent entries collapse into one card carrying duplicate_count, so the
+ * operator sees a repeated catalog entry as a repeat, not as two dependencies.
+ */
+function groupServices(services: readonly InfraService[]): Record<string, unknown>[] {
+  const byKey = new Map<string, { service: InfraService; count: number }>();
+  for (const service of services) {
+    const seen = byKey.get(service.key);
+    if (!seen) {
+      byKey.set(service.key, { service, count: 1 });
+      continue;
+    }
+    seen.count += 1;
+    const worseStatus = STATUS_SEVERITY[service.status] > STATUS_SEVERITY[seen.service.status];
+    const worseFreshness = FRESHNESS_SEVERITY[service.freshness] > FRESHNESS_SEVERITY[seen.service.freshness];
+    if (worseStatus || worseFreshness) {
+      seen.service = service;
+    }
+  }
+  return [...byKey.values()].map(({ service, count }) =>
+    count > 1 ? { ...service.row, duplicate_count: count } : service.row,
+  );
+}
+
+/**
+ * A runbook link the cockpit may render. Same-origin absolute path, or an
+ * http(s) URL with no credentials. Anything else is dropped rather than shown:
+ * a link the operator cannot trust is worse than no link.
+ */
+function safeRunbookUrl(value: unknown): string | undefined {
+  const raw = textOrUndefined(value);
+  if (!raw || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
+    return undefined;
+  }
+  if (raw.startsWith("/")) {
+    return raw.includes("@") ? undefined : raw;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username || url.password) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSnapshot {
   const availability = availabilityFromEnvelope(envelope);
@@ -24,8 +208,12 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   const payload = asRecord(envelope.payload) ?? {};
   const health = asArray(payload.service_health).length > 0 ? asArray(payload.service_health) : asArray(payload.health);
   const first = asRecord(health[0]) ?? payload;
-  const statuses = health.map((item) => String(asRecord(item)?.status ?? "unknown"));
+  const projected = health.map((item) => projectService(item, envelope, freshness));
+  const services = groupServices(projected);
+  const statuses = projected.map((service) => service.status);
   const partial = statuses.some((status) => status !== "healthy") && statuses.some((status) => status === "healthy");
+  const catalogErrors = projected.filter((service) => service.anonymous).length;
+  const duplicateGroups = services.filter((row) => typeof row.duplicate_count === "number").length;
   return {
     projector_version: PROJECTOR_VERSION,
     snapshot_kind: "infrastructure",
@@ -35,24 +223,13 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
       projector_version: PROJECTOR_VERSION,
       availability,
       service_name: first.service_name ?? "control-center-infrastructure",
-      status: partial ? "degraded" : first.status ?? (availability === "FRESH" ? "unknown" : "unknown"),
+      status: partial ? "degraded" : normalizeHealthStatus(first.status),
       partial_outage: partial,
-      services: capList(
-        health.map((item) => {
-          const row = asRecord(item) ?? {};
-          return {
-            id: row.id,
-            service_name: row.service_name ?? row.id,
-            status: row.status,
-            freshness_status: row.freshness_status,
-            partial_outage: row.partial_outage === true,
-            http: row.http,
-            tls: row.tls,
-            disk: row.disk,
-            memory: row.memory,
-          };
-        }),
-      ),
+      monitored_service_count: services.length,
+      catalog_error_count: catalogErrors,
+      duplicate_group_count: duplicateGroups,
+      ...(envelope.error ? { unavailability_reason: envelope.error.code } : {}),
+      services: capList(services),
     },
     freshness_status: freshness,
     availability,

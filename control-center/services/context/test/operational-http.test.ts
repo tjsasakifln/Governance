@@ -542,3 +542,129 @@ test("the clients mapper forwards the identity queue through a real envelope rea
   assert.equal(snapshot.unidentified_record_count, 2);
   assert.equal(snapshot.client_count, 0);
 });
+
+function infraSnapshotData(overrides: {
+  freshness_status: "FRESH" | "STALE" | "UNKNOWN" | "ERROR";
+  confidence: number;
+  services: Record<string, unknown>[];
+}) {
+  return {
+    operational_snapshots: [
+      {
+        id: "cc:operational-snapshot:infrastructure",
+        scope: "infrastructure",
+        snapshot_kind: "infrastructure",
+        generated_at: "2026-08-20T11:20:00.000Z",
+        source: { system: "collector", kind: "host-health", locator: "infrastructure/hosts" },
+        observed_at: "2026-08-20T11:20:00.000Z",
+        freshness_status: overrides.freshness_status,
+        confidence: overrides.confidence,
+        payload: {
+          schema_version: "control-center.infrastructure-snapshot.v1",
+          status: "healthy",
+          service_name: "edge",
+          services: overrides.services,
+        },
+      },
+    ],
+  };
+}
+
+function infraServicesOf(body: Record<string, unknown>): Record<string, unknown>[] {
+  const snapshots = body.snapshots as Record<string, { snapshot?: Record<string, unknown> }>;
+  const services = snapshots.infrastructure?.snapshot?.services;
+  assert.ok(Array.isArray(services));
+  return services as Record<string, unknown>[];
+}
+
+test("a nested service is never healthy when the snapshot's evidence is not fresh", async () => {
+  const port = createFixtureOperationalPort(
+    infraSnapshotData({
+      freshness_status: "UNKNOWN",
+      confidence: 0,
+      services: [
+        {
+          service_name: "confenge-api-http",
+          status: "healthy",
+          freshness_status: "FRESH",
+          confidence: 0.9,
+          provenance: {
+            source: { system: "collector", kind: "host-health", locator: "infrastructure/hosts" },
+            observed_at: "2026-08-20T11:20:00.000Z",
+            freshness_status: "FRESH",
+            confidence: 0.9,
+          },
+        },
+      ],
+    }),
+  );
+  await withServer(port, async (base) => {
+    const { res, body } = await getJson(base, "/v1/domains/infrastructure?scope=infrastructure");
+    assert.equal(res.status, 200);
+    const slot = body.snapshot as Record<string, unknown>;
+    assert.equal(slot.healthy, false);
+    const services = (slot.snapshot as { services: Record<string, unknown>[] }).services;
+    const service = services[0];
+    assert.ok(service);
+    assert.equal(service.status, "unknown");
+    assert.equal(service.freshness_status, "UNKNOWN");
+    assert.equal(service.confidence, 0);
+    assert.equal(service.evidence_conclusive, false);
+    const provenance = service.provenance as { freshness_status: string; confidence: number };
+    assert.equal(provenance.freshness_status, "UNKNOWN");
+    assert.equal(provenance.confidence, 0);
+  });
+});
+
+test("zero confidence demotes a nested service even when the snapshot reads FRESH", async () => {
+  const port = createFixtureOperationalPort(
+    infraSnapshotData({
+      freshness_status: "FRESH",
+      confidence: 0,
+      services: [{ service_name: "edge", status: "healthy", freshness_status: "FRESH", confidence: 0 }],
+    }),
+  );
+  await withServer(port, async (base) => {
+    const { body } = await getJson(base, "/v1/operational-snapshots?scope=infrastructure");
+    assert.equal(validateOperationalEnvelope(body).ok, true);
+    const snapshots = body.snapshots as Record<string, { healthy?: boolean }>;
+    assert.equal(snapshots.infrastructure?.healthy, false);
+    const service = infraServicesOf(body)[0];
+    assert.ok(service);
+    assert.equal(service.status, "unknown");
+    assert.equal(service.evidence_conclusive, false);
+  });
+});
+
+test("a fresh, evidenced service stays healthy and keeps its catalog identity", async () => {
+  const port = createFixtureOperationalPort(
+    infraSnapshotData({
+      freshness_status: "FRESH",
+      confidence: 0.88,
+      services: [
+        {
+          id: "cc:service-health:confenge-api-http",
+          service_id: "confenge-api-http",
+          service_name: "Confenge API inbound health",
+          role: "Endpoint de health do inbound",
+          endpoint: "https://api.confenge.com.br/health",
+          status: "healthy",
+          freshness_status: "FRESH",
+          confidence: 0.9,
+        },
+      ],
+    }),
+  );
+  await withServer(port, async (base) => {
+    const { body } = await getJson(base, "/v1/operational-snapshots?scope=infrastructure");
+    assert.equal(validateOperationalEnvelope(body).ok, true);
+    const service = infraServicesOf(body)[0];
+    assert.ok(service);
+    assert.equal(service.status, "healthy");
+    assert.equal(service.evidence_conclusive, true);
+    assert.equal(service.confidence, 0.88);
+    assert.equal(service.service_name, "Confenge API inbound health");
+    assert.equal(service.role, "Endpoint de health do inbound");
+    assert.equal(service.endpoint, "https://api.confenge.com.br/health");
+  });
+});

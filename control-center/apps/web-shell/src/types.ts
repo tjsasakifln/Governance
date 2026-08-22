@@ -354,6 +354,22 @@ export interface ServiceHealth {
   status: HealthStatus;
   provenance: Provenance;
   checked_at: UtcDateTime;
+  /** Catalog id of the monitored dependency, when the catalog names one. */
+  service_id?: string;
+  /** What the service does. */
+  role?: string;
+  /** Logical address the checks address. Never carries credentials. */
+  endpoint?: string;
+  /** Worst non-healthy check, in the collector's own words. */
+  last_error?: string;
+  /** Same-origin path or credential-free http(s) URL for the runbook. */
+  runbook_url?: string;
+  /** How many identical catalog entries collapsed into this card. */
+  duplicate_count?: number;
+  /** Set when the row itself is a catalog/telemetry defect. */
+  catalog_error?: string;
+  /** False when freshness or confidence cannot support a conclusion. */
+  evidence_conclusive?: boolean;
   latency_ms?: number;
   message?: string;
   checks?: ServiceHealthCheck[];
@@ -361,6 +377,7 @@ export interface ServiceHealth {
   tls?: { status?: string; detail?: string };
   docker?: { status?: string; detail?: string };
   backup?: { status?: string; detail?: string };
+  host_metrics?: { status?: string; detail?: string };
   disk?: { used_pct?: number; detail?: string };
   memory?: { used_pct?: number; detail?: string };
   pncp_freshness?: { freshness_status: FreshnessStatus; observed_at?: UtcDateTime; detail?: string };

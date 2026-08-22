@@ -23,6 +23,8 @@ Canonical Control Center contracts live in sibling path `control-center/contract
 | --- | --- | --- |
 | `service_id` | string | Allowlisted target id |
 | `display_name` | string | |
+| `role` | string | What the service does. Catalog `role`, else derived from the checks it runs |
+| `endpoint` | string | Logical address the checks address. Userinfo and query string stripped |
 | `source` | string | |
 | `observed_at` | string | UTC |
 | `freshness_status` | same enum | Worst of member checks |
@@ -31,6 +33,9 @@ Canonical Control Center contracts live in sibling path `control-center/contract
 | `uptime_seconds` | number? | When the uptime probe observed it |
 | `restart_count` | number? | When the uptime probe observed it |
 | `confidence` | number? | Min of member observations |
+| `latency_ms` | number? | Worst round trip across the member checks |
+| `last_error` | string? | Summary of the worst non-healthy check |
+| `runbook_url` | string? | Catalog `runbook_url`: same-origin path or credential-free http(s) URL |
 
 ## ActionableException
 
@@ -52,6 +57,14 @@ A service incident (failed/unreachable/unhealthy probe, expired TLS, missing/fai
 ## Allowlist
 
 See `config/allowlist.example.json`. No secrets, SSH material, passwords, tokens, or PEM. Hosts/URLs only. Thresholds are operational, not credentials.
+
+Two optional per-target fields make the cockpit readable instead of a wall of
+identical cards:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `role` | string? | What the target does, ≤120 chars. Omitted, the collector derives one from the target's checks |
+| `runbook_url` | string? | Same-origin absolute path, or an http(s) URL with no credentials. Protocol-relative and `javascript:` are refused at parse time |
 
 ## Read-only agent payload (`GET {AGENT}/v1/targets/{id}`)
 

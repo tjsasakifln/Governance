@@ -522,17 +522,78 @@ export function engineeringFrom(row: Record<string, unknown>, fallback: Provenan
   return snap;
 }
 
+const HEALTH_STATUSES = ["healthy", "degraded", "down", "unknown"] as const;
+
+/**
+ * The infrastructure collector says "unhealthy" where the contract says
+ * "down". Anything unrecognised is unknown — never healthy by omission.
+ */
+function healthStatusOf(value: unknown): ServiceHealth["status"] {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (raw === "unhealthy" || raw === "down") return "down";
+  return (HEALTH_STATUSES as readonly string[]).includes(raw)
+    ? (raw as ServiceHealth["status"])
+    : "unknown";
+}
+
+/**
+ * A runbook href the shell is willing to render: a same-origin absolute path,
+ * or an http(s) URL with no embedded credentials. The projector validates the
+ * same rule; the shell repeats it because a link it cannot vouch for is worse
+ * than no link.
+ */
+export function safeRunbookHref(value: unknown): string | undefined {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (raw === "" || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
+    return undefined;
+  }
+  if (raw.startsWith("/")) {
+    return raw.includes("@") ? undefined : raw;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username !== "" || url.password !== "") return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function healthFrom(row: Record<string, unknown>, fallback: Provenance): ServiceHealth {
   const prov = provenanceOf(row, fallback);
+  // The collector emits service_id/display_name; earlier payloads used
+  // id/service_name. Reading only one pair is what produced a wall of cards
+  // all called "service", so every known spelling is consulted before the row
+  // is declared nameless — and a nameless row is labelled as a catalog defect
+  // rather than given a generic name that hides it.
+  const identity =
+    str(row.service_name) || str(row.display_name) || str(row.service_id) || str(row.target_id);
   const item: ServiceHealth = {
     schema_version: "control-center.service-health.v1",
-    id: str(row.id, "cc:service-health:unknown"),
+    id: str(row.id, `cc:service-health:${identity !== "" ? identity : "sem-identidade"}`),
     scope: str(row.scope, "infrastructure"),
-    service_name: str(row.service_name, "service"),
-    status: (row.status as ServiceHealth["status"]) ?? "unknown",
+    service_name: identity !== "" ? identity : "serviço sem identidade no catálogo",
+    status: healthStatusOf(row.status),
     provenance: prov,
     checked_at: str(row.checked_at, prov.observed_at),
   };
+  const serviceId = str(row.service_id);
+  if (serviceId !== "") item.service_id = serviceId;
+  const role = str(row.role);
+  if (role !== "") item.role = role;
+  const endpoint = str(row.endpoint);
+  if (endpoint !== "") item.endpoint = endpoint;
+  const lastError = str(row.last_error);
+  if (lastError !== "") item.last_error = lastError;
+  const runbook = safeRunbookHref(row.runbook_url);
+  if (runbook) item.runbook_url = runbook;
+  if (typeof row.duplicate_count === "number" && row.duplicate_count > 1) {
+    item.duplicate_count = row.duplicate_count;
+  }
+  const catalogError = str(row.catalog_error) || (identity === "" ? "missing_service_identity" : "");
+  if (catalogError !== "") item.catalog_error = catalogError;
+  if (typeof row.evidence_conclusive === "boolean") item.evidence_conclusive = row.evidence_conclusive;
   if (typeof row.latency_ms === "number") item.latency_ms = row.latency_ms;
   if (typeof row.message === "string") item.message = row.message;
   if (Array.isArray(row.checks)) {
@@ -571,6 +632,13 @@ export function healthFrom(row: Record<string, unknown>, fallback: Provenance): 
     item.backup = {
       ...(typeof backup.status === "string" ? { status: backup.status } : {}),
       ...(typeof backup.detail === "string" ? { detail: backup.detail } : {}),
+    };
+  }
+  const hostMetrics = asRecord(row.host_metrics);
+  if (hostMetrics) {
+    item.host_metrics = {
+      ...(typeof hostMetrics.status === "string" ? { status: hostMetrics.status } : {}),
+      ...(typeof hostMetrics.detail === "string" ? { detail: hostMetrics.detail } : {}),
     };
   }
   const disk = asRecord(row.disk);
