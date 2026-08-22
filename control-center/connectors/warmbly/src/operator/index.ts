@@ -41,14 +41,20 @@ export type {
 } from "./identity.ts";
 
 export {
+  OPERATOR_DISPATCH_STATUS_PATH,
   OPERATOR_LEDGER_SCHEMA,
   OPERATOR_LEDGER_SOURCE_KIND,
   OPERATOR_LEDGER_SOURCE_SYSTEM,
+  OPERATOR_LEDGER_WAL_MARKER,
   OPERATOR_OUTCOMES,
   OPERATOR_REFUSAL_CODES,
+  OPERATOR_UNKNOWN_CODE,
   createFanOutOperatorActionLedger,
   createMemoryOperatorActionLedger,
+  defaultOperatorSinkErrorHandler,
   operatorLedgerId,
+  operatorLedgerWalLine,
+  writeOperatorLedgerWal,
 } from "./ledger.ts";
 export type {
   OperatorActionLedger,
@@ -58,10 +64,12 @@ export type {
   OperatorLedgerUpstream,
   OperatorOutcome,
   OperatorRefusalCode,
+  OperatorUnknownCode,
 } from "./ledger.ts";
 
 export {
   DEFAULT_CONFIRMATION_TTL_MS,
+  confirmationReasonHash,
   createConfirmationStore,
 } from "./confirmation.ts";
 export type {
@@ -74,6 +82,7 @@ export {
   OperatorPathNotAllowedError,
   OperatorTimeoutError,
   WarmblyOperatorClient,
+  isPreFlightTransportFailure,
 } from "./client.ts";
 export type { OperatorPostResult, WarmblyOperatorClientOptions } from "./client.ts";
 
@@ -85,6 +94,7 @@ export type {
   OperatorChallenged,
   OperatorExecuted,
   OperatorRefused,
+  OperatorUnknown,
   WarmblyOperatorChannel,
   WarmblyOperatorChannelOptions,
 } from "./channel.ts";

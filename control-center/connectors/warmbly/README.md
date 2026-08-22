@@ -20,7 +20,13 @@ Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stag
   Terms of the amendment:
   - There is **no generic proxy**. A caller names an action; the action owns its method, its path template and its body. No caller-supplied method or path is ever forwarded (`src/operator/actions.ts`, `src/operator/allowlist.ts`).
   - Every action requires an authenticated founder from Authelia's `Remote-User` / `Remote-Groups` / `Remote-Name` / `Remote-Email`, resolved through the existing `control-center/security` ForwardAuth contract (`parseForwardAuthIdentity` + trusted-hop check). The `ops.confenge.com.br` nginx vhost blanks any client-supplied `Remote-*`, so Authelia is the only writer. A caller cannot hand in a pre-built actor.
-  - Every path is fail-closed: unknown action, missing/spoofed/ungrouped actor, unsafe target id, missing audit reason, missing or invalid confirmation, open circuit breaker, non-2xx upstream, and transport failure all produce a **recorded refusal**. There is no branch that returns without writing a ledger entry.
+  - Every path is fail-closed: unknown action, missing/spoofed/ungrouped actor, unsafe target id, missing audit reason, missing or invalid confirmation, open circuit breaker, non-2xx upstream, and a transport failure that never left this process all produce a **recorded refusal**. There is no branch that returns without writing a ledger entry.
+  - **A written-but-unanswered call is `unknown`, never `refused`.** When the POST was already on the wire (timeout, or any failure not provably pre-flight) Warmbly may have applied it, so the outcome is recorded as `unknown` with `upstream.status: null` and `upstream.path` set, and the returned reason tells the operator to read `GET /v1/confenge/dispatch/status` before retrying. Calling that a refusal is how an operator ends up believing dispatch is paused while Warmbly is sending.
+  - **A confirmation token spent on an `unknown` stays spent.** Re-arming it would turn one observed token into a replayable resume; the operator reads dispatch status and, if still paused, mints a fresh confirmation. The `unknown` reason says so.
+  - **Redirects are never followed** (`redirect: "manual"`). A 3xx would re-issue the POST — Bearer token and body included — at a `Location` that `classifyOperatorRequest` never saw (e.g. `dispatch-now`), while the ledger recorded the allowlisted path. Any 3xx is an `upstream_error` refusal.
+  - **The ledger key is minted here.** `correlation_id` (and therefore the entry `id` and the agent-activity session) is always server-minted; a caller's own string is carried as `client_reference` and keys nothing, so replaying it can never rewrite an executed entry. While `paused_by` is missing upstream (`gaps` in `required_upstream_contract.json`) this ledger is the sole non-repudiation record.
+  - **A ledger failure is never silent.** `ledger.record` is wrapped: on failure the entry goes to a durable stderr WAL line (`cc.warmbly.operator-action.wal`) before the error is rethrown, and `createFanOutOperatorActionLedger` requires an `onSinkError` handler — `defaultOperatorSinkErrorHandler()` logs at error level with the full entry serialized.
+  - **Duplicated identity headers fail closed.** `control-center/security` returns no value for a `Remote-*` header that arrives more than once, so a client-supplied copy can never beat the proxy's.
   - `resume_dispatch` is two step because it is the action that can let traffic flow: `requestResumeConfirmation` mints a single-use, 2-minute, actor-bound and target-bound token, and `execute` refuses without it. `pause_dispatch` is one step and is never confirmation-gated.
   - Operator writes are **never retried** (a retried acknowledge would double-acknowledge). 4xx from Warmbly does not trip the circuit breaker; 5xx/429/timeout does.
   - The channel may share the read client's `CircuitBreaker`, so a degraded Warmbly blocks operator writes too. When the breaker is open, the refusal names the out-of-band fallback: `deploy/confenge-vps/pause.sh` on the VPS.
@@ -67,13 +73,20 @@ import {
   createFanOutOperatorActionLedger,
   createMemoryOperatorActionLedger,
   createOperatorHttpHandler,
+  defaultOperatorSinkErrorHandler,
 } from "@confenge/control-center-warmbly-connector";
 
 const client = new WarmblyOperatorClient({ baseUrl, token, breaker: readClient.breaker });
 const memory = createMemoryOperatorActionLedger();
 const channel = createWarmblyOperatorChannel({
   client,
-  ledger: createFanOutOperatorActionLedger(memory, [createAgentActivityLedgerSink(agentLedger)]),
+  // onSinkError is required: a mirror that fails silently is an executed
+  // action with no visible timeline row and no error.
+  ledger: createFanOutOperatorActionLedger(
+    memory,
+    [createAgentActivityLedgerSink(agentLedger)],
+    defaultOperatorSinkErrorHandler(),
+  ),
 });
 
 await channel.pauseDispatch({ request, reason: "spike de bounce" });        // one step
@@ -91,11 +104,12 @@ One `control-center.warmbly-operator-action.v1` entry per call, on success and o
 ```json
 {
   "schema_version": "control-center.warmbly-operator-action.v1",
-  "id": "cc:warmbly-operator-action:<correlation_id>",
+  "id": "cc:warmbly-operator-action:<minted correlation_id>",
   "correlation_id": "cc:warmbly-op:<uuid>",
+  "client_reference": "<the caller's own string, or null — keys nothing>",
   "requested_action": "pause_dispatch",
   "action": "pause_dispatch",
-  "outcome": "executed | refused | challenged",
+  "outcome": "executed | refused | challenged | unknown",
   "refusal_code": null,
   "refusal_reason": null,
   "actor": { "kind": "founder", "id": "<Remote-User>", "display_name": "<Remote-Name>" },
@@ -112,7 +126,11 @@ One `control-center.warmbly-operator-action.v1` entry per call, on success and o
 }
 ```
 
-`Remote-Email` never enters the record; the actor id is the `Remote-User` handle. `createAgentActivityLedgerSink` mirrors each entry into `control-center/domains/agent-activity` as a start + report pair (`executed → DONE`, `challenged → PARTIAL`, `refused → BLOCKED`; identity kind `human` → ledger kind `founder`), so operator actions appear on the same timeline as agent runs.
+`confirmation.token_id` is `cnf:<action>:<target_id>:<uuid>` — unique per challenge, so the ledger shows which challenge was spent and how many were minted and abandoned. The audit reason is bound to the challenge by hash: a token confirmed under one reason cannot be executed under another.
+
+`Remote-Email` never enters the record; the actor id is the `Remote-User` handle. `createAgentActivityLedgerSink` mirrors each entry into `control-center/domains/agent-activity` as a start + report pair (`executed → DONE`, `challenged → PARTIAL`, `refused → BLOCKED`, `unknown → UNKNOWN`; identity kind `human` → ledger kind `founder`), so operator actions appear on the same timeline as agent runs. The session is keyed by the minted `correlation_id`, so a replayed `client_reference` cannot revise an existing row.
+
+An `unknown` outcome is answered over HTTP as `503 {"outcome":"unknown","code":"transport_unknown"}`; the reason names `GET /v1/confenge/dispatch/status` as the only thing that settles it.
 
 ## Env vars (names only)
 

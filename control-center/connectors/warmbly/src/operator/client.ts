@@ -30,10 +30,112 @@ export class OperatorPathNotAllowedError extends Error {
 
 export class OperatorTimeoutError extends Error {
   readonly code = "OPERATOR_TIMEOUT" as const;
+  /**
+   * The request was already written when the clock ran out, so Warmbly may have
+   * applied it. A timeout is never evidence that the action did not happen.
+   */
+  readonly requestWritten = true as const;
   constructor(message: string) {
     super(message);
     this.name = "OperatorTimeoutError";
   }
+}
+
+/**
+ * Errors that prove the request never left this process: name resolution and
+ * connection establishment failed, so no byte of the POST reached Warmbly.
+ * Anything not on this list is treated as "may have been written" — the
+ * conservative direction for a channel that can start outbound email.
+ */
+const PRE_FLIGHT_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EACCES",
+  "ERR_INVALID_URL",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "CERT_HAS_EXPIRED",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+/**
+ * URL-level rejections. `fetch` throws these before opening a socket and they
+ * carry no `code`, so they are matched on the message the runtime uses.
+ */
+const PRE_FLIGHT_MESSAGES = [
+  "bad port",
+  "unsupported protocol",
+  "invalid url",
+  "failed to parse url",
+];
+
+function errorMessagesOf(err: unknown, depth = 0): string[] {
+  if (depth > 4 || typeof err !== "object" || err === null) {
+    return [];
+  }
+  const messages: string[] = [];
+  const message = (err as { message?: unknown }).message;
+  if (typeof message === "string") {
+    messages.push(message.toLowerCase());
+  }
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause !== undefined) {
+    messages.push(...errorMessagesOf(cause, depth + 1));
+  }
+  const aggregate = (err as { errors?: unknown }).errors;
+  if (Array.isArray(aggregate)) {
+    for (const inner of aggregate) {
+      messages.push(...errorMessagesOf(inner, depth + 1));
+    }
+  }
+  return messages;
+}
+
+function errorCodesOf(err: unknown, depth = 0): string[] {
+  if (depth > 4 || typeof err !== "object" || err === null) {
+    return [];
+  }
+  const codes: string[] = [];
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === "string") {
+    codes.push(code);
+  }
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause !== undefined) {
+    codes.push(...errorCodesOf(cause, depth + 1));
+  }
+  const aggregate = (err as { errors?: unknown }).errors;
+  if (Array.isArray(aggregate)) {
+    for (const inner of aggregate) {
+      codes.push(...errorCodesOf(inner, depth + 1));
+    }
+  }
+  return codes;
+}
+
+/**
+ * True only when the failure happened before anything was written to the
+ * socket. Used by the channel to decide between `refused` (nothing happened
+ * upstream) and `unknown` (it may have).
+ */
+export function isPreFlightTransportFailure(err: unknown): boolean {
+  if (err instanceof OperatorPathNotAllowedError) {
+    return true;
+  }
+  if (err instanceof OperatorTimeoutError) {
+    return false;
+  }
+  if (errorCodesOf(err).some((code) => PRE_FLIGHT_ERROR_CODES.has(code))) {
+    return true;
+  }
+  return errorMessagesOf(err).some((message) =>
+    PRE_FLIGHT_MESSAGES.some((marker) => message.includes(marker)),
+  );
 }
 
 export interface OperatorPostResult {
@@ -139,6 +241,11 @@ export class WarmblyOperatorClient {
         headers,
         body: JSON.stringify(body ?? {}),
         signal: controller.signal,
+        // Never follow a redirect. A 3xx would re-issue this POST — Bearer token,
+        // original body and all — at a Location that was never classified by
+        // `classifyOperatorRequest`, so `dispatch-now` could be executed while
+        // the ledger recorded the allowlisted path.
+        redirect: "manual",
       });
       let json: unknown = null;
       const text = await res.text();
@@ -148,6 +255,15 @@ export class WarmblyOperatorClient {
         } catch {
           json = { raw: redactSecrets(text.slice(0, 200)) };
         }
+      }
+      if (res.status >= 300 && res.status <= 399) {
+        this.logger({
+          level: "error",
+          msg: "warmbly.operator.redirect_refused",
+          method: "POST",
+          path: classified.path,
+          status: res.status,
+        });
       }
       // 4xx is an upstream refusal, not connector degradation: it must not trip
       // the breaker and lock the operator out of pausing.

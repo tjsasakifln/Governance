@@ -8,6 +8,7 @@
  * - outcome "executed"   -> ExecutionStatus DONE
  * - outcome "challenged" -> ExecutionStatus PARTIAL (step 1 of 2 completed)
  * - outcome "refused"    -> ExecutionStatus BLOCKED
+ * - outcome "unknown"    -> ExecutionStatus UNKNOWN (written, answer never came)
  *
  * Nothing sensitive crosses: the actor id is the Authelia `Remote-User` handle,
  * never `Remote-Email`, and no token or reason-with-secret shape is carried.
@@ -25,12 +26,17 @@ export interface AgentLedgerLike {
   reportResult(raw: unknown): unknown;
 }
 
-function statusFor(entry: OperatorActionLedgerEntry): "DONE" | "PARTIAL" | "BLOCKED" {
+function statusFor(entry: OperatorActionLedgerEntry): "DONE" | "PARTIAL" | "BLOCKED" | "UNKNOWN" {
   if (entry.outcome === "executed") {
     return "DONE";
   }
   if (entry.outcome === "challenged") {
     return "PARTIAL";
+  }
+  // Never BLOCKED: "unknown" means the request was written and Warmbly may have
+  // applied it. Showing it as blocked would claim nothing happened.
+  if (entry.outcome === "unknown") {
+    return "UNKNOWN";
   }
   return "BLOCKED";
 }
@@ -54,11 +60,15 @@ function evidenceFor(entry: OperatorActionLedgerEntry): string[] {
       entry.upstream.status === null ? "none" : entry.upstream.status
     }`,
     `circuit=${entry.circuit_state}`,
+    `client_reference=${entry.client_reference ?? "none"}`,
     `confirmation=required:${entry.confirmation.required} satisfied:${entry.confirmation.satisfied}`,
     `recorded_at=${entry.recorded_at}`,
   ];
   if (entry.refusal_code) {
     evidence.push(`refusal_code=${entry.refusal_code}`);
+  }
+  if (entry.confirmation.token_id) {
+    evidence.push(`confirmation_token_id=${entry.confirmation.token_id}`);
   }
   return evidence;
 }

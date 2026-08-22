@@ -75,6 +75,10 @@ function statusFor(result: OperatorActionResult): number {
     case "circuit_open":
     case "transport_error":
       return 503;
+    // The write may have been applied upstream. 503 tells the caller the
+    // connector could not resolve it — the body says to read dispatch status.
+    case "transport_unknown":
+      return 503;
     case "upstream_error":
       return 502;
     default:
@@ -85,7 +89,10 @@ function statusFor(result: OperatorActionResult): number {
 function render(result: OperatorActionResult): OperatorHttpResponse {
   const base: Record<string, unknown> = {
     outcome: result.outcome,
+    // Minted by the channel. `client_reference` is the caller's own string and
+    // keys nothing.
     correlation_id: result.entry.correlation_id,
+    client_reference: result.entry.client_reference,
     ledger_id: result.entry.id,
     recorded_at: result.entry.recorded_at,
   };
@@ -133,10 +140,14 @@ export function createOperatorHttpHandler(
     }
     const identity = { remoteAddress: req.remoteAddress ?? "", headers: req.headers };
     const body = asRecord(req.body);
+    // A caller-supplied correlation id is never accepted as one: it is carried
+    // as `client_reference`, which keys nothing. `correlation_id` in the body is
+    // still read, for compatibility, into the same non-key field.
+    const clientReference = str(body.client_reference) ?? str(body.correlation_id);
     const input = {
       request: identity,
       ...(str(body.reason) ? { reason: str(body.reason)! } : {}),
-      ...(str(body.correlation_id) ? { correlation_id: str(body.correlation_id)! } : {}),
+      ...(clientReference ? { client_reference: clientReference } : {}),
     };
 
     if (path === OPERATOR_HTTP_ROUTES.pause) {

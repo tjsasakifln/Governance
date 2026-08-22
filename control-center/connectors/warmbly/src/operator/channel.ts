@@ -4,8 +4,9 @@
  * Narrow by construction: a caller names one of three actions and supplies the
  * raw HTTP request whose Authelia `Remote-*` headers carry the founder. There
  * is no method parameter, no path parameter, and no escape hatch. Every call
- * — executed, refused or challenged — writes exactly one ledger entry before
- * it returns.
+ * — executed, refused, challenged, or unknown — writes exactly one ledger entry
+ * before it returns, under a correlation id minted here rather than supplied by
+ * the caller.
  */
 
 import { randomUUID } from "node:crypto";
@@ -26,6 +27,7 @@ import { classifyOperatorRequest } from "./allowlist.ts";
 import {
   OperatorPathNotAllowedError,
   OperatorTimeoutError,
+  isPreFlightTransportFailure,
   type WarmblyOperatorClient,
 } from "./client.ts";
 import {
@@ -41,17 +43,21 @@ import {
   type TrustedHopPolicy,
 } from "./identity.ts";
 import {
+  OPERATOR_DISPATCH_STATUS_PATH,
   OPERATOR_LEDGER_SCHEMA,
   OPERATOR_LEDGER_SOURCE_KIND,
   OPERATOR_LEDGER_SOURCE_SYSTEM,
+  OPERATOR_UNKNOWN_CODE,
   createMemoryOperatorActionLedger,
   operatorLedgerId,
+  writeOperatorLedgerWal,
   type OperatorActionLedger,
   type OperatorActionLedgerEntry,
   type OperatorLedgerConfirmation,
   type OperatorLedgerTarget,
   type OperatorLedgerUpstream,
   type OperatorRefusalCode,
+  type OperatorUnknownCode,
 } from "./ledger.ts";
 
 export interface OperatorActionInput {
@@ -62,7 +68,12 @@ export interface OperatorActionInput {
   target_id?: string;
   reason?: string;
   confirmation_token?: string;
-  correlation_id?: string;
+  /**
+   * The caller's own reference. It is echoed on the entry and never used as a
+   * key: `correlation_id` and the ledger `id` are minted here, so a replayed
+   * reference can never rewrite an existing record.
+   */
+  client_reference?: string;
 }
 
 export type NamedOperatorActionInput = Omit<OperatorActionInput, "action">;
@@ -94,7 +105,23 @@ export interface OperatorRefused {
   entry: OperatorActionLedgerEntry;
 }
 
-export type OperatorActionResult = OperatorExecuted | OperatorChallenged | OperatorRefused;
+/**
+ * The request reached Warmbly and the answer did not reach us. Not a success
+ * and — critically — not a refusal: the action may have been applied.
+ */
+export interface OperatorUnknown {
+  ok: false;
+  outcome: "unknown";
+  code: OperatorUnknownCode;
+  reason: string;
+  entry: OperatorActionLedgerEntry;
+}
+
+export type OperatorActionResult =
+  | OperatorExecuted
+  | OperatorChallenged
+  | OperatorRefused
+  | OperatorUnknown;
 
 export interface WarmblyOperatorChannelOptions {
   client: WarmblyOperatorClient;
@@ -105,6 +132,11 @@ export interface WarmblyOperatorChannelOptions {
   now?: () => Date;
   newCorrelationId?: () => string;
   logger?: Logger;
+  /**
+   * Durable last resort when `ledger.record` throws. Defaults to a synchronous
+   * stderr WAL line so an executed action is never lost silently.
+   */
+  onLedgerWriteFailure?: (entry: OperatorActionLedgerEntry, err: unknown) => void;
 }
 
 export interface WarmblyOperatorChannel {
@@ -142,17 +174,43 @@ export function createWarmblyOperatorChannel(
   const now = options.now ?? (() => new Date());
   const newCorrelationId = options.newCorrelationId ?? (() => randomUUID());
   const logger = options.logger ?? createStderrLogger();
+  const onLedgerWriteFailure = options.onLedgerWriteFailure ?? writeOperatorLedgerWal;
 
-  function correlationOf(input: OperatorActionInput): string {
-    const raw = typeof input.correlation_id === "string" ? input.correlation_id.trim() : "";
-    if (raw !== "" && /^[A-Za-z0-9._:~-]{1,96}$/.test(raw)) {
-      return raw;
-    }
+  /**
+   * Always minted here. A caller-chosen correlation id would key the ledger
+   * entry (and the agent-activity session), so replaying it would rewrite the
+   * row of an already-executed action — in a record that is the sole
+   * non-repudiation evidence while `paused_by` is missing upstream.
+   */
+  function correlationOf(): string {
     return `cc:warmbly-op:${newCorrelationId()}`;
   }
 
+  /** The caller's value, carried but never used as a key. */
+  function clientReferenceOf(input: OperatorActionInput): string | null {
+    const raw = typeof input.client_reference === "string" ? input.client_reference.trim() : "";
+    return raw !== "" && /^[A-Za-z0-9._:~-]{1,96}$/.test(raw) ? raw : null;
+  }
+
   function record(entry: OperatorActionLedgerEntry): OperatorActionLedgerEntry {
-    ledger.record(entry);
+    try {
+      ledger.record(entry);
+    } catch (err) {
+      // The upstream write may already have happened. An entry lost here is the
+      // non-repudiation failure, so put it somewhere durable before the failure
+      // surfaces to the caller.
+      onLedgerWriteFailure(entry, err);
+      logger({
+        level: "error",
+        msg: "warmbly.operator.ledger_write_failed",
+        correlation_id: entry.correlation_id,
+        requested_action: entry.requested_action,
+        outcome: entry.outcome,
+        upstream_status: entry.upstream.status,
+        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      });
+      throw err;
+    }
     logger({
       level: entry.outcome === "executed" ? "info" : "warn",
       msg: "warmbly.operator.recorded",
@@ -170,10 +228,11 @@ export function createWarmblyOperatorChannel(
 
   function buildEntry(parts: {
     correlation_id: string;
+    client_reference: string | null;
     requested_action: string;
     action: OperatorActionName | null;
     outcome: OperatorActionLedgerEntry["outcome"];
-    refusal_code: OperatorRefusalCode | null;
+    refusal_code: OperatorRefusalCode | OperatorUnknownCode | null;
     refusal_reason: string | null;
     actor: OperatorActor | null;
     target: OperatorLedgerTarget;
@@ -186,6 +245,7 @@ export function createWarmblyOperatorChannel(
       schema_version: OPERATOR_LEDGER_SCHEMA,
       id: operatorLedgerId(parts.correlation_id),
       correlation_id: parts.correlation_id,
+      client_reference: parts.client_reference,
       requested_action: parts.requested_action,
       action: parts.action,
       outcome: parts.outcome,
@@ -219,6 +279,7 @@ export function createWarmblyOperatorChannel(
 
   function refuse(parts: {
     correlation_id: string;
+    client_reference: string | null;
     requested_action: string;
     action: OperatorActionName | null;
     code: OperatorRefusalCode;
@@ -232,6 +293,7 @@ export function createWarmblyOperatorChannel(
     const entry = record(
       buildEntry({
         correlation_id: parts.correlation_id,
+        client_reference: parts.client_reference,
         requested_action: parts.requested_action,
         action: parts.action,
         outcome: "refused",
@@ -245,6 +307,45 @@ export function createWarmblyOperatorChannel(
       }),
     );
     return { ok: false, outcome: "refused", code: parts.code, reason: parts.reason, entry };
+  }
+
+  /**
+   * Records an action whose result is genuinely unknown: the POST was written
+   * and no answer came back. The reason points at the one place that can settle
+   * it, because a blind retry of a resume is exactly what must not happen.
+   */
+  function unresolved(parts: {
+    correlation_id: string;
+    client_reference: string | null;
+    action: OperatorActionName;
+    detail: string;
+    actor: OperatorActor;
+    target: OperatorLedgerTarget;
+    path: string;
+    confirmation: OperatorLedgerConfirmation;
+    auditReason: string | null;
+  }): OperatorUnknown {
+    const reason =
+      `${parts.detail}. The request was already written to Warmbly, so ${parts.action} may have ` +
+      `been applied: read GET ${OPERATOR_DISPATCH_STATUS_PATH} before retrying. Any confirmation ` +
+      "token used for this call is spent and a retry needs a fresh confirmation.";
+    const entry = record(
+      buildEntry({
+        correlation_id: parts.correlation_id,
+        client_reference: parts.client_reference,
+        requested_action: parts.action,
+        action: parts.action,
+        outcome: "unknown",
+        refusal_code: OPERATOR_UNKNOWN_CODE,
+        refusal_reason: reason,
+        actor: parts.actor,
+        target: parts.target,
+        upstream: { method: "POST", path: parts.path, status: null },
+        confirmation: parts.confirmation,
+        reason: parts.auditReason,
+      }),
+    );
+    return { ok: false, outcome: "unknown", code: OPERATOR_UNKNOWN_CODE, reason, entry };
   }
 
   interface Prepared {
@@ -263,6 +364,7 @@ export function createWarmblyOperatorChannel(
   function prepare(
     input: OperatorActionInput,
     correlationId: string,
+    clientReference: string | null,
   ): Prepared | OperatorRefused {
     const requested = typeof input.action === "string" ? input.action : String(input.action);
 
@@ -270,6 +372,7 @@ export function createWarmblyOperatorChannel(
     if (!identity.ok) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: null,
         code: "missing_actor",
@@ -283,6 +386,7 @@ export function createWarmblyOperatorChannel(
     if (!action) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: null,
         code: "unknown_action",
@@ -298,6 +402,7 @@ export function createWarmblyOperatorChannel(
     if (rawTarget === null || !isValidTargetId(rawTarget)) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: action.name,
         code: "invalid_target",
@@ -309,6 +414,7 @@ export function createWarmblyOperatorChannel(
     if (!action.target_in_path && rawTarget !== action.default_target_id) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: action.name,
         code: "invalid_target",
@@ -323,6 +429,7 @@ export function createWarmblyOperatorChannel(
     if (action.reason_required && !isValidReason(rawReason)) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: action.name,
         code: "invalid_reason",
@@ -334,6 +441,7 @@ export function createWarmblyOperatorChannel(
     if (rawReason !== "" && !isValidReason(rawReason)) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: action.name,
         code: "invalid_reason",
@@ -351,6 +459,7 @@ export function createWarmblyOperatorChannel(
     if (!classified.allowed) {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: requested,
         action: action.name,
         code: "forbidden_path",
@@ -370,8 +479,9 @@ export function createWarmblyOperatorChannel(
   }
 
   async function requestConfirmation(input: OperatorActionInput): Promise<OperatorActionResult> {
-    const correlationId = correlationOf(input);
-    const prepared = prepare(input, correlationId);
+    const correlationId = correlationOf();
+    const clientReference = clientReferenceOf(input);
+    const prepared = prepare(input, correlationId, clientReference);
     if (isRefusal(prepared)) {
       return prepared;
     }
@@ -379,6 +489,7 @@ export function createWarmblyOperatorChannel(
     if (action.confirmation !== "two_step") {
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: action.name,
         action: action.name,
         code: "confirmation_not_applicable",
@@ -392,11 +503,13 @@ export function createWarmblyOperatorChannel(
       action: action.name,
       target_id: target.id,
       actor_id: actor.id,
+      reason,
       now: now(),
     });
     const entry = record(
       buildEntry({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: action.name,
         action: action.name,
         outcome: "challenged",
@@ -413,8 +526,9 @@ export function createWarmblyOperatorChannel(
   }
 
   async function execute(input: OperatorActionInput): Promise<OperatorActionResult> {
-    const correlationId = correlationOf(input);
-    const prepared = prepare(input, correlationId);
+    const correlationId = correlationOf();
+    const clientReference = clientReferenceOf(input);
+    const prepared = prepare(input, correlationId, clientReference);
     if (isRefusal(prepared)) {
       return prepared;
     }
@@ -426,6 +540,7 @@ export function createWarmblyOperatorChannel(
       if (typeof supplied !== "string" || supplied.trim() === "") {
         return refuse({
           correlation_id: correlationId,
+          client_reference: clientReference,
           requested_action: action.name,
           action: action.name,
           code: "confirmation_required",
@@ -441,11 +556,13 @@ export function createWarmblyOperatorChannel(
         action: action.name,
         target_id: target.id,
         actor_id: actor.id,
+        reason,
         now: now(),
       });
       if (!checked.ok) {
         return refuse({
           correlation_id: correlationId,
+          client_reference: clientReference,
           requested_action: action.name,
           action: action.name,
           code: "confirmation_invalid",
@@ -465,6 +582,7 @@ export function createWarmblyOperatorChannel(
       if (err instanceof CircuitOpenError) {
         return refuse({
           correlation_id: correlationId,
+          client_reference: clientReference,
           requested_action: action.name,
           action: action.name,
           code: "circuit_open",
@@ -489,6 +607,7 @@ export function createWarmblyOperatorChannel(
       if (err instanceof CircuitOpenError) {
         return refuse({
           correlation_id: correlationId,
+          client_reference: clientReference,
           requested_action: action.name,
           action: action.name,
           code: "circuit_open",
@@ -503,6 +622,7 @@ export function createWarmblyOperatorChannel(
       if (err instanceof OperatorPathNotAllowedError) {
         return refuse({
           correlation_id: correlationId,
+          client_reference: clientReference,
           requested_action: action.name,
           action: action.name,
           code: "forbidden_path",
@@ -520,15 +640,32 @@ export function createWarmblyOperatorChannel(
           : err instanceof Error
             ? `Warmbly operator transport failure: ${err.name}`
             : "Warmbly operator transport failure";
+      // A timeout, or any failure that is not provably pre-flight, means the
+      // POST may already have been applied upstream. Calling that "refused"
+      // would tell the operator dispatch is still paused while Warmbly sends.
+      if (!isPreFlightTransportFailure(err)) {
+        return unresolved({
+          correlation_id: correlationId,
+          client_reference: clientReference,
+          action: action.name,
+          detail: message,
+          actor,
+          target,
+          path,
+          confirmation,
+          auditReason: reason,
+        });
+      }
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: action.name,
         action: action.name,
         code: "transport_error",
-        reason: message,
+        reason: `${message} (the request was never written: nothing was applied upstream)`,
         actor,
         target,
-        upstream: { method: "POST", path, status: null },
+        upstream: { method: null, path: null, status: null },
         confirmation,
         auditReason: reason,
       });
@@ -541,12 +678,17 @@ export function createWarmblyOperatorChannel(
     };
 
     if (response.status < 200 || response.status > 299) {
+      const redirected = response.status >= 300 && response.status <= 399;
       return refuse({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: action.name,
         action: action.name,
         code: "upstream_error",
-        reason: `Warmbly refused ${action.name} with HTTP ${response.status}`,
+        reason: redirected
+          ? `Warmbly answered ${action.name} with HTTP ${response.status}; the operator channel ` +
+            "never follows a redirect, because the Location is not classified by the write allowlist"
+          : `Warmbly refused ${action.name} with HTTP ${response.status}`,
         actor,
         target,
         upstream,
@@ -558,6 +700,7 @@ export function createWarmblyOperatorChannel(
     const entry = record(
       buildEntry({
         correlation_id: correlationId,
+        client_reference: clientReference,
         requested_action: action.name,
         action: action.name,
         outcome: "executed",

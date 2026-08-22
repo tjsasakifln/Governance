@@ -22,8 +22,15 @@ function headerValue(
       continue;
     }
     if (Array.isArray(raw)) {
-      const first = raw[0];
-      return first === undefined ? undefined : first;
+      // Fail closed on any duplicate. Taking the first value lets a client-sent
+      // copy of an identity header win over the one the proxy appends; Node's
+      // own http server joins duplicates into one string and denies, and a
+      // mount that hands us arrays must not behave differently.
+      if (raw.length !== 1) {
+        return undefined;
+      }
+      const only = raw[0];
+      return only === undefined ? undefined : only;
     }
     return raw;
   }

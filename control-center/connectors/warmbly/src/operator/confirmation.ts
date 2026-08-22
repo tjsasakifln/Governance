@@ -7,14 +7,27 @@
  * Pause never touches this file — it is one step and never confirmation-gated.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { OperatorActionName } from "./actions.ts";
 
 export const DEFAULT_CONFIRMATION_TTL_MS = 120_000;
 
+/**
+ * The audit reason is bound to the challenge by hash, so a token minted for
+ * "incidente resolvido" cannot be spent on a resume that records a different
+ * reason. The hash — not the reason — is what the ledger and the caller see, so
+ * binding costs nothing in disclosure.
+ */
+export function confirmationReasonHash(reason: string | null): string {
+  return createHash("sha256").update(`warmbly-operator-reason:${reason ?? ""}`).digest("hex");
+}
+
 export interface OperatorConfirmationChallenge {
   token: string;
+  /** Unique per challenge: `cnf:<action>:<target_id>:<uuid>`. */
   token_id: string;
+  /** sha256 of the audit reason this challenge was minted for. */
+  reason_hash: string;
   action: OperatorActionName;
   target_id: string;
   actor_id: string;
@@ -31,6 +44,7 @@ export interface ConfirmationStore {
     action: OperatorActionName;
     target_id: string;
     actor_id: string;
+    reason: string | null;
     now: Date;
   }): OperatorConfirmationChallenge;
   /** Single-use: a successful consume invalidates the token. */
@@ -39,6 +53,7 @@ export interface ConfirmationStore {
     action: OperatorActionName;
     target_id: string;
     actor_id: string;
+    reason: string | null;
     now: Date;
   }): ConfirmationCheck;
   pending(): OperatorConfirmationChallenge[];
@@ -51,9 +66,11 @@ interface StoredChallenge extends OperatorConfirmationChallenge {
 export function createConfirmationStore(options: {
   ttlMs?: number;
   newToken?: () => string;
+  newTokenId?: () => string;
 } = {}): ConfirmationStore {
   const ttlMs = options.ttlMs ?? DEFAULT_CONFIRMATION_TTL_MS;
   const newToken = options.newToken ?? (() => `wcnf_${randomUUID()}`);
+  const newTokenId = options.newTokenId ?? (() => randomUUID());
   const byToken = new Map<string, StoredChallenge>();
 
   function sweep(nowMs: number): void {
@@ -65,14 +82,17 @@ export function createConfirmationStore(options: {
   }
 
   return {
-    issue({ action, target_id, actor_id, now }) {
+    issue({ action, target_id, actor_id, reason, now }) {
       const nowMs = now.getTime();
       sweep(nowMs);
       const token = newToken();
       const expiresMs = nowMs + ttlMs;
       const challenge: StoredChallenge = {
         token,
-        token_id: `cnf:${action}:${target_id}`,
+        // Unique per mint: the ledger must show which challenge was spent and
+        // how many were minted and abandoned.
+        token_id: `cnf:${action}:${target_id}:${newTokenId()}`,
+        reason_hash: confirmationReasonHash(reason),
         action,
         target_id,
         actor_id,
@@ -86,7 +106,7 @@ export function createConfirmationStore(options: {
       return visible;
     },
 
-    consume({ token, action, target_id, actor_id, now }) {
+    consume({ token, action, target_id, actor_id, reason, now }) {
       const nowMs = now.getTime();
       sweep(nowMs);
       if (typeof token !== "string" || token.trim() === "") {
@@ -108,6 +128,9 @@ export function createConfirmationStore(options: {
       }
       if (challenge.actor_id !== actor_id) {
         return { ok: false, reason: "confirmation token was issued to a different operator" };
+      }
+      if (challenge.reason_hash !== confirmationReasonHash(reason)) {
+        return { ok: false, reason: "confirmation token was issued for a different audit reason" };
       }
       byToken.delete(token);
       return { ok: true, token_id: challenge.token_id };
