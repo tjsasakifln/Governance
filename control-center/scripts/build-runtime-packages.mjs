@@ -15,12 +15,21 @@ const SETS = {
     "@confenge/control-center-contracts",
     "@confenge/control-center-persistence",
     "@confenge/control-center-attention",
+    // The operator channel is lazy, but a lazy import still has to resolve to
+    // emitted JS. Both ship as source-only otherwise, so the channel would load
+    // nothing and from-env would swallow it as "connector not present".
+    "@confenge/control-center-security",
+    "@confenge/control-center-warmbly-connector",
     "@confenge/control-center-context",
   ],
   mcp: ["@confenge/control-center-contracts", "@confenge/control-center-mcp"],
   collector: [
     "@confenge/control-center-contracts",
     "@confenge/control-center-persistence",
+    // esbuild inlines the warmbly barrel through a relative import but leaves
+    // its @confenge specifiers external, so security stays a real runtime
+    // import on the collector's boot path and needs emitted JS.
+    "@confenge/control-center-security",
     "@confenge/control-center-collector",
   ],
   ops: ["@confenge/control-center-deploy"],

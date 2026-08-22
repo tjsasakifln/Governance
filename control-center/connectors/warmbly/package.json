@@ -20,7 +20,8 @@
     "collect": "tsx src/cli.ts",
     "canary": "tsx src/canary.ts",
     "cc-connector-canary": "tsx src/canary.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@confenge/control-center-security": "*"
