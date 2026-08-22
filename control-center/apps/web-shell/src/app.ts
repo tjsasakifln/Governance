@@ -112,6 +112,9 @@ function applyPaint(
   bindOperatorActions(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
   });
+  bindWarmblyDispatch(root, adapter, () => {
+    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+  });
 }
 
 function bindOperatorActions(
@@ -140,6 +143,83 @@ function bindOperatorActions(
         }),
       ).then((result) => {
         if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
+    });
+  }
+}
+
+/**
+ * Pending `resume_dispatch` confirmation, held across repaints.
+ *
+ * Deliberately module scope, not a per-binding closure. Every successful action
+ * repaints the shell, and a repaint replaces `root.innerHTML` wholesale — so a
+ * token parked in the closure of the form that minted it dies with that form,
+ * and the following submit would mint a second challenge instead of spending
+ * the first. That is not a stricter two-step; it is a resume that can never
+ * complete.
+ *
+ * It is still memory only and never persisted, so a reload loses it and forces
+ * a fresh confirmation. A repaint is not a reload.
+ */
+let pendingResumeToken: string | undefined;
+
+/** Exposed for tests and for an explicit abandon. */
+export function clearPendingResumeConfirmation(): void {
+  pendingResumeToken = undefined;
+}
+
+export function pendingResumeConfirmation(): string | undefined {
+  return pendingResumeToken;
+}
+
+/**
+ * Binds the Warmbly dispatch control.
+ *
+ * Pause is one click. Resume is two by contract: the first call mints a
+ * single-use token, the second replays it. Any outcome other than a fresh
+ * challenge drops the token, so a failed or spent confirmation always costs a
+ * new deliberate act.
+ */
+function bindWarmblyDispatch(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.warmblyDispatch || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-warmbly-dispatch]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const requested = form.getAttribute("data-warmbly-dispatch");
+      if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
+      const reason = form.querySelector('[name="reason"]')?.value ?? "";
+      const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
+      // A resume with no token yet is the confirmation step, not the resume.
+      const carried = pendingResumeToken;
+      const action = requested === "resume" && !carried ? "resume_confirm" : requested;
+      // Spend it at most once: whatever happens next, this token is not reused.
+      if (requested === "resume") {
+        pendingResumeToken = undefined;
+      }
+      void Promise.resolve(
+        adapter.warmblyDispatch?.({
+          action,
+          reason,
+          ...(action === "resume" && carried ? { confirmation_token: carried } : {}),
+          ...(requested === "acknowledge" ? { target_id: targetId } : {}),
+        }),
+      ).then((result) => {
+        if (result) {
+          adapter.lastOperatorResult = result;
+          // Arm the following resume only when this call actually minted a
+          // challenge. A refusal arms nothing.
+          if (action === "resume_confirm" && result.ok && result.confirmationToken) {
+            pendingResumeToken = result.confirmationToken;
+          }
+        }
         onDone();
       });
     });

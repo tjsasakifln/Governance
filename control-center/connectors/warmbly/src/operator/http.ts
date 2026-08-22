@@ -21,6 +21,20 @@ export const OPERATOR_HTTP_ROUTES = {
   acknowledge: "/v1/warmbly/operator/inbound/acknowledge",
 } as const;
 
+/**
+ * Read-back of this channel's own audit record. GET, never a Warmbly call: it
+ * answers "who last touched the kill switch, and what came of it" — which
+ * nothing upstream can answer, because Warmbly's dispatch status carries no
+ * `paused_by`.
+ *
+ * Same identity gate as the writes. The stored token never leaves this process;
+ * only the token *id* is disclosed.
+ */
+export const OPERATOR_LEDGER_ROUTE = "/v1/warmbly/operator/ledger/recent" as const;
+
+/** Never more than this, whatever a caller asks for. */
+export const OPERATOR_LEDGER_MAX = 20;
+
 export type OperatorHttpRoute = (typeof OPERATOR_HTTP_ROUTES)[keyof typeof OPERATOR_HTTP_ROUTES];
 
 export interface OperatorHttpRequest {
@@ -31,6 +45,19 @@ export interface OperatorHttpRequest {
   remoteAddress: string | undefined;
   /** Already-parsed JSON body. The handler never parses a stream itself. */
   body: unknown;
+}
+
+/** Ledger projection. Deliberately not the stored entry: no token, no raw headers. */
+export interface OperatorLedgerView {
+  action: string;
+  outcome: string;
+  actor_id: string | null;
+  target: string;
+  reason: string | null;
+  refusal_code: string | null;
+  upstream_status: number | null;
+  recorded_at: string;
+  correlation_id: string;
 }
 
 export interface OperatorHttpResponse {
@@ -123,11 +150,58 @@ function render(result: OperatorActionResult): OperatorHttpResponse {
   };
 }
 
+/** Newest first, capped, and projected down to what an operator needs to read. */
+function recentLedgerView(channel: WarmblyOperatorChannel): OperatorLedgerView[] {
+  let entries;
+  try {
+    entries = channel.ledger.list();
+  } catch {
+    // A ledger that cannot be read is not an empty ledger. Say nothing rather
+    // than claim nobody acted.
+    return [];
+  }
+  return entries
+    .slice(-OPERATOR_LEDGER_MAX)
+    .reverse()
+    .map((entry) => ({
+      action: entry.requested_action,
+      outcome: entry.outcome,
+      actor_id: entry.actor?.id ?? null,
+      target: `${entry.target.kind}:${entry.target.id}`,
+      reason: entry.reason,
+      refusal_code: entry.refusal_code,
+      upstream_status: entry.upstream.status,
+      recorded_at: entry.recorded_at,
+      correlation_id: entry.correlation_id,
+    }));
+}
+
 export function createOperatorHttpHandler(
   channel: WarmblyOperatorChannel,
 ): (req: OperatorHttpRequest) => Promise<OperatorHttpResponse> {
   return async (req) => {
     const path = pathOf(req.url);
+    if (path === OPERATOR_LEDGER_ROUTE) {
+      if ((req.method ?? "").toUpperCase() !== "GET") {
+        return {
+          status: 405,
+          body: { ok: false, code: "method_not_allowed", reason: "the operator ledger is read-only" },
+        };
+      }
+      // Same founder gate as a write: the audit trail names the operator, so it
+      // is not public just because it does not mutate anything.
+      const identity = channel.resolveActor({
+        remoteAddress: req.remoteAddress ?? "",
+        headers: req.headers,
+      });
+      if (!identity.ok) {
+        return {
+          status: 401,
+          body: { ok: false, code: identity.code, reason: identity.reason },
+        };
+      }
+      return { status: 200, body: { ok: true, entries: recentLedgerView(channel) } };
+    }
     const known = (Object.values(OPERATOR_HTTP_ROUTES) as string[]).includes(path);
     if (!known) {
       return { status: 404, body: { ok: false, code: "unknown_route", reason: `no operator route ${path}` } };

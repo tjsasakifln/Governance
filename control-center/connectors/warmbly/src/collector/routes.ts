@@ -47,6 +47,14 @@ export const COLLECT_ROUTES: CollectRoute[] = [
   },
   { key: "confenge_today", method: "GET", path: "/v1/confenge/today", required: false },
   { key: "confenge_inbound", method: "GET", path: "/v1/confenge/inbound", required: false },
+  // The kill-switch state the operator cockpit reads back. Not required: an
+  // older Warmbly answers 404 and the surface must say UNKNOWN, never "active".
+  {
+    key: "confenge_dispatch_status",
+    method: "GET",
+    path: "/v1/confenge/dispatch/status",
+    required: false,
+  },
   {
     key: "confenge_intel_scoreboard",
     method: "GET",

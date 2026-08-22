@@ -2,7 +2,7 @@
   "name": "@confenge/control-center-context",
   "version": "0.1.0",
   "private": true,
-  "description": "Confenge Control Center — strategic memory and directives (scoped context for agents).",
+  "description": "Confenge Control Center \u2014 strategic memory and directives (scoped context for agents).",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -22,7 +22,8 @@
   "dependencies": {
     "@confenge/control-center-attention": "*",
     "@confenge/control-center-contracts": "*",
-    "@confenge/control-center-persistence": "*"
+    "@confenge/control-center-persistence": "*",
+    "@confenge/control-center-warmbly-connector": "*"
   },
   "devDependencies": {
     "@embedded-postgres/linux-x64": "16.14.0-beta.17",
