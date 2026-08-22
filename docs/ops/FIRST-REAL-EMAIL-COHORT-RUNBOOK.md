@@ -38,6 +38,27 @@ Hostinger **gera** a chave, mas quem **publica** o registro é a Cloudflare.
      Proxy **DNS only**, TTL Auto.
 4. Se a Hostinger mostrar `hostingermail2` / `hostingermail3`, publique os três.
 
+### Por que não fiz por você
+
+Tentei, com browser real (Playwright em container no `ec-prod`). O hPanel está
+atrás do desafio anti-bot da Cloudflare — a página devolve "Executando verificação
+de segurança / proteção contra bots maliciosos" antes de qualquer formulário de
+login. Não vou tentar contornar um controle anti-automação de terceiro, então
+esse passo é seu. As credenciais que você passou foram usadas só para provar
+SMTP/IMAP e removidas do host em seguida.
+
+### Quanto isso realmente bloqueia
+
+Menos do que parece. O gate do próprio Warmbly (PR #160) exige **SPF presente e
+DMARC presente** — que já passam — e deliberadamente **não** exige DKIM, porque
+selectors não são descobríveis por DNS. Então o sistema não te barra. O que a
+ausência de DKIM custa é reputação de entrega: sem assinatura, provedores
+destinatários avaliam só SPF, e um cold outbound institucional fica mais exposto
+a spam folder.
+
+Minha leitura: **vale publicar antes de segunda**, mas não é o que impede o
+sistema de operar.
+
 ### Como eu confirmo
 
 Me avise e eu rodo a verificação real. Ou você mesmo:
@@ -57,60 +78,65 @@ PY
 
 ---
 
-## Bloqueio 2 — credenciais SMTP/IMAP vazias em produção
+## ~~Bloqueio 2~~ — RESOLVIDO: SMTP/IMAP já estava configurado
 
-O caminho de rede está **ok**: de dentro do namespace do worker,
-`smtp.hostinger.com:587` e `imap.hostinger.com:993` respondem. O que falta é
-exclusivamente credencial.
+**Eu estava errado.** Inferi "não configurado" das env vars vazias, mas a fonte de
+verdade é a tabela `email_accounts` no Postgres do Warmbly, onde há uma conta
+`smtp_imap` ativa para `tiago.sasaki@confenge.com.br` com host, user e senha
+cifrados. As env vars vazias são o comportamento esperado — elas são override.
 
-Verificado nos três contêineres (`backend`, `worker`, `consumer`):
+O preflight do próprio Warmbly em produção:
 
 ```
-SMTP_USERNAME=            # vazio
-SMTP_PASSWORD=            # vazio
-CONFENGE_MAILBOX_EMAIL=tiago.sasaki@confenge.com.br
-# CONFENGE_SMTP_PASSWORD / CONFENGE_IMAP_PASSWORD: não definidas
+[ok] mailbox    1 active mailbox(es) with send capability
+MAILBOX_CONNECTED=true
+MAILBOX_AUTH_VALID=true
+SEND_PERMISSION_OK=true
 ```
 
-O código lê, em ordem (`internal/app/confenge/release_live.go:183-184`):
-`CONFENGE_IMAP_USER` → `IMAP_USER` → `CONFENGE_MAILBOX_EMAIL`, e
-`CONFENGE_IMAP_PASSWORD` → `IMAP_PASSWORD` → `CONFENGE_MAILBOX_PASSWORD`.
+E verifiquei a credencial de forma independente, do namespace de rede do worker:
 
-**O que preciso de você:** a senha da caixa `tiago.sasaki@confenge.com.br`
-(ou uma senha de aplicativo criada no hPanel). Me passe e eu escrevo em
-`/opt/warmbly-confenge/.env.confenge` com permissão `600`, reinicio os serviços
-e provo SMTP AUTH + IMAP LOGIN reais.
+```
+SMTP AUTH  (smtp.hostinger.com:587 STARTTLS) : PASS
+IMAP LOGIN (imap.hostinger.com:993 SSL)      : PASS  — 5 mailboxes, INBOX 162
+```
 
-`MAIL_TRANSPORT=log` **não** é problema: o envio do cohort usa
-`CONFENGE_SMTP_HOST` (Hostinger), separado do transporte de notificação
-(`release_live.go:112`).
+Nada a fazer aqui.
 
 ---
 
-## Bloqueio 3 — token Warmbly com escrita para o Control Center
+## ~~Bloqueio 3~~ — RESOLVIDO: token emitido e canário executado
 
-O canal de operador está **montado e desligado por padrão** (fail-closed: toda
-rota devolve `404 operator_channel_not_configured`). Para ligar falta um token.
+Você não precisava conhecer o token — emiti um, com escopo mínimo, no próprio host.
+O segredo nunca passou pela conversa.
 
-O token do collector é **read-only** — provei com um POST inócuo:
+- Nome `control-center-operator`, id `59ae5d9c-8210-4891-bc26-019d2138bd03`
+- `permissions = 128` — **apenas** `APIPermWriteContacts`. Sem send, sem campanha,
+  sem bulk, sem leitura. Provado: write → `404` (permissão aceita, lead inexistente),
+  leitura de status → `403`.
+- Revogável: `UPDATE api_keys SET status='revoked', revoked_at=now() WHERE id='59ae5d9c-…';`
 
-```
-POST /v1/confenge/inbound/00000000-.../acknowledge  →  403
-```
+O canal está **ligado em produção** e o canário passou ponta a ponta, por uma sessão
+Authelia real com MFA:
 
-**O que preciso:** um token Warmbly com `PermManageContacts` /
-`APIPermWriteContacts`. Com ele eu:
+| Passo | Resultado |
+|---|---|
+| pause pelo Control Center | `200 executed` → readback Warmbly `paused=true` |
+| resume sem token | `428 confirmation_required` |
+| resume passo 1 | `202 challenged`, token emitido |
+| resume passo 2 | `200 executed` → readback `paused=false` |
+| replay do mesmo token | `428 confirmation_invalid` (single-use) |
+| ledger | actor, outcome e status upstream em cada entrada |
+| postura restaurada | `paused=true` |
 
-1. gravo em `/etc/confenge/control-center/secrets/.env`:
-   `CC_WARMBLY_BASE_URL=http://warmbly-confenge-backend-1:8080`
-   `CC_WARMBLY_OPERATOR_TOKEN=<token>`
-2. incluo o overlay já preparado
-   `/etc/confenge/control-center/docker-compose.warmbly-operator.yml`
-3. subo o `context` e rodo o canário completo: pause → readback → resume_confirm
-   → resume → readback → ledger.
+Resistência a spoof, testada de verdade:
 
-O canal continua limitado a exatamente três ações. **Não existe SEND_EMAIL nele
-e não deve passar a existir.**
+- `Remote-*` forjado de um hop **não** confiável → `401 missing_actor`,
+  `spoofed_identity: identity headers from an untrusted hop are ignored (fail-closed)`,
+  e a recusa fica registrada no ledger.
+- O mesmo spoof pelo edge sem sessão → `303` para a Authelia; não chega ao canal.
+
+---
 
 ---
 
