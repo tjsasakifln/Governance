@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { createMockAdapter } from "../src/adapters/index";
 import { healthFrom, safeRunbookHref } from "../src/adapters/map";
 import { createMemoryRuntime, mount } from "../src/app";
-import { healthCard, presentHealth } from "../src/ui/domains";
+import { healthCard, infraCatalogBlock, presentHealth } from "../src/ui/domains";
+import { httpAdapterFor } from "./helpers";
 import type { Provenance, ServiceHealth } from "../src/types";
 
 const FALLBACK: Provenance = {
@@ -153,4 +154,154 @@ test("service rows inherit the snapshot's provenance, not a blanket UNKNOWN/0", 
   assert.equal(item.provenance.freshness_status, "FRESH");
   assert.equal(item.provenance.confidence, 0.88);
   assert.equal(presentHealth(item).conclusive, true);
+});
+
+// --- Adversarial review follow-ups -----------------------------------------
+
+/** The real shape of GET /v1/domains/infrastructure: response -> slot -> snapshot. */
+function infraDomainPayload(
+  services: Record<string, unknown>[],
+  slot: Record<string, unknown> = {},
+  snapshot: Record<string, unknown> = {},
+) {
+  const freshness = (slot.freshness_status as string | undefined) ?? "FRESH";
+  const confidence = (slot.confidence as number | undefined) ?? 0.88;
+  return {
+    schema_version: "control-center.operational-envelope.v1",
+    scope: "infrastructure",
+    generated_at: "2026-08-20T11:20:00Z",
+    freshness_status: freshness,
+    confidence,
+    domain: "infrastructure",
+    snapshot: {
+      schema_version: "control-center.operational-domain.v1",
+      domain: "infrastructure",
+      scope: "infrastructure",
+      source: { system: "collector", kind: "host-health", locator: "infrastructure/hosts" },
+      observed_at: "2026-08-20T11:20:00Z",
+      presence: "present",
+      healthy: freshness === "FRESH" && confidence > 0,
+      ...slot,
+      freshness_status: freshness,
+      confidence,
+      snapshot: {
+        schema_version: "control-center.infrastructure-snapshot.v1",
+        availability: "FRESH",
+        monitored_service_count: services.length,
+        catalog_error_count: 0,
+        duplicate_group_count: 0,
+        services,
+        ...snapshot,
+      },
+    },
+  };
+}
+
+async function infraPageFor(payload: unknown) {
+  const { adapter } = httpAdapterFor((path) =>
+    path.startsWith("/v1/domains/infrastructure") ? payload : undefined,
+  );
+  const result = await adapter.readDestination("infra");
+  assert.equal(result.ok, true);
+  assert.equal(result.loading, false);
+  assert.ok(result.ok && !result.loading);
+  return result.page;
+}
+
+test("the HTTP adapter gives a service row the snapshot's provenance, not the blanket UNKNOWN/0", async () => {
+  // The row deliberately carries no freshness, confidence, provenance or
+  // source of its own: this is the shape that produced "healthy · confiança
+  // 0,00" in production. If loadDomain falls back to the adapter default again,
+  // this reads UNKNOWN/0 and the card stops being conclusive.
+  const page = await infraPageFor(
+    infraDomainPayload([
+      {
+        id: "cc:service-health:confenge-api-http",
+        service_name: "Confenge API inbound health",
+        role: "Endpoint de health do inbound",
+        endpoint: "https://api.confenge.com.br/health",
+        status: "healthy",
+      },
+    ]),
+  );
+  const service = page.health?.[0];
+  assert.ok(service);
+  assert.equal(service.provenance.freshness_status, "FRESH");
+  assert.equal(service.provenance.confidence, 0.88);
+  assert.equal(service.service_name, "Confenge API inbound health");
+  assert.equal(presentHealth(service).conclusive, true);
+  const html = healthCard(service);
+  assert.match(html, /data-conclusive="true"/);
+  assert.doesNotMatch(html, /confiança 0,00/);
+});
+
+test("the Infra route states why the evidence is weak instead of showing a bare confidence 0", async () => {
+  const page = await infraPageFor(
+    infraDomainPayload(
+      [],
+      { freshness_status: "UNKNOWN", confidence: 0, healthy: false },
+      {
+        availability: "NOT_CONFIGURED",
+        unavailability_reason: "NOT_CONFIGURED",
+        monitored_service_count: 0,
+        catalog_error_count: 0,
+      },
+    ),
+  );
+  const summary = page.health_summary;
+  assert.ok(summary);
+  assert.equal(summary.unavailability_reason, "NOT_CONFIGURED");
+  assert.equal(summary.availability, "NOT_CONFIGURED");
+  assert.equal(summary.confidence, 0);
+  const html = infraCatalogBlock(summary);
+  assert.match(html, /NOT_CONFIGURED/);
+  assert.match(html, /coletor não configurado neste ambiente/);
+  assert.match(html, /confiança 0,00/);
+  // A failed probe must not look identical to a collector that never ran.
+  const upstream = infraCatalogBlock({
+    freshness_status: "ERROR",
+    confidence: 0,
+    unavailability_reason: "UPSTREAM_ERROR",
+  });
+  assert.match(upstream, /erro na origem durante a coleta/);
+  assert.notEqual(upstream, html);
+});
+
+test("doubt about the collector run is shown as a caveat, not written into the service's state", () => {
+  const item = service({
+    service_name: "netcup-vps-1",
+    status: "healthy",
+    provenance: fresh(0.95),
+    snapshot_evidence: { freshness_status: "ERROR", confidence: 0, conclusive: false },
+  });
+  // The host answered fresh at 0.95. One sibling probe timing out must not
+  // repaint it "fora do ar".
+  assert.deepEqual(presentHealth(item), { status: "healthy", conclusive: true });
+  const html = healthCard(item);
+  assert.match(html, /data-snapshot-evidence="ERROR"/);
+  assert.match(html, /Coleta que trouxe este serviço: ERROR/);
+  assert.doesNotMatch(html, /data-status="down"/);
+});
+
+test("latency names the probe it came from, and absence stays absence", () => {
+  const timed = healthCard(service({ latency_ms: 42, latency_check: "http" }));
+  assert.match(timed, /Latência observada \(http\)/);
+  assert.match(timed, /42 ms/);
+  const untimed = healthCard(service({ status: "degraded" }));
+  assert.match(untimed, /não medida \(sem sonda de tempo neste serviço\)/);
+});
+
+test("a runbook URL carrying a secret-looking query key is refused", () => {
+  for (const unsafe of [
+    "https://runbooks.example/infra?api_key=abc",
+    "https://runbooks.example/infra?x=1&token=abc",
+    "/runbooks/infra?password=hunter2",
+    "/runbooks/infra?api%5Fkey=abc",
+  ]) {
+    assert.equal(safeRunbookHref(unsafe), undefined, unsafe);
+  }
+  assert.equal(
+    safeRunbookHref("https://runbooks.example/infra?service=api"),
+    "https://runbooks.example/infra?service=api",
+  );
 });

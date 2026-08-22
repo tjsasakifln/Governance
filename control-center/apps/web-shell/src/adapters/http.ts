@@ -29,6 +29,7 @@ import {
   fallbackProvenance,
   financeFrom,
   healthFrom,
+  infraSummaryFrom,
   itemsOf,
   mapContextDirectives,
   mapHojePayloads,
@@ -445,6 +446,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       page.health = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
         healthFrom(asRecord(row) ?? {}, slotProvenance),
       );
+      page.health_summary = infraSummaryFrom(inner, slotProvenance);
     }
     return page;
   }

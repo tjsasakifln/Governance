@@ -21,6 +21,7 @@ import {
   financeBlock,
   growthFunnelBlock,
   healthCard,
+  infraCatalogBlock,
   memoriaGroups,
 } from "./domains";
 import { provenanceBlock } from "./provenance";
@@ -160,7 +161,9 @@ function pageBody(page: DestinationPage, destination: DestinationId, surface?: s
           .join("")}</div></section>`
       : "",
     page.health && page.health.length > 0
-      ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2><div class="stack">${page.health.map(healthCard).join("")}</div></section>`
+      ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2>${
+          page.health_summary ? infraCatalogBlock(page.health_summary) : ""
+        }<div class="stack">${page.health.map(healthCard).join("")}</div></section>`
       : "",
   ].join("");
   const attention =

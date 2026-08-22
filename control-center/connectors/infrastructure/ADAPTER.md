@@ -33,7 +33,8 @@ Canonical Control Center contracts live in sibling path `control-center/contract
 | `uptime_seconds` | number? | When the uptime probe observed it |
 | `restart_count` | number? | When the uptime probe observed it |
 | `confidence` | number? | Min of member observations |
-| `latency_ms` | number? | Worst round trip across the member checks |
+| `latency_ms` | number? | Round trip of the most end-to-end timing probe (`http`, else `reachability`) |
+| `latency_check` | check kind? | Which check produced `latency_ms` |
 | `last_error` | string? | Summary of the worst non-healthy check |
 | `runbook_url` | string? | Catalog `runbook_url`: same-origin path or credential-free http(s) URL |
 

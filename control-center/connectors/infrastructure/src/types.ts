@@ -73,8 +73,10 @@ export interface ServiceHealth {
   readonly uptime_seconds?: number;
   readonly restart_count?: number;
   readonly confidence?: number;
-  /** Worst observed round trip across this service's checks. */
+  /** Round trip of the most end-to-end timing probe this service runs. */
   readonly latency_ms?: number;
+  /** Which check produced latency_ms. TCP connect and HTTP are not the same measure. */
+  readonly latency_check?: CheckKind;
   /** Summary of the worst non-healthy check, in the collector's own words. */
   readonly last_error?: string;
   /** Operator runbook for this service, from the catalog. Never invented. */

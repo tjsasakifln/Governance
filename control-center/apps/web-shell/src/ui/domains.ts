@@ -9,6 +9,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
 
@@ -705,6 +706,18 @@ export function healthCard(item: ServiceHealth): string {
     : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: freshness ${escapeHtml(
         item.provenance.freshness_status,
       )}, confiança ${escapeHtml(confidence)}. Nenhum estado conclusivo é afirmado para este serviço.</p>`;
+  // Doubt about the collector run is stated, never folded into the service's
+  // own status: one probe that timed out must not repaint a host that answered.
+  const snapshotCaveat =
+    item.snapshot_evidence && !item.snapshot_evidence.conclusive
+      ? `<p class="constraint" data-snapshot-evidence="${escapeHtml(
+          item.snapshot_evidence.freshness_status,
+        )}">Coleta que trouxe este serviço: ${escapeHtml(
+          item.snapshot_evidence.freshness_status,
+        )}, confiança ${escapeHtml(
+          item.snapshot_evidence.confidence.toFixed(2).replace(".", ","),
+        )}. O estado abaixo vem da evidência do próprio serviço.</p>`
+      : "";
   const catalogError = item.catalog_error
     ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
         item.catalog_error,
@@ -731,6 +744,7 @@ export function healthCard(item: ServiceHealth): string {
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
       ${catalogError}
+      ${snapshotCaveat}
       ${inconclusive}
       ${duplicates}
       ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
@@ -745,8 +759,10 @@ export function healthCard(item: ServiceHealth): string {
         )}
         ${fact("Estado avaliado", escapeHtml(`${presented.status} · ${HEALTH_LABELS[presented.status]}`))}
         ${fact(
-          "Latência observada",
-          item.latency_ms !== undefined ? escapeHtml(`${item.latency_ms} ms`) : escapeHtml("não medida"),
+          item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
+          item.latency_ms !== undefined
+            ? escapeHtml(`${item.latency_ms} ms`)
+            : escapeHtml("não medida (sem sonda de tempo neste serviço)"),
           item.latency_ms === undefined ? ` data-absent="true"` : "",
         )}
         ${fact("Freshness", escapeHtml(item.provenance.freshness_status))}
@@ -776,6 +792,48 @@ export function healthCard(item: ServiceHealth): string {
       </dl>
       ${provenanceBlock(item.provenance)}
     </article>
+  `;
+}
+
+const CATALOG_REASON_LABELS: Record<string, string> = {
+  NOT_CONFIGURED: "coletor não configurado neste ambiente",
+  BLOCKED_BY_SECRET: "credencial ausente; coleta bloqueada",
+  UPSTREAM_ERROR: "erro na origem durante a coleta",
+  UNKNOWN: "coleta sem evidência utilizável",
+  STALE: "coleta mais antiga que a janela de frescor",
+  collect_failed: "a coleta falhou",
+  timeout: "a coleta excedeu o tempo limite",
+};
+
+/**
+ * Why the Infra evidence is worth what it is worth. Confidence 0,00 alone
+ * cannot tell "never configured" from "the probe failed", and that ambiguity is
+ * the operator's complaint, so the reason is named on screen.
+ */
+export function infraCatalogBlock(summary: InfraCatalogSummary): string {
+  const reason = summary.unavailability_reason ?? summary.availability;
+  const reasonLabel = reason ? (CATALOG_REASON_LABELS[reason] ?? reason) : undefined;
+  const confidence = summary.confidence.toFixed(2).replace(".", ",");
+  return `
+    <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
+      ${fact("Serviços monitorados", escapeHtml(String(summary.monitored_service_count ?? "desconhecido")))}
+      ${fact("Evidência da coleta", escapeHtml(`${summary.freshness_status} · confiança ${confidence}`))}
+      ${
+        reasonLabel
+          ? fact("Motivo", escapeHtml(`${reason} · ${reasonLabel}`))
+          : fact("Motivo", escapeHtml("coleta íntegra"), ` data-absent="true"`)
+      }
+      ${
+        summary.catalog_error_count !== undefined
+          ? fact("Erros de catálogo/telemetria", escapeHtml(String(summary.catalog_error_count)))
+          : ""
+      }
+      ${
+        summary.duplicate_group_count !== undefined
+          ? fact("Duplicatas agrupadas", escapeHtml(String(summary.duplicate_group_count)))
+          : ""
+      }
+    </dl>
   `;
 }
 

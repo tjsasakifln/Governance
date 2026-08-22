@@ -17,6 +17,7 @@ import type {
   EngineeringSnapshot,
   FinanceSnapshot,
   FreshnessStatus,
+  InfraCatalogSummary,
   Money,
   PriorityRecommendation,
   Provenance,
@@ -542,22 +543,68 @@ function healthStatusOf(value: unknown): ServiceHealth["status"] {
  * same rule; the shell repeats it because a link it cannot vouch for is worse
  * than no link.
  */
+const SECRET_QUERY_KEY =
+  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem)((_|-).*)?$/i;
+
+function hasSecretQueryKey(query: string): boolean {
+  for (const pair of query.split("&")) {
+    if (pair === "") continue;
+    let key = pair.split("=")[0] ?? "";
+    try {
+      key = decodeURIComponent(key);
+    } catch {
+      // A key that will not decode is not one we can vouch for either.
+      return true;
+    }
+    if (SECRET_QUERY_KEY.test(key)) return true;
+  }
+  return false;
+}
+
 export function safeRunbookHref(value: unknown): string | undefined {
   const raw = typeof value === "string" ? value.trim() : "";
   if (raw === "" || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
     return undefined;
   }
   if (raw.startsWith("/")) {
-    return raw.includes("@") ? undefined : raw;
+    if (raw.includes("@")) return undefined;
+    return hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "") ? undefined : raw;
   }
   try {
     const url = new URL(raw);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (url.username !== "" || url.password !== "") return undefined;
+    for (const key of url.searchParams.keys()) {
+      if (SECRET_QUERY_KEY.test(key)) return undefined;
+    }
     return url.toString();
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Catalog-level truth for the Infra route, read off the domain snapshot. The
+ * operator needs to know whether confidence 0 means "never configured" or "the
+ * probe failed"; both used to look identical on screen.
+ */
+export function infraSummaryFrom(
+  body: Record<string, unknown>,
+  provenance: Provenance,
+): InfraCatalogSummary {
+  const summary: InfraCatalogSummary = {
+    freshness_status: provenance.freshness_status,
+    confidence: provenance.confidence,
+  };
+  for (const key of ["monitored_service_count", "catalog_error_count", "duplicate_group_count"] as const) {
+    const value = body[key];
+    if (typeof value === "number" && Number.isFinite(value)) summary[key] = value;
+  }
+  const availability = str(body.availability);
+  if (availability !== "") summary.availability = availability;
+  const reason = str(body.unavailability_reason);
+  if (reason !== "") summary.unavailability_reason = reason;
+  return summary;
 }
 
 export function healthFrom(row: Record<string, unknown>, fallback: Provenance): ServiceHealth {
@@ -594,7 +641,22 @@ export function healthFrom(row: Record<string, unknown>, fallback: Provenance): 
   const catalogError = str(row.catalog_error) || (identity === "" ? "missing_service_identity" : "");
   if (catalogError !== "") item.catalog_error = catalogError;
   if (typeof row.evidence_conclusive === "boolean") item.evidence_conclusive = row.evidence_conclusive;
+  const snapshotEvidence = asRecord(row.snapshot_evidence);
+  if (snapshotEvidence && isFreshness(snapshotEvidence.freshness_status)) {
+    const evidenceConfidence =
+      typeof snapshotEvidence.confidence === "number" ? snapshotEvidence.confidence : 0;
+    item.snapshot_evidence = {
+      freshness_status: snapshotEvidence.freshness_status,
+      confidence: evidenceConfidence,
+      conclusive:
+        typeof snapshotEvidence.conclusive === "boolean"
+          ? snapshotEvidence.conclusive
+          : snapshotEvidence.freshness_status === "FRESH" && evidenceConfidence > 0,
+    };
+  }
   if (typeof row.latency_ms === "number") item.latency_ms = row.latency_ms;
+  const latencyCheck = str(row.latency_check);
+  if (latencyCheck !== "") item.latency_check = latencyCheck;
   if (typeof row.message === "string") item.message = row.message;
   if (Array.isArray(row.checks)) {
     item.checks = row.checks.map((check) => {

@@ -11,6 +11,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   PriorityRecommendation,
   ServiceHealth,
   UtcDateTime,
@@ -53,6 +54,7 @@ export interface DestinationPage {
   /** Records the producer could not identify. Never clients; never counted as clients. */
   client_data_quality?: ClientIdentityException[];
   health?: ServiceHealth[];
+  health_summary?: InfraCatalogSummary;
   directives?: Directive[];
   sessions?: AgentSession[];
   activities?: AgentActivity[];

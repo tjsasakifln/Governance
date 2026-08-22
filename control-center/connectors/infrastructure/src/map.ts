@@ -212,18 +212,30 @@ export function logicalEndpoint(target: AllowlistTarget): string {
   return `target:${target.id}`;
 }
 
-/** Worst observed round trip across a service's checks. */
-function latencyOf(observations: readonly SourceObservation[]): number | undefined {
-  let worst: number | undefined;
-  for (const obs of observations) {
-    for (const key of ["latency_ms", "elapsed_ms"] as const) {
-      const value = numeric(obs.payload, key);
-      if (value !== undefined && (worst === undefined || value > worst)) {
-        worst = value;
+/**
+ * Which check the reported latency came from. A TCP connect time and an HTTP
+ * round trip measure different things, so they are not rolled up into one
+ * number: the most end-to-end probe the target actually runs wins, and the card
+ * names it. A target with no timing probe (TLS-only) reports no latency at all
+ * rather than a borrowed one.
+ */
+const LATENCY_CHECK_PRIORITY: readonly CheckKind[] = ["http", "reachability"];
+
+function latencySampleOf(
+  observations: readonly SourceObservation[],
+): { check: CheckKind; latency_ms: number } | undefined {
+  for (const kind of LATENCY_CHECK_PRIORITY) {
+    for (const obs of observations) {
+      if (obs.check !== kind) {
+        continue;
+      }
+      const value = numeric(obs.payload, "elapsed_ms") ?? numeric(obs.payload, "latency_ms");
+      if (value !== undefined) {
+        return { check: kind, latency_ms: value };
       }
     }
   }
-  return worst;
+  return undefined;
 }
 
 const STATUS_SEVERITY: Record<ServiceStatus, number> = {
@@ -335,9 +347,9 @@ export function mapServiceHealth(
   if (restarts !== undefined) {
     Object.assign(health, { restart_count: restarts });
   }
-  const latency = latencyOf(owned);
+  const latency = latencySampleOf(owned);
   if (latency !== undefined) {
-    Object.assign(health, { latency_ms: latency });
+    Object.assign(health, { latency_ms: latency.latency_ms, latency_check: latency.check });
   }
   const lastError = lastErrorOf(checks);
   if (lastError !== undefined) {

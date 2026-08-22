@@ -277,22 +277,37 @@ function isFreshnessStatus(value: unknown): value is FreshnessStatus {
  * The envelope forbids painting non-FRESH or unevidenced data as healthy, but
  * that rule was only applied to the slot's own status: the nested services[]
  * rode through untouched and reached the cockpit still claiming "healthy" with
- * a confidence of zero. Each row is bounded by its slot — worst-of freshness,
- * min confidence — and demoted by the same helper as the slot, one level down.
+ * a confidence of zero.
+ *
+ * Each row is bounded by ITS OWN evidence, never by the slot's. The slot's
+ * freshness is one arbitrary observation — `result.observations[0]`, picked by
+ * a lexicographic sort of `source:target_id:check` — so folding it into every
+ * row would let one timing-out HTTP probe repaint the host and the TLS
+ * certificate as "fora do ar" while they are answering fresh, and would do so
+ * only when the failing target happens to sort first. Replacing a fabricated
+ * "healthy" with a fabricated "down" is not an improvement; during triage it
+ * is worse. A row with no evidence of its own still inherits the slot's, which
+ * is the case that produced the original bug.
+ *
+ * Doubt about the run that carried the row is real and is reported as
+ * `snapshot_evidence`, for the surface to display as a caveat beside the card.
  */
 function demoteNestedServices(value: unknown, seed: ProvenanceSeed): unknown {
   if (!Array.isArray(value)) {
     return value;
   }
+  const snapshotEvidence = {
+    freshness_status: seed.freshness_status,
+    confidence: seed.confidence,
+    conclusive: seed.freshness_status === "FRESH" && seed.confidence > 0,
+  };
   return value.map((item) => {
     const row = asRecord(item);
     if (!row) {
       return item;
     }
-    const rowFreshness = isFreshnessStatus(row.freshness_status) ? row.freshness_status : seed.freshness_status;
-    const freshness = worstFreshness([seed.freshness_status, rowFreshness]);
-    const rowConfidence = typeof row.confidence === "number" ? row.confidence : seed.confidence;
-    const confidence = minConfidence([seed.confidence, rowConfidence]);
+    const freshness = isFreshnessStatus(row.freshness_status) ? row.freshness_status : seed.freshness_status;
+    const confidence = typeof row.confidence === "number" ? row.confidence : seed.confidence;
     const status = demoteHealthStatus(
       freshness,
       typeof row.status === "string" ? row.status : undefined,
@@ -304,6 +319,7 @@ function demoteNestedServices(value: unknown, seed: ProvenanceSeed): unknown {
       freshness_status: freshness,
       confidence,
       evidence_conclusive: freshness === "FRESH" && confidence > 0,
+      snapshot_evidence: snapshotEvidence,
     };
     if (status !== undefined) {
       out.status = status;

@@ -577,25 +577,14 @@ function infraServicesOf(body: Record<string, unknown>): Record<string, unknown>
   return services as Record<string, unknown>[];
 }
 
-test("a nested service is never healthy when the snapshot's evidence is not fresh", async () => {
+test("a nested service with no evidence of its own inherits the snapshot's and is demoted", async () => {
+  // The original bug: services[] carried a bare "healthy" and no freshness or
+  // confidence of its own, so the cockpit printed healthy next to 0,00.
   const port = createFixtureOperationalPort(
     infraSnapshotData({
       freshness_status: "UNKNOWN",
       confidence: 0,
-      services: [
-        {
-          service_name: "confenge-api-http",
-          status: "healthy",
-          freshness_status: "FRESH",
-          confidence: 0.9,
-          provenance: {
-            source: { system: "collector", kind: "host-health", locator: "infrastructure/hosts" },
-            observed_at: "2026-08-20T11:20:00.000Z",
-            freshness_status: "FRESH",
-            confidence: 0.9,
-          },
-        },
-      ],
+      services: [{ service_name: "confenge-api-http", status: "healthy" }],
     }),
   );
   await withServer(port, async (base) => {
@@ -603,16 +592,71 @@ test("a nested service is never healthy when the snapshot's evidence is not fres
     assert.equal(res.status, 200);
     const slot = body.snapshot as Record<string, unknown>;
     assert.equal(slot.healthy, false);
-    const services = (slot.snapshot as { services: Record<string, unknown>[] }).services;
-    const service = services[0];
+    const service = (slot.snapshot as { services: Record<string, unknown>[] }).services[0];
     assert.ok(service);
     assert.equal(service.status, "unknown");
     assert.equal(service.freshness_status, "UNKNOWN");
     assert.equal(service.confidence, 0);
     assert.equal(service.evidence_conclusive, false);
-    const provenance = service.provenance as { freshness_status: string; confidence: number };
-    assert.equal(provenance.freshness_status, "UNKNOWN");
-    assert.equal(provenance.confidence, 0);
+  });
+});
+
+test("one failing probe does not repaint a host that answered as 'down'", async () => {
+  // The slot's freshness is result.observations[0], picked by a lexicographic
+  // sort of source:target_id:check. Folding it into every row let a timing-out
+  // HTTP probe declare the VPS and the TLS certificate down — order-dependently
+  // at that. A row is bounded by its own evidence; the run's state is a caveat.
+  const port = createFixtureOperationalPort(
+    infraSnapshotData({
+      freshness_status: "ERROR",
+      confidence: 0,
+      services: [
+        {
+          service_id: "netcup-vps-tcp",
+          service_name: "Netcup VPS TCP",
+          status: "healthy",
+          freshness_status: "FRESH",
+          confidence: 0.95,
+          provenance: {
+            source: { system: "collector", kind: "host-health", locator: "infrastructure/hosts" },
+            observed_at: "2026-08-20T11:20:00.000Z",
+            freshness_status: "FRESH",
+            confidence: 0.95,
+          },
+        },
+        {
+          service_id: "confenge-api-http",
+          service_name: "Confenge API inbound health",
+          status: "down",
+          freshness_status: "ERROR",
+          confidence: 0,
+        },
+      ],
+    }),
+  );
+  await withServer(port, async (base) => {
+    const { body } = await getJson(base, "/v1/domains/infrastructure?scope=infrastructure");
+    const slot = body.snapshot as Record<string, unknown>;
+    // The slot itself is still not healthy: the contract's rule is untouched.
+    assert.equal(slot.healthy, false);
+    const services = (slot.snapshot as { services: Record<string, unknown>[] }).services;
+    const vps = services[0];
+    const api = services[1];
+    assert.ok(vps);
+    assert.ok(api);
+    assert.equal(vps.status, "healthy");
+    assert.equal(vps.freshness_status, "FRESH");
+    assert.equal(vps.confidence, 0.95);
+    assert.equal(vps.evidence_conclusive, true);
+    assert.deepEqual(vps.snapshot_evidence, {
+      freshness_status: "ERROR",
+      confidence: 0,
+      conclusive: false,
+    });
+    assert.equal((vps.provenance as { freshness_status: string }).freshness_status, "FRESH");
+    // The one that actually failed still reads as failed.
+    assert.equal(api.status, "down");
+    assert.equal(api.evidence_conclusive, false);
   });
 });
 
@@ -662,7 +706,8 @@ test("a fresh, evidenced service stays healthy and keeps its catalog identity", 
     assert.ok(service);
     assert.equal(service.status, "healthy");
     assert.equal(service.evidence_conclusive, true);
-    assert.equal(service.confidence, 0.88);
+    // The row's own confidence, not the slot's: the row measured itself.
+    assert.equal(service.confidence, 0.9);
     assert.equal(service.service_name, "Confenge API inbound health");
     assert.equal(service.role, "Endpoint de health do inbound");
     assert.equal(service.endpoint, "https://api.confenge.com.br/health");

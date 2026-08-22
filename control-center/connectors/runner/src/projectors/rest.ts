@@ -46,6 +46,12 @@ function asFreshness(value: unknown, fallback: FreshnessStatus): FreshnessStatus
     : fallback;
 }
 
+/**
+ * A DOM/resource-id-safe rendering of a catalog id. Lossy on purpose — target
+ * ids legally contain "." and "_" (allowlist TARGET_ID) — so it is used only to
+ * build an id, never to decide whether two rows are the same service. Two
+ * distinct ids that slug alike are reported as an ambiguity, not merged.
+ */
 function slugify(value: string): string {
   return (
     value
@@ -71,10 +77,14 @@ function checkSlot(checks: readonly Record<string, unknown>[], kind: string): Re
 }
 
 interface InfraService {
+  /** Exact identity. Never a slug: a slug merges services that are not the same. */
   readonly key: string;
+  readonly slug: string;
   readonly row: Record<string, unknown>;
   readonly status: HealthStatus;
   readonly freshness: FreshnessStatus;
+  readonly latency: number | undefined;
+  readonly lastError: string | undefined;
   readonly anonymous: boolean;
 }
 
@@ -86,6 +96,7 @@ interface InfraService {
  */
 function projectService(
   item: unknown,
+  index: number,
   envelope: CollectorEnvelope,
   fallbackFreshness: FreshnessStatus,
 ): InfraService {
@@ -96,12 +107,20 @@ function projectService(
   const serviceId = textOrUndefined(raw.service_id) ?? textOrUndefined(raw.id);
   const displayName = textOrUndefined(raw.display_name) ?? textOrUndefined(raw.service_name);
   const anonymous = serviceId === undefined && displayName === undefined;
-  const slug = slugify(serviceId ?? displayName ?? "");
+  // Identity is compared verbatim. Anonymous rows are each their own service:
+  // two defects are two defects, not a duplicate of one another.
+  const key = anonymous
+    ? `anonymous:${index}`
+    : serviceId !== undefined
+      ? `service_id:${serviceId}`
+      : `display_name:${String(displayName)}`;
+  const slug = anonymous ? `sem-identidade-${index + 1}` : slugify(serviceId ?? String(displayName));
   const freshness = asFreshness(raw.freshness_status, fallbackFreshness);
   const status = normalizeHealthStatus(raw.status);
   const observedAt = isoOr(raw.observed_at, envelope.observed_at);
   const confidence = finiteNumber(raw.confidence) ?? envelope.confidence;
   const latency = finiteNumber(raw.latency_ms);
+  const latencyCheck = textOrUndefined(raw.latency_check);
   const lastError = textOrUndefined(raw.last_error);
   const runbook = safeRunbookUrl(raw.runbook_url);
   const http = checkSlot(checks, "http");
@@ -137,6 +156,7 @@ function projectService(
       confidence,
     },
     ...(latency !== undefined ? { latency_ms: latency } : {}),
+    ...(latencyCheck ? { latency_check: latencyCheck } : {}),
     ...(lastError ? { last_error: lastError, message: lastError } : {}),
     ...(runbook ? { runbook_url: runbook } : {}),
     ...(http ? { http } : {}),
@@ -146,43 +166,140 @@ function projectService(
     ...(hostMetrics ? { host_metrics: hostMetrics } : {}),
     ...(anonymous ? { catalog_error: "missing_service_identity" } : {}),
   };
+  return { key, slug, row, status, freshness, latency, lastError, anonymous };
+}
+
+/**
+ * Two entries for the same catalog id collapse into one card. Every dimension
+ * is rolled up independently — worst status, worst freshness, lowest
+ * confidence, highest latency, first recorded error — because picking whichever
+ * member row looked worse "overall" silently discarded the other's evidence: a
+ * down+FRESH row losing to a healthy+STALE one took its 503 with it.
+ */
+function mergeDuplicates(members: readonly InfraService[]): Record<string, unknown> {
+  const base = members[0];
+  if (!base) {
+    throw new Error("mergeDuplicates called with no members");
+  }
+  if (members.length === 1) {
+    return base.row;
+  }
+  const worstStatus = members.reduce(
+    (worst, member) => (STATUS_SEVERITY[member.status] > STATUS_SEVERITY[worst] ? member.status : worst),
+    base.status,
+  );
+  const worstFreshness = members.reduce(
+    (worst, member) => (FRESHNESS_SEVERITY[member.freshness] > FRESHNESS_SEVERITY[worst] ? member.freshness : worst),
+    base.freshness,
+  );
+  const confidences = members
+    .map((member) => finiteNumber(member.row.confidence))
+    .filter((value): value is number => value !== undefined);
+  const latencies = members
+    .map((member) => member.latency)
+    .filter((value): value is number => value !== undefined);
+  const errors = members
+    .map((member) => member.lastError)
+    .filter((value): value is string => value !== undefined);
+  const worstMember =
+    members.find((member) => member.status === worstStatus && member.lastError !== undefined) ??
+    members.find((member) => member.status === worstStatus) ??
+    base;
+  const merged: Record<string, unknown> = {
+    ...base.row,
+    ...(worstMember.row.http ? { http: worstMember.row.http } : {}),
+    ...(worstMember.row.tls ? { tls: worstMember.row.tls } : {}),
+    ...(worstMember.row.docker ? { docker: worstMember.row.docker } : {}),
+    ...(worstMember.row.backup ? { backup: worstMember.row.backup } : {}),
+    ...(worstMember.row.host_metrics ? { host_metrics: worstMember.row.host_metrics } : {}),
+    status: worstStatus,
+    freshness_status: worstFreshness,
+    partial_outage: members.some((member) => member.row.partial_outage === true),
+    duplicate_count: members.length,
+  };
+  if (confidences.length > 0) {
+    merged.confidence = Math.min(...confidences);
+  }
+  if (latencies.length > 0) {
+    merged.latency_ms = Math.max(...latencies);
+  }
+  const joined = [...new Set(errors)].join(" | ");
+  if (joined !== "") {
+    merged.last_error = joined;
+    merged.message = joined;
+  }
+  const provenance = asRecord(merged.provenance);
+  if (provenance) {
+    merged.provenance = {
+      ...provenance,
+      freshness_status: worstFreshness,
+      ...(confidences.length > 0 ? { confidence: Math.min(...confidences) } : {}),
+    };
+  }
+  return merged;
+}
+
+interface GroupedServices {
+  readonly services: Record<string, unknown>[];
+  readonly duplicateGroups: number;
+  readonly ambiguousIds: number;
+}
+
+/**
+ * Grouping is by exact catalog identity. Two different ids that happen to slug
+ * alike (cfg-health and cfg.health) are two services, and losing one of them to
+ * a merge would delete a monitored dependency from the cockpit and from the
+ * count. They keep separate cards, separate ids, and are flagged so the
+ * ambiguity is fixed in the catalog rather than hidden here.
+ */
+function groupServices(services: readonly InfraService[]): GroupedServices {
+  const byKey = new Map<string, InfraService[]>();
+  for (const service of services) {
+    const bucket = byKey.get(service.key);
+    if (bucket) {
+      bucket.push(service);
+    } else {
+      byKey.set(service.key, [service]);
+    }
+  }
+  const groups = [...byKey.values()];
+  const slugCounts = new Map<string, number>();
+  for (const members of groups) {
+    const slug = members[0]?.slug ?? "sem-identidade";
+    slugCounts.set(slug, (slugCounts.get(slug) ?? 0) + 1);
+  }
+  const seenBySlug = new Map<string, number>();
+  let ambiguousIds = 0;
+  const rows = groups.map((members) => {
+    const merged = mergeDuplicates(members);
+    const slug = members[0]?.slug ?? "sem-identidade";
+    if ((slugCounts.get(slug) ?? 0) > 1) {
+      const ordinal = (seenBySlug.get(slug) ?? 0) + 1;
+      seenBySlug.set(slug, ordinal);
+      ambiguousIds += 1;
+      return {
+        ...merged,
+        id: `cc:service-health:${slug}-${ordinal}`,
+        catalog_error: merged.catalog_error ?? "ambiguous_service_id",
+      };
+    }
+    return merged;
+  });
   return {
-    key: anonymous ? `anonymous:${JSON.stringify(raw)}` : slug,
-    row,
-    status,
-    freshness,
-    anonymous,
+    services: rows,
+    duplicateGroups: groups.filter((members) => members.length > 1).length,
+    ambiguousIds,
   };
 }
 
-/**
- * Equivalent entries collapse into one card carrying duplicate_count, so the
- * operator sees a repeated catalog entry as a repeat, not as two dependencies.
- */
-function groupServices(services: readonly InfraService[]): Record<string, unknown>[] {
-  const byKey = new Map<string, { service: InfraService; count: number }>();
-  for (const service of services) {
-    const seen = byKey.get(service.key);
-    if (!seen) {
-      byKey.set(service.key, { service, count: 1 });
-      continue;
-    }
-    seen.count += 1;
-    const worseStatus = STATUS_SEVERITY[service.status] > STATUS_SEVERITY[seen.service.status];
-    const worseFreshness = FRESHNESS_SEVERITY[service.freshness] > FRESHNESS_SEVERITY[seen.service.freshness];
-    if (worseStatus || worseFreshness) {
-      seen.service = service;
-    }
-  }
-  return [...byKey.values()].map(({ service, count }) =>
-    count > 1 ? { ...service.row, duplicate_count: count } : service.row,
-  );
-}
+const SECRET_QUERY_KEY =
+  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem)((_|-).*)?$/i;
 
 /**
  * A runbook link the cockpit may render. Same-origin absolute path, or an
- * http(s) URL with no credentials. Anything else is dropped rather than shown:
- * a link the operator cannot trust is worse than no link.
+ * http(s) URL with no credentials and no secret-looking query key — the same
+ * rule the allowlist parser applies, repeated here because a link the operator
+ * cannot trust is worse than no link. Anything else is dropped, not shown.
  */
 function safeRunbookUrl(value: unknown): string | undefined {
   const raw = textOrUndefined(value);
@@ -190,12 +307,22 @@ function safeRunbookUrl(value: unknown): string | undefined {
     return undefined;
   }
   if (raw.startsWith("/")) {
-    return raw.includes("@") ? undefined : raw;
+    if (raw.includes("@")) return undefined;
+    const query = raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "";
+    for (const pair of query.split("&")) {
+      if (pair !== "" && SECRET_QUERY_KEY.test(decodeURIComponent(pair.split("=")[0] ?? ""))) {
+        return undefined;
+      }
+    }
+    return raw;
   }
   try {
     const url = new URL(raw);
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
     if (url.username || url.password) return undefined;
+    for (const key of url.searchParams.keys()) {
+      if (SECRET_QUERY_KEY.test(key)) return undefined;
+    }
     return url.toString();
   } catch {
     return undefined;
@@ -208,12 +335,11 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   const payload = asRecord(envelope.payload) ?? {};
   const health = asArray(payload.service_health).length > 0 ? asArray(payload.service_health) : asArray(payload.health);
   const first = asRecord(health[0]) ?? payload;
-  const projected = health.map((item) => projectService(item, envelope, freshness));
-  const services = groupServices(projected);
+  const projected = health.map((item, index) => projectService(item, index, envelope, freshness));
+  const grouped = groupServices(projected);
   const statuses = projected.map((service) => service.status);
   const partial = statuses.some((status) => status !== "healthy") && statuses.some((status) => status === "healthy");
-  const catalogErrors = projected.filter((service) => service.anonymous).length;
-  const duplicateGroups = services.filter((row) => typeof row.duplicate_count === "number").length;
+  const catalogErrors = projected.filter((service) => service.anonymous).length + grouped.ambiguousIds;
   return {
     projector_version: PROJECTOR_VERSION,
     snapshot_kind: "infrastructure",
@@ -225,11 +351,17 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
       service_name: first.service_name ?? "control-center-infrastructure",
       status: partial ? "degraded" : normalizeHealthStatus(first.status),
       partial_outage: partial,
-      monitored_service_count: services.length,
+      monitored_service_count: grouped.services.length,
       catalog_error_count: catalogErrors,
-      duplicate_group_count: duplicateGroups,
-      ...(envelope.error ? { unavailability_reason: envelope.error.code } : {}),
-      services: capList(services),
+      duplicate_group_count: grouped.duplicateGroups,
+      // Present whenever the run is not fully trustworthy, not only when the
+      // collector threw. A probe that failed while the collector itself ran
+      // fine is the common case, and it used to leave the operator with a bare
+      // confidence of 0 and nothing to distinguish it from "never configured".
+      ...(envelope.error || availability !== "FRESH"
+        ? { unavailability_reason: envelope.error?.code ?? availability }
+        : {}),
+      services: capList(grouped.services),
     },
     freshness_status: freshness,
     availability,

@@ -13,6 +13,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   PriorityRecommendation,
   Provenance,
   ServiceHealth,
@@ -519,6 +520,16 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
   },
 ];
 
+export const INFRA_CATALOG_SUMMARY: InfraCatalogSummary = {
+  freshness_status: "STALE",
+  confidence: 0.55,
+  monitored_service_count: HEALTH_FIXTURES.length,
+  catalog_error_count: 0,
+  duplicate_group_count: 1,
+  availability: "STALE",
+  unavailability_reason: "STALE",
+};
+
 export const DIRECTIVE_FIXTURES: Directive[] = [
   {
     schema_version: "control-center.directive.v1",
@@ -875,6 +886,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       attention: attentionByScope((item) => item.scope === "infrastructure"),
       priorities: [],
       health: HEALTH_FIXTURES,
+      health_summary: INFRA_CATALOG_SUMMARY,
     }),
     crescimento: pageFor("crescimento", {
       headline: "Inbound e visibilidade. Sem atribuição inventada entre sistemas.",
