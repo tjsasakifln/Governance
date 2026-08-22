@@ -219,7 +219,10 @@ export interface CommercialSnapshot {
   authority: CommercialAuthorityStamp;
   offer_pin: GovernanceOfferPin;
   funnel: CommercialFunnelCounts;
-  pipeline_nominal: Money;
+  /** Absent when the pipeline could not be denominated. Never a zero in a guessed currency. */
+  pipeline_nominal?: Money;
+  /** One total per currency, only when the pipeline spans more than one. Never summed, never converted. */
+  pipeline_nominal_by_currency?: Money[];
   pipeline_weighted?: WeightedPipeline;
   aging_count: number;
   stalled_count: number;

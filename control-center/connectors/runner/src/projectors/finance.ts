@@ -9,14 +9,38 @@ import {
   type ProjectedSnapshot,
 } from "./types.ts";
 
+/**
+ * CONFENGE is contracted in BRL and Governance is the catalog authority.
+ * An amount with no currency is denominated in it; an amount whose currency is
+ * present but unreadable fails closed rather than being relabelled as BRL.
+ */
+const CATALOG_CURRENCY = "BRL";
+const ISO_4217 = /^[A-Z]{3}$/;
+
+function currencyOf(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) {
+    return CATALOG_CURRENCY;
+  }
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+  const code = raw.trim().toUpperCase();
+  if (code === "") {
+    return CATALOG_CURRENCY;
+  }
+  return ISO_4217.test(code) ? code : undefined;
+}
+
 function moneyFromBucket(value: unknown): { amount_cents: number; currency: string } | undefined {
   const rec = asRecord(value);
   if (!rec) return undefined;
+  const currency = currencyOf(rec.currency);
+  if (!currency) return undefined;
   if (typeof rec.amount_cents === "number" && Number.isInteger(rec.amount_cents)) {
-    return { amount_cents: rec.amount_cents, currency: typeof rec.currency === "string" ? rec.currency : "BRL" };
+    return { amount_cents: rec.amount_cents, currency };
   }
   if (typeof rec.cents === "number" && Number.isInteger(rec.cents)) {
-    return { amount_cents: rec.cents, currency: typeof rec.currency === "string" ? rec.currency : "BRL" };
+    return { amount_cents: rec.cents, currency };
   }
   return undefined;
 }

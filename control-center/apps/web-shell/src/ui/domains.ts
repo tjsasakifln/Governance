@@ -37,6 +37,57 @@ function moneyFact(label: string, money: { amount_cents: number; currency: strin
   `;
 }
 
+const ISO_4217 = /^[A-Z]{3}$/;
+
+/**
+ * A value the read model could not denominate is unknown, and an unknown reads
+ * "sem dados". It must never be painted as `0,00`, which looks measured.
+ */
+function noDataFact(label: string): string {
+  return fact(label, "sem dados", ` data-absent="true" data-no-data="true"`);
+}
+
+function readableMoney(value: unknown): { amount_cents: number; currency: string } | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const rec = value as { amount_cents?: unknown; currency?: unknown };
+  if (!Number.isInteger(rec.amount_cents)) return undefined;
+  if (typeof rec.currency !== "string" || !ISO_4217.test(rec.currency)) return undefined;
+  return { amount_cents: rec.amount_cents as number, currency: rec.currency };
+}
+
+/**
+ * Pipeline nominal. Multi-currency pipelines are shown as separate totals per
+ * currency — never added together, because the Control Center has no rate
+ * source with a date to convert with.
+ */
+function pipelineNominalFact(snapshot: CommercialSnapshot): string {
+  const split = (snapshot.pipeline_nominal_by_currency ?? [])
+    .map((money) => readableMoney(money))
+    .filter((money): money is { amount_cents: number; currency: string } => money !== undefined);
+  if (split.length > 1) {
+    return fact(
+      "Pipeline nominal",
+      split.map((money) => escapeHtml(formatMoney(money))).join(" · "),
+      ` data-currency-split="${split.length}"`,
+    );
+  }
+  const single = readableMoney(snapshot.pipeline_nominal) ?? split[0];
+  return single ? moneyFact("Pipeline nominal", single) : noDataFact("Pipeline nominal");
+}
+
+/**
+ * A deal amount is only shown in a currency the read model actually stated.
+ * It no longer borrows BRL from the catalog, which used to make an
+ * undenominated figure look confirmed. An amount that cannot be read shows no
+ * money line; giving absence a visible word here belongs to the zero/ausente
+ * vocabulary in #62, not to this fix.
+ */
+function dealMoneyLine(value: unknown): string {
+  const money = readableMoney(value);
+  return money
+    ? `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`
+    : "";
+}
 function listFact(label: string, items: string[] | undefined): string {
   if (!items || items.length === 0) return "";
   return fact(label, escapeHtml(items.join(", ")));
@@ -199,7 +250,7 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
       ? moneyFact("Pipeline ponderado (probabilidade confiável)", snapshot.pipeline_weighted)
-      : fact("Pipeline ponderado", "omitido — probabilidade não confiável");
+      : fact("Pipeline ponderado", "omitido — sem base confiável para ponderar");
   const extra = snapshot.extra_historical
     ? fact(
         snapshot.extra_historical.label ?? "Extra histórica",
@@ -227,7 +278,7 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
         ${optionalCount("Oportunidades", funnel?.opportunities)}
         ${optionalCount("Propostas", funnel?.proposals)}
         ${optionalCount("Clientes", funnel?.clients)}
-        ${snapshot.pipeline_nominal ? moneyFact("Pipeline nominal", snapshot.pipeline_nominal) : ""}
+        ${pipelineNominalFact(snapshot)}
         ${weighted}
         ${typeof snapshot.aging_count === "number" ? fact("Aging", String(snapshot.aging_count)) : ""}
         ${typeof snapshot.missing_next_action_count === "number" ? fact("Missing next action", String(snapshot.missing_next_action_count)) : ""}
@@ -400,11 +451,10 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         : pipeline
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              const value = row.value && typeof row.value === "object" ? (row.value as { amount_cents?: number; currency?: string }) : null;
               return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
                 <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· stale" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "deal"))}</h3>
-                ${value && typeof value.amount_cents === "number" ? `<p class="money">${escapeHtml(formatMoney({ amount_cents: value.amount_cents, currency: value.currency ?? "BRL" }))}</p>` : ""}
+                ${dealMoneyLine(row.value)}
                 <dl class="facts">
                   ${fact("Próxima ação", String(row.next_action ?? "ausente"))}
                   ${fact("Idade (s)", String(row.age_seconds ?? "—"))}

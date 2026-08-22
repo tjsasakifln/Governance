@@ -112,6 +112,12 @@ export type CommercialSnapshot = {
   health: ConnectorHealth;
   counts: CommercialCounts;
   deal_value_open?: Money;
+  /**
+   * Per-currency open pipeline totals, present only when the open deals span
+   * more than one currency. The totals are never summed and never converted:
+   * the Control Center has no rate source with a date and a provenance.
+   */
+  deal_value_open_by_currency?: Money[];
   attention: CommercialAttentionItem[];
   observations: SourceObservation[];
   required_upstream_contract: RequiredUpstreamContract[];

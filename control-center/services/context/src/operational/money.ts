@@ -3,6 +3,13 @@ import type { EvidencedMoney, SourceRef } from "./types.ts";
 
 const CURRENCY_RE = /^[A-Z]{3}$/;
 
+/**
+ * The CONFENGE catalog is contracted in BRL and Governance is its authority.
+ * It is the contractual currency for amounts that arrive undenominated — never
+ * a fallback applied over a currency the payload actually stated.
+ */
+export const CATALOG_CURRENCY = "BRL";
+
 export interface ProvenanceSeed {
   source: SourceRef;
   observed_at: string;
@@ -28,10 +35,25 @@ function integerCents(value: unknown): number | undefined {
   return undefined;
 }
 
+/**
+ * Resolve the currency of one observed amount.
+ *
+ * Absent (or blank) resolves to the contractual catalog currency, which
+ * Governance owns. Present-but-unreadable fails closed as `undefined` — the
+ * caller then withholds the amount instead of relabelling a code it could not
+ * parse, so a bad upstream code can never be laundered into BRL.
+ */
 function currencyOf(value: unknown, fallback?: string): string | undefined {
   const rec = asRecord(value);
-  if (rec && typeof rec.currency === "string" && CURRENCY_RE.test(rec.currency)) {
-    return rec.currency;
+  const raw = rec?.currency;
+  if (raw !== undefined && raw !== null) {
+    if (typeof raw !== "string") {
+      return undefined;
+    }
+    const code = raw.trim().toUpperCase();
+    if (code !== "") {
+      return CURRENCY_RE.test(code) ? code : undefined;
+    }
   }
   if (fallback && CURRENCY_RE.test(fallback)) {
     return fallback;
@@ -91,7 +113,7 @@ export function evidencedMoney(value: unknown, seed: ProvenanceSeed): EvidencedM
   if (cents === undefined) {
     return undefined;
   }
-  const currency = currencyOf(value, "BRL");
+  const currency = currencyOf(value, CATALOG_CURRENCY);
   if (!currency) {
     return undefined;
   }
@@ -184,6 +206,78 @@ export function financeStages(
     out.chargebacks = chargebacks;
   }
   return out;
+}
+
+/**
+ * Nominal pipeline total for the commercial read model.
+ *
+ * Two rules the plain `evidencedMoney` path cannot express:
+ *  - provenance always comes from the reading seed, not from whatever the
+ *    stored payload claims about itself;
+ *  - a *scalar aggregate* of exactly zero is absence. Nothing denominated
+ *    contributed to it, so it has no currency to be stated in; rendering it
+ *    would print `<currency> 0,00` where the honest answer is "sem dados".
+ *
+ * The zero rule is scoped to scalar aggregates on purpose. A per-currency
+ * bucket exists only because some denominated amount created it, and a
+ * per-deal amount carries the currency stated on that deal — in both of those
+ * a zero is evidence, not a gap, so `pipelineByCurrency` does not apply it.
+ */
+export function nominalPipeline(value: unknown, seed: ProvenanceSeed): EvidencedMoney | undefined {
+  const cents = integerCents(value);
+  if (cents === undefined || cents === 0) {
+    return undefined;
+  }
+  const currency = currencyOf(value, CATALOG_CURRENCY);
+  if (!currency) {
+    return undefined;
+  }
+  return {
+    amount_cents: cents,
+    currency,
+    source: seed.source,
+    observed_at: seed.observed_at,
+    freshness_status: seed.freshness_status,
+    confidence: seed.confidence,
+  };
+}
+
+/**
+ * Per-currency pipeline totals. Kept apart rather than added: converting would
+ * need an explicit rate with a source and a date, and there is none here.
+ *
+ * A zero bucket is kept. The bucket exists because a deal denominated in that
+ * currency contributed to it, so unlike a scalar aggregate it has real currency
+ * evidence behind it. Dropping it here once destroyed the *sibling* totals too,
+ * because a split that filtered down to one entry was then discarded as "not a
+ * split" — see the promotion in `assemble.ts`.
+ */
+export function pipelineByCurrency(value: unknown, seed: ProvenanceSeed): EvidencedMoney[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const out: EvidencedMoney[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const cents = integerCents(item);
+    if (cents === undefined) {
+      continue;
+    }
+    const currency = currencyOf(item, CATALOG_CURRENCY);
+    if (!currency || seen.has(currency)) {
+      continue;
+    }
+    seen.add(currency);
+    out.push({
+      amount_cents: cents,
+      currency,
+      source: seed.source,
+      observed_at: seed.observed_at,
+      freshness_status: seed.freshness_status,
+      confidence: seed.confidence,
+    });
+  }
+  return out.sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 export function reliableWeightedPipeline(payload: Record<string, unknown>, seed: ProvenanceSeed): EvidencedMoney | undefined {
