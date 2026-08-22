@@ -43,6 +43,11 @@ export interface OperatorHttpRequest {
   headers: Readonly<Record<string, string | string[] | undefined>>;
   /** Socket peer address. The trusted-hop check is done against this. */
   remoteAddress: string | undefined;
+  /**
+   * `req.rawHeaders`. Node joins duplicate headers into one string, so this is
+   * the only place a client copy of Remote-Groups racing the proxy's is visible.
+   */
+  rawHeaders?: readonly string[];
   /** Already-parsed JSON body. The handler never parses a stream itself. */
   body: unknown;
 }
@@ -212,7 +217,11 @@ export function createOperatorHttpHandler(
         body: { ok: false, code: "method_not_allowed", reason: "operator routes are POST only" },
       };
     }
-    const identity = { remoteAddress: req.remoteAddress ?? "", headers: req.headers };
+    const identity = {
+      remoteAddress: req.remoteAddress ?? "",
+      headers: req.headers,
+      ...(req.rawHeaders ? { rawHeaders: req.rawHeaders } : {}),
+    };
     const body = asRecord(req.body);
     // A caller-supplied correlation id is never accepted as one: it is carried
     // as `client_reference`, which keys nothing. `correlation_id` in the body is

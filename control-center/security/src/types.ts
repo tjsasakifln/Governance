@@ -10,6 +10,14 @@ export interface ForwardAuthIdentity {
 export interface IdentityRequest {
   readonly remoteAddress: string;
   readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+  /**
+   * `req.rawHeaders` when the caller has it. Node's http server joins duplicate
+   * headers into one comma-separated string, so `headers` alone cannot tell
+   * `Remote-Groups: operators, viewers` (legitimate) from a client-sent
+   * `Remote-Groups: operators` appended to the proxy's `viewers`. The raw list
+   * keeps them apart, and that is the only place a duplicate is visible.
+   */
+  readonly rawHeaders?: readonly string[];
 }
 
 export interface TrustedHopPolicy {

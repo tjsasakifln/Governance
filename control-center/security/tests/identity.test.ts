@@ -189,3 +189,52 @@ describe("parseForwardAuthIdentity", () => {
     assert.equal(result.code, "spoofed_identity");
   });
 });
+
+it("denies a duplicated identity header even when Node joins it into one string", () => {
+  // req.headers gives "operators, viewers" — indistinguishable from a legitimate
+  // two-group value. rawHeaders is the only place the duplicate is visible.
+  const joined = parseForwardAuthIdentity(
+    {
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "remote-user": "mallory",
+        "remote-groups": "operators, viewers",
+        "remote-name": "Mallory",
+        "remote-email": "mallory@example.invalid",
+      },
+      rawHeaders: [
+        "Remote-User", "mallory",
+        "Remote-Groups", "operators",
+        "Remote-Groups", "viewers",
+        "Remote-Name", "Mallory",
+        "Remote-Email", "mallory@example.invalid",
+      ],
+    },
+    defaultTrustedHopPolicy(["127.0.0.1/32"]),
+  );
+  assert.equal(joined.ok, false);
+  if (!joined.ok) {
+    assert.equal(joined.code, "spoofed_identity");
+  }
+
+  // A genuine multi-group value, sent once, must still resolve.
+  const single = parseForwardAuthIdentity(
+    {
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "remote-user": "tiago",
+        "remote-groups": "operators, viewers",
+        "remote-name": "Tiago",
+        "remote-email": "tiago@example.invalid",
+      },
+      rawHeaders: [
+        "Remote-User", "tiago",
+        "Remote-Groups", "operators, viewers",
+        "Remote-Name", "Tiago",
+        "Remote-Email", "tiago@example.invalid",
+      ],
+    },
+    defaultTrustedHopPolicy(["127.0.0.1/32"]),
+  );
+  assert.equal(single.ok, true);
+});
