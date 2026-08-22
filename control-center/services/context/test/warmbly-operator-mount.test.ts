@@ -74,7 +74,11 @@ test("the channel receives the socket peer address so its trusted-hop check is r
     return { status: 202, body: { ok: true } };
   };
   await withServer(handler, async (base) => {
-    await fetch(`${base}${PAUSE}`, { method: "POST", body: "{}" });
+    await fetch(`${base}${PAUSE}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
   });
   assert.ok(seen?.remoteAddress, "remoteAddress must be forwarded, not left undefined");
 });
@@ -111,7 +115,12 @@ test("mounting is off by default and stays off when enabled but unconfigured", a
   );
   assert.notEqual(
     await createWarmblyOperatorHandlerFromEnv(
-      { CC_WARMBLY_OPERATOR_ENABLED: "true", CC_WARMBLY_BASE_URL: "http://x", CC_WARMBLY_OPERATOR_TOKEN: "t" },
+      {
+        CC_WARMBLY_OPERATOR_ENABLED: "true",
+        CC_WARMBLY_BASE_URL: "http://x",
+        CC_WARMBLY_OPERATOR_TOKEN: "t",
+        CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "10.89.0.2/32",
+      },
       { logger: silentLogger },
     ),
     undefined,
@@ -143,4 +152,100 @@ test("the mount does not shadow the service's own routes", async () => {
     const body = (await res.json()) as { service?: string };
     assert.equal(body.service, "control-center-context");
   });
+});
+
+// --- Regressions from the second adversarial review -------------------------
+
+test("a half-configured flag does not crash boot through the logger", async () => {
+  // `has_token` matched the service logger's secret-NAME regex, which throws.
+  // The branch meant to say "stay off" instead took the whole service down in a
+  // restart loop, taking /healthz and every read with it.
+  const thrown: unknown[] = [];
+  const strictLogger = {
+    info() {},
+    warn() {},
+    error(_msg: string, fields?: Record<string, string | number | boolean | null>) {
+      for (const key of Object.keys(fields ?? {})) {
+        if (/pass(word)?|secret|token|authorization|cookie/i.test(key)) {
+          const err = new Error("refusing to log a secret-bearing field name");
+          thrown.push(err);
+          throw err;
+        }
+      }
+    },
+  };
+  const handler = await createWarmblyOperatorHandlerFromEnv(
+    { CC_WARMBLY_OPERATOR_ENABLED: "true", CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "10.89.0.2/32" },
+    { logger: strictLogger },
+  );
+  assert.equal(handler, undefined);
+  assert.deepEqual(thrown, [], "no field name may trip the logger's secret guard");
+});
+
+test("the channel refuses to mount without an explicitly narrowed trusted hop", async () => {
+  // The library default trusts 10.89.0.0/24, which in production is the whole
+  // cc_edge network: web, mcp, collector and context sit there beside caddy.
+  // Any of them could forge Remote-* and execute a resume.
+  assert.equal(
+    await createWarmblyOperatorHandlerFromEnv(
+      {
+        CC_WARMBLY_OPERATOR_ENABLED: "true",
+        CC_WARMBLY_BASE_URL: "http://x",
+        CC_WARMBLY_OPERATOR_TOKEN: "t",
+      },
+      { logger: silentLogger },
+    ),
+    undefined,
+    "a missing trusted hop must fail closed, never fall back to the edge network",
+  );
+  assert.notEqual(
+    await createWarmblyOperatorHandlerFromEnv(
+      {
+        CC_WARMBLY_OPERATOR_ENABLED: "true",
+        CC_WARMBLY_BASE_URL: "http://x",
+        CC_WARMBLY_OPERATOR_TOKEN: "t",
+        CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "10.89.0.2/32",
+      },
+      { logger: silentLogger },
+    ),
+    undefined,
+  );
+});
+
+test("an operator write refuses a non-JSON content type", async () => {
+  // <form enctype="text/plain"> is CORS-simple, so no preflight runs and the
+  // lax session cookie is still sent from any *.confenge.com.br page.
+  let reached = false;
+  const handler = async () => {
+    reached = true;
+    return { status: 200, body: { ok: true } };
+  };
+  await withServer(handler, async (base) => {
+    const res = await fetch(`${base}${PAUSE}`, {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      body: '{"reason":"pausado pelo atacante"}',
+    });
+    assert.equal(res.status, 415);
+    const body = (await res.json()) as { code?: string };
+    assert.equal(body.code, "unsupported_media_type");
+  });
+  assert.equal(reached, false, "the channel must never see a cross-origin form body");
+});
+
+test("a JSON operator write still reaches the channel", async () => {
+  let reached = false;
+  const handler = async () => {
+    reached = true;
+    return { status: 200, body: { ok: true } };
+  };
+  await withServer(handler, async (base) => {
+    const res = await fetch(`${base}${PAUSE}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason: "bounce spike" }),
+    });
+    assert.equal(res.status, 200);
+  });
+  assert.equal(reached, true);
 });
