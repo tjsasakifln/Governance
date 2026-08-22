@@ -217,6 +217,27 @@ export type WarmblyHealth = {
   version?: string;
 };
 
+/**
+ * GET /v1/confenge/dispatch/status. Mirrors `dispatch.Status` in warmbly
+ * (internal/app/confenge/dispatch/types.go). Every field is optional: this
+ * connector must never turn a missing field into a confident reading of the
+ * kill switch — an absent `paused` is UNKNOWN, never "active".
+ */
+export type WarmblyDispatchStatus = {
+  paused?: boolean;
+  pause_reason?: string;
+  in_send_window?: boolean;
+  timezone?: string;
+  window_start?: string;
+  window_end?: string;
+  next_slot_at?: string;
+  sent_last_hour?: number;
+  cap?: number;
+  queued_approved?: number;
+  min_gap_seconds?: number;
+  active_leases?: number;
+};
+
 export type WarmblyPayload = {
   health?: WarmblyHealth;
   api_version?: string;
@@ -235,6 +256,7 @@ export type WarmblyPayload = {
   confenge_attention?: WarmblyAttentionItem[] | WarmblyList<WarmblyAttentionItem>;
   confenge_today?: WarmblyTodayView | { data: WarmblyTodayView };
   confenge_inbound?: WarmblyInboundItem[] | WarmblyList<WarmblyInboundItem>;
+  confenge_dispatch_status?: WarmblyDispatchStatus | { data: WarmblyDispatchStatus };
   confenge_intel_scoreboard?: Record<string, unknown>;
   confenge_intel_executive?: Record<string, unknown>;
   confenge_intel_exceptions?: unknown;

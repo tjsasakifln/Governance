@@ -15,7 +15,33 @@ export interface HttpDeps {
   logger: Logger;
   operational?: OperationalService;
   operatorActions?: OperatorActionService;
+  /**
+   * Warmbly operator channel. Optional: when absent every operator route 404s,
+   * which is the fail-closed default for an unconfigured deployment.
+   *
+   * It carries its own identity: Authelia's `Remote-*` headers, verified against
+   * a trusted hop. It deliberately does NOT use `x-actor-id`, which any caller
+   * that reaches this process can set — a client-settable actor must never be
+   * able to pause or resume outbound email.
+   */
+  warmblyOperator?: (req: WarmblyOperatorHttpRequest) => Promise<WarmblyOperatorHttpResponse>;
 }
+
+export interface WarmblyOperatorHttpRequest {
+  method: string | undefined;
+  url: string | undefined;
+  headers: Readonly<Record<string, string | string[] | undefined>>;
+  remoteAddress: string | undefined;
+  body: unknown;
+}
+
+export interface WarmblyOperatorHttpResponse {
+  status: number;
+  body: unknown;
+}
+
+/** Route prefix owned by the Warmbly operator channel. */
+const WARMBLY_OPERATOR_PREFIX = "/v1/warmbly/operator/";
 
 function header(req: IncomingMessage, name: string): string | undefined {
   const raw = req.headers[name];
@@ -143,6 +169,28 @@ async function handle(
     if (method === "GET" && url.pathname === "/ready") {
       const ready = await deps.service.ready();
       send(res, ready ? 200 : 503, { ready, service: "control-center-context" });
+      return;
+    }
+    // Mounted before actorFromRequest on purpose. The operator channel resolves
+    // its own actor from Authelia, and must never fall back to the
+    // client-supplied x-actor-id header this service uses elsewhere.
+    if (url.pathname.startsWith(WARMBLY_OPERATOR_PREFIX)) {
+      if (!deps.warmblyOperator) {
+        send(res, 404, {
+          ok: false,
+          code: "operator_channel_not_configured",
+          reason: "the Warmbly operator channel is not wired in this deployment",
+        });
+        return;
+      }
+      const result = await deps.warmblyOperator({
+        method,
+        url: url.pathname,
+        headers: req.headers,
+        remoteAddress: req.socket?.remoteAddress,
+        body: method === "POST" ? await readBody(req) : undefined,
+      });
+      send(res, result.status, result.body);
       return;
     }
     const actor = actorFromRequest(req);

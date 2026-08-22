@@ -34,6 +34,9 @@ COPY --from=builder --chown=node:node /src/node_modules ./node_modules
 COPY --from=builder --chown=node:node /src/contracts ./contracts
 COPY --from=builder --chown=node:node /src/persistence ./persistence
 COPY --from=builder --chown=node:node /src/intelligence/attention ./intelligence/attention
+# Optional dependency of the operator channel. Loaded lazily and only when
+# CC_WARMBLY_OPERATOR_ENABLED=true, but it has to be present to be loadable.
+COPY --from=builder --chown=node:node /src/connectors/warmbly ./connectors/warmbly
 COPY --from=builder --chown=node:node /src/services/context ./services/context
 COPY --from=builder --chown=node:node /src/scripts/node-http-probe.mjs ./node-http-probe.mjs
 ENV HOST=0.0.0.0
