@@ -394,10 +394,15 @@ function commercialOps(
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
               const rowId = String(row.source_id ?? row.id ?? "");
               const named = leadTitleOf(row);
-              const href = leadDetailHash(current, query, rowId, { index: index + 1, total: activity.length });
+              const title = escapeHtml(named ?? "Organização não identificada pela origem");
+              // A row the origin gave no id to cannot be opened; it is still
+              // listed, just not as a dead link.
+              const heading = rowId
+                ? `<a href="${escapeHtml(leadDetailHash(current, query, rowId, { index: index + 1, total: activity.length }))}" data-lead-detail-link="${escapeHtml(rowId)}">${title}</a>`
+                : title;
               return `<article class="card">
                 <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
-                <h3><a href="${escapeHtml(href)}" data-lead-detail-link="${escapeHtml(rowId)}">${escapeHtml(named ?? "Organização não identificada pela origem")}</a></h3>
+                <h3>${heading}</h3>
                 <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
                 <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
                   <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />

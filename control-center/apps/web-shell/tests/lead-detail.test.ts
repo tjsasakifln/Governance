@@ -389,3 +389,15 @@ test("the route reaches the detail and the rendered back link carries the queue 
   assert.equal(backParams.get("resource"), null);
   assert.match(root.innerHTML, /item 1 de 3/);
 });
+
+test("a queue row the origin gave no id is listed but not offered as a dead link", () => {
+  const ops = representativeOperations();
+  ops.activity = [
+    { at: "2026-08-20T17:30:00Z", lead_or_account: "Sem identificador", event: "unknown", evidence: "x" },
+  ];
+  const adapter = adapterFor(snapshotWith(ops));
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/comercial/atividade");
+  assert.match(root.innerHTML, /Sem identificador/);
+  assert.equal(/data-lead-detail-link=/.test(root.innerHTML), false);
+});
