@@ -8,73 +8,43 @@ Próxima janela comercial válida: **segunda-feira, 24/08/2026, 09:00 America/S�
 
 ---
 
-## Bloqueio 1 — DKIM ausente no domínio de envio
+## ~~Bloqueio 1~~ — RESOLVIDO: DKIM estava configurado o tempo todo
 
-**Verificado, não presumido.** Sondei 22 selectors contra `1.1.1.1` e `8.8.8.8`,
-incluindo os 14 que o próprio checker do Warmbly conhece
-(`dnsauth.go:59: defaultSelectors`) e os três da Hostinger
-(`hostingermail1/2/3`). Nenhum resolve.
+**Eu estava errado, e o erro foi meu.** Sondei `hostingermail1/2/3`. A Hostinger
+publica `hostingermail-a/-b/-c` — hífen e letra. Nenhuma das 15 variantes que
+testei cobria esse formato, então o domínio deu negativo enquanto assinava
+normalmente.
 
-| Registro | Estado | Valor observado |
-|---|---|---|
-| SPF | **PASS** | `v=spf1 include:_spf.mail.hostinger.com ~all` |
-| DMARC | **PASS** (presente) | `v=DMARC1; p=none` |
-| DKIM | **AUSENTE** | nenhum selector resolve |
-| MX | ok | `mx1/mx2.hostinger.com` |
+Os três CNAME já estavam na Cloudflare e resolvendo:
 
-Detalhe que muda o procedimento: **o DNS de `confenge.com.br` está na Cloudflare**
-(`grannbo.ns.cloudflare.com`, `kai.ns.cloudflare.com`), não na Hostinger. Então a
-Hostinger **gera** a chave, mas quem **publica** o registro é a Cloudflare.
-
-### Passo a passo
-
-1. hPanel da Hostinger → **E-mails** → `confenge.com.br` → **Configurações de e-mail**
-   → **DKIM**. Se estiver desabilitado, habilite.
-2. A Hostinger mostrará um registro TXT, tipicamente:
-   - Nome: `hostingermail1._domainkey`
-   - Valor: `v=DKIM1; k=rsa; p=MIIBIjANBg...`
-3. Cloudflare → zona `confenge.com.br` → **DNS** → **Add record**:
-   - Type `TXT`, Name `hostingermail1._domainkey`, Content = o valor do passo 2,
-     Proxy **DNS only**, TTL Auto.
-4. Se a Hostinger mostrar `hostingermail2` / `hostingermail3`, publique os três.
-
-### Por que não fiz por você
-
-Tentei, com browser real (Playwright em container no `ec-prod`). O hPanel está
-atrás do desafio anti-bot da Cloudflare — a página devolve "Executando verificação
-de segurança / proteção contra bots maliciosos" antes de qualquer formulário de
-login. Não vou tentar contornar um controle anti-automação de terceiro, então
-esse passo é seu. As credenciais que você passou foram usadas só para provar
-SMTP/IMAP e removidas do host em seguida.
-
-### Quanto isso realmente bloqueia
-
-Menos do que parece. O gate do próprio Warmbly (PR #160) exige **SPF presente e
-DMARC presente** — que já passam — e deliberadamente **não** exige DKIM, porque
-selectors não são descobríveis por DNS. Então o sistema não te barra. O que a
-ausência de DKIM custa é reputação de entrega: sem assinatura, provedores
-destinatários avaliam só SPF, e um cold outbound institucional fica mais exposto
-a spam folder.
-
-Minha leitura: **vale publicar antes de segunda**, mas não é o que impede o
-sistema de operar.
-
-### Como eu confirmo
-
-Me avise e eu rodo a verificação real. Ou você mesmo:
-
-```bash
-python3 - <<'PY'
-import dns.resolver
-r=dns.resolver.Resolver(configure=False); r.nameservers=["1.1.1.1"]
-for s in ("hostingermail1","hostingermail2","hostingermail3"):
-    try: print(s, [x.to_text()[:60] for x in r.resolve(f"{s}._domainkey.confenge.com.br","TXT")])
-    except Exception as e: print(s, type(e).__name__)
-PY
+```
+hostingermail-a._domainkey.confenge.com.br CNAME hostingermail-a.dkim.mail.hostinger.com
+  -> v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A...   (chave real)
+hostingermail-b / -c  -> v=DKIM1;p=                          (slots vazios, normal)
 ```
 
-> **Não vou declarar DKIM PASS sem esse registro resolvendo.** Um probe corrigido
-> não é DKIM configurado.
+Prova de ponta a ponta contra `verifier.port25.com`, com envio real da caixa:
+
+```
+dkim-signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+                d=confenge.com.br; s=hostingermail-a
+Result: pass (matches From: tiago.sasaki@confenge.com.br)
+
+Summary of Results
+  SPF check:     pass
+  "iprev" check: pass
+  DKIM check:    pass
+```
+
+Como `d=confenge.com.br` alinha com o `From:`, o DMARC também passa por
+alinhamento de DKIM, mesmo com o SPF do envelope apontando para o relay.
+
+**Autenticação do domínio de envio: SPF, DKIM, DMARC, SMTP e IMAP — todos PASS.**
+
+O checker do próprio Warmbly tinha o mesmo defeito de lista e reportaria DKIM
+ausente para qualquer domínio na Hostinger. Corrigido em warmbly#123.
+
+---
 
 ---
 
