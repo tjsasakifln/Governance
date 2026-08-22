@@ -2,7 +2,7 @@
   "name": "@confenge/control-center-warmbly-connector",
   "version": "0.1.0",
   "private": true,
-  "description": "Read-only Warmbly adapter that yields CommercialSnapshot + observations for the Confenge Control Center cockpit.",
+  "description": "Warmbly adapter for the Confenge Control Center cockpit: read-only collect (CommercialSnapshot + observations) plus a three-action operator channel (pause/resume dispatch, acknowledge inbound alert).",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -22,7 +22,11 @@
     "cc-connector-canary": "tsx src/canary.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@confenge/control-center-security": "*"
+  },
   "devDependencies": {
+    "@confenge/control-center-agent-activity": "*",
     "@types/node": "^24.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"

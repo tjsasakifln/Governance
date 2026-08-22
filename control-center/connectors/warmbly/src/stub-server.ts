@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { pathnameOf } from "./http/allowlist.ts";
+import { isAllowedOperatorWrite } from "./operator/allowlist.ts";
 import type { WarmblyPayload } from "./contracts/warmbly-payload.ts";
 
 export type RecordedCall = {
@@ -15,12 +16,24 @@ export type StubOptions = {
   failStatus?: number;
   failAfter?: number;
   token?: string;
+  /**
+   * Opt-in only. Serves the three allowed operator write routes so the operator
+   * channel can be tested end to end. Off by default: the collect path must
+   * never find a writable stub.
+   */
+  operatorWrites?: boolean;
+  /** Status the operator write routes answer with (default 200). */
+  operatorWriteStatus?: number;
 };
+
+export type RecordedOperatorCall = RecordedCall & { body: string };
 
 export type FixtureStub = {
   server: Server;
   url: string;
   calls: RecordedCall[];
+  /** Operator write routes that were actually served (empty unless opted in). */
+  operatorCalls: RecordedOperatorCall[];
   close: () => Promise<void>;
 };
 
@@ -106,6 +119,7 @@ function routeBody(payload: WarmblyPayload, pathname: string): unknown | undefin
 
 export async function startFixtureStub(opts: StubOptions): Promise<FixtureStub> {
   const calls: RecordedCall[] = [];
+  const operatorCalls: RecordedOperatorCall[] = [];
   const hide = new Set(opts.hide ?? []);
   let hits = 0;
   const stateChanged = { value: false };
@@ -130,7 +144,13 @@ export async function startFixtureStub(opts: StubOptions): Promise<FixtureStub> 
         return;
       }
       if (method === "POST") {
-        void readBody(req).then(() => {
+        void readBody(req).then((raw) => {
+          if (opts.operatorWrites && isAllowedOperatorWrite("POST", path)) {
+            operatorCalls.push({ method, path, url, body: raw });
+            const status = opts.operatorWriteStatus ?? 200;
+            json(res, status, { data: { path, accepted: status >= 200 && status <= 299 } });
+            return;
+          }
           if (
             path === "/v1/contacts/search" ||
             path === "/v1/crm/deals/search" ||
@@ -185,6 +205,7 @@ export async function startFixtureStub(opts: StubOptions): Promise<FixtureStub> 
     server,
     url,
     calls,
+    operatorCalls,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
