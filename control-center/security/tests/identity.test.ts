@@ -136,6 +136,47 @@ describe("parseForwardAuthIdentity", () => {
     }
   });
 
+  it("denies a duplicated identity header instead of trusting the first copy", () => {
+    // A mount that hands headers through as arrays (Node's own http server
+    // joins them into one string) must not let a client-supplied copy win over
+    // the value the proxy appends.
+    const duplicated = parseForwardAuthIdentity(
+      request("10.89.0.2", {
+        ...trustedHeaders,
+        "Remote-User": ["evil", "operator"],
+      }),
+      policy,
+    );
+    assert.equal(duplicated.ok, false);
+    if (!duplicated.ok) {
+      assert.equal(duplicated.code, "missing_identity");
+    }
+
+    const duplicatedGroups = parseForwardAuthIdentity(
+      request("10.89.0.2", {
+        ...trustedHeaders,
+        "Remote-Groups": ["operators", "operators"],
+      }),
+      policy,
+    );
+    assert.equal(duplicatedGroups.ok, false);
+
+    // A single-valued array is still a single value.
+    const single = parseForwardAuthIdentity(
+      request("10.89.0.2", {
+        "Remote-User": ["operator"],
+        "Remote-Groups": ["operators"],
+        "Remote-Name": ["Control Center Operator"],
+        "Remote-Email": ["ops@example.invalid"],
+      }),
+      policy,
+    );
+    assert.equal(single.ok, true);
+    if (single.ok) {
+      assert.equal(single.identity.user, "operator");
+    }
+  });
+
   it("fail-closes when no trusted hops are configured", () => {
     const result = parseForwardAuthIdentity(request("10.89.0.2"), {
       trustedHops: [],

@@ -42,3 +42,8 @@ export {
   loadWarmblyProductionConfig,
   resolveWarmblySecrets,
 } from "./production-config.ts";
+/**
+ * Operator action channel — the narrow, named write surface. Everything else
+ * exported from this connector stays read-only.
+ */
+export * from "./operator/index.ts";

@@ -24,15 +24,116 @@
     { "method": "GET", "path": "/v1/confenge/today", "notes": "feature-flagged executable human work" },
     { "method": "GET", "path": "/v1/confenge/inbound", "notes": "feature-flagged inbound-now queue (lead surface)" }
   ],
+  "operator_actions": {
+    "note": "Amended boundary. Three named, individually typed operational controls are the ONLY writes this connector may issue. Verified against the live Warmbly backend on the VPS (warmbly-confenge-backend-1, 127.0.0.1:8080) on 2026-08-22: each route answers 401 unauthenticated (registered) and 404 on the wrong method (not registered for it). Discovered in Warmbly internal/api/routes.go lines 594-604 under the feature-flagged `confengeWrite` group.",
+    "identity": "Authelia ForwardAuth Remote-User / Remote-Groups / Remote-Name / Remote-Email via control-center/security; the ops.confenge.com.br nginx vhost blanks client-supplied copies",
+    "retries": "none — operator writes are never retried",
+    "mapped_writes": [
+      {
+        "action": "pause_dispatch",
+        "method": "POST",
+        "path": "/v1/confenge/dispatch/pause",
+        "exists_upstream": true,
+        "verified_at": "2026-08-22",
+        "verification": "POST -> 401 (route registered, auth required); GET -> 404",
+        "handler": "internal/api/handler/confenge.go PauseConfengeDispatch",
+        "permission": "PermManageContacts / APIPermWriteContacts",
+        "confirmation": "one_step",
+        "request": { "body": { "reason": "string (1-200 safe chars, required by this connector)" } },
+        "response": { "status": 200, "body": { "data": "dispatch status object" } },
+        "out_of_band_fallback": "warmbly deploy/confenge-vps/pause.sh (file kill switch + governor API)"
+      },
+      {
+        "action": "resume_dispatch",
+        "method": "POST",
+        "path": "/v1/confenge/dispatch/resume",
+        "exists_upstream": true,
+        "verified_at": "2026-08-22",
+        "verification": "POST -> 401 (route registered, auth required); GET -> 404",
+        "handler": "internal/api/handler/confenge.go ResumeConfengeDispatch",
+        "permission": "PermManageContacts / APIPermWriteContacts",
+        "confirmation": "two_step",
+        "request": { "body": {} },
+        "response": { "status": 200, "body": { "data": "dispatch status object" } },
+        "out_of_band_fallback": "warmbly deploy/confenge-vps/resume.sh"
+      },
+      {
+        "action": "acknowledge_inbound_alert",
+        "method": "POST",
+        "path": "/v1/confenge/inbound/{lead_id}/acknowledge",
+        "exists_upstream": true,
+        "verified_at": "2026-08-22",
+        "verification": "POST -> 401 (route registered, auth required); GET -> 404",
+        "handler": "internal/api/handler/confenge_inbound.go AcknowledgeConfengeInboundAlert",
+        "permission": "PermManageContacts / APIPermWriteContacts",
+        "confirmation": "one_step",
+        "request": { "path_params": { "lead_id": "opaque id matching ^[A-Za-z0-9_~-]{1,128}$" }, "body": {} },
+        "response": { "status": 200, "body": { "data": "inbound alert object" } }
+      }
+    ],
+    "supporting_read": {
+      "method": "GET",
+      "path": "/v1/confenge/dispatch/status",
+      "notes": "already on the read allowlist; the operator UI should render kill-switch state from this before offering resume"
+    }
+  },
   "forbidden_in_this_connector": [
     "PATCH/PUT/DELETE any path",
     "POST /v1/campaigns, /start, /stop, /test-email, enroll, import, dispatch",
-    "POST /v1/confenge/import, /sync, /crm/bootstrap, /campaign/bootstrap, /inbound/:id/outcome, send/enroll/approve",
+    "POST /v1/confenge/import, /sync, /crm/bootstrap, /campaign/bootstrap, /inbound/:id/outcome, /inbound/:id/resolve, send/enroll/approve",
+    "POST /v1/confenge/cohorts/:id/dispatch, /accounts/:id/resume, /drafts/:id/send",
     "POST /v1/unibox/reply, /compose, /snooze",
     "POST /v1/crm/deals (create), POST /v1/crm/tasks (create), POST /v1/contacts (create)",
-    "Any Asaas / checkout / refund / financial mutation"
+    "Any Asaas / checkout / refund / financial mutation",
+    "Any POST outside the three operator_actions.mapped_writes rows"
   ],
   "gaps": [
+    {
+      "id": "dispatch status lacks paused_by / paused_at",
+      "method": "GET",
+      "path": "/v1/confenge/dispatch/status",
+      "reason": "Warmbly's dispatch.Status (internal/app/confenge/dispatch/types.go:186) exposes `paused` and `pause_reason` but no `paused_by` and no `paused_at`. The Control Center operator ledger records who paused and when on its side, but it cannot reconcile that against Warmbly truth, and it cannot tell an API pause apart from the file kill switch written by deploy/confenge-vps/pause.sh. Until this lands, the ledger is the only record of the actor. No route is invented here.",
+      "min_request": {
+        "method": "GET",
+        "path": "/v1/confenge/dispatch/status",
+        "headers": ["Authorization", "API-Version"]
+      },
+      "min_response": {
+        "status": 200,
+        "body": {
+          "data": {
+            "paused": true,
+            "pause_reason": "string",
+            "paused_by": "actor handle or null",
+            "paused_at": "RFC3339 UTC or null",
+            "pause_source": "api | file_kill_switch | env_flag"
+          }
+        }
+      }
+    },
+    {
+      "id": "no read-back for inbound alert acknowledgement",
+      "method": "GET",
+      "path": "/v1/confenge/inbound",
+      "reason": "GET /v1/confenge/inbound returns the inbound-now queue but does not carry `acknowledged_by` / `acknowledged_at`, so a Control Center acknowledge cannot be confirmed from a later read. The connector records the upstream 2xx and the actor in its own ledger instead. No route is invented here.",
+      "min_request": {
+        "method": "GET",
+        "path": "/v1/confenge/inbound",
+        "headers": ["Authorization", "API-Version"]
+      },
+      "min_response": {
+        "status": 200,
+        "body": {
+          "data": [
+            {
+              "id": "string",
+              "acknowledged_by": "actor handle or null",
+              "acknowledged_at": "RFC3339 UTC or null"
+            }
+          ]
+        }
+      }
+    },
     {
       "id": "GET /v1/leads",
       "method": "GET",

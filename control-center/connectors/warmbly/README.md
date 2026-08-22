@@ -1,6 +1,6 @@
 # Warmbly connector (Control Center)
 
-Read-only adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline.
+Read-only adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline — plus one narrow, named **operator action channel** (`src/operator/`) for three operational controls.
 
 Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stages as Control Center source of truth.
 
@@ -8,8 +8,29 @@ Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stag
 
 - Governance is strategic/canonical; Warmbly is operational commercial/CRM authority.
 - HTTP is fail-closed: timeouts, exponential backoff, circuit breaker, method allowlist.
-- Allowed methods: `GET`/`HEAD` of discovered commercial reads; `POST` only for Warmbly's existing `/search` and `/summary` on contacts, deals, and tasks (read queries that must not change stub/upstream state).
-- Forbidden: `PATCH`/`PUT`/`DELETE`, creating contacts/deals/tasks, campaign start/stop/send, Confenge import/enroll/bootstrap/dispatch, unibox reply/compose, any Asaas/financial mutation.
+- **Collect path (`src/http/`) stays read-only.** Allowed methods: `GET`/`HEAD` of discovered commercial reads; `POST` only for Warmbly's existing `/search` and `/summary` on contacts, deals, and tasks (read queries that must not change stub/upstream state). `classifyRequest` still denies every operator write path listed below, so the read client can never reach one.
+- **Amended boundary (operator action channel).** The earlier blanket "no writes" decision is deliberately amended for exactly three named, individually typed operational controls, and for nothing else:
+
+  | Action | Method + path | Confirmation | Effect |
+  | --- | --- | --- | --- |
+  | `pause_dispatch` | `POST /v1/confenge/dispatch/pause` | one step | engage the CONFENGE outbound kill switch |
+  | `resume_dispatch` | `POST /v1/confenge/dispatch/resume` | **two step** | release the kill switch |
+  | `acknowledge_inbound_alert` | `POST /v1/confenge/inbound/{lead_id}/acknowledge` | one step | mark one inbound alert as seen by a human |
+
+  Terms of the amendment:
+  - There is **no generic proxy**. A caller names an action; the action owns its method, its path template and its body. No caller-supplied method or path is ever forwarded (`src/operator/actions.ts`, `src/operator/allowlist.ts`).
+  - Every action requires an authenticated founder from Authelia's `Remote-User` / `Remote-Groups` / `Remote-Name` / `Remote-Email`, resolved through the existing `control-center/security` ForwardAuth contract (`parseForwardAuthIdentity` + trusted-hop check). The `ops.confenge.com.br` nginx vhost blanks any client-supplied `Remote-*`, so Authelia is the only writer. A caller cannot hand in a pre-built actor.
+  - Every path is fail-closed: unknown action, missing/spoofed/ungrouped actor, unsafe target id, missing audit reason, missing or invalid confirmation, open circuit breaker, non-2xx upstream, and a transport failure that never left this process all produce a **recorded refusal**. There is no branch that returns without writing a ledger entry.
+  - **A written-but-unanswered call is `unknown`, never `refused`.** When the POST was already on the wire (timeout, or any failure not provably pre-flight) Warmbly may have applied it, so the outcome is recorded as `unknown` with `upstream.status: null` and `upstream.path` set, and the returned reason tells the operator to read `GET /v1/confenge/dispatch/status` before retrying. Calling that a refusal is how an operator ends up believing dispatch is paused while Warmbly is sending.
+  - **A confirmation token spent on an `unknown` stays spent.** Re-arming it would turn one observed token into a replayable resume; the operator reads dispatch status and, if still paused, mints a fresh confirmation. The `unknown` reason says so.
+  - **Redirects are never followed** (`redirect: "manual"`). A 3xx would re-issue the POST — Bearer token and body included — at a `Location` that `classifyOperatorRequest` never saw (e.g. `dispatch-now`), while the ledger recorded the allowlisted path. Any 3xx is an `upstream_error` refusal.
+  - **The ledger key is minted here.** `correlation_id` (and therefore the entry `id` and the agent-activity session) is always server-minted; a caller's own string is carried as `client_reference` and keys nothing, so replaying it can never rewrite an executed entry. While `paused_by` is missing upstream (`gaps` in `required_upstream_contract.json`) this ledger is the sole non-repudiation record.
+  - **A ledger failure is never silent.** `ledger.record` is wrapped: on failure the entry goes to a durable stderr WAL line (`cc.warmbly.operator-action.wal`) before the error is rethrown, and `createFanOutOperatorActionLedger` requires an `onSinkError` handler — `defaultOperatorSinkErrorHandler()` logs at error level with the full entry serialized.
+  - **Duplicated identity headers fail closed.** `control-center/security` returns no value for a `Remote-*` header that arrives more than once, so a client-supplied copy can never beat the proxy's.
+  - `resume_dispatch` is two step because it is the action that can let traffic flow: `requestResumeConfirmation` mints a single-use, 2-minute, actor-bound and target-bound token, and `execute` refuses without it. `pause_dispatch` is one step and is never confirmation-gated.
+  - Operator writes are **never retried** (a retried acknowledge would double-acknowledge). 4xx from Warmbly does not trip the circuit breaker; 5xx/429/timeout does.
+  - The channel may share the read client's `CircuitBreaker`, so a degraded Warmbly blocks operator writes too. When the breaker is open, the refusal names the out-of-band fallback: `deploy/confenge-vps/pause.sh` on the VPS.
+- **Still forbidden, through this channel or any other:** `PATCH`/`PUT`/`DELETE` on any path, creating contacts/deals/tasks, campaign start/stop/send, `dispatch-now` / cohort dispatch, enroll, approve-content, draft send, `POST /v1/confenge/inbound/:id/outcome` and `/resolve`, Confenge import/sync/bootstrap, unibox reply/compose/snooze, and **any Asaas / checkout / refund / financial mutation** (`commercial/authority/authority-manifest.v1.json` still carries `real_money_mutation_approved: false`).
 - Every aggregated item carries `source`, `observed_at` (UTC), `freshness_status`, and `confidence` when the upstream payload supplies it.
 - Deal money is integer **cents** + `currency`. Warmbly `value` is treated as major units (1500.50 BRL → 150050 cents).
 - No `GET /leads` exists on Warmbly. Contacts search + Confenge inbound (when enabled) are the lead surface. The gap is documented in `required_upstream_contract.json`.
@@ -39,6 +60,77 @@ See `required_upstream_contract.json` for the full table. Collect calls:
 | GET | `/v1/confenge/inbound` | inbound leads needing a human |
 
 Auth: `Authorization: Bearer <token>` and `API-Version: v1`. Tokens are prefixed `wmbly_`.
+
+## Operator action channel (`src/operator/`)
+
+The only write surface in this connector. Read `required_upstream_contract.json → operator_actions` for the upstream table.
+
+```ts
+import {
+  WarmblyOperatorClient,
+  createWarmblyOperatorChannel,
+  createAgentActivityLedgerSink,
+  createFanOutOperatorActionLedger,
+  createMemoryOperatorActionLedger,
+  createOperatorHttpHandler,
+  defaultOperatorSinkErrorHandler,
+} from "@confenge/control-center-warmbly-connector";
+
+const client = new WarmblyOperatorClient({ baseUrl, token, breaker: readClient.breaker });
+const memory = createMemoryOperatorActionLedger();
+const channel = createWarmblyOperatorChannel({
+  client,
+  // onSinkError is required: a mirror that fails silently is an executed
+  // action with no visible timeline row and no error.
+  ledger: createFanOutOperatorActionLedger(
+    memory,
+    [createAgentActivityLedgerSink(agentLedger)],
+    defaultOperatorSinkErrorHandler(),
+  ),
+});
+
+await channel.pauseDispatch({ request, reason: "spike de bounce" });        // one step
+const step1 = await channel.requestResumeConfirmation({ request, reason: "incidente resolvido" });
+await channel.resumeDispatch({ request, reason: "incidente resolvido", confirmation_token });
+await channel.acknowledgeInboundAlert({ request, target_id: "lead-2f7c" });
+```
+
+`request` is `{ remoteAddress, headers }` from the inbound HTTP request — nothing else. `createOperatorHttpHandler(channel)` mounts four POST-only routes (`/v1/warmbly/operator/dispatch/pause`, `.../resume/confirm`, `.../resume`, `/v1/warmbly/operator/inbound/acknowledge`) and maps refusals to 400/401/403/428/502/503; a refusal is never rendered as a success.
+
+### Ledger record
+
+One `control-center.warmbly-operator-action.v1` entry per call, on success and on refusal alike:
+
+```json
+{
+  "schema_version": "control-center.warmbly-operator-action.v1",
+  "id": "cc:warmbly-operator-action:<minted correlation_id>",
+  "correlation_id": "cc:warmbly-op:<uuid>",
+  "client_reference": "<the caller's own string, or null — keys nothing>",
+  "requested_action": "pause_dispatch",
+  "action": "pause_dispatch",
+  "outcome": "executed | refused | challenged | unknown",
+  "refusal_code": null,
+  "refusal_reason": null,
+  "actor": { "kind": "founder", "id": "<Remote-User>", "display_name": "<Remote-Name>" },
+  "target": { "kind": "dispatch", "id": "confenge-dispatch" },
+  "upstream": { "method": "POST", "path": "/v1/confenge/dispatch/pause", "status": 200 },
+  "confirmation": { "required": false, "satisfied": false, "token_id": null },
+  "circuit_state": "closed",
+  "reason": "spike de bounce",
+  "recorded_at": "2026-08-22T12:00:00.000Z",
+  "source": { "system": "control-center", "kind": "warmbly-operator-action", "locator": "cc:warmbly-op:<uuid>" },
+  "observed_at": "2026-08-22T12:00:00.000Z",
+  "freshness_status": "FRESH",
+  "confidence": 1
+}
+```
+
+`confirmation.token_id` is `cnf:<action>:<target_id>:<uuid>` — unique per challenge, so the ledger shows which challenge was spent and how many were minted and abandoned. The audit reason is bound to the challenge by hash: a token confirmed under one reason cannot be executed under another.
+
+`Remote-Email` never enters the record; the actor id is the `Remote-User` handle. `createAgentActivityLedgerSink` mirrors each entry into `control-center/domains/agent-activity` as a start + report pair (`executed → DONE`, `challenged → PARTIAL`, `refused → BLOCKED`, `unknown → UNKNOWN`; identity kind `human` → ledger kind `founder`), so operator actions appear on the same timeline as agent runs. The session is keyed by the minted `correlation_id`, so a replayed `client_reference` cannot revise an existing row.
+
+An `unknown` outcome is answered over HTTP as `503 {"outcome":"unknown","code":"transport_unknown"}`; the reason names `GET /v1/confenge/dispatch/status` as the only thing that settles it.
 
 ## Env vars (names only)
 
