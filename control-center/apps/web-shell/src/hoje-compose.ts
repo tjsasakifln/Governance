@@ -183,9 +183,36 @@ function section(
  * never arrived (`faltam dados`, with the contract's absence reason). The
  * envelope is what knows the difference.
  */
-function emptyNote(input: HojeComposeInput, domain: string, noOccurrences: string): string {
+const DOMAIN_BAND_LABELS: Record<string, string> = {
+  commercial: "Comercial",
+  finance: "Financeiro",
+  clients: "Clientes",
+  engineering: "Engenharia",
+  infrastructure: "Infra",
+};
+
+function emptyNote(
+  input: HojeComposeInput,
+  domains: readonly string[],
+  noOccurrences: string,
+): string {
+  for (const domain of domains) {
+    const missing = absenceNoteFor(input.operational_envelope, domain);
+    if (missing !== null) return `${DOMAIN_BAND_LABELS[domain] ?? domain}: ${missing}`;
+  }
+  return noOccurrences;
+}
+
+/**
+ * The detailed bands below are still fed by the legacy per-resource mapping.
+ * When that mapping produces nothing, the honest thing to say is that this
+ * band was not assembled — and to point at the panorama, which reads the
+ * envelope and does know the domain's state.
+ */
+function bandNotAssembled(input: HojeComposeInput, domain: string, label: string): string {
   const missing = absenceNoteFor(input.operational_envelope, domain);
-  return missing ?? noOccurrences;
+  if (missing !== null) return missing;
+  return `Faltam dados nesta faixa: o recorte ${label} detalhado não foi montado. O estado do domínio está no panorama por domínio, acima.`;
 }
 
 /**
@@ -280,7 +307,7 @@ function composeClients(input: HojeComposeInput): HojeSection {
     compressed
       ? emptyNote(
           input,
-          "clients",
+          ["clients"],
           "Sem ocorrências: o recorte de clientes foi lido e nenhum cliente exige atenção.",
         )
       : null,
@@ -306,11 +333,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       "commercial",
       [],
       true,
-      emptyNote(
-        input,
-        "commercial",
-        "Faltam dados: o recorte comercial não chegou nesta leitura.",
-      ),
+      bandNotAssembled(input, "commercial", "comercial"),
     );
   }
   const funnel = snap.funnel
@@ -323,7 +346,7 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       "commercial",
       [],
       true,
-      `${funnel} — ${emptyNote(input, "commercial", "sem exceção comercial nesta coleta; a leitura chegou e veio limpa")}`,
+      `${funnel} — ${emptyNote(input, ["commercial"], "sem exceção comercial nesta coleta; a leitura chegou e veio limpa")}`,
     );
   }
   const rows: HojeRow[] = [];
@@ -427,7 +450,7 @@ function composeFinance(input: HojeComposeInput): HojeSection {
       "finance",
       [],
       true,
-      emptyNote(input, "finance", "Faltam dados: o recorte financeiro não chegou nesta leitura."),
+      bandNotAssembled(input, "finance", "financeiro"),
     );
   }
   const overdue = snap.overdue ?? snap.receivables_overdue;
@@ -438,7 +461,7 @@ function composeFinance(input: HojeComposeInput): HojeSection {
       "finance",
       [],
       true,
-      `${kpi} — ${emptyNote(input, "finance", "sem exceção financeira nesta coleta; a leitura chegou e veio limpa")} (somente leitura; sem cobrança neste cockpit)`,
+      `${kpi} — ${emptyNote(input, ["finance"], "sem exceção financeira nesta coleta; a leitura chegou e veio limpa")} (somente leitura; sem cobrança neste cockpit)`,
     );
   }
   const rows: HojeRow[] = [];
@@ -603,7 +626,7 @@ function composeEngineering(input: HojeComposeInput): HojeSection {
   if (!snap && infra.length === 0) parts.push("Sem recorte de engenharia/infra");
   const engineeringNote = emptyNote(
     input,
-    "engineering",
+    ["engineering", "infrastructure"],
     "sem exceção de engenharia/infra nesta coleta; as leituras chegaram e vieram limpas",
   );
   return section(
