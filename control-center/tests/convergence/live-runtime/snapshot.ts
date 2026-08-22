@@ -24,7 +24,7 @@ import { parseForwardAuthIdentity, defaultTrustedHopPolicy } from "../../../secu
 import { COOKIE_POLICY, CORS_POLICY, CSRF_STRATEGY } from "../../../security/src/constants.ts";
 import { analyzeCaddyfile } from "../../../security/src/caddy.ts";
 import { createHttpAdapter } from "../../../apps/web-shell/src/adapters/http.ts";
-import { collectProvenance } from "../../../apps/web-shell/src/page.ts";
+import { collectPresentedFreshness } from "./presented-freshness.ts";
 import { FOUNDER, LIVE_AS_OF, LIVE_NOW } from "./seed.ts";
 import {
   bootLiveRuntime,
@@ -430,15 +430,11 @@ export async function collectLiveSnapshot(runtime: LiveRuntime): Promise<LiveSna
     if (!pageResult.ok || pageResult.loading) {
       continue;
     }
-    for (const prov of collectProvenance(pageResult.page)) {
-      freshnessRecords.push({
-        id: `ui:${prov.source.locator}`,
-        freshness_status: prov.freshness_status,
-        observed_at: observedAt(prov.observed_at),
-        freshness_window_seconds: 86400,
-        presented_as: prov.freshness_status,
-        health_status: prov.freshness_status,
-      });
+    // The rendered health word and the rendered freshness pill are separate
+    // signals. Echoing freshness into both made the evaluator compare freshness
+    // to itself, so it could never fail.
+    for (const presented of collectPresentedFreshness(pageResult.page)) {
+      freshnessRecords.push({ ...presented, observed_at: observedAt(presented.observed_at) });
     }
   }
 

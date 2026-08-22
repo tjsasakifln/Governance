@@ -79,6 +79,22 @@ test("CI installs Playwright OS deps including libnspr4 without Ubuntu 22 libaso
   assert.match(workflow, /launch-probe ok/);
 });
 
+test("live QA gate asserts READY_FOR_INTERNAL_PRODUCTION structurally, not by grepping the log", () => {
+  const workflow = readFileSync(join(root, "../.github/workflows/control-center.yml"), "utf8");
+  // A bare `grep -F READY_FOR_INTERNAL_PRODUCTION` matched `false` as happily as `true`.
+  assert.doesNotMatch(workflow, /grep -F "READY_FOR_INTERNAL_PRODUCTION"/);
+  assert.match(workflow, /npm run qa:live -- \/tmp\/cc-live-qa\.json/);
+  assert.match(workflow, /node tests\/convergence\/live-runtime\/assert-ready\.mjs \/tmp\/cc-live-qa\.json/);
+  // The exit-code path stays: run-gate.ts exits 2 when not ready and the step is piped under pipefail.
+  assert.match(workflow, /set -o pipefail/);
+  assert.match(workflow, /grep -F "stale data mostrado como saudável"/);
+  // The stale-data detector must be proven capable of failing on every run.
+  assert.match(
+    workflow,
+    /npx tsx --test tests\/convergence\/live-runtime\/presented-freshness\.test\.ts/,
+  );
+});
+
 test("web-shell Vite aliases exact-match contract subpaths, not index.ts prefix", () => {
   const vite = readFileSync(join(root, "apps/web-shell/vite.config.ts"), "utf8");
   assert.match(vite, /find:\s*\/\^@confenge\\\/control-center-contracts\\\/taxonomy\$\//);
