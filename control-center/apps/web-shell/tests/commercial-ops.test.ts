@@ -53,3 +53,101 @@ test("memory runtime can navigate commercial surfaces", () => {
   runtime.setHash("#/comercial/cohorts");
   assert.equal(runtime.getHash(), "#/comercial/cohorts");
 });
+
+test("cohort decision view renders explicit zero but never turns UNKNOWN into zero", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.equal(initial.ok, true);
+  if (!initial.ok || !initial.page || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: { acquisition: [] },
+    controlled_email: {
+      availability: "OBSERVED",
+      report_month: "2026-08",
+      last_update_at: "2026-08-22T18:00:00.000Z",
+      current: {
+        cohort_id: "cohort-real-10",
+        cohort_hash: "sha256:cohort",
+        policy_version: "controlled-email.v1",
+        authorized_quantity: 10,
+        sent: 0,
+        reserved: 0,
+        max_daily_volume: 10,
+        authorization_state: "active",
+        authorized_at: "2026-08-22T10:00:00.000Z",
+        expires_at: "2026-08-23T10:00:00.000Z",
+        integrity_flags: [],
+        route_class_distribution: { DIRECT_PERSON: 1 },
+        dispatch: { state: "blocked_outside_window" },
+        outcomes: {
+          provider_accepted: 0,
+          hard_bounce: null,
+          soft_bounce: null,
+          reply: null,
+          positive_reply: null,
+          opt_out: null,
+        },
+      },
+      rows: [],
+    },
+  };
+  const adapter = {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  assert.match(root.innerHTML, /Enviados<\/dt><dd>0<\/dd>/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>0<\/dd>/);
+  assert.match(root.innerHTML, /Rejeições permanentes<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
+  assert.match(root.innerHTML, /Aceite pelo SMTP não comprova entrega/);
+  assert.match(root.innerHTML, /Mês do relatório<\/dt><dd>2026-08<\/dd>/);
+  assert.match(root.innerHTML, /Autorizado em<\/dt><dd>2026-08-22T10:00:00.000Z<\/dd>/);
+  assert.match(root.innerHTML, /Expira em<\/dt><dd>2026-08-23T10:00:00.000Z<\/dd>/);
+  assert.match(root.innerHTML, /Instante de coleta\/observação/);
+  assert.match(root.innerHTML, /Estado da autorização<\/dt><dd>ativa<\/dd>/);
+  assert.match(root.innerHTML, /Estado do disparo<\/dt><dd>bloqueado fora da janela de envio<\/dd>/);
+  assert.match(root.innerHTML, /Rota pessoa identificada diretamente/);
+  assert.match(root.innerHTML, /authorization_state=active/);
+  assert.match(root.innerHTML, /dispatch_state=blocked_outside_window/);
+  assert.doesNotMatch(root.innerHTML, /Rejeições permanentes<\/dt><dd>0<\/dd>/);
+});
+
+test("cohort view does not present unproven telemetry as real outcomes", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.equal(initial.ok, true);
+  if (!initial.ok || !initial.page || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: { acquisition: [] },
+    controlled_email: {
+      availability: "UNKNOWN",
+      last_update_at: "2026-08-22T18:00:00.000Z",
+      current: {
+        cohort_id: "cohort-unproven",
+        policy_version: "controlled-email.v1",
+        outcomes: { provider_accepted: 99 },
+        integrity_flags: ["grant_revoked"],
+      },
+      rows: [{ route_class: "SHOULD_NOT_RENDER", provider_accepted: 99 }],
+    },
+  };
+  const adapter = {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  assert.match(root.innerHTML, /data-controlled-email="unknown"/);
+  assert.match(root.innerHTML, /telemetria real não comprovada/);
+  assert.match(root.innerHTML, /autorização observada como revogada/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
+  assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
+  assert.doesNotMatch(root.innerHTML, /Primeira coorte real de e-mail/);
+});

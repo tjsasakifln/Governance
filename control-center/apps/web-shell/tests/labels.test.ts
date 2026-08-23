@@ -46,9 +46,16 @@ import {
  * detalhe técnico continuam com o token cru de propósito.
  */
 function visibleText(html: string): string {
-  return html
-    .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
-    .replace(/<span class="term-help-text"[^>]*>[\s\S]*?<\/span>/g, " ")
+  let collapsed = html;
+  let prior: string;
+  do {
+    prior = collapsed;
+    collapsed = collapsed.replace(
+      /<details\b[^>]*>((?:(?!<details\b)[\s\S])*?)<\/details>/gi,
+      (_whole, body: string) => body.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i)?.[1] ?? " ",
+    );
+  } while (collapsed !== prior);
+  return collapsed
     .replace(/<[^>]*>/g, " ")
     .replaceAll("&amp;", "&")
     .replaceAll("&lt;", "<")
@@ -121,9 +128,9 @@ test("every taxonomy value has a Portuguese label and no label is left blank", (
   }
 });
 
-test("a code the backend never enumerated survives untranslated instead of being invented", () => {
+test("a new commercial exception code is hidden behind an honest fallback", () => {
   assert.equal(exceptionKindLabel("missing_version"), "versão de oferta ausente");
-  assert.equal(exceptionKindLabel("some_code_warmbly_just_invented"), "some_code_warmbly_just_invented");
+  assert.equal(exceptionKindLabel("some_code_warmbly_just_invented"), "tipo não reconhecido");
   assert.equal(availabilityLabel("BLOCKED_BY_SECRET"), "bloqueado por credencial ausente");
   assert.equal(availabilityLabel("A_BRAND_NEW_CODE"), "A_BRAND_NEW_CODE");
 });

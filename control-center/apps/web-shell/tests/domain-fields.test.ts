@@ -105,9 +105,9 @@ test("Infra page surfaces HTTP, TLS, Docker, backup, disk/memory, PNCP freshness
   const root = { innerHTML: "" };
   const handle = mount(root, createMockAdapter(), createMemoryRuntime("#/infra"));
   try {
-    assert.match(root.innerHTML, />Resposta HTTP</);
-    assert.match(root.innerHTML, />Certificado TLS</);
-    assert.match(root.innerHTML, />Contêiner Docker</);
+    assert.match(root.innerHTML, />HTTP</);
+    assert.match(root.innerHTML, />TLS</);
+    assert.match(root.innerHTML, />Docker</);
     assert.match(root.innerHTML, />Backup</);
     assert.match(root.innerHTML, /Disco/);
     assert.match(root.innerHTML, /Memória/);

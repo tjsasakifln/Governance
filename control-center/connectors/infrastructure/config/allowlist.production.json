@@ -16,29 +16,41 @@
     {
       "id": "netcup-vps-tcp",
       "display_name": "Netcup VPS TCP",
+      "role": "Host Netcup: alcance TCP da porta 443",
+      "runbook_url": "https://github.com/tjsasakifln/Governance/blob/main/control-center/deploy/PRODUCTION-RUNBOOK.md",
       "host": "159.195.18.88",
       "connect_host": "159.195.18.88",
       "port": 443,
-      "checks": ["reachability"]
+      "checks": [
+        "reachability"
+      ]
     },
     {
       "id": "netcup-api-tls",
       "display_name": "Confenge API TLS",
+      "role": "Certificado TLS de api.confenge.com.br",
+      "runbook_url": "https://github.com/tjsasakifln/Governance/blob/main/control-center/deploy/PRODUCTION-RUNBOOK.md",
       "host": "159.195.18.88",
       "connect_host": "159.195.18.88",
       "tls_server_name": "api.confenge.com.br",
       "port": 443,
-      "checks": ["tls"]
+      "checks": [
+        "tls"
+      ]
     },
     {
       "id": "confenge-api-http",
       "display_name": "Confenge API inbound health",
+      "role": "Endpoint de health do inbound de webhooks Confenge",
+      "runbook_url": "https://github.com/tjsasakifln/Governance/blob/main/control-center/deploy/PRODUCTION-RUNBOOK.md",
       "url": "https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health",
       "connect_host": "159.195.18.88",
       "http_host": "api.confenge.com.br",
       "tls_server_name": "api.confenge.com.br",
       "expect_status": 200,
-      "checks": ["http"]
+      "checks": [
+        "http"
+      ]
     }
   ]
 }

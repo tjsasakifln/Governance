@@ -7,6 +7,7 @@ import { assertJsonSize } from "./sanitize.ts";
 import { parseScope } from "./scope.ts";
 import type { OperatorActionService } from "./operational/actions.ts";
 import type { OperationalService } from "./operational/service.ts";
+import { COMMERCIAL_LIST_IDS, type CommercialListId } from "./operational/commercial-list.ts";
 import type { ContextService } from "./service.ts";
 import { LIMITS, type ActorRef, type Scope } from "./types.ts";
 
@@ -140,6 +141,25 @@ function optionalQuerySource(url: URL): string | undefined {
   return source;
 }
 
+function listParams(url: URL): Readonly<Record<string, string>> {
+  const allowed = new Set([
+    "q", "estado", "tipo", "origem", "responsavel", "prioridade",
+    "periodo", "ordem", "pagina", "por_pagina",
+  ]);
+  const out: Record<string, string> = {};
+  for (const [key, value] of url.searchParams) {
+    if (allowed.has(key)) out[key] = value;
+  }
+  return out;
+}
+
+function commercialListId(raw: string): CommercialListId {
+  if (!(COMMERCIAL_LIST_IDS as readonly string[]).includes(raw)) {
+    throw invalid(`commercial list must be one of: ${COMMERCIAL_LIST_IDS.join(", ")}`);
+  }
+  return raw as CommercialListId;
+}
+
 function mustOperational(deps: HttpDeps): OperationalService {
   if (!deps.operational) {
     throw invalid("operational read port is not configured");
@@ -239,6 +259,27 @@ async function handle(
         res,
         200,
         await mustOperational(deps).getSourceObservations(actor, queryScope(url), optionalQuerySource(url)),
+      );
+      return;
+    }
+    if (
+      method === "GET" &&
+      parts[0] === "v1" &&
+      parts[1] === "domains" &&
+      parts[2] === "commercial" &&
+      parts[3] === "lists" &&
+      parts[4] &&
+      !parts[5]
+    ) {
+      send(
+        res,
+        200,
+        await mustOperational(deps).getCommercialList(
+          actor,
+          queryScope(url),
+          commercialListId(parts[4]),
+          listParams(url),
+        ),
       );
       return;
     }

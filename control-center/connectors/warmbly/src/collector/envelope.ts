@@ -4,6 +4,7 @@
  * Current Warmbly intel handlers return gin.H{"data": payload}:
  *   GET /v1/confenge/intel/scoreboard          → {"data": Scoreboard}
  *   GET /v1/confenge/intel/executive           → {"data": ExecutiveView}
+ *   GET /v1/confenge/intel/report              → {"data": ObservabilityReport}
  *   GET /v1/confenge/intel/exceptions          → {"data": []Exception}
  *   GET /v1/confenge/intel/organic-scoreboard  → {"data": OrganicScoreboard}
  *
@@ -16,6 +17,7 @@
 export type IntelSurface =
   | "intel_scoreboard"
   | "intel_executive"
+  | "intel_report"
   | "intel_exceptions"
   | "intel_organic_scoreboard";
 
@@ -33,6 +35,8 @@ const EXECUTIVE_KEYS = [
   "inbound_qualified_pipeline",
   "generated_at",
 ] as const;
+const REPORT_KEYS = ["schema_version", "month", "controlled_email", "real_empty"] as const;
+const REAL_REPORT_SCHEMA = "confenge.observability_report.v1";
 const ORGANIC_KEYS = ["schema_version", "windows", "sources", "recommendation", "generated_at"] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -53,6 +57,53 @@ function looksLikeScoreboard(value: unknown): value is Record<string, unknown> {
 
 function looksLikeExecutive(value: unknown): value is Record<string, unknown> {
   return isPlainObject(value) && hasAnyKey(value, EXECUTIVE_KEYS);
+}
+
+function looksLikeReport(value: unknown): value is Record<string, unknown> {
+  return isPlainObject(value) && hasAnyKey(value, REPORT_KEYS);
+}
+
+function validForSurface(value: unknown, surface: IntelSurface): boolean {
+  switch (surface) {
+    case "intel_exceptions":
+      return looksLikeExceptions(value);
+    case "intel_scoreboard":
+      return looksLikeScoreboard(value);
+    case "intel_executive":
+      return looksLikeExecutive(value);
+    case "intel_report":
+      return looksLikeReport(value);
+    case "intel_organic_scoreboard":
+      return looksLikeOrganic(value);
+  }
+}
+
+export function realIntelReportDriftReason(value: unknown): string | null {
+  if (!isPlainObject(value)) return "intel_report payload is not an object";
+  if (value.schema_version !== REAL_REPORT_SCHEMA) {
+    return `intel_report schema_version is not ${REAL_REPORT_SCHEMA}`;
+  }
+  if (value.include_synthetic !== false) {
+    return "intel_report does not prove include_synthetic=false";
+  }
+  if (typeof value.real_empty !== "boolean") {
+    return "intel_report real_empty is not boolean";
+  }
+  if (!Array.isArray(value.controlled_email)) {
+    return "intel_report controlled_email is not an array";
+  }
+  if (value.controlled_email.some((row) => !isPlainObject(row))) {
+    return "intel_report controlled_email contains a non-object row";
+  }
+  if (value.real_empty && value.controlled_email.length > 0) {
+    return "intel_report declares real_empty with controlled_email rows";
+  }
+  return null;
+}
+
+function validateRealReport(value: unknown): EnvelopeDrift | null {
+  const reason = realIntelReportDriftReason(value);
+  return reason ? drift(reason) : null;
 }
 
 function looksLikeOrganic(value: unknown): value is Record<string, unknown> {
@@ -88,34 +139,28 @@ export function normalizeIntelEnvelope(json: unknown, surface: IntelSurface): En
     return drift("empty success body");
   }
 
-  const rawLooksValid =
-    surface === "intel_exceptions"
-      ? looksLikeExceptions(json)
-      : surface === "intel_scoreboard"
-        ? looksLikeScoreboard(json)
-        : surface === "intel_executive"
-          ? looksLikeExecutive(json)
-          : looksLikeOrganic(json);
+  const rawLooksValid = validForSurface(json, surface);
 
   if (isPlainObject(json) && Object.prototype.hasOwnProperty.call(json, "data")) {
     const unwrapped = innerFromDataWrapper(json);
     if (!unwrapped.ok) return unwrapped;
     const inner = unwrapped.value;
-    const innerValid =
-      surface === "intel_exceptions"
-        ? looksLikeExceptions(inner)
-        : surface === "intel_scoreboard"
-          ? looksLikeScoreboard(inner)
-          : surface === "intel_executive"
-            ? looksLikeExecutive(inner)
-            : looksLikeOrganic(inner);
+    const innerValid = validForSurface(inner, surface);
     if (!innerValid) {
       return drift(`unwrapped data is not a ${surface} payload`);
+    }
+    if (surface === "intel_report") {
+      const reportDrift = validateRealReport(inner);
+      if (reportDrift) return reportDrift;
     }
     return { ok: true, value: inner };
   }
 
   if (rawLooksValid) {
+    if (surface === "intel_report") {
+      const reportDrift = validateRealReport(json);
+      if (reportDrift) return reportDrift;
+    }
     return { ok: true, value: json };
   }
 
@@ -130,6 +175,8 @@ export function intelSurfaceForRouteKey(
       return "intel_scoreboard";
     case "confenge_intel_executive":
       return "intel_executive";
+    case "confenge_intel_report":
+      return "intel_report";
     case "confenge_intel_exceptions":
       return "intel_exceptions";
     case "confenge_intel_organic_scoreboard":

@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
+import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import type {
   AgentActivity,
@@ -9,14 +10,23 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
-
+import {
+  leadDetailBlock,
+  leadDetailHash,
+  leadTitleOf,
+  queueFocusDomId,
+  queueFocusToken,
+} from "./lead-detail";
+import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 import {
   ABSENT_HELP,
   BLOCKED_HELP,
   agentStatusLabel,
+  authorizationStateLabel,
   authorityLabel,
   availabilityLabel,
   clientLifecycleLabel,
@@ -24,17 +34,19 @@ import {
   commercialStateLabel,
   directiveKindLabel,
   directiveStatusLabel,
+  dispatchStateLabel,
   exceptionKindLabel,
   freshnessLabel,
   healthLabel,
   helpTerm,
   hopStatusLabel,
   MEMORY_GROUP_TITLES,
-  operatorActionLabel,
-  operatorOutcomeLabel,
   pipelineStageLabel,
+  providerLabel,
   providerMutationLabel,
   scopeLabel,
+  routeClassLabel,
+  goReviewVerdictLabel,
   statusPill,
   technicalDetails,
 } from "./labels";
@@ -273,6 +285,133 @@ function metricRate(value: unknown): string {
   return `${pct} (${num}/${den})${tiny}`;
 }
 
+function observedCount(value: unknown): string {
+  return typeof value === "number" && Number.isInteger(value)
+    ? String(value)
+    : "desconhecido / dados ainda incompletos";
+}
+
+function controlledEmailCohort(ops: Record<string, unknown>): string {
+  const root = ops.controlled_email && typeof ops.controlled_email === "object"
+    ? (ops.controlled_email as Record<string, unknown>)
+    : {};
+  const current = root.current && typeof root.current === "object"
+    ? (root.current as Record<string, unknown>)
+    : null;
+  const telemetryObserved = root.availability === "OBSERVED";
+  const rows = telemetryObserved && Array.isArray(root.rows) ? root.rows : [];
+  if (!current) {
+    return `<article class="card" data-controlled-email="unknown">
+      <h3>Cohort controlado de e-mail</h3>
+      <p class="constraint">Nenhuma autorização limitada foi observada. Ausência não é autorização.</p>
+      ${fact("Telemetria", escapeHtml(availabilityLabel(String(root.availability ?? "UNKNOWN"))))}
+      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
+    </article>`;
+  }
+  const dispatch = current.dispatch && typeof current.dispatch === "object"
+    ? (current.dispatch as Record<string, unknown>)
+    : {};
+  const outcomes = telemetryObserved && current.outcomes && typeof current.outcomes === "object"
+    ? (current.outcomes as Record<string, unknown>)
+    : {};
+  const distribution = current.route_class_distribution && typeof current.route_class_distribution === "object"
+    ? (current.route_class_distribution as Record<string, unknown>)
+    : {};
+  const routeFacts = Object.entries(distribution)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([route, count]) => fact(`Rota ${routeClassLabel(route)}`, observedCount(count)))
+    .join("");
+  const window = dispatch.window_start && dispatch.window_end
+    ? `${String(dispatch.window_start)}–${String(dispatch.window_end)} ${String(dispatch.timezone ?? "")}`.trim()
+    : "desconhecida";
+  const integrityLabels: Record<string, string> = {
+    grant_revoked: "autorização observada como revogada",
+    grant_expired: "autorização expirada no instante desta coleta",
+    authorized_quantity_exceeded: "enviados + reservados excedem a quantidade autorizada",
+    daily_cap_unexpected: "cap diário diverge do limite esperado de 10",
+  };
+  const integrityFlags = Array.isArray(current.integrity_flags)
+    ? current.integrity_flags.filter((flag): flag is string => typeof flag === "string")
+    : [];
+  const integrityWarning = integrityFlags.length > 0
+    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? flag).join("; "))}.</p>`
+    : "";
+  const telemetryWarning = telemetryObserved
+    ? ""
+    : `<p class="banner" data-controlled-email-telemetry="unproven">A autorização foi observada, mas o relatório não comprovou telemetria real sem dados sintéticos. Os resultados permanecem desconhecidos.</p>`;
+  const outcomeRows = rows
+    .filter((item) => item && typeof item === "object")
+    .map((item) => item as Record<string, unknown>)
+    .map((row) => {
+      const route = String(row.route_class ?? "UNKNOWN");
+      const provider = String(row.provider ?? "UNKNOWN");
+      return `<article class="card" data-controlled-email-route="${escapeHtml(route)}">
+      <h3>${escapeHtml(routeClassLabel(route))}</h3>
+      <dl class="facts">
+        ${fact("Provedor", escapeHtml(providerLabel(provider)))}
+        ${fact("Tentativas", observedCount(row.attempted))}
+        ${fact("Aceitos pelo SMTP", observedCount(row.provider_accepted))}
+        ${fact("Entregues", observedCount(row.delivered))}
+        ${fact("Rejeições permanentes", observedCount(row.hard_bounce))}
+        ${fact("Rejeições temporárias", observedCount(row.soft_bounce))}
+        ${fact("Respostas", observedCount(row.reply))}
+        ${fact("Respostas positivas", observedCount(row.positive_reply))}
+        ${fact("Pedidos de descadastro", observedCount(row.opt_out))}
+        ${fact("Denúncias de spam", observedCount(row.spam_complaint))}
+      </dl>
+      ${technicalDetails(
+        [
+          { term: "route_class", value: route },
+          { term: "provider", value: provider },
+        ],
+        "controlled-email-row",
+      )}
+    </article>`;
+    })
+    .join("");
+  return `<section class="stack" aria-labelledby="controlled-email-title" data-controlled-email="${telemetryObserved ? "observed" : "unknown"}">
+    <h2 id="controlled-email-title">${telemetryObserved ? "Primeira coorte real de e-mail" : "Coorte controlada — telemetria real não comprovada"}</h2>
+    ${telemetryWarning}
+    ${integrityWarning}
+    <article class="card">
+      <h3>${escapeHtml(String(current.cohort_id ?? "UNKNOWN"))}</h3>
+      <dl class="facts">
+        ${fact("Hash da coorte", escapeHtml(String(current.cohort_hash ?? "desconhecido")))}
+        ${fact("Versão da política", escapeHtml(String(current.policy_version ?? "desconhecida")))}
+        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "desconhecido")))}
+        ${fact("Quantidade autorizada", observedCount(current.authorized_quantity))}
+        ${fact("Enviados", observedCount(current.sent))}
+        ${fact("Reservados", observedCount(current.reserved))}
+        ${fact("Aceitos pelo SMTP", observedCount(outcomes.provider_accepted))}
+        ${fact("Rejeições permanentes", observedCount(outcomes.hard_bounce))}
+        ${fact("Rejeições temporárias", observedCount(outcomes.soft_bounce))}
+        ${fact("Respostas", observedCount(outcomes.reply))}
+        ${fact("Respostas positivas", observedCount(outcomes.positive_reply))}
+        ${fact("Pedidos de descadastro", observedCount(outcomes.opt_out))}
+        ${fact("Estado da autorização", escapeHtml(authorizationStateLabel(String(current.authorization_state ?? "UNKNOWN"))))}
+        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "desconhecido")))}
+        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "desconhecido")))}
+        ${fact("Revisão para prosseguir", escapeHtml(goReviewVerdictLabel(String(current.go_review_verdict ?? "UNKNOWN"))))}
+        ${fact("Estado do disparo", escapeHtml(dispatchStateLabel(String(dispatch.state ?? "UNKNOWN"))))}
+        ${fact("Cap diário", observedCount(current.max_daily_volume))}
+        ${fact("Janela", escapeHtml(window))}
+        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
+        ${routeFacts}
+      </dl>
+      <p class="constraint">Aceite pelo SMTP não comprova entrega. Métricas sem evento reconciliado permanecem desconhecidas.</p>
+      ${technicalDetails(
+        [
+          { term: "authorization_state", value: String(current.authorization_state ?? "") },
+          { term: "go_review_verdict", value: String(current.go_review_verdict ?? "") },
+          { term: "dispatch_state", value: String(dispatch.state ?? "") },
+        ],
+        "controlled-email-grant",
+      )}
+    </article>
+    <div class="cards">${outcomeRows || `<p class="banner empty">Nenhum evento comercial real observado para esta coorte. Ausência não é zero.</p>`}</div>
+  </section>`;
+}
+
 export function commercialSubnav(surface: string | null): string {
   const items = [
     ["visao", "Visão"],
@@ -290,7 +429,13 @@ export function commercialSubnav(surface: string | null): string {
     .join("")}</nav>`;
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
+export function commercialBlock(
+  snapshot: CommercialSnapshot,
+  surface: string | null = "visao",
+  resource: string | null = null,
+  query: string | null = null,
+  hash = "#/comercial",
+): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -339,116 +484,98 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   return `
     ${commercialSubnav(current)}
     ${current === "visao" ? recorte : ""}
-    ${commercialOps(snapshot, current)}
+    ${commercialOps(snapshot, current, resource, query, hash)}
   `;
 }
 
 /**
- * Operator cockpit for the CONFENGE outbound kill switch.
- *
- * Three controls and nothing else: pause, resume, acknowledge. There is no send
- * control here and there must never be one — this surface can stop outbound and
- * let it flow again, and that is the whole of its authority.
- *
- * Every reading is rendered as observed-or-"—". `state` is tri-state because
- * Warmbly reporting nothing is not the same as Warmbly reporting "running", and
- * an operator who is told ACTIVE when nobody knows will make the wrong call.
+ * Read-model rows arrive as `unknown[]` because `operations` is passed through
+ * from the Warmbly projector without a schema of its own.
  */
-function dispatchPanel(ops: Record<string, unknown>): string {
-  const d = ops.dispatch && typeof ops.dispatch === "object" ? (ops.dispatch as Record<string, unknown>) : {};
-  const state = String(d.state ?? "UNKNOWN");
-  const label =
-    state === "PAUSED" ? "Pausado" : state === "ACTIVE" ? "Ativo" : "Desconhecido";
-  const show = (v: unknown): string => (v === undefined || v === null || v === "" ? "—" : String(v));
-  const window =
-    d.window_start && d.window_end
-      ? `${String(d.window_start)}–${String(d.window_end)} ${show(d.timezone)}`
-      : "—";
-  const inWindow =
-    typeof d.in_send_window === "boolean" ? (d.in_send_window ? "dentro da janela" : "fora da janela") : "—";
-  const volume =
-    typeof d.sent_last_hour === "number" || typeof d.cap === "number"
-      ? `${show(d.sent_last_hour)} / ${show(d.cap)}`
-      : "—";
-  const last = ops.last_operator_action && typeof ops.last_operator_action === "object"
-    ? (ops.last_operator_action as Record<string, unknown>)
-    : null;
-  const lastBlock = last
-    ? `<dl class="facts">
-        ${fact("Última ação", escapeHtml(operatorActionLabel(show(last.action))))}
-        ${fact("Resultado", escapeHtml(operatorOutcomeLabel(show(last.outcome))))}
-        ${fact("Operador", escapeHtml(show(last.actor_id)))}
-        ${fact("Quando", escapeHtml(show(last.recorded_at)))}
-        ${fact("Motivo registrado", escapeHtml(show(last.reason)))}
-      </dl>
-      ${technicalDetails(
-        [
-          { term: "action", value: show(last.action) },
-          { term: "outcome", value: show(last.outcome) },
-          { term: "actor_id", value: show(last.actor_id) },
-          { term: "recorded_at", value: show(last.recorded_at) },
-        ],
-        "last-operator-action",
-      )}`
-    // Absence of a recorded action is not "nobody acted": this ledger is
-    // in-process and a restart empties it.
-    : `<p class="constraint">Nenhuma ação de operador registrada nesta instância do Control Center. Um reinício do serviço esvazia este registro — ausência aqui não prova que ninguém agiu.</p>`;
-
-  return `
-    <section class="stack domain-dispatch" aria-labelledby="dispatch-title" data-domain="dispatch" data-dispatch-state="${escapeHtml(state)}">
-      <h2 id="dispatch-title">Disparo de saída (Warmbly)</h2>
-      <article class="card" data-dispatch-observed="${d.observed === true ? "true" : "false"}">
-        <p class="kicker">${statusPill(state, label)}</p>
-        <dl class="facts">
-          ${fact("Estado do disparo", escapeHtml(label))}
-          ${fact("Motivo da pausa", escapeHtml(show(d.pause_reason)))}
-          ${fact("Janela comercial", escapeHtml(window))}
-          ${fact("Agora", escapeHtml(inWindow))}
-          ${fact("Próximo slot", escapeHtml(show(d.next_slot_at)))}
-          ${fact("Enviados na última hora / teto", escapeHtml(volume))}
-          ${fact("Aprovados na fila", escapeHtml(show(d.queued_approved)))}
-        </dl>
-        ${d.why ? `<p class="constraint">${escapeHtml(String(d.why))}</p>` : ""}
-        ${technicalDetails(
-          [
-            { term: "dispatch_state", value: state },
-            { term: "observed", value: d.observed === true ? "true" : "false" },
-            { term: "in_send_window", value: typeof d.in_send_window === "boolean" ? String(d.in_send_window) : "" },
-            { term: "next_slot_at", value: d.next_slot_at === undefined ? "" : String(d.next_slot_at) },
-          ],
-          "dispatch",
-        )}
-      </article>
-      <article class="card">
-        <h3>Última ação do operador</h3>
-        ${lastBlock}
-      </article>
-      <article class="card">
-        <h3>Controles</h3>
-        <p class="constraint" data-operator-scope="warmbly-write">Estas três ações escrevem no Warmbly. Não existe controle de envio aqui: pausar, retomar e reconhecer é toda a autoridade desta superfície.</p>
-        <form data-warmbly-dispatch="pause" class="operator-form">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">Pausar disparos</button>
-        </form>
-        <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
-          <p class="constraint">Retomar libera e-mail frio para empresas reais. Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>
-          <button type="submit">Retomar disparos (confirmação em duas etapas)</button>
-        </form>
-        <form data-warmbly-dispatch="acknowledge" class="operator-form">
-          <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
-          <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">RECONHECER ALERTA</button>
-        </form>
-      </article>
-    </section>`;
+function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
+  return items.map((item) =>
+    item && typeof item === "object" ? (item as Record<string, unknown>) : {},
+  );
 }
 
-function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+function activityOpsCard(
+  row: Record<string, unknown>,
+  query: string | null,
+  position: { index: number; total: number },
+): string {
+  const rowId = String(row.source_id ?? row.id ?? "");
+  const title = escapeHtml(leadTitleOf(row) ?? "Organização não identificada pela origem");
+  const heading = rowId
+    ? `<a href="${escapeHtml(leadDetailHash("atividade", query, rowId, position))}" data-lead-detail-link="${escapeHtml(rowId)}">${title}</a>`
+    : title;
+  const focusToken = queueFocusToken(rowId, position);
+  const focusAttributes = rowId
+    ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
+    : "";
+  const event = String(row.event ?? "activity");
+  const state = String(row.state ?? "");
+  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}">
+    <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, commercialEventLabel(event))}${state ? ` ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
+    <h3>${heading}</h3>
+    <p>${escapeHtml(row.evidence === undefined ? commercialStateLabel(state) : String(row.evidence))}</p>
+    ${technicalDetails(
+      [
+        { term: "event", value: event },
+        { term: "state", value: state },
+        { term: "source_id", value: rowId },
+      ],
+      "commercial-activity",
+    )}
+    <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Validar atividade</button>
+    </form>
+  </article>`;
+}
+
+function exceptionOpsCard(row: Record<string, unknown>): string {
+  const kind = String(row.kind ?? "exception");
+  const state = String(row.status ?? row.state ?? "");
+  return `<article class="card" data-exception-id="${escapeHtml(String(row.id ?? ""))}" data-exception-status="${escapeHtml(String(row.status ?? ""))}">
+    <p class="kicker">${statusPill(kind, exceptionKindLabel(kind))}${state ? ` ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
+    <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+    <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
+    ${technicalDetails(
+      [
+        { term: "kind", value: kind },
+        { term: "state", value: state },
+        { term: "canonical_id", value: String(row.canonical_id ?? "") },
+        { term: "source_id", value: String(row.source_id ?? row.id ?? "") },
+      ],
+      "commercial-exception",
+    )}
+    <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Reconhecer no Control Center</button>
+    </form>
+  </article>`;
+}
+
+function commercialOps(
+  snapshot: CommercialSnapshot,
+  surface: string | null,
+  resource: string | null = null,
+  query: string | null = null,
+  hash = "#/comercial",
+): string {
   const ops = operationsOf(snapshot);
+  const listViews = ops.list_views && typeof ops.list_views === "object"
+    ? (ops.list_views as Record<string, unknown>)
+    : {};
+  const overview = ops.overview && typeof ops.overview === "object"
+    ? (ops.overview as Record<string, unknown>)
+    : {};
   const current = surface && surface.length > 0 ? surface : "visao";
   const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
-  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
   const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
   const activity = Array.isArray(ops.activity) ? ops.activity : [];
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
@@ -492,43 +619,31 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
           )}
         </article>
       </section>
-      ${dispatchPanel(ops)}`;
+      ${controlledEmailCohort(ops)}
+      <article class="card" data-dispatch-moved="true">
+        <h3>Controles de disparo do Warmbly</h3>
+        <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
+      </article>
+      `;
+  } else if (current === "atividade" && resource) {
+    // Detail sub-surface (#66). Owns its own back link, so the queue below is
+    // replaced wholesale rather than rendered underneath it.
+    body = leadDetailBlock({ snapshot, resource, query, surface: current });
   } else if (current === "atividade") {
-    body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
-      activity.length === 0
-        ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
-        : activity
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              const event = String(row.event ?? "activity");
-              const state = row.state === undefined || row.state === null ? "" : String(row.state);
-              const eventLabel = commercialEventLabel(event);
-              const stateLabel = commercialStateLabel(state);
-              const statePill = state.length > 0 && state !== event && stateLabel !== eventLabel
-                ? ` ${statusPill(state, stateLabel)}`
-                : "";
-              return `<article class="card" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}">
-                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, eventLabel)}${statePill}</p>
-                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
-                <p>${escapeHtml(String(row.evidence ?? "Sem evidência descritiva."))}</p>
-                ${technicalDetails(
-                  [
-                    { term: "event", value: String(row.event ?? "") },
-                    { term: "state", value: String(row.state ?? "") },
-                    { term: "source_id", value: String(row.source_id ?? "") },
-                  ],
-                  "commercial-activity",
-                )}
-                <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Validar atividade</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: ACTIVITY_LIST,
+      rows: rowsOf(activity),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "atividade-title",
+      heading: "Atividade recente",
+      noun: "atividade(s) observada(s)",
+      emptyData: "Sem atividade observada neste recorte. Ausência não é zero.",
+      card: (row, position) => activityOpsCard(row, query, position),
+      remote: listViews.atividade,
+      declaredTotal: typeof overview.activity === "number" ? overview.activity : activity.length,
+      complete: typeof overview.activity === "number" ? overview.activity === activity.length : true,
+    });
   } else if (current === "pipeline") {
     body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
       pipeline.length === 0
@@ -559,37 +674,21 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
             .join("")
     }</div></section>`;
   } else if (current === "excecoes") {
-    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2>
-      <p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>
-      <div class="stack">${
-      exceptions.length === 0
-        ? `<p class="banner empty">Nenhuma exceção observada.</p>`
-        : exceptions
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              const kind = String(row.kind ?? "exception");
-              return `<article class="card" data-exception-kind="${escapeHtml(kind)}">
-                <p class="kicker">${statusPill(kind, exceptionKindLabel(kind))}</p>
-                <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
-                <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
-                ${technicalDetails(
-                  [
-                    { term: "kind", value: kind },
-                    { term: "canonical_id", value: String(row.canonical_id ?? "") },
-                    { term: "source_id", value: String(row.source_id ?? row.id ?? "") },
-                  ],
-                  "commercial-exception",
-                )}
-                <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Reconhecer no Control Center</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: EXCEPTION_LIST,
+      rows: rowsOf(exceptions),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "excecoes-ops-title",
+      heading: "Exceções comerciais",
+      noun: "exceção(ões) observada(s)",
+      emptyData: "Nenhuma exceção observada.",
+      intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
+      card: exceptionOpsCard,
+      remote: listViews.excecoes,
+      declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
+      complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
+    });
   } else {
     body = `<section aria-labelledby="comercial-ops-title">
       <h2 id="comercial-ops-title">Operação agora</h2>
@@ -800,24 +899,137 @@ function checkLine(label: string, value: { status?: string; detail?: string } | 
   );
 }
 
+const HEALTH_LABELS: Record<ServiceHealth["status"], string> = {
+  healthy: "saudável",
+  degraded: "degradado",
+  down: "fora do ar",
+  unknown: "sem conclusão",
+};
+
+/**
+ * Why this row is a defect, per code. A single hardcoded sentence used to claim
+ * the origin gave no identity even for ambiguous_service_id, where it gave two
+ * — and two distinct ids colliding is the entire problem. An unrecognised code
+ * gets no invented cause: the code itself is the whole statement.
+ */
+export function catalogErrorExplanation(code: string): string {
+  switch (code) {
+    case "missing_service_identity":
+      return "A origem não informou identidade para este serviço.";
+    case "ambiguous_service_id":
+      return "Duas entradas distintas do catálogo produzem o mesmo identificador. Os serviços seguem separados; corrigir os ids na origem.";
+    default:
+      return "Código não reconhecido por esta versão do cockpit; nenhuma causa é presumida.";
+  }
+}
+
+interface PresentedHealth {
+  readonly status: ServiceHealth["status"];
+  readonly conclusive: boolean;
+}
+
+/**
+ * "Saudável" is a conclusion, and a conclusion needs evidence. A row whose
+ * freshness is not FRESH, or whose confidence is zero — not configured,
+ * blocked, or failed collection — has none, so the card refuses to print the
+ * word and says "sem conclusão" instead. The raw value stays on the element as
+ * data-raw-status so nothing is hidden, only un-asserted.
+ */
+export function presentHealth(item: ServiceHealth): PresentedHealth {
+  const conclusive =
+    item.evidence_conclusive !== false &&
+    item.provenance.freshness_status === "FRESH" &&
+    item.provenance.confidence > 0;
+  if (!conclusive && item.status === "healthy") {
+    return { status: "unknown", conclusive: false };
+  }
+  return { status: item.status, conclusive };
+}
+
 export function healthCard(item: ServiceHealth): string {
-  const tone = item.status === "healthy" && item.provenance.freshness_status === "FRESH" ? "green" : "not-green";
+  const presented = presentHealth(item);
+  const tone = presented.status === "healthy" && presented.conclusive ? "green" : "not-green";
+  const confidence = item.provenance.confidence.toFixed(2).replace(".", ",");
+  const degraded = presented.status !== "healthy";
+  const runbook = degraded ? item.runbook_url : undefined;
+  const inconclusive = presented.conclusive
+    ? ""
+    : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: atualização ${escapeHtml(
+        freshnessLabel(item.provenance.freshness_status),
+      )}, confiança ${escapeHtml(confidence)}. Nenhum estado conclusivo é afirmado para este serviço.</p>`;
+  // Doubt about the collector run is stated, never folded into the service's
+  // own status: one probe that timed out must not repaint a host that answered.
+  const snapshotCaveat =
+    item.snapshot_evidence && !item.snapshot_evidence.conclusive
+      ? `<p class="constraint" data-snapshot-evidence="${escapeHtml(
+          item.snapshot_evidence.freshness_status,
+        )}">Coleta que trouxe este serviço: ${escapeHtml(
+          freshnessLabel(item.snapshot_evidence.freshness_status),
+        )}, confiança ${escapeHtml(
+          item.snapshot_evidence.confidence.toFixed(2).replace(".", ","),
+        )}. O estado abaixo vem da evidência do próprio serviço.</p>`
+      : "";
+  const catalogError = item.catalog_error
+    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
+        item.catalog_error,
+      )}. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
+    : "";
+  const duplicates =
+    item.duplicate_count && item.duplicate_count > 1
+      ? `<p class="constraint" data-duplicate-count="${item.duplicate_count}">${item.duplicate_count} entradas idênticas do catálogo agrupadas neste card.</p>`
+      : "";
+  const runbookFact = degraded
+    ? runbook
+      ? fact(
+          "Runbook",
+          `<a class="wrap-any" href="${escapeHtml(runbook)}" rel="noreferrer noopener">${escapeHtml(runbook)}</a>`,
+        )
+      : fact("Runbook", escapeHtml("não cadastrado no catálogo"), ` data-absent="true"`)
+    : "";
   return `
-    <article class="card health" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
+    <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker">${statusPill(item.status, healthLabel(item.status))} <span class="sr-only">${escapeHtml(healthLabel(item.status))}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
+        <p class="kicker">${statusPill(presented.status, HEALTH_LABELS[presented.status])} <span class="sr-only">${escapeHtml(
+          HEALTH_LABELS[presented.status],
+        )}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
+      ${catalogError}
+      ${snapshotCaveat}
+      ${inconclusive}
+      ${duplicates}
       ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
-      ${item.latency_ms !== undefined ? `<p>Latência observada: ${item.latency_ms} ms</p>` : ""}
       ${item.partial_outage ? `<p class="constraint">Indisponibilidade parcial</p>` : ""}
       <dl class="facts">
-        ${checkLine("Resposta HTTP", item.http)}
-        ${checkLine("Certificado TLS", item.tls)}
-        ${checkLine("Contêiner Docker", item.docker)}
+        ${fact("Função", escapeHtml(item.role ?? "não declarada no catálogo"), item.role ? "" : ` data-absent="true"`)}
+        ${fact("Endpoint lógico", `<span class="wrap-any">${escapeHtml(item.endpoint ?? "não declarado no catálogo")}</span>`, item.endpoint ? "" : ` data-absent="true"`)}
+        ${item.service_id ? fact("Id no catálogo", escapeHtml(item.service_id)) : ""}
+        ${fact(
+          "Última verificação",
+          `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
+        )}
+        ${fact("Estado avaliado", escapeHtml(HEALTH_LABELS[presented.status]))}
+        ${fact(
+          item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
+          item.latency_ms !== undefined
+            ? escapeHtml(`${item.latency_ms} ms`)
+            : escapeHtml("não medida (sem sonda de tempo neste serviço)"),
+          item.latency_ms === undefined ? ` data-absent="true"` : "",
+        )}
+        ${fact("Atualização", escapeHtml(freshnessLabel(item.provenance.freshness_status)))}
+        ${fact(
+          "Erro recente",
+          escapeHtml(item.last_error ?? "nenhum erro registrado nesta coleta"),
+          item.last_error ? "" : ` data-absent="true"`,
+        )}
+        ${checkLine("HTTP", item.http)}
+        ${checkLine("TLS", item.tls)}
+        ${checkLine("Docker", item.docker)}
         ${checkLine("Backup", item.backup)}
+        ${checkLine("Host", item.host_metrics)}
         ${item.disk ? fact("Disco", escapeHtml(item.disk.detail ?? `${item.disk.used_pct ?? "?"}%`)) : ""}
         ${item.memory ? fact("Memória", escapeHtml(item.memory.detail ?? `${item.memory.used_pct ?? "?"}%`)) : ""}
+        ${runbookFact}
         ${
           item.pncp_freshness
             ? fact(
@@ -842,6 +1054,56 @@ export function healthCard(item: ServiceHealth): string {
       )}
       ${provenanceBlock(item.provenance)}
     </article>
+  `;
+}
+
+const CATALOG_REASON_LABELS: Record<string, string> = {
+  NOT_CONFIGURED: "coletor não configurado neste ambiente",
+  BLOCKED_BY_SECRET: "credencial ausente; coleta bloqueada",
+  UPSTREAM_ERROR: "erro na origem durante a coleta",
+  UNKNOWN: "coleta sem evidência utilizável",
+  STALE: "coleta mais antiga que a janela de frescor",
+  collect_failed: "a coleta falhou",
+  timeout: "a coleta excedeu o tempo limite",
+};
+
+/**
+ * Why the Infra evidence is worth what it is worth. Confidence 0,00 alone
+ * cannot tell "never configured" from "the probe failed", and that ambiguity is
+ * the operator's complaint, so the reason is named on screen.
+ */
+export function infraCatalogBlock(summary: InfraCatalogSummary): string {
+  const reason = summary.unavailability_reason ?? summary.availability;
+  const reasonLabel = reason ? (CATALOG_REASON_LABELS[reason] ?? "motivo não reconhecido") : undefined;
+  const confidence = summary.confidence.toFixed(2).replace(".", ",");
+  return `
+    <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
+      ${fact("Serviços monitorados", escapeHtml(String(summary.monitored_service_count ?? "desconhecido")))}
+      ${fact("Evidência da coleta", escapeHtml(`${freshnessLabel(summary.freshness_status)} · confiança ${confidence}`))}
+      ${
+        reasonLabel
+          ? fact("Motivo", escapeHtml(reasonLabel))
+          : fact("Motivo", escapeHtml("coleta íntegra"), ` data-absent="true"`)
+      }
+      ${
+        summary.catalog_error_count !== undefined
+          ? fact("Erros de catálogo/telemetria", escapeHtml(String(summary.catalog_error_count)))
+          : ""
+      }
+      ${
+        summary.duplicate_group_count !== undefined
+          ? fact("Duplicatas agrupadas", escapeHtml(String(summary.duplicate_group_count)))
+          : ""
+      }
+    </dl>
+    ${technicalDetails(
+      [
+        { term: "freshness_status", value: summary.freshness_status },
+        { term: "availability", value: summary.availability ?? "" },
+        { term: "unavailability_reason", value: summary.unavailability_reason ?? "" },
+      ],
+      "infra-catalog-summary",
+    )}
   `;
 }
 

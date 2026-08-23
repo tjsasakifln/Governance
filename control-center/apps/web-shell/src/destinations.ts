@@ -1,6 +1,7 @@
 export const DESTINATION_IDS = [
   "hoje",
   "comercial",
+  "warmbly",
   "clientes",
   "financeiro",
   "engenharia",
@@ -39,6 +40,14 @@ export const DESTINATIONS: readonly DestinationDef[] = [
     path: "#/comercial",
     scope: "commercial",
     description: "Operação comercial: funil, coortes, atividade, pipeline e exceções. Autoridade operacional permanece no Warmbly.",
+  },
+  {
+    id: "warmbly",
+    label: "Operação Warmbly",
+    path: "#/warmbly",
+    scope: "commercial",
+    description:
+      "Cockpit de operação segura do outbound Warmbly: estado, janela, fila, limites e trilha antes dos controles.",
   },
   {
     id: "clientes",
@@ -121,6 +130,23 @@ export function hasChatDestination(): boolean {
 export const COMMERCIAL_SURFACES = ["visao", "cohorts", "atividade", "pipeline", "excecoes"] as const;
 export type CommercialSurface = (typeof COMMERCIAL_SURFACES)[number];
 
+/**
+ * Sub-surfaces of "Operação Warmbly", in navigation order.
+ *
+ * `operacao` is the safe-operation cockpit itself and is the default. Sibling
+ * surfaces (daily triage, lead/opportunity detail) slot in as one entry here
+ * plus one entry in the renderer registry of `ui/warmbly.ts`; nothing else in
+ * the shell has to change.
+ */
+export const WARMBLY_SURFACES = ["operacao"] as const;
+export type WarmblySurface = (typeof WARMBLY_SURFACES)[number];
+
+export const DEFAULT_WARMBLY_SURFACE: WarmblySurface = "operacao";
+
+export function isWarmblySurface(value: string | null | undefined): value is WarmblySurface {
+  return typeof value === "string" && (WARMBLY_SURFACES as readonly string[]).includes(value);
+}
+
 export interface ParsedLocation {
   destination: DestinationId;
   view: string | null;
@@ -139,6 +165,9 @@ export function parseHash(hash: string): ParsedLocation {
   let surface: string | null = params.get("surface");
   let resource: string | null = params.get("client") ?? params.get("resource");
   if (destination === "comercial" && segments[1] && (COMMERCIAL_SURFACES as readonly string[]).includes(segments[1])) {
+    surface = segments[1];
+  }
+  if (destination === "warmbly" && segments[1] && isWarmblySurface(segments[1])) {
     surface = segments[1];
   }
   if (destination === "clientes" && segments[1]) {
@@ -162,4 +191,43 @@ export function hashFor(destination: DestinationId, view?: string | null, extra?
   const query = params.toString();
   const path = parts[0] ?? `#/${destination}`;
   return query ? `${path}?${query}` : path;
+}
+
+/**
+ * Query params of a hash location, decoded into a plain record.
+ *
+ * `parseHash` reads the two params the router itself understands (`view`,
+ * `surface`/`client`). List chrome — search, filters, sorting, pagination —
+ * reflects its own state in the same query string so a recorte can be returned
+ * to or shared internally, and this is the single place that reads it back.
+ */
+export function queryParamsOf(hash: string): Readonly<Record<string, string>> {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const queryPart = stripped.split("?")[1] ?? "";
+  const out: Record<string, string> = {};
+  for (const [key, value] of new URLSearchParams(queryPart)) {
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Rewrites the query string of a hash location, preserving the path and every
+ * param the patch does not mention. A `null` or empty value drops the param, so
+ * a cleared filter leaves no residue in a shared URL.
+ */
+export function withQueryParams(
+  hash: string,
+  patch: Readonly<Record<string, string | null>>,
+): string {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const [pathPart, queryPart] = stripped.split("?");
+  const params = new URLSearchParams(queryPart ?? "");
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === "") params.delete(key);
+    else params.set(key, value);
+  }
+  const query = params.toString();
+  const path = pathPart && pathPart.length > 0 ? pathPart : "/hoje";
+  return query ? `#${path}?${query}` : `#${path}`;
 }

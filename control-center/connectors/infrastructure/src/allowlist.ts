@@ -1,9 +1,8 @@
+import { hasSecretQueryKey, isSecretKeyName } from "./secret-keys.js";
 import { CHECK_KINDS, type Allowlist, type AllowlistTarget, type CheckKind } from "./types.js";
 
 const TARGET_ID = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 const COLLECTOR_ID = /^[a-z0-9][a-z0-9._-]{0,80}$/;
-const SECRET_KEY =
-  /^(.*(_|-))?((pass(word)?)|secret|token|api[_-]?key|authorization|private[_-]?key|ssh|credential|pem|identity)((_|-).*)?$/i;
 const FORBIDDEN_VALUE = /BEGIN [A-Z ]*(PRIVATE KEY|CERTIFICATE)|ssh-rsa |ssh-ed25519 /i;
 
 class AllowlistError extends Error {
@@ -29,7 +28,7 @@ function rejectSecrets(node: unknown, path: string): void {
     return;
   }
   for (const [key, value] of Object.entries(node)) {
-    if (SECRET_KEY.test(key)) {
+    if (isSecretKeyName(key)) {
       throw new AllowlistError(`${path}.${key} is not allowed (secrets stay out of allowlist/config)`);
     }
     rejectSecrets(value, `${path}.${key}`);
@@ -74,12 +73,59 @@ function assertSafeUrl(raw: string, path: string): URL {
   if (url.username || url.password) {
     throw new AllowlistError(`${path} must not embed credentials`);
   }
-  for (const key of url.searchParams.keys()) {
-    if (SECRET_KEY.test(key)) {
-      throw new AllowlistError(`${path} query parameter ${key} looks like a secret`);
-    }
+  if (hasSecretQueryKey(url.search)) {
+    throw new AllowlistError(`${path} has a query parameter that looks like a secret`);
   }
   return url;
+}
+
+const ROLE_MAX_LENGTH = 120;
+const RUNBOOK_MAX_LENGTH = 512;
+
+function parseRole(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AllowlistError(`${path} must be a non-empty string`);
+  }
+  const role = value.trim();
+  if (role.length > ROLE_MAX_LENGTH) {
+    throw new AllowlistError(`${path} must be at most ${ROLE_MAX_LENGTH} characters`);
+  }
+  return role;
+}
+
+/**
+ * A runbook the cockpit will render as a link. Either a same-origin absolute
+ * path or a credential-free http(s) URL. Protocol-relative values are refused
+ * because "//host/x" leaves the origin while looking like a path.
+ */
+function parseRunbookUrl(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new AllowlistError(`${path} must be a non-empty string`);
+  }
+  const raw = value.trim();
+  if (raw.length > RUNBOOK_MAX_LENGTH) {
+    throw new AllowlistError(`${path} must be at most ${RUNBOOK_MAX_LENGTH} characters`);
+  }
+  if (/[\s<>"'\\]/.test(raw)) {
+    throw new AllowlistError(`${path} must not contain whitespace or markup characters`);
+  }
+  if (raw.startsWith("//")) {
+    throw new AllowlistError(`${path} must not be protocol-relative`);
+  }
+  if (raw.startsWith("/")) {
+    if (raw.includes("@")) {
+      throw new AllowlistError(`${path} must not embed credentials`);
+    }
+    // The same-origin branch used to skip this: the catalog boundary, the one
+    // that is supposed to be strictest, accepted /runbooks/x?token=abc and left
+    // it to be caught downstream.
+    if (hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "")) {
+      throw new AllowlistError(`${path} has a query parameter that looks like a secret`);
+    }
+    return raw;
+  }
+  assertSafeUrl(raw, path);
+  return raw;
 }
 
 function parseTarget(raw: unknown, index: number): AllowlistTarget {
@@ -108,6 +154,12 @@ function parseTarget(raw: unknown, index: number): AllowlistTarget {
     checks,
   };
 
+  if (raw.role !== undefined) {
+    Object.assign(target, { role: parseRole(raw.role, `${path}.role`) });
+  }
+  if (raw.runbook_url !== undefined) {
+    Object.assign(target, { runbook_url: parseRunbookUrl(raw.runbook_url, `${path}.runbook_url`) });
+  }
   if (raw.host !== undefined) {
     Object.assign(target, { host: parseHostField(raw.host, `${path}.host`) });
   }

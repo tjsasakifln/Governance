@@ -47,19 +47,17 @@ export function provenanceBlock(provenance: Provenance): string {
         <dt>${helpTerm("Confiança", CONFIDENCE_HELP)}</dt>
         <dd>${escapeHtml(`${confidenceWord(p.confidence)} (${p.confidenceLabel.replace("confiança ", "")})`)}</dd>
       </div>
-      <div class="tech-row">
-        ${technicalDetails(
-          [
-            { term: "sistema", value: p.sourceSystem },
-            { term: "tipo_de_origem", value: p.sourceKind },
-            { term: "locator", value: p.sourceLocator },
-            { term: "freshness_status", value: p.freshnessStatus },
-            { term: "observed_at_utc", value: p.observedAtUtc },
-            { term: "confidence", value: p.confidence.toFixed(2) },
-          ],
-          "provenance",
-        )}
-      </div>
     </dl>
+    ${technicalDetails(
+      [
+        { term: "sistema", value: p.sourceSystem },
+        { term: "tipo_de_origem", value: p.sourceKind },
+        { term: "locator", value: p.sourceLocator },
+        { term: "freshness_status", value: p.freshnessStatus },
+        { term: "observed_at_utc", value: p.observedAtUtc },
+        { term: "confidence", value: p.confidence.toFixed(2) },
+      ],
+      "provenance",
+    )}
   `;
 }

@@ -39,10 +39,12 @@ test("mounted Hoje HTML is an attention cockpit without chat or mutation control
     for (const label of [
       "Hoje",
       "Comercial",
+      "Operação Warmbly",
       "Clientes",
       "Financeiro",
       "Engenharia",
       "Infra",
+      "Crescimento",
       "Memória/Decisões",
       "Agentes",
     ]) {
@@ -95,10 +97,12 @@ test("README names destinations, mock-only mode, run commands and later converge
   for (const label of [
     "Hoje",
     "Comercial",
+    "Operação Warmbly",
     "Clientes",
     "Financeiro",
     "Engenharia",
     "Infra",
+    "Crescimento",
     "Memória/Decisões",
     "Agentes",
   ]) {

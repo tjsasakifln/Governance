@@ -63,13 +63,31 @@ test("resume without a confirmation token never reaches the wire", async () => {
   assert.equal(calls.length, 0, "the resume must not be attempted without the second step");
 });
 
-test("a write with no audit reason never reaches the wire", async () => {
+test("pause and resume confirmation with no audit reason never reach the wire", async () => {
   const { adapter, calls } = adapterWith(() => ({ status: 200, body: { ok: true } }));
-  for (const action of ["pause", "resume_confirm", "acknowledge"] as const) {
-    const result = await adapter.warmblyDispatch({ action, reason: "   ", target_id: "lead-1" });
+  for (const action of ["pause", "resume_confirm"] as const) {
+    const result = await adapter.warmblyDispatch({ action, reason: "   " });
     assert.equal(result.ok, false, `${action} accepted an empty reason`);
   }
   assert.equal(calls.length, 0);
+});
+
+test("acknowledge really accepts an omitted reason through the HTTP adapter", async () => {
+  const { adapter, calls } = adapterWith(() => ({
+    status: 200,
+    body: { ok: true, outcome: "executed", action: "acknowledge_inbound_alert" },
+  }));
+  const result = await adapter.warmblyDispatch({
+    action: "acknowledge",
+    reason: "",
+    target_id: "lead-1",
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0]!.url.endsWith(WARMBLY_DISPATCH_PATHS.acknowledge));
+  const body = JSON.parse(String(calls[0]!.init.body)) as Record<string, unknown>;
+  assert.equal(body.target_id, "lead-1");
+  assert.equal("reason" in body, false, "an optional empty reason must stay absent on the wire");
 });
 
 test("resume_confirm surfaces the token so the caller can replay exactly one resume", async () => {
@@ -243,6 +261,155 @@ test("a refused confirmation arms nothing", async () => {
   assert.deepEqual(seen.map((s) => s.action), ["resume_confirm", "resume_confirm"]);
 });
 
+test("the real submit binder sends acknowledge with an empty optional reason", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  const adapter = binderAdapter(seen);
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/warmbly");
+
+  dom.submit("acknowledge", { reason: "", target_id: "lead-optional" });
+  await settle();
+
+  assert.deepEqual(seen, [
+    { action: "acknowledge", reason: "", target_id: "lead-optional" },
+  ]);
+});
+
+for (const intervention of ["pause", "acknowledge"] as const) {
+  test(`${intervention} submit invalidates an armed resume before the next submit`, async () => {
+    clearPendingResumeConfirmation();
+    const seen: WarmblyDispatchInput[] = [];
+    const adapter = binderAdapter(seen);
+    const dom = repaintingRoot();
+    paintShell(dom.root as never, adapter as never, "#/warmbly");
+
+    dom.submit("resume", { reason: "liberar depois da revisão" });
+    await settle();
+    dom.submit(intervention, {
+      reason: intervention === "acknowledge" ? "" : "parar por nova anomalia",
+      target_id: "lead-1",
+    });
+    await settle();
+    dom.submit("resume", { reason: "liberar depois da revisão" });
+    await settle();
+
+    assert.deepEqual(
+      seen.map((input) => input.action),
+      ["resume_confirm", intervention, "resume_confirm"],
+    );
+    assert.equal(seen[2]!.confirmation_token, undefined);
+  });
+}
+
+test("changing the reason costs a fresh challenge before resume", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  const adapter = binderAdapter(seen);
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/warmbly");
+
+  dom.submit("resume", { reason: "motivo original" });
+  await settle();
+  dom.submit("resume", { reason: "motivo diferente" });
+  await settle();
+  dom.submit("resume", { reason: "motivo diferente" });
+  await settle();
+
+  assert.deepEqual(seen.map((input) => input.action), ["resume_confirm", "resume_confirm", "resume"]);
+  assert.equal(seen[2]!.confirmation_token, "wcnf_2");
+});
+
+test("a dispatch observation change after challenge blocks resume before the write", async () => {
+  clearPendingResumeConfirmation();
+  const seen: WarmblyDispatchInput[] = [];
+  let state = "PAUSED";
+  const adapter = binderAdapter(seen, () => state);
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/warmbly");
+
+  dom.submit("resume", { reason: "incidente resolvido" });
+  await settle();
+  state = "ACTIVE";
+  dom.submit("resume", { reason: "incidente resolvido" });
+  await settle();
+
+  assert.deepEqual(seen.map((input) => input.action), ["resume_confirm"]);
+  assert.equal(adapter.lastOperatorResult?.code, "confirmation_stale");
+  assert.match(adapter.lastOperatorResult?.message ?? "", /não foi executada/i);
+});
+
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function binderAdapter(
+  seen: WarmblyDispatchInput[],
+  state: () => string = () => "PAUSED",
+): {
+  mode: "http";
+  lastOperatorResult?: {
+    ok: boolean;
+    path: string;
+    kind: "nota";
+    message: string;
+    code?: string;
+  };
+  readDestination(): { ok: true; loading: false; page: never };
+  warmblyDispatch(input: WarmblyDispatchInput): Promise<{
+    ok: boolean;
+    path: string;
+    kind: "nota";
+    message: string;
+    confirmationToken?: string;
+  }>;
+} {
+  return {
+    mode: "http",
+    readDestination: () => ({
+      ok: true,
+      loading: false,
+      page: {
+        generated_at: "2026-08-22T20:00:00Z",
+        operator: { kind: "human", id: "founder" },
+        headline: "Warmbly",
+        attention: [],
+        priorities: [],
+        commercial: {
+          provenance: {
+            source: { system: "warmbly", kind: "dispatch", locator: "dispatch" },
+            observed_at: "2026-08-22T20:00:00Z",
+            freshness_status: "FRESH",
+            confidence: 1,
+          },
+          operations: {
+            dispatch: {
+              state: state(),
+              observed: true,
+              queued_approved: 4,
+              sent_last_hour: 2,
+              cap: 20,
+            },
+          },
+        },
+      } as never,
+    }),
+    warmblyDispatch: async (input: WarmblyDispatchInput) => {
+      seen.push({ ...input });
+      return input.action === "resume_confirm"
+        ? {
+            ok: true,
+            path: "/x",
+            kind: "nota",
+            message: "confirme",
+            confirmationToken: `wcnf_${seen.filter((item) => item.action === "resume_confirm").length}`,
+          }
+        : { ok: true, path: "/x", kind: "nota", message: "ok" };
+    },
+  };
+}
+
 /**
  * A repainting root. Every `innerHTML` write throws away the previous form
  * objects and hands out new ones on the next query — exactly what
@@ -250,7 +417,7 @@ test("a refused confirmation arms nothing", async () => {
  */
 function repaintingRoot(): {
   root: { innerHTML: string; querySelectorAll(sel: string): FakeForm[] };
-  submit(action: string): void;
+  submit(action: string, fields?: Record<string, string>): void;
   paints: number;
 } {
   let forms: FakeForm[] = [];
@@ -275,9 +442,10 @@ function repaintingRoot(): {
   };
   return {
     root,
-    submit(action: string): void {
+    submit(action: string, fields: Record<string, string> = {}): void {
       const form = forms.find((f) => f.action === action);
       if (!form) throw new Error(`no form for ${action}`);
+      for (const [name, value] of Object.entries(fields)) form.setValue(name, value);
       form.submit();
     },
     get paints(): number {
@@ -305,6 +473,11 @@ class FakeForm {
   querySelector(selector: string): { value: string } | null {
     const name = selector.replace(/[[\]'"]/g, "").replace("name=", "");
     return this.fields[name] ?? null;
+  }
+  setValue(name: string, value: string): void {
+    const field = this.fields[name];
+    if (!field) throw new Error(`unknown field ${name}`);
+    field.value = value;
   }
   submit(): void {
     if (!this.listener) throw new Error("form was never bound");

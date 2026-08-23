@@ -14,6 +14,9 @@
   --low: #b7c4d4;
   --ok: #b5c9b0;
   --space: 0.85rem;
+  /* Design-system maximum measure for the main content column. Content wider
+     than this is centred inside the column instead of hugging its left edge. */
+  --content-max: 76rem;
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, monospace;
 }
@@ -67,6 +70,7 @@ a {
   min-height: 100dvh;
   height: 100dvh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
     "top"
@@ -85,10 +89,73 @@ a {
   background: var(--bg-elev);
 }
 
+/* CONFENGE first, "Control Center" second. */
 .brand {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  /* The identity does not give way first: the topbar's other content reflows
+     before the mark or the product name is clipped. `max-width` still caps the
+     brand so a pathological operator string cannot be pushed off-screen. */
+  flex: 0 0 auto;
+  max-width: 62%;
+  align-self: center;
+  color: var(--fg);
+  text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* The official white PNG, never altered: `height` + `width: auto` against the
+   intrinsic width/height attributes keeps the aspect ratio exact, and no
+   filter or opacity is allowed to recolour or fade the mark. */
+.brand-logo {
+  display: block;
+  flex: 0 0 auto;
+  height: 1.6rem;
+  width: auto;
+  max-width: 40vw;
+  object-fit: contain;
+}
+
+.brand-product {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px solid var(--line);
+  padding-left: 0.55rem;
+  color: var(--fg-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Narrow viewport: the mark and the whole product name still read on one line.
+   The pair scales down together, and the room they need comes from letting the
+   topbar's other content drop to its own row — never from clipping either. */
+@media (max-width: 30rem) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+
+  .brand {
+    gap: 0.4rem;
+  }
+
+  .brand-logo {
+    height: 1.35rem;
+  }
+
+  .brand-product {
+    padding-left: 0.4rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
 }
 
 .operator {
@@ -192,11 +259,23 @@ a {
 
 main {
   grid-area: main;
+  /* Positioned ancestor for the .sr-only absolutes the page body renders.
+     Without it their containing block is the initial containing block, so they
+     escape this scroll container and inflate the document scrolling area with
+     thousands of invisible pixels -- the second, competing scrollbar. */
+  position: relative;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  /* main is the only vertical scroll context; never chain to the document. */
+  overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 0.9rem 0.9rem 1.4rem;
-  max-width: 52rem;
+  --main-gutter: 0.9rem;
+  padding-block: 0.9rem 1.4rem;
+  /* Full-bleed scroll container, centred content column capped at
+     --content-max. Replaces a bare max-width, which pinned the content to the
+     left edge of the desktop grid column and left the right half empty. */
+  padding-inline: max(var(--main-gutter), calc((100% - var(--content-max)) / 2));
 }
 
 .page-head h1 {
@@ -423,6 +502,19 @@ h2 {
 .money dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts.catalog {
+  margin-bottom: 0.9rem;
+}
+
+/* Endpoints and runbook URLs are long and arbitrary; they wrap instead of
+   pushing the 360px viewport into horizontal scroll. */
+.wrap-any {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .compact {
@@ -570,8 +662,8 @@ h2 {
 
 @media (min-width: 880px) {
   .shell {
-    grid-template-columns: 13.5rem 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-columns: 13.5rem minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       "top top"
       "nav main";
@@ -579,14 +671,15 @@ h2 {
 
   .nav {
     flex-direction: column;
-    overflow: visible;
+    overflow-x: hidden;
+    /* Stretches to its grid row instead of a hardcoded calc(100dvh - 3rem)
+       that never matched the real topbar height and pushed the shell past the
+       viewport. Scrolls internally when the link list is taller than the row. */
+    overflow-y: auto;
     border-top: 0;
     border-right: 1px solid var(--line);
     padding: 0.8rem 0.55rem;
-    position: sticky;
-    top: 0;
-    align-self: start;
-    height: calc(100dvh - 3rem);
+    min-height: 0;
   }
 
   .nav a {
@@ -595,7 +688,8 @@ h2 {
   }
 
   main {
-    padding: 1.2rem 1.6rem 2rem;
+    --main-gutter: 1.6rem;
+    padding-block: 1.2rem 2rem;
   }
 
   .page-head h1 {
@@ -609,8 +703,485 @@ h2 {
   }
 
   main {
-    padding: 0.75rem 0.75rem 1.1rem;
+    --main-gutter: 0.75rem;
+    padding-block: 0.75rem 1.1rem;
   }
+}
+
+/* Lead/opportunity detail (#66). Opaque identifiers live in a collapsed,
+   copyable block; the two action groups are visually separated so that a
+   local audit record can never be mistaken for a Warmbly write. */
+.lead-detail {
+  gap: 1rem;
+}
+
+.lead-back a {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+  font-weight: 600;
+}
+
+.lead-detail code,
+.lead-technical code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.lead-technical {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+}
+
+.lead-technical summary {
+  cursor: pointer;
+  min-height: 44px;
+  line-height: 44px;
+  font-weight: 600;
+}
+
+.copy-form textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.lead-actions[data-action-scope="warmbly-write"] {
+  border-left: 4px solid #f97316;
+  padding-left: 0.8rem;
+}
+
+.lead-actions[data-action-scope="control-center-only"] {
+  border-left: 4px solid #64748b;
+  padding-left: 0.8rem;
+}
+
+.lead-action {
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  padding-top: 0.6rem;
+}
+
+.lead-action .confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+
+.pill[data-risk="alto"] {
+  background: rgba(249, 115, 22, 0.18);
+}
+
+.pill[data-risk="medio"] {
+  background: rgba(234, 179, 8, 0.18);
+}
+
+.card[data-queue-focus]:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Long operational lists: search, filters, sorting, count and pagination.
+   Every control wraps and every field is width-capped so the filter bar cannot
+   push the document sideways at 390px — the launch probe fails the build on more
+   than 1px of accidental horizontal overflow. */
+.list-surface {
+  display: block;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.6rem;
+  align-items: flex-end;
+  margin: 0 0 0.7rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+/* Panorama por domínio (Hoje) — issue #61 */
+.domain-total {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+.domain-total .hint,
+.domain-integrations .prov-inline {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+}
+
+.domain-unmapped {
+  margin: 0 0 0.6rem;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.domain-card[data-tone="green"] {
+  border-left: 3px solid var(--ok);
+}
+
+.domain-card[data-tone="amber"] {
+  border-left: 3px solid var(--high);
+}
+
+.domain-card[data-tone="red"] {
+  border-left: 3px solid var(--crit);
+}
+
+.domain-card[data-tone="slate"] {
+  border-left: 3px solid var(--low);
+}
+
+.domain-card,
+.domain-reason,
+.domain-indicator,
+.domain-pending li {
+  overflow-wrap: anywhere;
+}
+
+.domain-reason,
+.domain-indicator {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+
+.domain-empty {
+  margin: 0 0 0.5rem;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.domain-pending {
+  margin: 0 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+
+.domain-link {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.pill-state-saudavel {
+  border-color: var(--ok);
+}
+
+.pill-state-atencao {
+  border-color: var(--high);
+}
+
+.pill-state-critico,
+.pill-state-erro_coleta {
+  border-color: var(--crit);
+}
+
+.pill-state-desconhecido {
+  border-color: var(--low);
+}
+
+.pill-outbound {
+  border-color: var(--accent);
+}
+
+.domain-outbound,
+.domain-integrations-block {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+.filters .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 9rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filters .field.grow {
+  flex: 2 1 12rem;
+}
+
+.filters label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.filters input,
+.filters select,
+.filters button {
+  min-height: 44px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.filters .field.actions {
+  flex: 1 1 9rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.filters button {
+  border-color: var(--accent);
+  cursor: pointer;
+  width: auto;
+}
+
+.filters .clear-filters {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+}
+
+.count {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.9rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+
+.pagination .page-step {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pagination .page-step[aria-disabled="true"] {
+  color: var(--fg-muted);
+  opacity: 0.55;
+}
+
+.pagination .page-position {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
+.domain-outbound h3,
+.domain-integrations-block h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.98rem;
+}
+
+.domain-integrations {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.domain-integrations li {
+  overflow-wrap: anywhere;
+}
+
+/* --- Alertas acionáveis (Hoje e recortes) ------------------------------- */
+
+/*
+ * The visual band is driven by `data-alert-class`, not by severity alone: a
+ * cosmetic copy tweak and an open incident must never look the same, even when
+ * both are "open". `incidente` gets the loud left rule, `ajuste` is muted and
+ * carries a dashed rule so it reads as backlog at a glance.
+ */
+.alert-card {
+  border-left: 3px solid var(--line);
+}
+
+.alert-card[data-alert-class="incidente"][data-severity="critical"] {
+  border-left: 4px solid var(--crit);
+}
+
+.alert-card[data-alert-class="incidente"][data-severity="high"] {
+  border-left: 4px solid var(--high);
+}
+
+.alert-card[data-alert-class="acao"] {
+  border-left: 3px solid var(--med);
+}
+
+.alert-card[data-alert-class="ajuste"] {
+  border-left: 3px dashed var(--low);
+  opacity: 0.88;
+}
+
+.pill-severity[data-severity-pill="critical"] {
+  border-color: var(--crit);
+  color: var(--crit);
+}
+
+.pill-severity[data-severity-pill="high"] {
+  border-color: var(--high);
+  color: var(--high);
+}
+
+.pill-severity[data-severity-pill="medium"] {
+  border-color: var(--med);
+}
+
+.pill-severity[data-severity-pill="low"] {
+  border-color: var(--low);
+  color: var(--fg-muted);
+}
+
+.alert-impact {
+  margin: 0 0 0.45rem;
+}
+
+.alert-description {
+  color: var(--fg-muted);
+}
+
+/*
+ * `.facts div` is `1fr auto`, which lets a long value push the card past the
+ * viewport. Alert values are sentences (deadline, owner note), so the value
+ * column is capped and allowed to wrap instead.
+ */
+.alert-facts div {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.alert-facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .alert-facts div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.alert-facts dd .hint {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+}
+
+.locator {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.alert-next {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.alert-next-title {
+  margin: 0 0 0.25rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+.alert-open {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+}
+
+.alert-ack {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.alert-ack textarea {
+  width: 100%;
+  max-width: 100%;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 0.35rem;
+}
+
+.alert-ack button {
+  min-height: 44px;
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  padding: 0 0.8rem;
+  justify-self: start;
+}
+
+.alert-ack .hint {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+}
+
+details.alert-why {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+}
+
+details.alert-why > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+}
+
+.alert-formula,
+.alert-why-notes,
+.alert-evidence {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.alert-evidence,
+.alert-why-notes {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
 }
 
 /* Detalhe técnico progressivo (issue #63): identificadores, schema e

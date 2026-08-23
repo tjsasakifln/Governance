@@ -1,4 +1,6 @@
 import { resolveClientIdentity } from "@confenge/control-center-contracts";
+import { realIntelReportDriftReason } from "../../../warmbly/src/collector/envelope.ts";
+import { WARMBLY_FULL_OPERATIONS } from "../../../warmbly/src/mapper/normalize.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
   JOIN_UNPROVEN,
@@ -162,12 +164,168 @@ function sourceIdOf(row: Record<string, unknown>): string | null {
   return typeof row.id === "string" && row.id.trim() !== "" ? row.id.trim() : null;
 }
 
-function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: string): Record<string, unknown> {
+const CONTROLLED_EMAIL_METRICS = [
+  "attempted",
+  "provider_accepted",
+  "delivered",
+  "hard_bounce",
+  "soft_bounce",
+  "reply",
+  "positive_reply",
+  "routed_or_forwarded_reply",
+  "opt_out",
+  "spam_complaint",
+] as const;
+const EXPECTED_FIRST_REAL_COHORT_CAP = 10;
+
+function controlledCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function controlledEmailOperation(
+  reportValue: unknown,
+  status: Record<string, unknown>,
+  dispatch: Record<string, unknown>,
+  observedAt: string,
+): Record<string, unknown> {
+  const report = asRecord(reportValue);
+  const reportTrusted = report !== null && realIntelReportDriftReason(report) === null;
+  const rows = asArray(reportTrusted ? report.controlled_email : null)
+    .map((value) => asRecord(value))
+    .filter((value): value is Record<string, unknown> => value !== null)
+    .map((row) => {
+      const out: Record<string, unknown> = {
+        route_class: typeof row.route_class === "string" ? row.route_class : "UNKNOWN",
+        provider: typeof row.provider === "string" ? row.provider : "UNKNOWN",
+        cohort_id: typeof row.cohort_id === "string" ? row.cohort_id : "UNKNOWN",
+        policy_version: typeof row.policy_version === "string" ? row.policy_version : "UNKNOWN",
+      };
+      for (const metric of CONTROLLED_EMAIL_METRICS) {
+        out[metric] = controlledCount(row[metric]);
+      }
+      return out;
+    });
+  const readiness = asRecord(status.readiness) ?? {};
+  const grant = asRecord(readiness.latest_bounded_cohort);
+  const cohortID = grant ? firstText(grant, ["cohort_id"]) : null;
+  const policyVersion = grant ? firstText(grant, ["policy_version"]) : null;
+  // A cohort id is not globally unique across policy revisions. Aggregate and
+  // expose telemetry only when the grant proves both dimensions; otherwise a
+  // stale/foreign policy could be presented as the currently authorized run.
+  const cohortRows = cohortID && policyVersion
+    ? rows.filter(
+        (row) => row.cohort_id === cohortID && row.policy_version === policyVersion,
+      )
+    : [];
+  const totals: Record<string, number | null> = {};
+  for (const metric of CONTROLLED_EMAIL_METRICS) {
+    const values = cohortRows.map((row) => row[metric]);
+    totals[metric] =
+      values.length > 0 && values.every((value) => typeof value === "number")
+        ? (values as number[]).reduce((sum, value) => sum + value, 0)
+        : null;
+  }
+  const authorizedQuantity = controlledCount(grant?.authorized_quantity);
+  const sent = controlledCount(grant?.sent);
+  const reserved = controlledCount(grant?.reserved);
+  const maxDailyVolume = controlledCount(grant?.max_daily_volume);
+  const authorizationState = typeof grant?.state === "string" ? grant.state : "UNKNOWN";
+  const expiresAt = typeof grant?.expires_at === "string" ? grant.expires_at : null;
+  const observedMs = Date.parse(observedAt);
+  const expiresMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const integrityFlags: string[] = [];
+  if (authorizationState.toLowerCase() === "revoked") integrityFlags.push("grant_revoked");
+  if (!Number.isNaN(expiresMs) && !Number.isNaN(observedMs) && expiresMs <= observedMs) {
+    integrityFlags.push("grant_expired");
+  }
+  if (
+    authorizedQuantity !== null &&
+    sent !== null &&
+    reserved !== null &&
+    sent + reserved > authorizedQuantity
+  ) {
+    integrityFlags.push("authorized_quantity_exceeded");
+  }
+  if (maxDailyVolume !== null && maxDailyVolume !== EXPECTED_FIRST_REAL_COHORT_CAP) {
+    integrityFlags.push("daily_cap_unexpected");
+  }
+  return {
+    availability: reportTrusted ? "OBSERVED" : "UNKNOWN",
+    report_month: reportTrusted && typeof report.month === "string" ? report.month : null,
+    last_update_at: observedAt,
+    current: grant
+      ? {
+          authorization_id: typeof grant.authorization_id === "string" ? grant.authorization_id : null,
+          cohort_id: cohortID,
+          cohort_hash: typeof grant.cohort_hash === "string" ? grant.cohort_hash : null,
+          policy_version: policyVersion,
+          allowed_route_classes: asArray(grant.allowed_route_classes).filter(
+            (value): value is string => typeof value === "string",
+          ),
+          route_class_distribution: asRecord(grant.route_class_distribution),
+          authorized_quantity: authorizedQuantity,
+          sent,
+          reserved,
+          max_daily_volume: maxDailyVolume,
+          authorized_at: typeof grant.authorized_at === "string" ? grant.authorized_at : null,
+          expires_at: expiresAt,
+          authorization_state: authorizationState,
+          integrity_flags: integrityFlags,
+          go_review_verdict:
+            typeof grant.go_review_verdict === "string" ? grant.go_review_verdict : "UNKNOWN",
+          go_review_at: typeof grant.go_review_at === "string" ? grant.go_review_at : null,
+          dispatch,
+          outcomes: totals,
+        }
+      : null,
+    rows: cohortRows,
+  };
+}
+
+function firstText(row: Record<string, unknown>, keys: readonly string[]): string | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+  }
+  return null;
+}
+
+interface CommercialOperationsProjection {
+  readonly operations: Record<string, unknown>;
+  readonly activity: readonly Record<string, unknown>[];
+  readonly exceptions: readonly Record<string, unknown>[];
+  readonly exceptionsDeclaredTotal: number;
+}
+
+function operationsFromWarmbly(
+  payload: Record<string, unknown>,
+  observedAt: string,
+  sourceSystem = "warmbly",
+): CommercialOperationsProjection {
   const nested = asRecord(payload.operations) ?? {};
-  const deals = asArray(nested.deals).length > 0 ? asArray(nested.deals) : asArray(payload.deals);
-  const tasks = asArray(nested.tasks).length > 0 ? asArray(nested.tasks) : asArray(payload.tasks);
-  const contacts = asArray(nested.contacts).length > 0 ? asArray(nested.contacts) : asArray(payload.contacts);
-  const inbound = asArray(nested.inbound).length > 0 ? asArray(nested.inbound) : asArray(payload.confenge_inbound);
+  const full = asRecord(
+    (payload as Record<PropertyKey, unknown>)[WARMBLY_FULL_OPERATIONS],
+  );
+  const deals = asArray(full?.deals).length > 0
+    ? asArray(full?.deals)
+    : asArray(nested.deals).length > 0
+      ? asArray(nested.deals)
+      : asArray(payload.deals);
+  const tasks = asArray(full?.tasks).length > 0
+    ? asArray(full?.tasks)
+    : asArray(nested.tasks).length > 0
+      ? asArray(nested.tasks)
+      : asArray(payload.tasks);
+  const contacts = asArray(full?.contacts).length > 0
+    ? asArray(full?.contacts)
+    : asArray(nested.contacts).length > 0
+      ? asArray(nested.contacts)
+      : asArray(payload.contacts);
+  const inbound = asArray(full?.inbound).length > 0
+    ? asArray(full?.inbound)
+    : asArray(nested.inbound).length > 0
+      ? asArray(nested.inbound)
+      : asArray(payload.confenge_inbound);
   const attention = asArray(payload.attention);
   const now = Date.parse(observedAt);
 
@@ -219,33 +377,68 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       }),
   );
 
-  const activity = capList(
-    [...deals, ...tasks, ...inbound, ...attention]
+  const inboundRecords = inbound
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionRecords = attention
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionSet = new Set(attentionRecords);
+  const allActivity = [...deals, ...tasks, ...inboundRecords, ...attentionRecords]
       .map((item) => asRecord(item))
       .filter((row): row is Record<string, unknown> => row !== null)
       .map((row) => {
         const at = isoOr(row.updated_at ?? row.observed_at ?? row.created_at ?? row.detected_at, observedAt);
+        const entityRef = attentionSet.has(row) ? asRecord(row.entity_ref) : null;
+        const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+        const kind = typeof row.kind === "string" ? row.kind : "";
+        const inboundLeadId =
+          attentionSet.has(row) &&
+          /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+          ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+          typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+            ? entityRef.id.trim()
+            : null;
         return {
           at,
           lead_or_account: displayName(row),
           source_id: typeof row.id === "string" ? row.id : typeof row.lead_id === "string" ? row.lead_id : "unknown",
-          event: typeof row.kind === "string" ? row.kind : typeof row.status === "string" ? row.status : "activity",
+          event:
+            typeof row.kind === "string"
+              ? row.kind
+              : typeof row.type === "string"
+                ? row.type
+                : typeof row.status === "string"
+                  ? row.status
+                  : "activity",
           state: typeof row.status === "string" ? row.status : typeof row.commercial_state === "string" ? row.commercial_state : null,
           evidence: typeof row.why === "string" ? row.why : typeof row.why_now === "string" ? row.why_now : typeof row.title === "string" ? row.title : null,
+          source: sourceSystem,
+          owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
+          priority: firstText(row, ["priority", "severity"]),
+          ...(inboundLeadId
+            ? { operator_target_kind: "inbound_lead", operator_target_id: inboundLeadId }
+            : {}),
         };
       })
-      .sort((a, b) => b.at.localeCompare(a.at)),
-  );
+      .sort((a, b) => b.at.localeCompare(a.at));
+  const activity = capList(allActivity);
 
   const intelExceptions = asArray(
-    nested.intel_exceptions ?? payload.intel_exceptions ?? payload.confenge_intel_exceptions,
+    full?.intel_exceptions ?? nested.intel_exceptions ?? payload.intel_exceptions ?? payload.confenge_intel_exceptions,
   );
   const intelExceptionsTotal = declaredIntelExceptionsTotal(nested, payload, intelExceptions.length);
   const mergedExceptions = mergeExceptions(intelExceptions, attention, observedAt);
   const exceptionsTotal = Math.max(intelExceptionsTotal, mergedExceptions.length);
   const exceptions = capList(mergedExceptions);
 
-  const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
+  // The production mapper owns this block under `operations`; older direct
+  // projector callers used the top-level field, so retain it only as fallback.
+  const status =
+    asRecord(nested.confenge_status) ??
+    asRecord(payload.confenge_status) ??
+    asRecord(asRecord(payload.health)?.confenge_status) ??
+    {};
   const autoSend =
     status.auto_send_enabled === true
       ? { enabled: true, source: "warmbly.confenge.status", note: "observed enabled; Control Center must not enable sending" }
@@ -253,6 +446,7 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
+  const report = nested.intel_report ?? payload.intel_report ?? payload.confenge_intel_report;
   const organic =
     nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
   const intelExceptionsPresent = intelExceptions.length > 0 || intelExceptionsSourcePresent(nested, payload);
@@ -265,19 +459,20 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
     scoreboard,
     executive,
   });
+  const dispatch = asRecord(nested.dispatch) ?? {
+    state: "UNKNOWN",
+    observed: false,
+    why: "the collector produced no dispatch reading; the kill-switch state is not known",
+  };
 
-  return {
+  const operations = {
     schema_version: "control-center.commercial-operations.v1",
     projector_version: PROJECTOR_VERSION,
     // Passed through from the connector rather than re-derived. This projector
     // rebuilds most of `operations` from the raw payload, so a block that only
     // the connector computes has to be forwarded explicitly or it silently
     // disappears between the mapper and the surface that renders it.
-    dispatch: asRecord(nested.dispatch) ?? {
-      state: "UNKNOWN",
-      observed: false,
-      why: "the collector produced no dispatch reading; the kill-switch state is not known",
-    },
+    dispatch,
     authority: {
       catalog_authority: "governance",
       commercial_runtime: "warmbly",
@@ -285,6 +480,8 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
     },
     auto_send: autoSend,
     overview: {
+      activity: allActivity.length,
+      activity_shown: activity.length,
       exceptions: exceptionsTotal,
       exceptions_shown: exceptions.length,
       overdue_work: integerOrUndefined(asRecord(payload.counts)?.tasks_overdue),
@@ -292,6 +489,12 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
     },
     cohorts,
+    controlled_email: controlledEmailOperation(
+      report,
+      status,
+      dispatch,
+      observedAt,
+    ),
     activity,
     pipeline,
     exceptions,
@@ -304,6 +507,12 @@ function operationsFromWarmbly(payload: Record<string, unknown>, observedAt: str
       organic_scoreboard: organicPresent(organic) ? organic : null,
     },
     growth: growthFromIntel(scoreboard, executive, organic, observedAt),
+  };
+  return {
+    operations,
+    activity: allActivity,
+    exceptions: mergedExceptions,
+    exceptionsDeclaredTotal: exceptionsTotal,
   };
 }
 
@@ -337,6 +546,23 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
     if (seen.has(id)) return;
     seen.add(id);
     const slug = id.replace(/[^A-Za-z0-9._~-]+/g, "-");
+    const kind =
+      typeof row.kind === "string"
+        ? row.kind
+        : typeof row.code === "string"
+          ? row.code
+          : source === "warmbly.intel.exceptions"
+            ? "intel_exception"
+            : "exception_state";
+    const entityRef = asRecord(row.entity_ref);
+    const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+    const explicitLeadId =
+      source === "warmbly.attention" &&
+      /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+      ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+      typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+        ? entityRef.id.trim()
+        : null;
     out.push({
       id,
       canonical_id: `cc:attention-item:${slug}`,
@@ -351,14 +577,7 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
               : typeof row.code === "string"
                 ? row.code
                 : "exception",
-      kind:
-        typeof row.kind === "string"
-          ? row.kind
-          : typeof row.code === "string"
-            ? row.code
-            : source === "warmbly.intel.exceptions"
-              ? "intel_exception"
-              : "exception_state",
+      kind,
       recommended_next_action:
         typeof row.recommended_next_action === "string"
           ? row.recommended_next_action
@@ -369,7 +588,10 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
               : null,
       status: typeof row.status === "string" ? row.status : "open",
       source,
+      owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
+      priority: firstText(row, ["priority", "severity"]),
       observed_at: isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt),
+      ...(explicitLeadId ? { lead_id: explicitLeadId } : {}),
       evidence: stripIdentity(row),
     });
   };
@@ -571,7 +793,12 @@ export function projectCommercial(envelope: CollectorEnvelope): ProjectedSnapsho
   const payload = asRecord(envelope.payload) ?? {};
   const inner = asRecord(payload.snapshot) ?? payload;
   const counts = asRecord(inner.counts) ?? {};
-  const operations = operationsFromWarmbly(inner, envelope.observed_at);
+  const projectedOperations = operationsFromWarmbly(
+    inner,
+    envelope.observed_at,
+    envelope.source.system,
+  );
+  const operations = projectedOperations.operations;
 
   const funnel: Record<string, unknown> = {};
   const inboundNow = integerOrUndefined(counts.inbound_now);
@@ -666,6 +893,110 @@ export function projectCommercial(envelope: CollectorEnvelope): ProjectedSnapsho
     observed_at: envelope.observed_at,
     source: envelope.source,
   };
+}
+
+export const COMMERCIAL_LIST_PAGE_SIZE = 50;
+
+function compactListRow(row: Record<string, unknown>, list: "activity" | "exceptions"): Record<string, unknown> {
+  const keys =
+    list === "activity"
+      ? [
+          "at",
+          "lead_or_account",
+          "source_id",
+          "event",
+          "state",
+          "evidence",
+          "source",
+          "owner",
+          "priority",
+          "operator_target_kind",
+          "operator_target_id",
+        ]
+      : [
+          "id",
+          "canonical_id",
+          "source_id",
+          "why",
+          "kind",
+          "recommended_next_action",
+          "status",
+          "source",
+          "observed_at",
+          "owner",
+          "priority",
+          "lead_id",
+        ];
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    const value = row[key];
+    if (value === undefined) continue;
+    if (typeof value === "string") {
+      out[key] = value.slice(0, 4000);
+    } else if (value === null || typeof value === "number" || typeof value === "boolean") {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * Persist long commercial queues as independent, bounded pages. The normal
+ * commercial snapshot keeps its 50-row operational preview; these auxiliary
+ * snapshots let the Context Service search the full observed queue and return
+ * only the requested UI page.
+ */
+export function projectCommercialListPages(envelope: CollectorEnvelope): ProjectedSnapshot[] {
+  const availability = availabilityFromEnvelope(envelope);
+  const freshness = freshnessForAvailability(availability, envelope.freshness_status);
+  const payload = asRecord(envelope.payload) ?? {};
+  const inner = asRecord(payload.snapshot) ?? payload;
+  const projected = operationsFromWarmbly(inner, envelope.observed_at, envelope.source.system);
+  const lists = [
+    {
+      id: "activity" as const,
+      rows: projected.activity,
+      declaredTotal: projected.activity.length,
+    },
+    {
+      id: "exceptions" as const,
+      rows: projected.exceptions,
+      declaredTotal: projected.exceptionsDeclaredTotal,
+    },
+  ];
+  const pages: ProjectedSnapshot[] = [];
+  for (const list of lists) {
+    const pageCount = Math.ceil(list.rows.length / COMMERCIAL_LIST_PAGE_SIZE);
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      const offset = pageIndex * COMMERCIAL_LIST_PAGE_SIZE;
+      pages.push({
+        projector_version: PROJECTOR_VERSION,
+        snapshot_kind: "commercial-list-page",
+        scope: "commercial",
+        payload: {
+          schema_version: "control-center.commercial-list-page.v1",
+          list: list.id,
+          page_index: pageIndex,
+          page_size: COMMERCIAL_LIST_PAGE_SIZE,
+          loaded_total: list.rows.length,
+          declared_total: list.declaredTotal,
+          complete: list.declaredTotal === list.rows.length,
+          items: list.rows
+            .slice(offset, offset + COMMERCIAL_LIST_PAGE_SIZE)
+            .map((row) => compactListRow(row, list.id)),
+        },
+        freshness_status: freshness,
+        availability,
+        confidence: envelope.confidence,
+        observed_at: envelope.observed_at,
+        source: {
+          ...envelope.source,
+          locator: `${envelope.source.locator}/lists/${list.id}/${pageIndex}`,
+        },
+      });
+    }
+  }
+  return pages;
 }
 
 export { LIST_CAP };

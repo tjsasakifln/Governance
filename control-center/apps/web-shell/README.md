@@ -4,18 +4,50 @@ Mobile-first cockpit for Confenge Control Center. This workstream is **fixture-b
 
 ## Destinations
 
-Chrome navigation exposes exactly these eight areas:
+Chrome navigation exposes exactly these ten areas:
 
 1. Hoje
 2. Comercial
-3. Clientes
-4. Financeiro
-5. Engenharia
-6. Infra
-7. Memória/Decisões
-8. Agentes
+3. Operação Warmbly
+4. Clientes
+5. Financeiro
+6. Engenharia
+7. Infra
+8. Crescimento
+9. Memória/Decisões
+10. Agentes
+
+“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one.
 
 Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. Financial and commercial-send mutations (cobrança, checkout, refund, cancelamento, Asaas write, commercial send) are not offered.
+
+## Cards de alerta
+
+Alertas (top 3 e incidentes) usam um card com duas metades, montado em
+`src/alerts.ts` e `src/ui/alert-card.ts`:
+
+- **Frente** — gravidade em português, impacto em linguagem simples, origem
+  (sistema · tipo · locator), área responsável com link, idade desde a detecção,
+  prazo/SLA e **O que fazer agora** com a ação segura recomendada.
+- **`Como foi priorizado`** — bloco recolhido (`<details>`) com a prosa do motor
+  de atenção (`Score … = peso_categoria … × freshness_bp … × confidence_bp …`,
+  `KILL-RULE`), as evidências e a proveniência completa. Nenhum desses termos
+  aparece fora do bloco recolhido.
+
+Distinção visual obrigatória: `data-alert-class` separa `incidente` (gravidade
+crítica/alta), `acao` (média) e `ajuste` (baixa, ou categoria `estetica`/`refactor`).
+Um ajuste estético nunca usa a faixa de incidente.
+
+O prazo/SLA é **política deste cockpit**, não um campo upstream: nenhum contrato
+carrega data-limite para um item de atenção, e o card diz isso.
+
+“Reconhecer” grava `ACKNOWLEDGE_EXCEPTION` em `POST /v1/operator-actions`. Isso
+**não** resolve o incidente, não altera Warmbly/Asaas/GitHub e não transiciona
+`AttentionItem.status` — nada no backend transiciona esse campo hoje. O item
+continua no ranking (`eligible_statuses = ["open","acknowledged"]`). Não há
+controle de resolver ou dispensar, porque não há escrita que o sustente.
+
+Responsável é **área**, não pessoa: nenhum contrato carrega responsável nominal.
 
 ## Decisions (local)
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createMemoryRuntime, mount } from "../src/app";
 import { pageIsEmpty } from "../src/page";
-import { HOJE_SECTION_TITLES } from "../src/hoje-compose";
+import { HOJE_SECTION_IDS, HOJE_SECTION_TITLES } from "../src/hoje-compose";
 import { httpAdapterFor, readContractFixture } from "./helpers";
 
 async function waitSettled(root: { innerHTML: string }): Promise<void> {
@@ -120,24 +120,14 @@ test("pageIsEmpty is false when a composed Hoje view exists with no exception ro
         headline: "quiet day",
         charts_emitted: false,
         sections: HOJE_SECTION_TITLES.map((title, index) => ({
-          id: (
-            [
-              "top3",
-              "incidents",
-              "clients",
-              "commercial",
-              "finance",
-              "engineering",
-              "agents",
-              "shortcuts",
-            ] as const
-          )[index]!,
+          id: HOJE_SECTION_IDS[index]!,
           title,
-          compressed: index !== 7,
-          compressed_summary: index === 7 ? null : "ignorar",
+          compressed: HOJE_SECTION_IDS[index] !== "shortcuts",
+          compressed_summary:
+            HOJE_SECTION_IDS[index] === "shortcuts" ? null : "sem ocorrências nesta coleta",
           rows: [],
           shortcuts:
-            index === 7
+            HOJE_SECTION_IDS[index] === "shortcuts"
               ? [
                   {
                     kind: "decision" as const,
@@ -176,7 +166,7 @@ test("HTTP #/agentes with Goal 04 activities paints ready ledger, not empty", as
   }
 });
 
-test("HTTP empty-day Hoje still shows the eight section titles and write shortcuts", async () => {
+test("HTTP empty-day Hoje still shows every section title and write shortcuts", async () => {
   const { adapter, calls } = httpAdapterFor(emptyDayRouter());
   const root = { innerHTML: "" };
   const handle = mount(root, adapter, createMemoryRuntime("#/hoje"));

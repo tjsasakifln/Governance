@@ -262,6 +262,7 @@ export const OPERATOR_OUTCOME_LABELS: Record<string, string> = {
   executed: "executada",
   challenged: "aguardando confirmação",
   refused: "recusada",
+  failed: "falhou",
   unknown: "sem resposta do Warmbly",
   accepted: "aceita",
   rejected: "rejeitada",
@@ -338,12 +339,17 @@ export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
   lost: "perdido",
   failed: "falhou",
   error: "falhou",
+  acknowledged: "reconhecido",
+  resolved: "resolvido",
+  dismissed: "descartado",
   unknown: "desconhecido",
 };
 
 /** Estágios conhecidos; qualquer valor novo segue o fallback seguro abaixo. */
 export const PIPELINE_STAGE_LABELS: Record<string, string> = {
   ...COMMERCIAL_STATE_LABELS,
+  Proposta: "Proposta",
+  proposta: "proposta",
   qualified: "qualificado",
   qualification: "qualificação",
   discovery: "descoberta",
@@ -354,6 +360,48 @@ export const PIPELINE_STAGE_LABELS: Record<string, string> = {
 };
 
 export const UNRECOGNIZED_COMMERCIAL_STATE_LABEL = "estado não reconhecido";
+
+export const ROUTE_CLASS_LABELS: Record<string, string> = {
+  DIRECT_PERSON: "pessoa identificada diretamente",
+  DIRECT_COMPANY: "empresa identificada diretamente",
+  INBOUND: "mensagem recebida",
+  UNKNOWN: "classe de rota desconhecida",
+};
+
+export const PROVIDER_LABELS: Record<string, string> = {
+  smtp: "SMTP",
+  warmbly: "Warmbly",
+  UNKNOWN: "provedor desconhecido",
+};
+
+export const AUTHORIZATION_STATE_LABELS: Record<string, string> = {
+  active: "ativa",
+  authorized: "autorizada",
+  revoked: "revogada",
+  expired: "expirada",
+  pending: "pendente",
+  UNKNOWN: "desconhecida",
+};
+
+export const GO_REVIEW_VERDICT_LABELS: Record<string, string> = {
+  GO: "aprovado para prosseguir",
+  NO_GO: "não aprovado",
+  approved: "aprovado para prosseguir",
+  rejected: "não aprovado",
+  pending: "pendente",
+  UNKNOWN: "desconhecido",
+};
+
+export const DISPATCH_STATE_LABELS: Record<string, string> = {
+  ACTIVE: "ativo",
+  PAUSED: "pausado",
+  UNKNOWN: "desconhecido",
+  active: "ativo",
+  paused: "pausado",
+  blocked_outside_window: "bloqueado fora da janela de envio",
+  blocked: "bloqueado",
+  ready: "pronto",
+};
 
 /* ------------------------------------------------------------------ */
 /* Consultas tolerantes: cada catálogo define seu fallback seguro.     */
@@ -412,7 +460,7 @@ export function providerMutationLabel(value: string): string {
 }
 
 export function exceptionKindLabel(kind: string): string {
-  return lookup(EXCEPTION_KIND_LABELS, kind);
+  return EXCEPTION_KIND_LABELS[kind] ?? "tipo não reconhecido";
 }
 
 export function viewKindLabel(kind: string): string {
@@ -449,6 +497,26 @@ export function pipelineStageLabel(stage: string): string {
     PIPELINE_STAGE_LABELS[stage.toLowerCase()] ??
     UNRECOGNIZED_COMMERCIAL_STATE_LABEL
   );
+}
+
+export function routeClassLabel(value: string): string {
+  return ROUTE_CLASS_LABELS[value] ?? "classe de rota não reconhecida";
+}
+
+export function providerLabel(value: string): string {
+  return PROVIDER_LABELS[value] ?? "provedor não reconhecido";
+}
+
+export function authorizationStateLabel(value: string): string {
+  return AUTHORIZATION_STATE_LABELS[value] ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+}
+
+export function goReviewVerdictLabel(value: string): string {
+  return GO_REVIEW_VERDICT_LABELS[value] ?? "veredito não reconhecido";
+}
+
+export function dispatchStateLabel(value: string): string {
+  return DISPATCH_STATE_LABELS[value] ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
 }
 
 /**
