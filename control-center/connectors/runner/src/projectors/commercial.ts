@@ -295,7 +295,13 @@ function stripIdentity(row: Record<string, unknown>): Record<string, unknown> {
     if (/(email|phone|telefone|cpf|cnpj|secret|token|password|authorization)/i.test(key)) {
       continue;
     }
-    if (child && typeof child === "object" && !Array.isArray(child)) {
+    if (Array.isArray(child)) {
+      out[key] = child.map((item) =>
+        item && typeof item === "object" && !Array.isArray(item)
+          ? stripIdentity(item as Record<string, unknown>)
+          : item,
+      );
+    } else if (child && typeof child === "object") {
       out[key] = stripIdentity(child as Record<string, unknown>);
     } else {
       out[key] = child;

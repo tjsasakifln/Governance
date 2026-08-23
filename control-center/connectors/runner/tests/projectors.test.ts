@@ -86,6 +86,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
         include_synthetic: false,
         causal_proof: false,
         real_empty: false,
+        families: [{ id: "family_real_001", contact: { email: "must-not-project@example.com", role: "owner" } }],
         weekly_revenue_chains: [
           {
             schema_version: "confenge.weekly_revenue_chain.v1",
@@ -136,6 +137,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
   assert.ok(commercial);
   const operations = commercial.payload.operations as {
     weekly_revenue_chains: Array<Record<string, unknown>>;
+    intel: { executive: Record<string, unknown> };
   };
   assert.equal(operations.weekly_revenue_chains.length, 1);
   const chain = operations.weekly_revenue_chains[0] as Record<string, unknown>;
@@ -158,6 +160,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
     (chain.canonical_identity as Record<string, unknown>).correlation_id,
     "corr_extra_sbx_week_2026_34",
   );
+  assert.equal(JSON.stringify(operations.intel.executive).includes("must-not-project"), false);
 });
 
 test("weekly revenue projection fails closed on authority drift, collisions, and unbound money", () => {
