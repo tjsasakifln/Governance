@@ -81,6 +81,21 @@ export interface AdapterWriteResult {
    * single-use, bound to the issuing operator, and never re-armed.
    */
   confirmationToken?: string;
+  /**
+   * Warmbly operator channel outcome, carried verbatim from the response body
+   * (`executed | challenged | refused | unknown`).
+   *
+   * `ok` alone cannot tell an operator what happened: an HTTP failure may mean
+   * the channel refused before touching Warmbly, or that the POST was written
+   * and the answer never came back. Those demand opposite next moves, so the
+   * classification travels with the result instead of being guessed from the
+   * message string.
+   */
+  outcome?: string;
+  /** Refusal code from the channel (`circuit_open`, `confirmation_invalid`, …). */
+  code?: string;
+  /** HTTP status the channel answered with, absent when the call never left the browser. */
+  status?: number;
 }
 
 /**
@@ -93,7 +108,7 @@ export interface ControlCenterReadAdapter {
   readonly actions: readonly AdapterAction[];
   lastOperatorResult?: AdapterWriteResult;
   readOperator(): ActorRef;
-  readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
+  readDestination(id: DestinationId, location?: string): AdapterReadResult | Promise<AdapterReadResult>;
   readAttention(): AttentionItem[] | Promise<AttentionItem[]>;
   readPriorities(): PriorityRecommendation[] | Promise<PriorityRecommendation[]>;
   writeShortcut?(

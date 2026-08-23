@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
+import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import type {
   AgentActivity,
@@ -12,7 +13,7 @@ import type {
   InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
-
+import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 
 function fact(label: string, value: string, extra = ""): string {
@@ -333,7 +334,11 @@ export function commercialSubnav(surface: string | null): string {
     .join("")}</nav>`;
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
+export function commercialBlock(
+  snapshot: CommercialSnapshot,
+  surface: string | null = "visao",
+  hash = "#/comercial",
+): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -382,98 +387,58 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   return `
     ${commercialSubnav(current)}
     ${current === "visao" ? recorte : ""}
-    ${commercialOps(snapshot, current)}
+    ${commercialOps(snapshot, current, hash)}
   `;
 }
 
 /**
- * Operator cockpit for the CONFENGE outbound kill switch.
- *
- * Three controls and nothing else: pause, resume, acknowledge. There is no send
- * control here and there must never be one — this surface can stop outbound and
- * let it flow again, and that is the whole of its authority.
- *
- * Every reading is rendered as observed-or-"—". `state` is tri-state because
- * Warmbly reporting nothing is not the same as Warmbly reporting "running", and
- * an operator who is told ACTIVE when nobody knows will make the wrong call.
+ * Read-model rows arrive as `unknown[]` because `operations` is passed through
+ * from the Warmbly projector without a schema of its own.
  */
-function dispatchPanel(ops: Record<string, unknown>): string {
-  const d = ops.dispatch && typeof ops.dispatch === "object" ? (ops.dispatch as Record<string, unknown>) : {};
-  const state = String(d.state ?? "UNKNOWN");
-  const label =
-    state === "PAUSED" ? "PAUSADO" : state === "ACTIVE" ? "ATIVO" : "DESCONHECIDO";
-  const show = (v: unknown): string => (v === undefined || v === null || v === "" ? "—" : String(v));
-  const window =
-    d.window_start && d.window_end
-      ? `${String(d.window_start)}–${String(d.window_end)} ${show(d.timezone)}`
-      : "—";
-  const inWindow =
-    typeof d.in_send_window === "boolean" ? (d.in_send_window ? "dentro da janela" : "fora da janela") : "—";
-  const volume =
-    typeof d.sent_last_hour === "number" || typeof d.cap === "number"
-      ? `${show(d.sent_last_hour)} / ${show(d.cap)}`
-      : "—";
-  const last = ops.last_operator_action && typeof ops.last_operator_action === "object"
-    ? (ops.last_operator_action as Record<string, unknown>)
-    : null;
-  const lastBlock = last
-    ? `<dl class="facts">
-        ${fact("Última ação", show(last.action))}
-        ${fact("Resultado", show(last.outcome))}
-        ${fact("Operador", show(last.actor_id))}
-        ${fact("Quando", show(last.recorded_at))}
-        ${fact("Motivo registrado", show(last.reason))}
-      </dl>`
-    // Absence of a recorded action is not "nobody acted": this ledger is
-    // in-process and a restart empties it.
-    : `<p class="constraint">Nenhuma ação de operador registrada nesta instância do Control Center. Um reinício do serviço esvazia este registro — ausência aqui não prova que ninguém agiu.</p>`;
-
-  return `
-    <section class="stack domain-dispatch" aria-labelledby="dispatch-title" data-domain="dispatch" data-dispatch-state="${escapeHtml(state)}">
-      <h2 id="dispatch-title">Disparo de saída (Warmbly)</h2>
-      <article class="card" data-dispatch-observed="${d.observed === true ? "true" : "false"}">
-        <p class="kicker"><span class="pill">${escapeHtml(label)}</span></p>
-        <dl class="facts">
-          ${fact("Estado do disparo", escapeHtml(label))}
-          ${fact("Motivo da pausa", escapeHtml(show(d.pause_reason)))}
-          ${fact("Janela comercial", escapeHtml(window))}
-          ${fact("Agora", escapeHtml(inWindow))}
-          ${fact("Próximo slot", escapeHtml(show(d.next_slot_at)))}
-          ${fact("Enviados na hora / teto", escapeHtml(volume))}
-          ${fact("Aprovados na fila", escapeHtml(show(d.queued_approved)))}
-        </dl>
-        ${d.why ? `<p class="constraint">${escapeHtml(String(d.why))}</p>` : ""}
-      </article>
-      <article class="card">
-        <h3>Última ação do operador</h3>
-        ${lastBlock}
-      </article>
-      <article class="card">
-        <h3>Controles</h3>
-        <p class="constraint" data-operator-scope="warmbly-write">Estas três ações escrevem no Warmbly. Não existe controle de envio aqui: pausar, retomar e reconhecer é toda a autoridade desta superfície.</p>
-        <form data-warmbly-dispatch="pause" class="operator-form">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">PAUSAR OUTBOUND</button>
-        </form>
-        <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
-          <p class="constraint">Retomar libera e-mail frio para empresas reais. Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>
-          <button type="submit">RETOMAR OUTBOUND (dois passos)</button>
-        </form>
-        <form data-warmbly-dispatch="acknowledge" class="operator-form">
-          <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
-          <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">RECONHECER ALERTA</button>
-        </form>
-      </article>
-    </section>`;
+function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
+  return items.map((item) =>
+    item && typeof item === "object" ? (item as Record<string, unknown>) : {},
+  );
 }
 
-function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+function activityOpsCard(row: Record<string, unknown>): string {
+  return `<article class="card" data-activity-id="${escapeHtml(String(row.source_id ?? ""))}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
+    <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
+    <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+    <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
+    <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Validar atividade</button>
+    </form>
+  </article>`;
+}
+
+function exceptionOpsCard(row: Record<string, unknown>): string {
+  return `<article class="card" data-exception-id="${escapeHtml(String(row.id ?? ""))}" data-exception-status="${escapeHtml(String(row.status ?? ""))}">
+    <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
+    <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+    <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
+    <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Reconhecer no Control Center</button>
+    </form>
+  </article>`;
+}
+
+function commercialOps(snapshot: CommercialSnapshot, surface: string | null, hash: string): string {
   const ops = operationsOf(snapshot);
+  const listViews = ops.list_views && typeof ops.list_views === "object"
+    ? (ops.list_views as Record<string, unknown>)
+    : {};
+  const overview = ops.overview && typeof ops.overview === "object"
+    ? (ops.overview as Record<string, unknown>)
+    : {};
   const current = surface && surface.length > 0 ? surface : "visao";
   const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
-  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
   const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
   const activity = Array.isArray(ops.activity) ? ops.activity : [];
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
@@ -511,28 +476,26 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         </article>
       </section>
       ${controlledEmailCohort(ops)}
-      ${dispatchPanel(ops)}`;
+      <article class="card" data-dispatch-moved="true">
+        <h3>Controles de disparo do Warmbly</h3>
+        <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
+      </article>
+      `;
   } else if (current === "atividade") {
-    body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
-      activity.length === 0
-        ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
-        : activity
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card">
-                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
-                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
-                <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
-                <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Validar atividade</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: ACTIVITY_LIST,
+      rows: rowsOf(activity),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "atividade-title",
+      heading: "Atividade recente",
+      noun: "atividade(s) observada(s)",
+      emptyData: "Sem atividade observada neste recorte. Ausência não é zero.",
+      card: activityOpsCard,
+      remote: listViews.atividade,
+      declaredTotal: typeof overview.activity === "number" ? overview.activity : activity.length,
+      complete: typeof overview.activity === "number" ? overview.activity === activity.length : true,
+    });
   } else if (current === "pipeline") {
     body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
       pipeline.length === 0
@@ -553,28 +516,21 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
             .join("")
     }</div></section>`;
   } else if (current === "excecoes") {
-    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2>
-      <p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>
-      <div class="stack">${
-      exceptions.length === 0
-        ? `<p class="banner empty">Nenhuma exceção observada.</p>`
-        : exceptions
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card">
-                <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
-                <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
-                <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
-                <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Reconhecer no Control Center</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: EXCEPTION_LIST,
+      rows: rowsOf(exceptions),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "excecoes-ops-title",
+      heading: "Exceções comerciais",
+      noun: "exceção(ões) observada(s)",
+      emptyData: "Nenhuma exceção observada.",
+      intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
+      card: exceptionOpsCard,
+      remote: listViews.excecoes,
+      declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
+      complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
+    });
   } else {
     body = `<section aria-labelledby="comercial-ops-title">
       <h2 id="comercial-ops-title">Operação agora</h2>

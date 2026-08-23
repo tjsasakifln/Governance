@@ -38,6 +38,16 @@ import { CATALOG_CURRENCY, majorUnitsToCents, openDealTotals, resolveCurrency } 
 
 const OPERATIONS_CAP = 50;
 
+/**
+ * Same-process handoff to the runner projector. Symbol keys are deliberately
+ * non-serializable: the collector's public snapshot and persisted observation
+ * keep their bounded 50-row preview, while the runner can split the complete
+ * observed queues into independently bounded list-page snapshots.
+ */
+export const WARMBLY_FULL_OPERATIONS = Symbol.for(
+  "confenge.control-center.warmbly.full-operations.v1",
+);
+
 function isRequiredPath(method: string, path: string): boolean {
   const clean = path.split("?")[0] ?? path;
   return COLLECT_ROUTES.some(
@@ -444,12 +454,8 @@ export function collectFromWarmblyPayload(
     snapshot.deal_value_open_by_currency = dealValueByCurrency;
   }
 
-  snapshot.operations = {
-    authority: "warmbly",
-    this_document: "read_model",
-    dispatch: dispatchOf(payload),
-    cap: OPERATIONS_CAP,
-    deals: deals.slice(0, OPERATIONS_CAP).map((d) => ({
+  const fullOperations = {
+    deals: deals.map((d) => ({
       id: d.id,
       name: d.name,
       status: d.status,
@@ -460,6 +466,7 @@ export function collectFromWarmblyPayload(
       contact_id: d.contact_id ?? null,
       account_id: d.account_id ?? null,
       lead_id: d.lead_id ?? null,
+      assigned_to: d.assigned_to ?? null,
       created_at: d.created_at,
       updated_at: d.updated_at,
       won_at: d.won_at,
@@ -467,17 +474,19 @@ export function collectFromWarmblyPayload(
       expected_close_date: d.expected_close_date,
       campaign_id: d.campaign_id,
     })),
-    tasks: tasks.slice(0, OPERATIONS_CAP).map((t) => ({
+    tasks: tasks.map((t) => ({
       id: t.id,
       title: t.title,
       status: t.status,
       due_date: t.due_date,
       priority: t.priority,
+      type: t.type,
+      assigned_to: t.assigned_to ?? null,
       deal_id: t.deal_id,
       created_at: t.created_at,
       updated_at: t.updated_at,
     })),
-    contacts: contacts.slice(0, OPERATIONS_CAP).map((c) => ({
+    contacts: contacts.map((c) => ({
       id: c.id,
       company: c.company,
       first_name: c.first_name,
@@ -489,7 +498,7 @@ export function collectFromWarmblyPayload(
       account_id: c.account_id ?? null,
       lead_id: c.lead_id ?? null,
     })),
-    inbound: inbound.slice(0, OPERATIONS_CAP).map((row) => ({
+    inbound: inbound.map((row) => ({
       lead_id: row.lead_id,
       company: row.company,
       person: row.person,
@@ -497,6 +506,18 @@ export function collectFromWarmblyPayload(
       why_now: row.why_now,
       recommended_action: row.recommended_action,
     })),
+    intel_exceptions: intelExceptions,
+  };
+
+  snapshot.operations = {
+    authority: "warmbly",
+    this_document: "read_model",
+    dispatch: dispatchOf(payload),
+    cap: OPERATIONS_CAP,
+    deals: fullOperations.deals.slice(0, OPERATIONS_CAP),
+    tasks: fullOperations.tasks.slice(0, OPERATIONS_CAP),
+    contacts: fullOperations.contacts.slice(0, OPERATIONS_CAP),
+    inbound: fullOperations.inbound.slice(0, OPERATIONS_CAP),
     intel_scoreboard: payload.confenge_intel_scoreboard ?? null,
     intel_executive: payload.confenge_intel_executive ?? null,
     intel_report: payload.confenge_intel_report ?? null,
@@ -505,6 +526,13 @@ export function collectFromWarmblyPayload(
     intel_organic_scoreboard: payload.confenge_intel_organic_scoreboard ?? null,
     confenge_status: payload.confenge_status ?? null,
   };
+
+  Object.defineProperty(snapshot, WARMBLY_FULL_OPERATIONS, {
+    value: fullOperations,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
 
   // Pipelines are read for stage names on stalled deals only — never copied
   // onto the snapshot as a replica board.

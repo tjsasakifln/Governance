@@ -22,6 +22,10 @@ export const WRITE_SHORTCUT_LABELS: Record<WriteShortcutKind, string> = {
 
 const DOMAIN_BY_DESTINATION: Record<Exclude<DestinationId, "hoje" | "memoria" | "agentes">, string> = {
   comercial: "commercial",
+  // The dispatch state the operation cockpit reads lives in
+  // `operations.dispatch` of the commercial snapshot; there is no separate
+  // Warmbly domain read model to invent one from.
+  warmbly: "commercial",
   clientes: "clients",
   financeiro: "finance",
   engenharia: "engineering",

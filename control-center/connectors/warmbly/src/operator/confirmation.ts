@@ -4,7 +4,8 @@
  * Releasing the kill switch is the one action that can let traffic flow, so it
  * takes two calls: `requestConfirmation` mints a single-use, short-lived,
  * actor-bound and target-bound challenge, and `execute` refuses without it.
- * Pause never touches this file — it is one step and never confirmation-gated.
+ * Pause remains one-step, but revokes pending resumes because it changes the
+ * singleton dispatch decision those challenges were meant to confirm.
  */
 
 import { createHash, randomUUID } from "node:crypto";
@@ -56,6 +57,15 @@ export interface ConfirmationStore {
     reason: string | null;
     now: Date;
   }): ConfirmationCheck;
+  /**
+   * Revokes outstanding challenges after another deliberate intervention.
+   * Omit actor_id when the intervention changes the singleton for everybody.
+   */
+  invalidate(input: {
+    action: OperatorActionName;
+    target_id: string;
+    actor_id?: string;
+  }): number;
   pending(): OperatorConfirmationChallenge[];
 }
 
@@ -134,6 +144,21 @@ export function createConfirmationStore(options: {
       }
       byToken.delete(token);
       return { ok: true, token_id: challenge.token_id };
+    },
+
+    invalidate({ action, target_id, actor_id }) {
+      let count = 0;
+      for (const [token, challenge] of byToken) {
+        if (
+          challenge.action === action &&
+          challenge.target_id === target_id &&
+          (actor_id === undefined || challenge.actor_id === actor_id)
+        ) {
+          byToken.delete(token);
+          count += 1;
+        }
+      }
+      return count;
     },
 
     pending() {
