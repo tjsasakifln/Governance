@@ -1,4 +1,9 @@
 import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
+import {
+  BRAND_LOGO_HEIGHT,
+  BRAND_LOGO_SRC,
+  BRAND_LOGO_WIDTH,
+} from "../brand";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -9,6 +14,8 @@ import {
   type ViewState,
 } from "../view-state";
 import type { AgentSession, AttentionItem, PriorityRecommendation } from "../types";
+import { attentionAlert, priorityAlert } from "../alerts";
+import { alertBody, alertDataAttributes } from "./alert-card";
 import { isOperationalClient } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
@@ -21,9 +28,9 @@ import {
   financeBlock,
   growthFunnelBlock,
   healthCard,
+  infraCatalogBlock,
   memoriaGroups,
 } from "./domains";
-import { provenanceBlock } from "./provenance";
 import { warmblyBlock } from "./warmbly";
 import {
   pendingResumeConfirmation,
@@ -41,27 +48,26 @@ export interface ShellModel {
   operatorResult?: AdapterWriteResult;
 }
 
-function attentionCard(item: AttentionItem): string {
+function attentionCard(item: AttentionItem, now: string): string {
+  const alert = attentionAlert(item, now);
   return `
-    <article class="card attention" data-severity="${escapeHtml(item.severity)}" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
+    <article class="card attention alert-card" ${alertDataAttributes(alert)} data-status="${escapeHtml(item.status)}" data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.severity)}</span> <span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
         <h3>${escapeHtml(item.title)}</h3>
       </header>
-      <p>${escapeHtml(item.summary)}</p>
-      ${item.recommended_action ? `<p class="action">Ação sugerida: ${escapeHtml(item.recommended_action)}</p>` : ""}
-      ${provenanceBlock(item.provenance)}
+      ${alertBody(alert, item.provenance)}
     </article>
   `;
 }
 
-function priorityCard(item: PriorityRecommendation): string {
+function priorityCard(item: PriorityRecommendation, now: string): string {
+  const alert = priorityAlert(item, now);
   return `
-    <li class="card priority" data-rank="${item.rank}" data-id="${escapeHtml(item.id)}">
+    <li class="card priority alert-card" data-rank="${item.rank}" ${alertDataAttributes(alert)} data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <p class="kicker">Prioridade ${item.rank} · ${escapeHtml(item.horizon)}</p>
       <h3>${escapeHtml(item.title)}</h3>
-      <p>${escapeHtml(item.rationale)}</p>
-      ${provenanceBlock(item.provenance)}
+      ${alertBody(alert, item.provenance)}
     </li>
   `;
 }
@@ -186,16 +192,18 @@ function pageBody(
           .join("")}</div></section>`
       : "",
     page.health && page.health.length > 0
-      ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2><div class="stack">${page.health.map(healthCard).join("")}</div></section>`
+      ? `<section aria-labelledby="infra-title"><h2 id="infra-title">Serviços</h2>${
+          page.health_summary ? infraCatalogBlock(page.health_summary) : ""
+        }<div class="stack">${page.health.map(healthCard).join("")}</div></section>`
       : "",
   ].join("");
   const attention =
     page.attention.length > 0
-      ? `<section class="exceptions" aria-labelledby="excecoes-title"><h2 id="excecoes-title">Exceções</h2><div class="stack">${page.attention.map(attentionCard).join("")}</div></section>`
+      ? `<section class="exceptions" aria-labelledby="excecoes-title"><h2 id="excecoes-title">Exceções</h2><div class="stack">${page.attention.map((item) => attentionCard(item, page.generated_at)).join("")}</div></section>`
       : "";
   const priorities =
     page.priorities.length > 0
-      ? `<section class="priorities" aria-labelledby="prioridades-title"><h2 id="prioridades-title">Prioridades deste recorte</h2><ol>${page.priorities.map(priorityCard).join("")}</ol></section>`
+      ? `<section class="priorities" aria-labelledby="prioridades-title"><h2 id="prioridades-title">Prioridades deste recorte</h2><ol>${page.priorities.map((item) => priorityCard(item, page.generated_at)).join("")}</ol></section>`
       : "";
   return `${attention}${priorities}${extras}`;
 }
@@ -243,7 +251,17 @@ export function renderShell(model: ShellModel): string {
     <a class="skip-link" href="#conteudo">Saltar para o conteúdo</a>
     <div class="shell" data-destination="${escapeHtml(model.destination)}" data-surface="${escapeHtml(model.surface ?? "")}" data-resource="${escapeHtml(model.resource ?? "")}" data-view-state="${escapeHtml(model.viewKind)}" data-productive-origin="${escapeHtml(PRODUCTIVE_URL)}" data-auth-origin="${escapeHtml(AUTH_URL)}">
       <header class="topbar">
-        <p class="brand">Control Center</p>
+        <a class="brand" href="${hashFor("hoje", null)}" data-brand="confenge">
+          <img
+            class="brand-logo"
+            src="${BRAND_LOGO_SRC}"
+            alt="CONFENGE"
+            width="${BRAND_LOGO_WIDTH}"
+            height="${BRAND_LOGO_HEIGHT}"
+            decoding="async"
+          />
+          <span class="brand-product">Control Center</span>
+        </a>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
       </header>
       <nav class="nav" aria-label="Áreas do Control Center">

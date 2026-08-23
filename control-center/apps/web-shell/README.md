@@ -21,6 +21,34 @@ Chrome navigation exposes exactly these ten areas:
 
 Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. Financial and commercial-send mutations (cobrança, checkout, refund, cancelamento, Asaas write, commercial send) are not offered.
 
+## Cards de alerta
+
+Alertas (top 3 e incidentes) usam um card com duas metades, montado em
+`src/alerts.ts` e `src/ui/alert-card.ts`:
+
+- **Frente** — gravidade em português, impacto em linguagem simples, origem
+  (sistema · tipo · locator), área responsável com link, idade desde a detecção,
+  prazo/SLA e **O que fazer agora** com a ação segura recomendada.
+- **`Como foi priorizado`** — bloco recolhido (`<details>`) com a prosa do motor
+  de atenção (`Score … = peso_categoria … × freshness_bp … × confidence_bp …`,
+  `KILL-RULE`), as evidências e a proveniência completa. Nenhum desses termos
+  aparece fora do bloco recolhido.
+
+Distinção visual obrigatória: `data-alert-class` separa `incidente` (gravidade
+crítica/alta), `acao` (média) e `ajuste` (baixa, ou categoria `estetica`/`refactor`).
+Um ajuste estético nunca usa a faixa de incidente.
+
+O prazo/SLA é **política deste cockpit**, não um campo upstream: nenhum contrato
+carrega data-limite para um item de atenção, e o card diz isso.
+
+“Reconhecer” grava `ACKNOWLEDGE_EXCEPTION` em `POST /v1/operator-actions`. Isso
+**não** resolve o incidente, não altera Warmbly/Asaas/GitHub e não transiciona
+`AttentionItem.status` — nada no backend transiciona esse campo hoje. O item
+continua no ranking (`eligible_statuses = ["open","acknowledged"]`). Não há
+controle de resolver ou dispensar, porque não há escrita que o sustente.
+
+Responsável é **área**, não pessoa: nenhum contrato carrega responsável nominal.
+
 ## Decisions (local)
 
 - Governance remains the strategic/canonical authority; Warmbly remains the commercial/CRM operational authority. This shell only renders a read-model recorte.

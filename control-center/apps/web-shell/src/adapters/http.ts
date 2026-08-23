@@ -29,9 +29,11 @@ import {
   fallbackProvenance,
   financeFrom,
   healthFrom,
+  infraSummaryFrom,
   itemsOf,
   mapContextDirectives,
   mapHojePayloads,
+  provenanceOf,
 } from "./map";
 import {
   AUTHORIZED_WRITE_PATH,
@@ -489,9 +491,16 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     } else if (id === "infra") {
       const list = itemsOf(inner.services);
       const rows = list.length > 0 ? list : itemsOf(payload).length > 0 ? itemsOf(payload) : itemsOf(rec.health);
+      // Per-service rows inherit the snapshot's provenance, not the adapter's
+      // "nothing is known" default. Using the generic fallback printed every
+      // card as UNKNOWN with confidence 0,00 while still echoing the row's own
+      // "healthy" — the freshness of the snapshot the row came from is the
+      // honest floor.
+      const slotProvenance = provenanceOf(inner, fallback);
       page.health = (rows.length > 0 ? rows : inner.schema_version ? [inner] : []).map((row) =>
-        healthFrom(asRecord(row) ?? {}, fallback),
+        healthFrom(asRecord(row) ?? {}, slotProvenance),
       );
+      page.health_summary = infraSummaryFrom(inner, slotProvenance);
     }
     return page;
   }
