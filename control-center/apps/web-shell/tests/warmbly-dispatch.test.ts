@@ -9,6 +9,14 @@ import type { WarmblyDispatchInput } from "../src/adapters/contract";
 
 type Call = { url: string; init: RequestInit };
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
+    .replace(/<span class="term-help-text"[^>]*>[\s\S]*?<\/span>/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 function adapterWith(
   responder: (url: string, init: RequestInit) => { status: number; body: unknown },
 ): { adapter: HttpControlCenterAdapter; calls: Call[] } {
@@ -147,8 +155,8 @@ test("a resume confirmation survives the repaint it triggers and the second subm
     warmblyDispatch: async (input: WarmblyDispatchInput) => {
       seen.push({ ...input });
       return input.action === "resume_confirm"
-        ? { ok: true, path: "/x", kind: "nota" as const, message: "confirme", confirmationToken: "wcnf_abc" }
-        : { ok: true, path: "/x", kind: "nota" as const, message: "ok" };
+        ? { ok: true, path: WARMBLY_DISPATCH_PATHS.resume_confirm, kind: "nota" as const, message: "confirmation required", confirmationToken: "wcnf_abc" }
+        : { ok: true, path: WARMBLY_DISPATCH_PATHS.resume, kind: "nota" as const, message: "resumed" };
     },
   };
   const dom = repaintingRoot();
@@ -159,6 +167,9 @@ test("a resume confirmation survives the repaint it triggers and the second subm
   assert.equal(seen.length, 1);
   assert.equal(seen[0]!.action, "resume_confirm", "first submit mints the challenge");
   assert.ok(dom.paints > 1, "the first step must have repainted, destroying the original form");
+  assert.match(visibleText(dom.root.innerHTML), /Confirmação registrada\. Envie novamente para retomar os disparos\./);
+  assert.doesNotMatch(visibleText(dom.root.innerHTML), /confirmation required/);
+  assert.match(dom.root.innerHTML, /mensagem_original=confirmation required/);
 
   // Second submit lands on a form object that did not exist when the token was
   // minted. It must still spend that token.
@@ -167,6 +178,38 @@ test("a resume confirmation survives the repaint it triggers and the second subm
   assert.equal(seen.length, 2);
   assert.equal(seen[1]!.action, "resume", "second submit must execute, not re-challenge");
   assert.equal(seen[1]!.confirmation_token, "wcnf_abc");
+  assert.match(visibleText(dom.root.innerHTML), /Disparos retomados\./);
+  assert.doesNotMatch(visibleText(dom.root.innerHTML), /\bresumed\b/);
+  assert.match(dom.root.innerHTML, /mensagem_original=resumed/);
+});
+
+test("post-action pause and failure banners use authored Portuguese while preserving diagnostics", async () => {
+  clearPendingResumeConfirmation();
+  let fail = false;
+  const adapter = {
+    mode: "http" as const,
+    lastOperatorResult: undefined as unknown,
+    readDestination: () => ({ ok: true as const, loading: false as const, page: null as never }),
+    warmblyDispatch: async () =>
+      fail
+        ? { ok: false, path: WARMBLY_DISPATCH_PATHS.pause, kind: "nota" as const, message: "connect ECONNREFUSED" }
+        : { ok: true, path: WARMBLY_DISPATCH_PATHS.pause, kind: "nota" as const, message: "paused" },
+  };
+  const dom = repaintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/comercial/cohorts");
+
+  dom.submit("pause");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(visibleText(dom.root.innerHTML), /Disparos pausados\./);
+  assert.doesNotMatch(visibleText(dom.root.innerHTML), /\bpaused\b/);
+  assert.match(dom.root.innerHTML, /mensagem_original=paused/);
+
+  fail = true;
+  dom.submit("pause");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.match(visibleText(dom.root.innerHTML), /A ação não foi concluída\./);
+  assert.doesNotMatch(visibleText(dom.root.innerHTML), /ECONNREFUSED/);
+  assert.match(dom.root.innerHTML, /mensagem_original=connect ECONNREFUSED/);
 });
 
 test("a spent confirmation is not replayed: the next resume challenges again", async () => {
@@ -379,6 +422,7 @@ function repaintingRoot(): {
 } {
   let forms: FakeForm[] = [];
   let paints = 0;
+  let html = "";
   const rebuild = (): void => {
     paints += 1;
     forms = [new FakeForm("pause"), new FakeForm("resume"), new FakeForm("acknowledge")];
@@ -386,9 +430,10 @@ function repaintingRoot(): {
   rebuild();
   const root = {
     get innerHTML(): string {
-      return "";
+      return html;
     },
-    set innerHTML(_next: string) {
+    set innerHTML(next: string) {
+      html = next;
       rebuild();
     },
     querySelectorAll(_sel: string): FakeForm[] {

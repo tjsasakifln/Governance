@@ -91,7 +91,7 @@ test("live ranked items paint severity, impact, origin, owner, age and deadline 
   const card = cardFor(html, "cc:attention-item:overdue-receivable");
   assert.match(card, /data-severity-pill="high">Alto</);
   assert.match(card, /<strong>Impacto:<\/strong> Afeta receita/);
-  assert.match(card, /<dt>Origem<\/dt><dd>asaas · receivable-read/);
+  assert.match(card, /<dt>Origem<\/dt><dd>Asaas · leitura de recebíveis/);
   assert.match(card, /finance\/receivables/);
   assert.match(card, /<dt>Responsável<\/dt>[\s\S]*?data-owner-destination="financeiro">Financeiro</);
   assert.match(card, /<dt>Idade<\/dt><dd>há \d+ (min|h|d)/);
@@ -99,6 +99,8 @@ test("live ranked items paint severity, impact, origin, owner, age and deadline 
   assert.match(card, /O que fazer agora/);
   assert.match(card, /Tratar o recebível vencido/);
   assert.match(card, /class="alert-open" href="#\/financeiro">Abrir Financeiro</);
+  const frontText = withoutDisclosures(card).replace(/<[^>]*>/g, " ");
+  assert.doesNotMatch(frontText, /receivable-read|crm-read-model|repo-read|finance\/receivables/);
 });
 
 test("the scoring formula appears only inside the collapsed 'Como foi priorizado'", async () => {
@@ -287,6 +289,23 @@ test("SLA, age, owner, class and impact are derived, not invented per card", () 
 
   assert.match(impactSentence("high", "receita"), /receita/);
   assert.match(impactSentence("high", "nao-existe"), /Impacto alto/);
+});
+
+test("alert catalogues ignore inherited property names", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    assert.equal(ownerFor(poisoned, poisoned).label, "Fundador (sem área dedicada)");
+    assert.equal(
+      impactSentence(poisoned as never, poisoned),
+      "Impacto não reconhecido; revise os dados técnicos.",
+    );
+    const deadline = deadlineFor(
+      poisoned as never,
+      "2026-08-20T17:00:00Z",
+      "2026-08-20T18:00:00Z",
+    );
+    assert.match(deadline.label, /gravidade não reconhecida|prazo não reconhecido/);
+    assert.doesNotMatch(deadline.label, new RegExp(poisoned));
+  }
 });
 
 test("a priority with no engine severity is not inflated to critical", () => {

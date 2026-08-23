@@ -17,10 +17,10 @@ test("Comercial page surfaces funnel, pipelines, aging, next action, stalled, dr
     assert.match(root.innerHTML, /Clientes/);
     assert.match(root.innerHTML, /Pipeline nominal/);
     assert.match(root.innerHTML, /Pipeline ponderado \(probabilidade confiável\)/);
-    assert.match(root.innerHTML, /Aging/);
-    assert.match(root.innerHTML, /Missing next action/);
-    assert.match(root.innerHTML, /Stalled stage/);
-    assert.match(root.innerHTML, /Offer\/version drift/);
+    assert.match(root.innerHTML, /Negócios envelhecidos/);
+    assert.match(root.innerHTML, /Sem próxima ação/);
+    assert.match(root.innerHTML, /Estágio parado/);
+    assert.match(root.innerHTML, /Divergência de oferta\/versão/);
     assert.match(root.innerHTML, /Extra histórica/);
     assert.match(root.innerHTML, /data-public-offer="false"/);
     assert.doesNotMatch(root.innerHTML, /oferta pública da Extra/i);
@@ -36,16 +36,20 @@ test("Clientes page surfaces saúde, compromissos, owner, due date, entregáveis
     assert.match(root.innerHTML, /Acme Indústria/);
     assert.match(root.innerHTML, /Saúde/);
     assert.match(root.innerHTML, /Compromissos/);
-    assert.match(root.innerHTML, /Owner/);
-    assert.match(root.innerHTML, /Due date/);
+    assert.match(root.innerHTML, /Responsável/);
+    assert.match(root.innerHTML, /Vencimento/);
     assert.match(root.innerHTML, /Entregáveis/);
-    assert.match(root.innerHTML, /Blockers/);
+    assert.match(root.innerHTML, /Bloqueios/);
     assert.match(root.innerHTML, /Próxima ação/);
     assert.match(root.innerHTML, /Evidência/);
     assert.match(root.innerHTML, /data-client-source="warmbly"/);
     assert.match(root.innerHTML, /data-client-source="asaas"/);
     assert.match(root.innerHTML, /data-client-source="governance"/);
     assert.match(root.innerHTML, /data-client-source="asaas"[^>]*data-absent="true"/);
+    // O enum cru continua legível pela sonda, mas o texto visível é português.
+    assert.match(root.innerHTML, /data-source-status="UNKNOWN"/);
+    assert.match(root.innerHTML, /risco de saída/);
+    assert.doesNotMatch(root.innerHTML, /<dd>UNKNOWN<\/dd>/);
   } finally {
     handle.unmount();
   }
@@ -61,13 +65,17 @@ test("Financeiro page surfaces contracted/billed/paid/received/overdue/receivabl
     assert.match(root.innerHTML, /Efetivamente recebido/);
     assert.match(root.innerHTML, /Vencido/);
     assert.match(root.innerHTML, /A receber/);
-    assert.match(root.innerHTML, /Refunds/);
-    assert.match(root.innerHTML, /Chargebacks/);
-    assert.match(root.innerHTML, /MRR/);
-    assert.match(root.innerHTML, /Runway/);
+    assert.match(root.innerHTML, /Estornos/);
+    assert.match(root.innerHTML, /Contestações de pagamento/);
+    assert.match(root.innerHTML, /Receita recorrente mensal/);
+    assert.match(root.innerHTML, /Fôlego de caixa/);
     assert.match(root.innerHTML, /omitido — caixa e despesas não confiáveis/);
     assert.match(root.innerHTML, /data-amount-cents="1500000"/);
-    assert.match(root.innerHTML, /Mutações de provedor: forbidden/);
+    assert.match(root.innerHTML, /Mutações de provedor: proibidas/);
+    assert.doesNotMatch(root.innerHTML, /Mutações de provedor: forbidden/);
+    // provider_mutations e read_model_only continuam disponíveis, recolhidos.
+    assert.match(root.innerHTML, /provider_mutations=forbidden/);
+    assert.match(root.innerHTML, /read_model_only=true/);
   } finally {
     handle.unmount();
   }
@@ -78,12 +86,12 @@ test("Engenharia page surfaces repo, branch, PRs, CI, P0/P1, aging, blockers, ev
   const handle = mount(root, createMockAdapter(), createMemoryRuntime("#/engenharia"));
   try {
     assert.match(root.innerHTML, /Repositório/);
-    assert.match(root.innerHTML, /Branch\/default/);
-    assert.match(root.innerHTML, />PRs</);
-    assert.match(root.innerHTML, />CI</);
-    assert.match(root.innerHTML, /P0\/P1/);
-    assert.match(root.innerHTML, /Aging/);
-    assert.match(root.innerHTML, /Blockers/);
+    assert.match(root.innerHTML, /Branch padrão/);
+    assert.match(root.innerHTML, />Pull requests abertos</);
+    assert.match(root.innerHTML, />Integração contínua</);
+    assert.match(root.innerHTML, /Prioridade 0 \/ prioridade 1/);
+    assert.match(root.innerHTML, /Itens envelhecidos/);
+    assert.match(root.innerHTML, /Bloqueios/);
     assert.match(root.innerHTML, /Última evidência/);
     assert.match(root.innerHTML, /Trabalho ativo sem evidência/);
     assert.match(root.innerHTML, /data-hypothesis="true"/);
@@ -103,8 +111,12 @@ test("Infra page surfaces HTTP, TLS, Docker, backup, disk/memory, PNCP freshness
     assert.match(root.innerHTML, />Backup</);
     assert.match(root.innerHTML, /Disco/);
     assert.match(root.innerHTML, /Memória/);
-    assert.match(root.innerHTML, /PNCP freshness/);
-    assert.match(root.innerHTML, /Partial outage/);
+    assert.match(root.innerHTML, /Atualização do PNCP/);
+    assert.match(root.innerHTML, /Indisponibilidade parcial/);
+    // status cru some do texto, mas não dos dados nem do detalhe recolhido.
+    assert.match(root.innerHTML, /data-status="degraded"/);
+    assert.match(root.innerHTML, /degradado/);
+    assert.match(root.innerHTML, /status=degraded/);
     assert.match(root.innerHTML, /data-partial-outage="true"/);
   } finally {
     handle.unmount();
@@ -126,8 +138,13 @@ test("Memória groups decisions, directives, facts, constraints, priorities, ris
     ]) {
       assert.match(root.innerHTML, new RegExp(`data-memory-kind="${kind}"`));
     }
-    assert.match(root.innerHTML, /Decisions/);
-    assert.match(root.innerHTML, /Revisões \/ supersession/);
+    assert.match(root.innerHTML, /<h2 id="memoria-decision">Decisões<\/h2>/);
+    assert.match(root.innerHTML, /<h2 id="memoria-hypothesis">Hipóteses<\/h2>/);
+    assert.match(root.innerHTML, /Revisões \/ substituições/);
+    assert.doesNotMatch(root.innerHTML, /Decisions|Directives|Hypotheses/);
+    // kind e status crus continuam nos dados e no detalhe recolhido.
+    assert.match(root.innerHTML, /data-kind="decision"/);
+    assert.match(root.innerHTML, /kind=decision/);
   } finally {
     handle.unmount();
   }
@@ -137,15 +154,17 @@ test("Agentes page presents RUNNING/DONE/PARTIAL/BLOCKED/FAILED/UNKNOWN and neve
   const root = { innerHTML: "" };
   const handle = mount(root, createMockAdapter(), createMemoryRuntime("#/agentes"));
   try {
-    assert.match(root.innerHTML, /RUNNING/);
-    assert.match(root.innerHTML, /PARTIAL/);
-    assert.match(root.innerHTML, /UNKNOWN/);
-    assert.match(root.innerHTML, /Agent\/provider/);
-    assert.match(root.innerHTML, /Repo\/scope/);
-    assert.match(root.innerHTML, /Goal\/campaign/);
-    assert.match(root.innerHTML, /residual_work/);
+    assert.match(root.innerHTML, /data-status="RUNNING"/);
+    assert.match(root.innerHTML, /data-status="PARTIAL"/);
+    assert.match(root.innerHTML, /em execução/);
+    assert.match(root.innerHTML, /parcial/);
+    assert.match(root.innerHTML, /Agente \/ provedor/);
+    assert.match(root.innerHTML, /Repositório \/ escopo/);
+    assert.match(root.innerHTML, /Objetivo \/ campanha/);
+    assert.match(root.innerHTML, /Trabalho residual/);
+    assert.match(root.innerHTML, /presentation_status=RUNNING/);
     assert.match(root.innerHTML, /data-stale-running="true"/);
-    assert.match(root.innerHTML, /não vira DONE/);
+    assert.match(root.innerHTML, /não vira concluído/);
     const running = root.innerHTML.match(/data-status="RUNNING"[\s\S]*?data-freshness="STALE"/);
     assert.ok(running);
   } finally {
@@ -320,10 +339,11 @@ test("the rendered identity queue is the producer's, with its origin, reason cod
   assert.match(html, /data-queue="client-identity"/);
   assert.match(html, /data-operational-client="false"/);
   assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
-  // Origin is the producer, not the reader's base URL.
-  assert.match(html, /warmbly · deal-7/);
+  // Origin is authored on the front; locator and reason code stay technical.
+  assert.match(html, /<dt>Origem<\/dt><dd>Warmbly<\/dd>/);
   assert.doesNotMatch(html, /control-center · http/);
   assert.match(html, /não está vinculado a nenhuma conta\/empresa/);
+  assert.match(html, /locator=deal-7/);
   assert.match(html, /missing_client_key/);
   assert.match(html, /Vincular o registro a uma conta\/empresa/);
 });
@@ -352,8 +372,9 @@ test("a published row that fails the identity rule is queued, never rendered as 
   assert.match(html, /class="card client"/);
   assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
   assert.doesNotMatch(html, /client:unknown/);
-  // The queue names the row's own declared source, not the HTTP reader.
-  assert.match(html, /warmbly · commercial\/pipeline/);
+  // The queue names the source safely; its locator remains available technically.
+  assert.match(html, /<dt>Origem<\/dt><dd>Warmbly<\/dd>/);
+  assert.match(html, /locator=commercial\/pipeline/);
 });
 
 test("drilling into one client does not show the whole identity queue", async () => {

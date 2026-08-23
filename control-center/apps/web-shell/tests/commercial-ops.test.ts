@@ -4,6 +4,13 @@ import { paintShell, createMemoryRuntime } from "../src/app";
 import { createMockAdapter } from "../src/adapters/index";
 import { parseHash } from "../src/destinations";
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 test("commercial surfaces render cohort, pipeline, activity and exception operator forms", () => {
   const adapter = createMockAdapter();
   const root = { innerHTML: "" };
@@ -39,6 +46,89 @@ test("commercial surfaces render cohort, pipeline, activity and exception operat
     "client_revenue",
   ]) {
     assert.match(root.innerHTML, new RegExp(`data-growth-hop="${hop}"`));
+  }
+});
+
+test("cohort contract tokens receive authored labels and future values stay technical", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.ok(initial.ok && !initial.loading && initial.page.commercial);
+  if (!initial.ok || initial.loading || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: {
+      mixing_rule: "acquisition_cohorts_and_event_period_metrics_are_labeled_separately",
+      acquisition: [
+        {
+          window: "7d",
+          kind: "acquisition_cohort",
+          anchor_event: "contact.created_at",
+          anchor_label: "Acquisition cohort: contact created_at. Not an event-period metric.",
+          source: "control-center.derived_from_warmbly_crm_reads",
+          population: 3,
+        },
+        {
+          window: "future",
+          kind: "FUTURE_KIND",
+          anchor_event: "FUTURE_EVENT",
+          anchor_label: "FUTURE_ANCHOR",
+          source: "FUTURE_SOURCE",
+          population: 1,
+        },
+      ],
+      inbound_truth: {
+        configured: true,
+        kind: "event_period_funnel",
+        anchor_event: "warmbly_inbound_truth_scoreboard",
+        anchor_label: "Warmbly inbound-truth scoreboard. Not an acquisition cohort.",
+      },
+    },
+  };
+  const adapter = {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /Coortes de aquisição e métricas por período são apresentadas separadamente/);
+  assert.match(shown, /coorte de aquisição/);
+  assert.match(shown, /Coorte de aquisição ancorada na criação do contato/);
+  assert.match(shown, /Placar de mensagens recebidas do Warmbly/);
+  assert.match(shown, /tipo de coorte não reconhecido/);
+  assert.match(shown, /Referência da métrica não reconhecida/);
+  assert.match(shown, /Janela não reconhecida/);
+  assert.doesNotMatch(
+    shown,
+    /acquisition_cohorts_and_event_period_metrics_are_labeled_separately|acquisition_cohort|Acquisition cohort|event_period_funnel|FUTURE_(?:KIND|EVENT|ANCHOR|SOURCE)/,
+  );
+  assert.match(root.innerHTML, /mixing_rule=acquisition_cohorts_and_event_period_metrics_are_labeled_separately/);
+  assert.match(root.innerHTML, /data-cohort-kind="FUTURE_KIND"/);
+  assert.match(root.innerHTML, /anchor_label=FUTURE_ANCHOR/);
+  assert.match(root.innerHTML, /window=future/);
+
+  (commercial.operations.cohorts as Record<string, unknown>).mixing_rule = "FUTURE_MIXING_RULE";
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  assert.match(visibleText(root.innerHTML), /Regra de separação não reconhecida/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_MIXING_RULE/);
+  assert.match(root.innerHTML, /mixing_rule=FUTURE_MIXING_RULE/);
+
+  const cohorts = commercial.operations.cohorts as Record<string, unknown>;
+  const futureRow = (cohorts.acquisition as Record<string, unknown>[])[1];
+  assert.ok(futureRow);
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    cohorts.mixing_rule = poisoned;
+    futureRow.kind = poisoned;
+    futureRow.anchor_label = poisoned;
+    paintShell(root, adapter as never, "#/comercial/cohorts");
+    const reading = visibleText(root.innerHTML);
+    assert.match(reading, /Regra de separação não reconhecida/);
+    assert.match(reading, /tipo de coorte não reconhecido/);
+    assert.match(reading, /Referência da métrica não reconhecida/);
+    assert.doesNotMatch(reading, new RegExp(poisoned));
+    assert.match(root.innerHTML, new RegExp(`mixing_rule=${poisoned}`));
   }
 });
 
@@ -101,14 +191,19 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
   const root = { innerHTML: "" };
   paintShell(root, adapter as never, "#/comercial/cohorts");
   assert.match(root.innerHTML, /Enviados<\/dt><dd>0<\/dd>/);
-  assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>0<\/dd>/);
-  assert.match(root.innerHTML, /Hard bounce<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
-  assert.match(root.innerHTML, /SMTP accepted não é delivery/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>0<\/dd>/);
+  assert.match(root.innerHTML, /Rejeições permanentes<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
+  assert.match(root.innerHTML, /Aceite pelo SMTP não comprova entrega/);
   assert.match(root.innerHTML, /Mês do relatório<\/dt><dd>2026-08<\/dd>/);
   assert.match(root.innerHTML, /Autorizado em<\/dt><dd>2026-08-22T10:00:00.000Z<\/dd>/);
   assert.match(root.innerHTML, /Expira em<\/dt><dd>2026-08-23T10:00:00.000Z<\/dd>/);
   assert.match(root.innerHTML, /Instante de coleta\/observação/);
-  assert.doesNotMatch(root.innerHTML, /Hard bounce<\/dt><dd>0<\/dd>/);
+  assert.match(root.innerHTML, /Estado da autorização<\/dt><dd>ativa<\/dd>/);
+  assert.match(root.innerHTML, /Estado do disparo<\/dt><dd>bloqueado fora da janela de envio<\/dd>/);
+  assert.match(root.innerHTML, /Rota pessoa identificada diretamente/);
+  assert.match(root.innerHTML, /authorization_state=active/);
+  assert.match(root.innerHTML, /dispatch_state=blocked_outside_window/);
+  assert.doesNotMatch(root.innerHTML, /Rejeições permanentes<\/dt><dd>0<\/dd>/);
 });
 
 test("cohort view does not present unproven telemetry as real outcomes", () => {
@@ -125,10 +220,9 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
       availability: "UNKNOWN",
       last_update_at: "2026-08-22T18:00:00.000Z",
       current: {
-        cohort_id: "cohort-unproven",
         policy_version: "controlled-email.v1",
         outcomes: { provider_accepted: 99 },
-        integrity_flags: ["grant_revoked"],
+        integrity_flags: ["grant_revoked", "FUTURE_FLAG", "constructor", "toString", "__proto__"],
       },
       rows: [{ route_class: "SHOULD_NOT_RENDER", provider_accepted: 99 }],
     },
@@ -141,8 +235,12 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   paintShell(root, adapter as never, "#/comercial/cohorts");
   assert.match(root.innerHTML, /data-controlled-email="unknown"/);
   assert.match(root.innerHTML, /telemetria real não comprovada/);
-  assert.match(root.innerHTML, /grant observado como revogado/);
-  assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
+  assert.match(root.innerHTML, /autorização observada como revogada/);
+  assert.match(visibleText(root.innerHTML), /verificação não reconhecida/);
+  assert.match(visibleText(root.innerHTML), /Coorte não identificada/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_FLAG|UNKNOWN|constructor|toString|__proto__/);
+  assert.match(root.innerHTML, /integrity_flags=grant_revoked,FUTURE_FLAG,constructor,toString,__proto__/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
   assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
-  assert.doesNotMatch(root.innerHTML, /Primeiro cohort real de e-mail/);
+  assert.doesNotMatch(root.innerHTML, /Primeira coorte real de e-mail/);
 });

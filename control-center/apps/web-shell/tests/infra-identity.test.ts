@@ -47,7 +47,7 @@ test("Infra cards name the service, its function, its endpoint and its evidence"
     assert.match(root.innerHTML, />Endpoint lógico</);
     assert.match(root.innerHTML, />Última verificação</);
     assert.match(root.innerHTML, />Latência observada</);
-    assert.match(root.innerHTML, />Freshness</);
+    assert.match(root.innerHTML, />Atualização</);
     assert.match(root.innerHTML, />Erro recente</);
     const names = [...root.innerHTML.matchAll(/<article class="card health"[\s\S]*?<h3>([^<]*)<\/h3>/g)].map(
       (match) => match[1],
@@ -282,7 +282,7 @@ test("doubt about the collector run is shown as a caveat, not written into the s
   assert.deepEqual(presentHealth(item), { status: "healthy", conclusive: true });
   const html = healthCard(item);
   assert.match(html, /data-snapshot-evidence="ERROR"/);
-  assert.match(html, /Coleta que trouxe este serviço: ERROR/);
+  assert.match(html, /Coleta que trouxe este serviço: erro de coleta/);
   assert.doesNotMatch(html, /data-status="down"/);
 });
 

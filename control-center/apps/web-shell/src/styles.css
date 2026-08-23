@@ -393,6 +393,10 @@ h2 {
   margin: 0 0 0.55rem;
 }
 
+.help-line {
+  margin: 0 0 0.55rem;
+}
+
 .kicker {
   display: flex;
   flex-wrap: wrap;
@@ -1178,4 +1182,80 @@ details.alert-why > summary {
 .alert-why-notes {
   margin: 0 0 0.4rem;
   padding-left: 1.1rem;
+}
+
+/* Detalhe técnico progressivo (issue #63): identificadores, schema e
+   provenance recolhidos e copiáveis, sem sair da página. */
+.tech {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.tech > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.tech-facts {
+  display: grid;
+  gap: 0.2rem 0.6rem;
+  margin: 0.3rem 0 0;
+}
+
+.tech-facts div {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.35rem;
+}
+
+.tech-facts dt,
+.tech-facts dd {
+  margin: 0;
+}
+
+.tech-copy {
+  margin: 0.4rem 0 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+  user-select: all;
+}
+
+.term-help {
+  display: inline;
+  position: relative;
+}
+
+.term-help > summary {
+  display: inline;
+  list-style: none;
+}
+
+.term-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-help > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.term-help-text {
+  display: block;
+  margin: 0.35rem 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--accent);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
+.term[data-help] {
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
 }
