@@ -1,0 +1,18 @@
+{
+  "schema_version": "confenge.campaign_state.v1",
+  "campaign_id": "CONFENGE-EXTRA-WEEKLY-REVENUE-CHAIN-01",
+  "status": "SANDBOX_RECONCILED_WAITING_HUMAN_GATE",
+  "done": false,
+  "correlation_id": "corr_extra_sbx_week_2026_34",
+  "human_gate": "WAIT",
+  "production_revenue_observed": false,
+  "client_contacted": false,
+  "real_charge_created": false,
+  "pii_transmitted": false,
+  "ordered_pull_requests": [
+    "warmbly#132",
+    "warmbly#133",
+    "Governance#89",
+    "Governance UI/docs stacked PR"
+  ]
+}
