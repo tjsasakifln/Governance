@@ -109,6 +109,13 @@ function observedLinkedOpaqueText(value: unknown, expectedId: string, collectedA
 function observedProviderMoney(value: unknown, expectedId: string, collectedAt: number): Record<string, unknown> {
   const row = asRecord(value);
   if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
+  const hasObservedAt = Object.prototype.hasOwnProperty.call(row, "observed_at");
+  const observedAt = observedInstant(row.observed_at, collectedAt);
+  // The producer contract makes observed_at optional. Omission therefore keeps
+  // backward compatibility, but a present-yet-invalid timestamp is evidence
+  // drift and invalidates the entire financial fact rather than merely hiding
+  // its provenance.
+  if (hasObservedAt && !observedAt) return { availability: "UNKNOWN" };
   const id = opaqueCommercialId(row.id);
   if (id === "UNKNOWN" || expectedId === "UNKNOWN" || id !== expectedId) {
     return { availability: "UNKNOWN" };
@@ -119,7 +126,6 @@ function observedProviderMoney(value: unknown, expectedId: string, collectedAt: 
     ? Number(row.amount_cents)
     : undefined;
   const hasDenominatedAmount = amount !== undefined && currency !== undefined;
-  const observedAt = observedInstant(row.observed_at, collectedAt);
   return {
     availability: "OBSERVED",
     id,

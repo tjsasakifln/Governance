@@ -265,6 +265,56 @@ test("weekly revenue projection fails closed on authority drift, collisions, and
     currency: "BRL",
   });
 
+  const boundFinancialFacts = {
+    ...chain,
+    charge: {
+      availability: "OBSERVED",
+      id: identity.charge_id,
+      status: "CONFIRMED",
+      amount_cents: 800000,
+      currency: "BRL",
+    },
+    receipt: {
+      availability: "OBSERVED",
+      id: identity.payment_id,
+      status: "RECEIVED",
+      amount_cents: 0,
+      currency: "BRL",
+    },
+  };
+  const [withoutOptionalTimestamp] = project({ ...executive, weekly_revenue_chains: [boundFinancialFacts] });
+  assert.deepEqual(withoutOptionalTimestamp?.charge, {
+    availability: "OBSERVED",
+    id: identity.charge_id,
+    status: "CONFIRMED",
+    amount_cents: 800000,
+    currency: "BRL",
+  });
+  assert.deepEqual(withoutOptionalTimestamp?.receipt, {
+    availability: "OBSERVED",
+    id: identity.payment_id,
+    status: "RECEIVED",
+    amount_cents: 0,
+    currency: "BRL",
+  });
+
+  for (const observed_at of [
+    "2026-02-30T12:00:00Z",
+    "2050-01-01T00:00:00Z",
+    "2026-08-21T12:00:00+00:00",
+  ]) {
+    const [hostileTime] = project({
+      ...executive,
+      weekly_revenue_chains: [{
+        ...boundFinancialFacts,
+        charge: { ...boundFinancialFacts.charge, observed_at },
+        receipt: { ...boundFinancialFacts.receipt, observed_at },
+      }],
+    });
+    assert.deepEqual(hostileTime?.charge, { availability: "UNKNOWN" });
+    assert.deepEqual(hostileTime?.receipt, { availability: "UNKNOWN" });
+  }
+
   assert.deepEqual(project({ ...executive, weekly_revenue_chains: [chain, chain] }), []);
 });
 
