@@ -439,7 +439,10 @@ try {
   console.log("critical_path=exception_without_truth writes=blocked");
   await page.unroute(exceptionsListPattern);
 
-  await page.goto(`${baseUrl}#/comercial/excecoes`, { waitUntil: "networkidle" });
+  // The browser is already on this exact URL, so `goto` would be a same-document
+  // no-op and would keep the intercepted truth-less DOM. Reload so the untouched
+  // production fixture is really fetched with the route removed.
+  await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector('[data-exception-id="exception-fixture-owner"]');
   const exceptionTruth = await page.locator("[data-operational-truth]").first().getAttribute("data-operational-truth");
   if (exceptionTruth !== "HEALTHY") {
