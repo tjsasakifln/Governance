@@ -1,3 +1,4 @@
+import { alertBody, alertDataAttributes } from "./alert-card";
 import { escapeHtml } from "../escape";
 import { formatMoney } from "../money";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
@@ -9,6 +10,25 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const money = row.money
     ? `<p class="money" data-amount-cents="${row.money.amount_cents}" data-currency="${escapeHtml(row.money.currency)}">${escapeHtml(formatMoney(row.money))}</p>`
     : "";
+  if (row.alert) {
+    // Alert rows get the actionable card: severity in Portuguese, impact,
+    // origin, owner, age, deadline and "O que fazer agora" up front; the
+    // engine formula behind a closed disclosure.
+    return `
+    <article class="card ${sectionId === "incidents" ? "attention" : "hoje-row"} alert-card" ${alertDataAttributes(row.alert)} data-freshness="${escapeHtml(row.freshness_status)}" data-tone="${escapeHtml(tone)}">
+      <header>
+        <h3>${escapeHtml(row.title)}</h3>
+      </header>
+      ${alertBody(row.alert, {
+        source: row.source,
+        observed_at: row.observed_at,
+        freshness_status: row.freshness_status,
+        confidence: row.confidence ?? 0,
+      })}
+      ${money}
+    </article>
+  `;
+  }
   const severity = row.severity ? `<span class="pill">${escapeHtml(row.severity)}</span>` : "";
   return `
     <article class="card ${sectionId === "incidents" ? "attention" : "hoje-row"}" data-id="${escapeHtml(row.id)}" data-freshness="${escapeHtml(row.freshness_status)}" data-tone="${escapeHtml(tone)}"${row.severity ? ` data-severity="${escapeHtml(row.severity)}"` : ""}>

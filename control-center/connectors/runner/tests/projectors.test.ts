@@ -956,3 +956,517 @@ test("finance projector fails closed on an unreadable bucket currency and defaul
   assert.equal(finance.payload.billed, undefined);
   assert.deepEqual(finance.payload.paid, { amount_cents: 2_500_000, currency: "BRL" });
 });
+
+function infraEnvelope(payload: unknown, overrides: Partial<{
+  freshness_status: "FRESH" | "STALE" | "UNKNOWN" | "ERROR";
+  confidence: number;
+  error: { code: string; message: string };
+}> = {}) {
+  return {
+    collector: "infra",
+    freshness_status: overrides.freshness_status ?? ("FRESH" as const),
+    observed_at: now,
+    source: { system: "infra", kind: "collector-runner", locator: "infra" },
+    confidence: overrides.confidence ?? 0.9,
+    ...(overrides.error ? { error: overrides.error } : {}),
+    payload,
+  };
+}
+
+function infraServices(snapshot: { payload: Record<string, unknown> }): Record<string, unknown>[] {
+  const services = snapshot.payload.services;
+  assert.ok(Array.isArray(services));
+  return services as Record<string, unknown>[];
+}
+
+test("infrastructure services keep the collector's identity, function and endpoint", () => {
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        {
+          service_id: "netcup-vps-tcp",
+          display_name: "Netcup VPS TCP",
+          role: "Host Netcup: alcance TCP da porta 443",
+          endpoint: "159.195.18.88:443",
+          source: "infrastructure",
+          observed_at: now,
+          freshness_status: "FRESH",
+          status: "healthy",
+          confidence: 0.9,
+          latency_ms: 11,
+          checks: [{ check: "reachability", status: "healthy", summary: "host reachable" }],
+        },
+        {
+          service_id: "confenge-api-http",
+          display_name: "Confenge API inbound health",
+          role: "Endpoint de health do inbound",
+          endpoint: "https://api.confenge.com.br/health",
+          source: "infrastructure",
+          observed_at: now,
+          freshness_status: "FRESH",
+          status: "unhealthy",
+          confidence: 0.9,
+          latency_ms: 30,
+          last_error: "http: HTTP 503",
+          runbook_url: "/runbooks/confenge-api-http",
+          checks: [{ check: "http", status: "unhealthy", summary: "HTTP 503" }],
+        },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 2);
+  const names = services.map((row) => row.service_name);
+  assert.deepEqual(names, ["Netcup VPS TCP", "Confenge API inbound health"]);
+  assert.equal(new Set(services.map((row) => row.id)).size, 2);
+  for (const row of services) {
+    assert.notEqual(String(row.role), "");
+    assert.notEqual(String(row.endpoint), "");
+    assert.equal(row.catalog_error, undefined);
+    const provenance = row.provenance as { freshness_status: string; confidence: number };
+    assert.equal(provenance.freshness_status, "FRESH");
+    assert.equal(provenance.confidence, 0.9);
+  }
+  const [, broken] = services;
+  assert.ok(broken);
+  // The collector says "unhealthy"; the contract and the cockpit say "down".
+  assert.equal(broken.status, "down");
+  assert.equal(broken.last_error, "http: HTTP 503");
+  assert.equal(broken.runbook_url, "/runbooks/confenge-api-http");
+  assert.deepEqual(broken.http, { status: "down", detail: "HTTP 503" });
+  assert.equal(infra.payload.catalog_error_count, 0);
+  assert.equal(infra.payload.monitored_service_count, 2);
+});
+
+test("infrastructure summary keeps the worst state regardless of service order", () => {
+  const service = (id: string, status: string) => ({
+    service_id: id,
+    display_name: id,
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status,
+    confidence: 0.9,
+    checks: [],
+  });
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [service("first-degraded", "degraded"), service("later-down", "unhealthy")],
+    }),
+  );
+  assert.ok(infra);
+  assert.equal(infra.payload.status, "down");
+});
+
+test("identical catalog entries collapse into one card and keep the worst state", () => {
+  const row = {
+    service_id: "cfg-health",
+    display_name: "cfg-health HTTP",
+    role: "Painel de configuração",
+    endpoint: "http://127.0.0.1:18081/health",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    confidence: 0.9,
+    checks: [],
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        { ...row, status: "healthy" },
+        { ...row, status: "degraded" },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 1);
+  assert.equal(services[0]?.duplicate_count, 2);
+  assert.equal(services[0]?.status, "degraded");
+  assert.equal(infra.payload.duplicate_group_count, 1);
+  assert.equal(infra.payload.partial_outage, false);
+  assert.equal(infra.payload.status, "degraded");
+});
+
+test("duplicate services retain independent checks and the worst freshness timestamp", () => {
+  const newer = "2026-02-23T12:10:00.000Z";
+  const older = "2026-02-23T11:00:00.000Z";
+  const common = {
+    service_id: "cfg-health",
+    display_name: "cfg-health",
+    source: "infrastructure",
+    confidence: 0.9,
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        {
+          ...common,
+          observed_at: newer,
+          freshness_status: "FRESH",
+          status: "healthy",
+          checks: [{ check: "http", status: "healthy", summary: "HTTP 200" }],
+        },
+        {
+          ...common,
+          observed_at: older,
+          freshness_status: "STALE",
+          status: "degraded",
+          checks: [{ check: "tls", status: "degraded", summary: "certificate aging" }],
+        },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const [service] = infraServices(infra);
+  assert.ok(service);
+  assert.deepEqual(service.checks, [
+    { name: "http", status: "healthy", detail: "HTTP 200" },
+    { name: "tls", status: "degraded", detail: "certificate aging" },
+  ]);
+  assert.deepEqual(service.http, { status: "healthy", detail: "HTTP 200" });
+  assert.deepEqual(service.tls, { status: "degraded", detail: "certificate aging" });
+  assert.equal(service.freshness_status, "STALE");
+  assert.equal(service.observed_at, older);
+  assert.equal(service.checked_at, older);
+  assert.equal((service.provenance as Record<string, unknown>).observed_at, older);
+});
+
+test("an unknown service beside a healthy one is inconclusive, not a partial outage", () => {
+  const service = (id: string, status: string) => ({
+    service_id: id,
+    display_name: id,
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: status === "unknown" ? "UNKNOWN" : "FRESH",
+    status,
+    confidence: status === "unknown" ? 0 : 0.9,
+    checks: [],
+  });
+  const [infra] = projectCollector(
+    infraEnvelope({ service_health: [service("healthy", "healthy"), service("unknown", "unknown")] }),
+  );
+  assert.ok(infra);
+  assert.equal(infra.payload.partial_outage, false);
+  assert.equal(infra.payload.status, "unknown");
+});
+
+test("a service with no identity is flagged as a catalog error, not named 'service'", () => {
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [{ status: "healthy", freshness_status: "FRESH", checks: [] }],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 1);
+  assert.equal(services[0]?.catalog_error, "missing_service_identity");
+  assert.notEqual(services[0]?.service_name, "service");
+  assert.equal(services[0]?.service_id, null);
+  assert.equal(infra.payload.catalog_error_count, 1);
+});
+
+test("an unconfigured infra collector names the reason instead of scoring like a failure", () => {
+  const [infra] = projectCollector(
+    infraEnvelope(
+      { ok: false, availability: "NOT_CONFIGURED" },
+      {
+        freshness_status: "UNKNOWN",
+        confidence: 0,
+        error: { code: "NOT_CONFIGURED", message: "CC_INFRA_ALLOWLIST is not configured" },
+      },
+    ),
+  );
+  assert.ok(infra);
+  assert.equal(infra.availability, "NOT_CONFIGURED");
+  assert.equal(infra.payload.unavailability_reason, "NOT_CONFIGURED");
+  assert.notEqual(infra.payload.status, "healthy");
+  assert.deepEqual(infra.payload.services, []);
+});
+
+test("a runbook link that is not same-origin or credential-free is dropped", () => {
+  const base = {
+    service_id: "x",
+    display_name: "X",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const unsafe of [
+    "javascript:alert(1)",
+    "//evil.invalid/runbook",
+    "https://user:pass@example.invalid/runbook",
+    "/run book",
+  ]) {
+    const [infra] = projectCollector(
+      infraEnvelope({ service_health: [{ ...base, runbook_url: unsafe }] }),
+    );
+    assert.ok(infra);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, unsafe);
+  }
+});
+
+test("two catalog ids that slug alike stay two services and are flagged, never merged", () => {
+  // cfg-health and cfg.health are both legal target ids (allowlist TARGET_ID
+  // permits "." and "_"). Keying the group on a slug merged them and deleted a
+  // monitored dependency from the cockpit and from the count.
+  const row = (id: string, status: string, endpoint: string) => ({
+    service_id: id,
+    display_name: id,
+    role: "Painel de configuração",
+    endpoint,
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status,
+    confidence: 0.9,
+    checks: [],
+  });
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        row("cfg-health", "healthy", "http://127.0.0.1:18081/health"),
+        row("cfg.health", "unhealthy", "https://other.example/h"),
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 2);
+  assert.equal(infra.payload.monitored_service_count, 2);
+  assert.equal(infra.payload.duplicate_group_count, 0);
+  assert.equal(new Set(services.map((r) => r.id)).size, 2, "ambiguous ids must still be distinct");
+  assert.deepEqual(
+    services.map((r) => r.service_id),
+    ["cfg-health", "cfg.health"],
+  );
+  assert.deepEqual(
+    services.map((r) => r.endpoint),
+    ["http://127.0.0.1:18081/health", "https://other.example/h"],
+  );
+  for (const service of services) {
+    assert.equal(service.catalog_error, "ambiguous_service_id");
+    assert.equal(service.duplicate_count, undefined);
+  }
+  assert.equal(infra.payload.catalog_error_count, 2);
+});
+
+test("merging duplicates rolls up each dimension and keeps the evidence of both", () => {
+  const base = {
+    service_id: "cfg-health",
+    display_name: "cfg-health HTTP",
+    source: "infrastructure",
+    observed_at: now,
+    confidence: 0.9,
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        {
+          ...base,
+          status: "unhealthy",
+          freshness_status: "FRESH",
+          last_error: "http: HTTP 503",
+          latency_ms: 30,
+          checks: [{ check: "http", status: "unhealthy", summary: "HTTP 503" }],
+        },
+        { ...base, status: "healthy", freshness_status: "STALE", confidence: 0.4, checks: [] },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 1);
+  const merged = services[0];
+  assert.ok(merged);
+  assert.equal(merged.duplicate_count, 2);
+  // Worst per dimension, independently: the down state and the STALE recency
+  // both survive, and so does the 503 that a whole-row swap used to discard.
+  assert.equal(merged.status, "down");
+  assert.equal(merged.freshness_status, "STALE");
+  assert.equal(merged.confidence, 0.4);
+  assert.equal(merged.latency_ms, 30);
+  assert.equal(merged.last_error, "http: HTTP 503");
+  assert.deepEqual(merged.http, { status: "down", detail: "HTTP 503" });
+});
+
+test("two nameless rows are two catalog defects, not one card with a shared id", () => {
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        { status: "healthy", freshness_status: "FRESH", checks: [] },
+        { status: "unhealthy", freshness_status: "FRESH", checks: [] },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 2);
+  assert.equal(new Set(services.map((r) => r.id)).size, 2);
+  for (const service of services) {
+    assert.equal(service.catalog_error, "missing_service_identity");
+  }
+  assert.equal(infra.payload.catalog_error_count, 2);
+});
+
+test("a failed probe names its reason even though the collector itself ran fine", () => {
+  // The common case: collect() returned, no throw, but the first-sorted
+  // observation is ERROR. Without a reason the operator sees confidence 0 and
+  // cannot tell this from a collector that was never configured.
+  const [infra] = projectCollector(
+    infraEnvelope(
+      {
+        service_health: [
+          {
+            service_id: "confenge-api-http",
+            display_name: "Confenge API inbound health",
+            source: "infrastructure",
+            observed_at: now,
+            freshness_status: "ERROR",
+            status: "unhealthy",
+            confidence: 0,
+            checks: [],
+          },
+        ],
+      },
+      { freshness_status: "ERROR", confidence: 0 },
+    ),
+  );
+  assert.ok(infra);
+  assert.equal(infra.availability, "UPSTREAM_ERROR");
+  assert.equal(infra.payload.unavailability_reason, "UPSTREAM_ERROR");
+});
+
+test("a runbook URL with a secret-looking query key is refused by the projector too", () => {
+  const base = {
+    service_id: "x",
+    display_name: "X",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const unsafe of [
+    "https://runbooks.example/infra?api_key=abc",
+    "https://runbooks.example/infra?x=1&token=abc",
+    "/runbooks/infra?password=hunter2",
+  ]) {
+    const [infra] = projectCollector(
+      infraEnvelope({ service_health: [{ ...base, runbook_url: unsafe }] }),
+    );
+    assert.ok(infra);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, unsafe);
+  }
+  const [ok] = projectCollector(
+    infraEnvelope({
+      service_health: [{ ...base, runbook_url: "https://runbooks.example/infra?service=api" }],
+    }),
+  );
+  assert.ok(ok);
+  assert.equal(infraServices(ok)[0]?.runbook_url, "https://runbooks.example/infra?service=api");
+});
+
+test("a malformed percent-escape in a runbook URL drops the link instead of crashing the projector", () => {
+  // parseAllowlist's path branch does no decoding, so this value reaches the
+  // projector through shipped config. A bare decodeURIComponent here threw
+  // URIError past projectCollector and past runSource's try/finally, and the
+  // whole infra snapshot went unpersisted for that run.
+  const base = {
+    service_id: "confenge-api-http",
+    display_name: "Confenge API inbound health",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const malformed of ["/runbooks/infra?%ZZ=1", "/runbooks/infra?a=1&%E0%A4%A=2", "%ZZ"]) {
+    let projected: ReturnType<typeof projectCollector> | undefined;
+    assert.doesNotThrow(() => {
+      projected = projectCollector(infraEnvelope({ service_health: [{ ...base, runbook_url: malformed }] }));
+    }, malformed);
+    const infra = projected?.[0];
+    assert.ok(infra, malformed);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, malformed);
+    // The card itself still ships: a bad link must not cost the snapshot.
+    assert.equal(infraServices(infra)[0]?.service_name, "Confenge API inbound health");
+  }
+});
+
+test("a query key wearing brackets or encoding is still a secret", () => {
+  const base = {
+    service_id: "x",
+    display_name: "X",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "degraded",
+    confidence: 0.9,
+    checks: [],
+  };
+  for (const unsafe of [
+    "/runbooks/infra?token[]=abc",
+    "/runbooks/infra?token%5B%5D=abc",
+    "https://runbooks.example/i?token[]=abc",
+    "https://runbooks.example/i?identity=abc",
+    "https://runbooks.example/i?x-api-key=abc",
+  ]) {
+    const [infra] = projectCollector(infraEnvelope({ service_health: [{ ...base, runbook_url: unsafe }] }));
+    assert.ok(infra);
+    assert.equal(infraServices(infra)[0]?.runbook_url, undefined, unsafe);
+  }
+});
+
+test("two byte-identical nameless rows stay two catalog defects", () => {
+  // The discriminating case for keying anonymous rows on their index: under the
+  // old JSON.stringify key these two collapse into one card and a monitored
+  // entry disappears behind duplicate_count.
+  const row = { status: "healthy", freshness_status: "FRESH", confidence: 0.9, checks: [] };
+  const [infra] = projectCollector(infraEnvelope({ service_health: [{ ...row }, { ...row }] }));
+  assert.ok(infra);
+  const services = infraServices(infra);
+  assert.equal(services.length, 2);
+  assert.equal(infra.payload.monitored_service_count, 2);
+  assert.equal(infra.payload.duplicate_group_count, 0);
+  assert.equal(new Set(services.map((r) => r.id)).size, 2);
+  for (const service of services) {
+    assert.equal(service.duplicate_count, undefined);
+    assert.equal(service.catalog_error, "missing_service_identity");
+  }
+  assert.equal(infra.payload.catalog_error_count, 2);
+});
+
+test("the surviving latency carries the check that measured it", () => {
+  const base = {
+    service_id: "netcup-vps-1",
+    display_name: "Netcup VPS",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status: "healthy",
+    confidence: 0.9,
+    checks: [],
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        { ...base, latency_ms: 9, latency_check: "http" },
+        { ...base, latency_ms: 120, latency_check: "reachability" },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const merged = infraServices(infra)[0];
+  assert.ok(merged);
+  assert.equal(merged.duplicate_count, 2);
+  assert.equal(merged.latency_ms, 120);
+  // Not "http" — that was the base row's check, for a number it did not measure.
+  assert.equal(merged.latency_check, "reachability");
+});

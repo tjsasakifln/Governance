@@ -7,7 +7,19 @@ export { isKillRule } from "./kill-rules.js";
 export { diverseTopN } from "./diversity.js";
 export { synthesizeDadosStale, appendDadosStale, isDadosStaleTitle } from "./freshness.js";
 export { applyOverride } from "./override.js";
-export { buildReason, toRankedItem } from "./explain.js";
+export {
+  buildReason,
+  buildReasonParts,
+  buildPlainNotes,
+  buildScoreFormula,
+  buildEvidenceSentence,
+  joinReasonParts,
+  splitReason,
+  toRankedItem,
+  REASON_MAX_LENGTH,
+  SCORE_SENTENCE_RE,
+} from "./explain.js";
+export type { ReasonParts } from "./explain.js";
 export {
   toPersistenceFreshness,
   fromPersistenceFreshness,
