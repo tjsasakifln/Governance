@@ -21,7 +21,7 @@ const EXECUTIVE = {
 };
 
 const REPORT = {
-  schema_version: "confenge.observability_report.v1",
+  schema_version: "confenge.inbound_learning_report.v1",
   month: "2026-08",
   include_synthetic: false,
   real_empty: false,

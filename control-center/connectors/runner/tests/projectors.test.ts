@@ -169,7 +169,7 @@ test("real Warmbly mapping selects controlled-email telemetry by cohort and poli
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       month: "2026-08",
       include_synthetic: false,
       real_empty: false,
@@ -208,7 +208,7 @@ test("real Warmbly mapping selects controlled-email telemetry by cohort and poli
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { sent: number; max_daily_volume: number; outcomes: Record<string, number | null> };
     report_month: string | null;
     rows: Array<{ cohort_id: string; policy_version: string; provider_accepted: number }>;
@@ -237,7 +237,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: false,
       controlled_email: [
@@ -266,7 +266,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { policy_version: string | null; outcomes: Record<string, number | null> };
     rows: unknown[];
   };
@@ -288,7 +288,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
         },
       },
       confenge_intel_report: {
-        schema_version: "confenge.observability_report.v1",
+        schema_version: "confenge.inbound_learning_report.v1",
         include_synthetic: includeSynthetic,
         real_empty: false,
         controlled_email: [{
@@ -309,7 +309,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
     });
     const commercial = projected.find((row) => row.snapshot_kind === "commercial");
     assert.ok(commercial);
-    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
       availability: string;
       current: { outcomes: Record<string, number | null> };
       rows: unknown[];
@@ -337,7 +337,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: true,
       controlled_email: [],
@@ -353,7 +353,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { integrity_flags: string[] };
   };
   assert.deepEqual(controlled.current.integrity_flags, [

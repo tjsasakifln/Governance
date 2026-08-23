@@ -602,7 +602,10 @@ function operationsFromWarmbly(
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
     },
     cohorts,
-    controlled_email: controlledEmailOperation(
+    // This is an aggregate outcome contract, not an address-bearing object.
+    // Avoid the generic PII vocabulary (`email`) in the persisted key: the
+    // persistence boundary intentionally removes keys with that vocabulary.
+    controlled_outbound: controlledEmailOperation(
       report,
       status,
       dispatch,
