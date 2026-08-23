@@ -46,6 +46,8 @@ export interface ShellModel {
   surface?: string | null;
   resource?: string | null;
   operatorResult?: AdapterWriteResult;
+  /** Full current location. List chrome reflects search/filters/sort/page in it. */
+  hash?: string;
 }
 
 function attentionCard(item: AttentionItem, now: string): string {
@@ -134,6 +136,7 @@ function pageBody(
   destination: DestinationId,
   surface?: string | null,
   resource?: string | null,
+  hash = `#/${destination}`,
   operatorResult?: AdapterWriteResult,
 ): string {
   if (destination === "hoje") {
@@ -177,7 +180,9 @@ function pageBody(
   );
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
-    page.commercial ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao") : "",
+    page.commercial
+      ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao", hash)
+      : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
     operationalClients.length > 0
@@ -244,7 +249,14 @@ export function renderShell(model: ShellModel): string {
 
   const body =
     page && (model.view.kind === "ready" || model.view.kind === "stale")
-      ? pageBody(page, model.destination, model.surface, model.resource, model.operatorResult)
+      ? pageBody(
+          page,
+          model.destination,
+          model.surface,
+          model.resource,
+          model.hash ?? `#/${model.destination}`,
+          model.operatorResult,
+        )
       : "";
 
   return `

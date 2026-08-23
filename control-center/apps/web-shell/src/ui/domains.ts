@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
+import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import type {
   AgentActivity,
@@ -12,7 +13,7 @@ import type {
   InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
-
+import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 
 function fact(label: string, value: string, extra = ""): string {
@@ -246,7 +247,11 @@ export function commercialSubnav(surface: string | null): string {
     .join("")}</nav>`;
 }
 
-export function commercialBlock(snapshot: CommercialSnapshot, surface: string | null = "visao"): string {
+export function commercialBlock(
+  snapshot: CommercialSnapshot,
+  surface: string | null = "visao",
+  hash = "#/comercial",
+): string {
   const funnel = snapshot.funnel;
   const weighted =
     snapshot.pipeline_weighted && snapshot.pipeline_weighted.probability_reliable
@@ -295,15 +300,58 @@ export function commercialBlock(snapshot: CommercialSnapshot, surface: string | 
   return `
     ${commercialSubnav(current)}
     ${current === "visao" ? recorte : ""}
-    ${commercialOps(snapshot, current)}
+    ${commercialOps(snapshot, current, hash)}
   `;
 }
 
-function commercialOps(snapshot: CommercialSnapshot, surface: string | null): string {
+/**
+ * Read-model rows arrive as `unknown[]` because `operations` is passed through
+ * from the Warmbly projector without a schema of its own.
+ */
+function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
+  return items.map((item) =>
+    item && typeof item === "object" ? (item as Record<string, unknown>) : {},
+  );
+}
+
+function activityOpsCard(row: Record<string, unknown>): string {
+  return `<article class="card" data-activity-id="${escapeHtml(String(row.source_id ?? ""))}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
+    <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
+    <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+    <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
+    <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Validar atividade</button>
+    </form>
+  </article>`;
+}
+
+function exceptionOpsCard(row: Record<string, unknown>): string {
+  return `<article class="card" data-exception-id="${escapeHtml(String(row.id ?? ""))}" data-exception-status="${escapeHtml(String(row.status ?? ""))}">
+    <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
+    <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+    <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
+    <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
+      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
+      <button type="submit">Reconhecer no Control Center</button>
+    </form>
+  </article>`;
+}
+
+function commercialOps(snapshot: CommercialSnapshot, surface: string | null, hash: string): string {
   const ops = operationsOf(snapshot);
+  const listViews = ops.list_views && typeof ops.list_views === "object"
+    ? (ops.list_views as Record<string, unknown>)
+    : {};
+  const overview = ops.overview && typeof ops.overview === "object"
+    ? (ops.overview as Record<string, unknown>)
+    : {};
   const current = surface && surface.length > 0 ? surface : "visao";
   const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
-  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
   const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
   const activity = Array.isArray(ops.activity) ? ops.activity : [];
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
@@ -345,26 +393,20 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         </article>
       </section>`;
   } else if (current === "atividade") {
-    body = `<section aria-labelledby="atividade-title"><h2 id="atividade-title">Atividade recente</h2><div class="stack">${
-      activity.length === 0
-        ? `<p class="banner empty">Sem atividade observada neste recorte.</p>`
-        : activity
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card">
-                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
-                <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
-                <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
-                <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Validar atividade</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: ACTIVITY_LIST,
+      rows: rowsOf(activity),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "atividade-title",
+      heading: "Atividade recente",
+      noun: "atividade(s) observada(s)",
+      emptyData: "Sem atividade observada neste recorte. Ausência não é zero.",
+      card: activityOpsCard,
+      remote: listViews.atividade,
+      declaredTotal: typeof overview.activity === "number" ? overview.activity : activity.length,
+      complete: typeof overview.activity === "number" ? overview.activity === activity.length : true,
+    });
   } else if (current === "pipeline") {
     body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
       pipeline.length === 0
@@ -385,28 +427,21 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
             .join("")
     }</div></section>`;
   } else if (current === "excecoes") {
-    body = `<section aria-labelledby="excecoes-ops-title"><h2 id="excecoes-ops-title">Exceções comerciais</h2>
-      <p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>
-      <div class="stack">${
-      exceptions.length === 0
-        ? `<p class="banner empty">Nenhuma exceção observada.</p>`
-        : exceptions
-            .map((item) => {
-              const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card">
-                <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
-                <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
-                <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
-                <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
-                  <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
-                  <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
-                  <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-                  <button type="submit">Reconhecer no Control Center</button>
-                </form>
-              </article>`;
-            })
-            .join("")
-    }</div></section>`;
+    body = renderFilteredList({
+      spec: EXCEPTION_LIST,
+      rows: rowsOf(exceptions),
+      hash,
+      generatedAt: snapshot.generated_at,
+      headingId: "excecoes-ops-title",
+      heading: "Exceções comerciais",
+      noun: "exceção(ões) observada(s)",
+      emptyData: "Nenhuma exceção observada.",
+      intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
+      card: exceptionOpsCard,
+      remote: listViews.excecoes,
+      declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
+      complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
+    });
   } else {
     body = `<section aria-labelledby="comercial-ops-title">
       <h2 id="comercial-ops-title">Operação agora</h2>

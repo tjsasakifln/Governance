@@ -192,3 +192,42 @@ export function hashFor(destination: DestinationId, view?: string | null, extra?
   const path = parts[0] ?? `#/${destination}`;
   return query ? `${path}?${query}` : path;
 }
+
+/**
+ * Query params of a hash location, decoded into a plain record.
+ *
+ * `parseHash` reads the two params the router itself understands (`view`,
+ * `surface`/`client`). List chrome — search, filters, sorting, pagination —
+ * reflects its own state in the same query string so a recorte can be returned
+ * to or shared internally, and this is the single place that reads it back.
+ */
+export function queryParamsOf(hash: string): Readonly<Record<string, string>> {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const queryPart = stripped.split("?")[1] ?? "";
+  const out: Record<string, string> = {};
+  for (const [key, value] of new URLSearchParams(queryPart)) {
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Rewrites the query string of a hash location, preserving the path and every
+ * param the patch does not mention. A `null` or empty value drops the param, so
+ * a cleared filter leaves no residue in a shared URL.
+ */
+export function withQueryParams(
+  hash: string,
+  patch: Readonly<Record<string, string | null>>,
+): string {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const [pathPart, queryPart] = stripped.split("?");
+  const params = new URLSearchParams(queryPart ?? "");
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === "") params.delete(key);
+    else params.set(key, value);
+  }
+  const query = params.toString();
+  const path = pathPart && pathPart.length > 0 ? pathPart : "/hoje";
+  return query ? `#${path}?${query}` : `#${path}`;
+}

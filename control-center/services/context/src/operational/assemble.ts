@@ -61,7 +61,14 @@ function latestSnapshot(
   rows: readonly OperationalSnapshotRow[],
   domain: OperationalDomain,
 ): OperationalSnapshotRow | undefined {
-  const matches = rows.filter((row) => snapshotKindToDomain(row.snapshot_kind) === domain);
+  // Auxiliary commercial list pages share the commercial scope/source but are
+  // not the domain headline. Selecting one here would replace the entire
+  // commercial snapshot with a 50-row storage page.
+  const matches = rows.filter(
+    (row) =>
+      row.snapshot_kind !== "commercial-list-page" &&
+      snapshotKindToDomain(row.snapshot_kind) === domain,
+  );
   matches.sort((a, b) => {
     const time = b.observed_at.localeCompare(a.observed_at);
     return time !== 0 ? time : b.id.localeCompare(a.id);

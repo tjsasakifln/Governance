@@ -5,6 +5,11 @@ import type { RepoDomainMap } from "../scope.ts";
 import { parseScope } from "../scope.ts";
 import type { ActorRef, Scope } from "../types.ts";
 import { assembleEnvelope, type AssembleDeps } from "./assemble.ts";
+import {
+  buildCommercialListResponse,
+  type CommercialListId,
+  type CommercialListResponse,
+} from "./commercial-list.ts";
 import type { OperationalReadPort } from "./port.ts";
 import {
   OPERATIONAL_DOMAINS,
@@ -30,6 +35,12 @@ export interface OperationalService {
   getAttention(actor: ActorRef, scope: Scope, horizon: AttentionHorizon): Promise<OperationalAttentionResponse>;
   getToday(actor: ActorRef, scope: Scope): Promise<OperationalTodayResponse>;
   getSourceObservations(actor: ActorRef, scope: Scope, source?: string): Promise<OperationalObservationsResponse>;
+  getCommercialList(
+    actor: ActorRef,
+    scope: Scope,
+    list: CommercialListId,
+    params: Readonly<Record<string, string>>,
+  ): Promise<CommercialListResponse>;
 }
 
 function parseDomain(raw: string): OperationalDomain {
@@ -127,6 +138,13 @@ export function createOperationalService(deps: OperationalServiceDeps): Operatio
         confidence: envelope.confidence,
         source_observations: items,
       };
+    },
+
+    async getCommercialList(actor, scope, list, params) {
+      assertOperationalReader(actor, deps.founderActorId);
+      const query = parseScope(scope);
+      const bundle = await deps.port.readLatest();
+      return buildCommercialListResponse(bundle, query, deps.repoDomains, list, params);
     },
   };
 }

@@ -108,7 +108,7 @@ export interface ControlCenterReadAdapter {
   readonly actions: readonly AdapterAction[];
   lastOperatorResult?: AdapterWriteResult;
   readOperator(): ActorRef;
-  readDestination(id: DestinationId): AdapterReadResult | Promise<AdapterReadResult>;
+  readDestination(id: DestinationId, location?: string): AdapterReadResult | Promise<AdapterReadResult>;
   readAttention(): AttentionItem[] | Promise<AttentionItem[]>;
   readPriorities(): PriorityRecommendation[] | Promise<PriorityRecommendation[]>;
   writeShortcut?(
