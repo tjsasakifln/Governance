@@ -29,6 +29,7 @@
 import { formatLocal } from "../datetime";
 import { escapeHtml } from "../escape";
 import { formatMoney, isMoney } from "../money";
+import { sourcePresentationLabel, sourceSystemLabel } from "../provenance";
 import type { CommercialSnapshot } from "../types";
 import {
   commercialEventLabel,
@@ -361,7 +362,10 @@ export interface HistoryEntry {
   event: string;
   state: string | null;
   detail: string | null;
+  /** Authored label for the reading surface. */
   origin: string;
+  /** Upstream token, retained only in attributes and the collapsed technical detail. */
+  source: string | null;
 }
 
 export interface EvidenceEntry {
@@ -451,6 +455,26 @@ function ownerFrom(rows: readonly Record<string, unknown>[]): string | null {
     }
   }
   return null;
+}
+
+const HISTORY_SOURCE_LABELS: Record<string, string> = {
+  "warmbly.attention": "Warmbly · fila de atenção",
+  "warmbly.intel.exceptions": "Warmbly · exceções comerciais",
+};
+
+/**
+ * A history row may carry a projector namespace rather than presentation copy.
+ * Only recognized namespaces influence the authored label; every raw value is
+ * retained separately for the technical disclosure.
+ */
+function historyOriginLabel(
+  rawSource: string | null,
+  fallbackSystem: string,
+  subject: "atividade comercial" | "exceção comercial",
+): string {
+  if (rawSource && HISTORY_SOURCE_LABELS[rawSource]) return HISTORY_SOURCE_LABELS[rawSource];
+  const namespace = rawSource?.split(".", 1)[0] ?? fallbackSystem;
+  return `${sourceSystemLabel(namespace)} · ${subject}`;
 }
 
 function localActionsFor(opts: {
@@ -566,9 +590,9 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     (deal ? text(deal.next_action) : null) ??
     (firstException ? text(firstException.recommended_next_action) : null);
   const owner = ownerFrom(related);
-  const originSystem = input.snapshot.provenance.source.system;
-  const originLocator = input.snapshot.provenance.source.locator;
-  const rowOrigin = firstException ? text(firstException.source) : null;
+  const originSource = input.snapshot.provenance.source;
+  const originSystem = originSource.system;
+  const originLocator = originSource.locator;
 
   const fields: DetailField[] = [
     {
@@ -578,7 +602,7 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     },
     {
       label: "Origem",
-      value: found ? `${originSystem} · ${originLocator}${rowOrigin ? ` · ${rowOrigin}` : ""}` : null,
+      value: found ? sourcePresentationLabel(originSource) : null,
       ...(found ? {} : { absence: "nenhum registro casou com este identificador" }),
     },
     {
@@ -603,24 +627,30 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   ];
 
   const history: HistoryEntry[] = activity
-    .map((row) => ({
-      kind: "activity" as const,
-      at: text(row.at),
-      event: text(row.event) ?? "atividade",
-      state: text(row.state),
-      detail: text(row.evidence),
-      origin: `${originSystem} · atividade`,
-    }))
+    .map((row) => {
+      const source = text(row.source) ?? originSystem;
+      return {
+        kind: "activity" as const,
+        at: text(row.at),
+        event: text(row.event) ?? "atividade",
+        state: text(row.state),
+        detail: text(row.evidence),
+        origin: historyOriginLabel(text(row.source), originSystem, "atividade comercial"),
+        source,
+      };
+    })
     .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 
   for (const row of exceptions) {
+    const source = text(row.source) ?? originSystem;
     history.push({
       kind: "exception",
       at: text(row.observed_at),
       event: text(row.kind) ?? "exceção",
       state: text(row.status),
       detail: text(row.why),
-      origin: text(row.source) ?? `${originSystem} · exceção`,
+      origin: historyOriginLabel(text(row.source), originSystem, "exceção comercial"),
+      source,
     });
   }
   history.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
@@ -666,7 +696,11 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     pushId("Exceção · canonical_id", text(row.canonical_id));
   }
   pushId("Snapshot comercial", input.snapshot.id);
+  pushId("Origem (sistema)", originSystem);
+  pushId("Origem (tipo)", originSource.kind);
   pushId("Origem (locator)", originLocator);
+  for (const row of activity) pushId("Histórico de atividade · source", text(row.source));
+  for (const row of exceptions) pushId("Histórico de exceção · source", text(row.source));
 
   const openException = exceptions.some((row) => (text(row.status) ?? "open") === "open");
   const closedException = exceptions.some((row) => {
@@ -812,7 +846,7 @@ function historySection(model: LeadDetailModel): string {
         ? exceptionKindLabel(entry.event)
         : commercialEventLabel(entry.event);
       const stateLabel = entry.state ? commercialStateLabel(entry.state) : null;
-      return `<li class="card" data-history-event="${escapeHtml(entry.event)}">
+      return `<li class="card" data-history-event="${escapeHtml(entry.event)}" data-history-source="${escapeHtml(entry.source ?? "")}">
         <p class="kicker">${timeCell(entry.at)} · ${escapeHtml(entry.origin)}</p>
         <h4>${escapeHtml(eventLabel)}${stateLabel ? ` · ${escapeHtml(stateLabel)}` : ""}</h4>
         ${entry.detail ? `<p>${escapeHtml(entry.detail)}</p>` : ""}
@@ -820,6 +854,7 @@ function historySection(model: LeadDetailModel): string {
           [
             { term: "event", value: entry.event },
             { term: "state", value: entry.state ?? "" },
+            { term: "source", value: entry.source ?? "" },
           ],
           "lead-history-event",
         )}

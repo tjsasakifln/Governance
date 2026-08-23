@@ -126,6 +126,13 @@ function visibleTextOf(html: string): string {
     .replace(/<[^>]*>/g, " ");
 }
 
+/** Reading surface only: collapsed diagnostics and element attributes are excluded. */
+function readingTextOf(html: string): string {
+  return html
+    .replace(/<details\b[\s\S]*?<\/details>/g, "")
+    .replace(/<[^>]*>/g, " ");
+}
+
 test("an opaque handle is recognised as a handle and a company name is not", () => {
   assert.equal(isOpaqueIdentifier(OPAQUE), true);
   assert.equal(isOpaqueIdentifier("6f2c1f7a-6b4e-4a1e-9c3d-2f7b8a5e1c44"), true);
@@ -186,7 +193,7 @@ test("a detail assembles organisation, stage, next step, history and evidence fr
   const byLabel = new Map(model.fields.map((field) => [field.label, field]));
   assert.equal(byLabel.get("Estágio")?.value, "Proposta");
   assert.equal(byLabel.get("Próximo passo")?.value, "confirmar escopo com o engenheiro responsável");
-  assert.match(byLabel.get("Origem")?.value ?? "", /warmbly/);
+  assert.equal(byLabel.get("Origem")?.value, "Warmbly · leitura comercial");
   // No owner is projected upstream today: the field is present and absent, not
   // silently dropped and not invented.
   assert.equal(byLabel.get("Responsável")?.value, null);
@@ -206,6 +213,56 @@ test("a detail assembles organisation, stage, next step, history and evidence fr
     html,
     new RegExp(`name="target_canonical_id" value="cc:commercial-deal:${DEAL_ID}"`),
   );
+});
+
+test("lead detail presents known origin and history labels while keeping source locators technical", () => {
+  const snapshot = snapshotWith(representativeOperations());
+  const root = { innerHTML: "" };
+  paintShell(root, adapterFor(snapshot), `#/comercial/atividade?resource=${DEAL_ID}`);
+
+  const reading = readingTextOf(root.innerHTML);
+  assert.match(reading, /Warmbly · leitura comercial/);
+  assert.match(reading, /Warmbly · atividade comercial/);
+  assert.match(reading, /Warmbly · fila de atenção/);
+  assert.doesNotMatch(reading, /commercial\/pipeline/);
+  assert.doesNotMatch(reading, /warmbly\.attention/);
+
+  assert.match(root.innerHTML, /locator=commercial\/pipeline/);
+  assert.match(root.innerHTML, /data-history-source="warmbly\.attention"/);
+  assert.match(root.innerHTML, /source=warmbly\.attention/);
+});
+
+test("lead detail gives future provenance and history sources authored fallbacks", () => {
+  const operations = representativeOperations();
+  for (const row of operations.activity as Record<string, unknown>[]) {
+    row.source = "FUTURE_ACTIVITY_SOURCE";
+  }
+  for (const row of operations.exceptions as Record<string, unknown>[]) {
+    row.source = "FUTURE_HISTORY_SOURCE";
+  }
+  const snapshot = snapshotWith(operations);
+  snapshot.provenance.source = {
+    system: "FUTURE_SOURCE_SYSTEM",
+    kind: "FUTURE_SOURCE_KIND",
+    locator: "FUTURE_LOCATOR",
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapterFor(snapshot), `#/comercial/atividade?resource=${DEAL_ID}`);
+
+  const reading = readingTextOf(root.innerHTML);
+  assert.match(reading, /Sistema de origem · leitura operacional/);
+  assert.match(reading, /Sistema de origem · atividade comercial/);
+  assert.match(reading, /Sistema de origem · exceção comercial/);
+  for (const raw of [
+    "FUTURE_SOURCE_SYSTEM",
+    "FUTURE_SOURCE_KIND",
+    "FUTURE_LOCATOR",
+    "FUTURE_ACTIVITY_SOURCE",
+    "FUTURE_HISTORY_SOURCE",
+  ]) {
+    assert.doesNotMatch(reading, new RegExp(raw));
+    assert.match(root.innerHTML, new RegExp(raw));
+  }
 });
 
 test("an unnamed item is titled honestly and its handle only exists in the technical block", () => {
