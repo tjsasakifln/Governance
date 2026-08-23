@@ -75,6 +75,11 @@ const extraHashes = [
   "comercial/pipeline",
   "comercial/excecoes",
   "warmbly/operacao",
+  // The gate surfaces are part of the layout matrix now that they carry tables,
+  // a stepper and a message body. `revisao` with no resource is a real page —
+  // the version selector — so it is probe-safe without a fixture id.
+  "warmbly/cohorts",
+  "warmbly/revisao",
   "clientes/acme",
 ];
 const minimalEvidence = process.env.CC_EVIDENCE_MINIMAL === "1";

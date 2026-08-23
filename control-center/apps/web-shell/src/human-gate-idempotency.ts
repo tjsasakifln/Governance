@@ -5,7 +5,7 @@
  */
 
 export interface HumanGateIntent {
-  action: "create" | "reproduce" | "validate" | "review" | "decide";
+  action: "create" | "reproduce" | "validate" | "review" | "decide" | "adjust";
   version_id?: string;
   candidate_id?: string;
   limit?: number;
@@ -13,6 +13,16 @@ export interface HumanGateIntent {
   reason?: string;
   acknowledged?: boolean;
   confirmation?: string;
+  /**
+   * Adjust only. The proposed copy is part of the intent's identity: retrying
+   * the *same* text must reuse the key, while changing a word is a different
+   * intent that must not inherit the previous one's slot.
+   *
+   * Only the fingerprint of these reaches storage — see `identity` below.
+   */
+  subject?: string;
+  body_text?: string;
+  expected_frozen_hash?: string;
 }
 
 interface TinyStorage {
@@ -59,6 +69,13 @@ function identity(intent: HumanGateIntent): string {
     intent.reason?.trim() ?? "",
     intent.acknowledged === true,
     intent.confirmation?.trim().toLowerCase() ?? "",
+    // Proposed message content is folded into the identity as a fingerprint, so
+    // the same retry keeps its key while different copy gets a different one —
+    // and no subject or body is ever written to browser storage.
+    intent.subject === undefined && intent.body_text === undefined
+      ? ""
+      : fingerprint(JSON.stringify([intent.subject ?? "", intent.body_text ?? ""])),
+    intent.expected_frozen_hash ?? "",
   ]);
 }
 

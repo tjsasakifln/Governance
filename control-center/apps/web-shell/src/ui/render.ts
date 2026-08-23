@@ -250,6 +250,7 @@ function pageBody(
         ...(operatorResult ? { operatorResult } : {}),
         ...(page.warmbly_gate ? { gate: page.warmbly_gate } : {}),
         ...(query ? { query } : {}),
+        ...(resource ? { resource } : {}),
       },
       surface,
     );

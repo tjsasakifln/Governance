@@ -73,6 +73,25 @@ export type AdapterReadResult =
   | { ok: false; loading: false; error: AdapterError }
   | { ok: true; loading: true; page: null };
 
+/** One field the server itself reported as changed by an accepted adjust. */
+export interface GateDiffEntry {
+  field: string;
+  before?: string;
+  after?: string;
+}
+
+/**
+ * What a GET issued *after* a definitive write found.
+ *
+ * A 2xx says the channel accepted the call, not that the resource now reads the
+ * way the operator expects. Claiming "aplicado" from the status alone is the
+ * same mistake as reading "PAUSADO" from a collection that never ran.
+ */
+export interface GateReadback {
+  status: "confirmed" | "not_confirmed" | "unavailable" | "skipped";
+  detail: string;
+}
+
 export interface AdapterWriteResult {
   ok: boolean;
   path: string;
@@ -112,6 +131,31 @@ export interface AdapterWriteResult {
     target?: string;
     writes_to: "control-center" | "warmbly";
   };
+  /**
+   * Which human-gate action produced this result.
+   *
+   * Without it every gate write collapses into one anonymous "decisão
+   * registrada" and the operator cannot tell a created cohort from a recorded
+   * HOLD, which is exactly the defect this field exists to prevent.
+   */
+  gateAction?: WarmblyGateAction;
+  /** The card this result belongs to, so feedback lands where the operator acted. */
+  gateTarget?: { cohort_id?: string; candidate_id?: string };
+  /**
+   * Resource the server created or superseded, read from the response body.
+   *
+   * The UI navigates to what the server returned. It never guesses `n + 1`:
+   * a version the server did not name is a version that may not exist.
+   */
+  gateResource?: { cohort_id?: string; version?: number };
+  /** Correlation id echoed by the edge envelope, for the audit trail. */
+  correlationId?: string;
+  /** Receipt token echoed by the gate (a string, unlike the dispatch receipt object). */
+  receiptId?: string;
+  /** Field-level diff the server returned for an accepted adjust. */
+  diff?: readonly GateDiffEntry[];
+  /** Result of the GET readback performed after a definitive response. */
+  readback?: GateReadback;
 }
 
 /**
@@ -152,8 +196,22 @@ export interface ControlCenterReadAdapter {
   warmblyGate?(input: WarmblyGateInput): AdapterWriteResult | Promise<AdapterWriteResult>;
 }
 
+export const WARMBLY_GATE_ACTIONS = [
+  "create",
+  "reproduce",
+  "validate",
+  "review",
+  "decide",
+  "adjust",
+] as const;
+export type WarmblyGateAction = (typeof WARMBLY_GATE_ACTIONS)[number];
+
+export function isWarmblyGateAction(value: string | null): value is WarmblyGateAction {
+  return typeof value === "string" && (WARMBLY_GATE_ACTIONS as readonly string[]).includes(value);
+}
+
 export interface WarmblyGateInput {
-  action: "create" | "reproduce" | "validate" | "review" | "decide";
+  action: WarmblyGateAction;
   version_id?: string;
   candidate_id?: string;
   limit?: number;
@@ -161,6 +219,15 @@ export interface WarmblyGateInput {
   reason?: string;
   acknowledged?: boolean;
   confirmation?: string;
+  /**
+   * `adjust` only. Exactly three fields are editable, and the contract carries
+   * no others: mailbox, evidence, source, policy and route class are frozen by
+   * construction, so this UI has no control that could offer to change them.
+   */
+  subject?: string;
+  body_text?: string;
+  /** `adjust` only: the frozen hash the operator actually reviewed. */
+  expected_frozen_hash?: string;
   idempotency_key: string;
 }
 
