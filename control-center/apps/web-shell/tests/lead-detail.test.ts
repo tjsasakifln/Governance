@@ -326,7 +326,7 @@ test("Warmbly acknowledge targets the proven inbound lead, never the exception, 
     why: "inbound aguarda leitura",
     evidence: {
       entity_ref: { type: "inbound_lead", id: leadId },
-      lead_id: "lead_lower_priority_ignored",
+      lead_id: leadId,
     },
   }];
 
@@ -339,6 +339,27 @@ test("Warmbly acknowledge targets the proven inbound lead, never the exception, 
   assert.equal(html.includes(`name="target_id" value="${exceptionId}"`), false);
   assert.equal(html.includes(`name="target_id" value="${sourceId}"`), false);
   assert.equal(html.includes(`name="target_id" value="${openedResource}"`), false);
+});
+
+test("conflicting explicit lead ids fail closed instead of choosing a preferred field", () => {
+  const ops = representativeOperations();
+  ops.activity = [{ source_id: "opened_ambiguous", event: "inbound_unread", state: "open" }];
+  ops.pipeline = [];
+  ops.exceptions = [{
+    id: "exception_ambiguous",
+    target_id: "opened_ambiguous",
+    source_id: "exception_source",
+    kind: "inbound_unread",
+    source: "warmbly.attention",
+    status: "open",
+    evidence: {
+      entity_ref: { type: "inbound_lead", id: "lead_A" },
+      lead_id: "lead_B",
+    },
+  }];
+  const model = leadDetailView({ snapshot: snapshotWith(ops), resource: "opened_ambiguous" });
+  assert.equal(model.warmblyTargetId, null);
+  assert.equal(model.warmblyRefusalReason, "lead-id-unproven");
 });
 
 test("an inbound exception without proven lead identity fails closed even when source_id looks valid", () => {

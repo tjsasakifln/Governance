@@ -30,6 +30,7 @@ import {
 import { TARGET_ID_PATTERN } from "../../connectors/warmbly/src/operator/actions.ts";
 import { collectFromWarmblyPayload } from "../../connectors/warmbly/src/mapper/normalize.ts";
 import { projectCommercial } from "../../connectors/runner/src/projectors/commercial.ts";
+import { projectCollector } from "../../connectors/runner/src/projectors/project.ts";
 import { validateOperationalEnvelope } from "../../contracts/src/operational-envelope.ts";
 import { frozenClock } from "../../services/context/src/clock.ts";
 import { createRequestListener } from "../../services/context/src/http.ts";
@@ -113,10 +114,13 @@ function projectedRow(): OperationalSnapshotRow {
   };
 }
 
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
+async function withRows(
+  rows: OperationalSnapshotRow[],
+  fn: (base: string) => Promise<void>,
+): Promise<void> {
   const { service } = makeService();
   const operational = createOperationalService({
-    port: createFixtureOperationalPort({ operational_snapshots: [projectedRow()] }),
+    port: createFixtureOperationalPort({ operational_snapshots: rows }),
     clock: frozenClock(NOW),
     founderActorId: FOUNDER.id,
     repoDomains: REPRESENTATIVE_REPO_DOMAINS,
@@ -132,6 +136,10 @@ async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
       server.close((err) => (err ? reject(err) : resolve()));
     });
   }
+}
+
+async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
+  return withRows([projectedRow()], fn);
 }
 
 async function paint(base: string, hash: string): Promise<string> {
@@ -215,6 +223,79 @@ test("the real normalizer/projector preserves a proven inbound lead id for ackno
   assert.equal(model.warmblyTargetId, leadId);
 });
 
+test("clicking inbound activity 51 carries the compact operator target through Context HTTP", async () => {
+  const inbound = Array.from({ length: 51 }, (_, index) => ({
+    lead_id: `lead-${String(index).padStart(3, "0")}`,
+    company: `Conta inbound ${index}`,
+    status: "new",
+    why_now: `inbound ${index} aguarda humano`,
+    recommended_action: "revisar inbound",
+  }));
+  const normalized = collectFromWarmblyPayload(
+    { confenge_inbound: inbound },
+    { now: new Date(OBSERVED_AT) },
+  );
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: OBSERVED_AT,
+    source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+    confidence: 0.9,
+    payload: normalized,
+  });
+  const rows: OperationalSnapshotRow[] = projected.map((snapshot, index) => ({
+    id: `cc:operational-snapshot:inbound-51-${index}`,
+    scope: snapshot.scope,
+    snapshot_kind: snapshot.snapshot_kind,
+    generated_at: snapshot.observed_at,
+    source: snapshot.source,
+    observed_at: snapshot.observed_at,
+    freshness_status: snapshot.freshness_status,
+    confidence: snapshot.confidence,
+    payload: snapshot.payload,
+  }));
+
+  await withRows(rows, async (base) => {
+    const auth = {
+      "x-actor-id": FOUNDER.id,
+      "x-actor-kind": FOUNDER.kind,
+    };
+    const exceptionResponse = await fetch(
+      `${base}/v1/domains/commercial/lists/exceptions?scope=commercial&tipo=inbound_lead&ordem=identificador&pagina=3`,
+      { headers: auth },
+    );
+    assert.equal(exceptionResponse.status, 200);
+    const exceptionPage = await exceptionResponse.json() as Record<string, unknown>;
+    const exception51 = (exceptionPage.items as Record<string, unknown>[])[0];
+    assert.equal(exception51?.lead_id, "lead-050");
+    assert.equal("evidence" in (exception51 ?? {}), false, "compact exception must not expose broad evidence");
+
+    const rawInboundResponse = await fetch(
+      `${base}/v1/domains/commercial/lists/activity?scope=commercial&tipo=new&ordem=identificador`,
+      { headers: auth },
+    );
+    const rawInboundPage = await rawInboundResponse.json() as Record<string, unknown>;
+    assert.ok(
+      (rawInboundPage.items as Record<string, unknown>[]).every(
+        (row) => row.operator_target_id === undefined && row.operator_target_kind === undefined,
+      ),
+      "ordinary inbound collection rows are not operator alerts",
+    );
+
+    const queue = await paint(
+      base,
+      "#/comercial/atividade?tipo=inbound_lead&ordem=identificador&pagina=3",
+    );
+    const href = /href="([^"]*resource=[^"]*)" data-lead-detail-link=/.exec(queue)?.[1]
+      ?.replaceAll("&amp;", "&") ?? "";
+    assert.match(href, /pos=51&of=51/, "the real page-three row must be the clicked occurrence");
+    const detail = await paint(base, href);
+    assert.match(detail, /data-lead-detail="found"/);
+    assert.match(detail, /name="target_id" value="lead-050"/);
+    assert.equal(/data-warmbly-refusal=/.test(detail), false);
+  });
+});
+
 test("the projector really does headline an opaque handle — this is the defect being fixed", () => {
   const payload = projectedRow().payload;
   const operations = payload.operations as Record<string, unknown>;
@@ -290,9 +371,9 @@ test("the two write mechanisms stay separate on a real payload", async () => {
       );
     }
 
-    // The deal has no alert of its own, so nothing upstream applies to it.
-    assert.match(html, /data-warmbly-refusal="not-an-alert"/);
-    assert.equal(/data-warmbly-dispatch=/.test(html), false);
+    // The associated inbound exception proves exactly one lead-scoped target.
+    assert.match(html, /data-warmbly-dispatch="acknowledge"/);
+    assert.match(html, new RegExp(`name="target_id" value="${DEAL_UUID}"`));
 
     for (const forbidden of ["send", "send_email", "send_whatsapp", "dispatch_now", "enroll", "charge"]) {
       assert.equal(

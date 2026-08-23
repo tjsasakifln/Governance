@@ -292,24 +292,36 @@ function mergeObservedRows(
 
 const LEAD_ENTITY_TYPES = new Set(["lead", "lead_id", "inbound_lead"]);
 
-/** A lead id explicitly carried by an inbound exception, never inferred from the opened record. */
-function provenInboundLeadId(row: Record<string, unknown>): string | null {
-  if (!isInboundAlertException(row)) return null;
+/** All lead ids explicitly carried by an inbound exception. Ambiguity is data, not precedence. */
+function inboundLeadIds(row: Record<string, unknown>): string[] {
+  if (!isInboundAlertException(row)) return [];
+  const candidates: string[] = [];
+  const explicitLeadId = text(row.lead_id);
+  if (explicitLeadId) candidates.push(explicitLeadId);
   const evidence = asRecord(row.evidence);
-  if (!evidence) return null;
-  const entityRef = asRecord(evidence.entity_ref);
+  const entityRef = evidence ? asRecord(evidence.entity_ref) : null;
   const entityType = entityRef ? text(entityRef.type)?.toLowerCase() : null;
   const entityId = entityRef ? text(entityRef.id) : null;
-  if (entityId && entityType && LEAD_ENTITY_TYPES.has(entityType)) return entityId;
+  if (entityId && entityType && LEAD_ENTITY_TYPES.has(entityType)) candidates.push(entityId);
 
-  const evidenceLeadId = text(evidence.lead_id);
-  if (evidenceLeadId) return evidenceLeadId;
+  const evidenceLeadId = evidence ? text(evidence.lead_id) : null;
+  if (evidenceLeadId) candidates.push(evidenceLeadId);
 
   // `source_id` is normally the exception record id. It becomes a lead id only
   // under an explicit discriminator; a plausible-looking string is not proof.
-  const sourceKind = (text(evidence.source_id_kind) ?? text(row.source_id_kind))?.toLowerCase();
+  const sourceKind = (evidence ? text(evidence.source_id_kind) : null) ?? text(row.source_id_kind);
   const sourceId = text(row.source_id);
-  return sourceId && sourceKind && LEAD_ENTITY_TYPES.has(sourceKind) ? sourceId : null;
+  if (sourceId && sourceKind && LEAD_ENTITY_TYPES.has(sourceKind.toLowerCase())) {
+    candidates.push(sourceId);
+  }
+  return [...new Set(candidates)];
+}
+
+function typedActivityLeadIds(row: Record<string, unknown>): string[] | null {
+  const kind = text(row.operator_target_kind)?.toLowerCase();
+  if (!kind || !LEAD_ENTITY_TYPES.has(kind)) return null;
+  const target = text(row.operator_target_id);
+  return target ? [target] : [];
 }
 
 /** Human title for a row, or `null` when the origin only gave a handle. */
@@ -656,11 +668,17 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   // The one lead-scoped Warmbly write is `acknowledge_inbound_alert`. Its URL
   // takes a lead id, not the exception id, source row id, deal id or whatever
   // opaque resource happened to open this detail.
-  const isAlert = exceptions.some(isInboundAlertException);
-  const provenTargets = [...new Set(exceptions.map(provenInboundLeadId).filter(
-    (value): value is string => value !== null,
-  ))];
-  const provenTarget = provenTargets.length === 1 ? provenTargets[0] ?? null : null;
+  const inboundExceptionProofs = exceptions.filter(isInboundAlertException).map(inboundLeadIds);
+  const activityProofs = activity
+    .map(typedActivityLeadIds)
+    .filter((value): value is string[] => value !== null);
+  const isAlert = inboundExceptionProofs.length > 0 || activityProofs.length > 0;
+  const proofSets = [...inboundExceptionProofs, ...activityProofs];
+  const proofIncomplete = proofSets.some((candidates) => candidates.length !== 1);
+  const provenTargets = [...new Set(proofSets.flat())];
+  const provenTarget = !proofIncomplete && provenTargets.length === 1
+    ? provenTargets[0] ?? null
+    : null;
   const warmblyTargetId =
     found && isAlert && provenTarget && WARMBLY_TARGET_ID_PATTERN.test(provenTarget)
       ? provenTarget

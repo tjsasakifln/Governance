@@ -258,11 +258,28 @@ function operationsFromWarmbly(
       }),
   );
 
-  const allActivity = [...deals, ...tasks, ...inbound, ...attention]
+  const inboundRecords = inbound
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionRecords = attention
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionSet = new Set(attentionRecords);
+  const allActivity = [...deals, ...tasks, ...inboundRecords, ...attentionRecords]
       .map((item) => asRecord(item))
       .filter((row): row is Record<string, unknown> => row !== null)
       .map((row) => {
         const at = isoOr(row.updated_at ?? row.observed_at ?? row.created_at ?? row.detected_at, observedAt);
+        const entityRef = attentionSet.has(row) ? asRecord(row.entity_ref) : null;
+        const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+        const kind = typeof row.kind === "string" ? row.kind : "";
+        const inboundLeadId =
+          attentionSet.has(row) &&
+          /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+          ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+          typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+            ? entityRef.id.trim()
+            : null;
         return {
           at,
           lead_or_account: displayName(row),
@@ -280,6 +297,9 @@ function operationsFromWarmbly(
           source: sourceSystem,
           owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
           priority: firstText(row, ["priority", "severity"]),
+          ...(inboundLeadId
+            ? { operator_target_kind: "inbound_lead", operator_target_id: inboundLeadId }
+            : {}),
         };
       })
       .sort((a, b) => b.at.localeCompare(a.at));
@@ -393,6 +413,23 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
     if (seen.has(id)) return;
     seen.add(id);
     const slug = id.replace(/[^A-Za-z0-9._~-]+/g, "-");
+    const kind =
+      typeof row.kind === "string"
+        ? row.kind
+        : typeof row.code === "string"
+          ? row.code
+          : source === "warmbly.intel.exceptions"
+            ? "intel_exception"
+            : "exception_state";
+    const entityRef = asRecord(row.entity_ref);
+    const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+    const explicitLeadId =
+      source === "warmbly.attention" &&
+      /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+      ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+      typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+        ? entityRef.id.trim()
+        : null;
     out.push({
       id,
       canonical_id: `cc:attention-item:${slug}`,
@@ -407,14 +444,7 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
               : typeof row.code === "string"
                 ? row.code
                 : "exception",
-      kind:
-        typeof row.kind === "string"
-          ? row.kind
-          : typeof row.code === "string"
-            ? row.code
-            : source === "warmbly.intel.exceptions"
-              ? "intel_exception"
-              : "exception_state",
+      kind,
       recommended_next_action:
         typeof row.recommended_next_action === "string"
           ? row.recommended_next_action
@@ -428,6 +458,7 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
       owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
       priority: firstText(row, ["priority", "severity"]),
       observed_at: isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt),
+      ...(explicitLeadId ? { lead_id: explicitLeadId } : {}),
       evidence: stripIdentity(row),
     });
   };
@@ -736,7 +767,19 @@ export const COMMERCIAL_LIST_PAGE_SIZE = 50;
 function compactListRow(row: Record<string, unknown>, list: "activity" | "exceptions"): Record<string, unknown> {
   const keys =
     list === "activity"
-      ? ["at", "lead_or_account", "source_id", "event", "state", "evidence", "source", "owner", "priority"]
+      ? [
+          "at",
+          "lead_or_account",
+          "source_id",
+          "event",
+          "state",
+          "evidence",
+          "source",
+          "owner",
+          "priority",
+          "operator_target_kind",
+          "operator_target_id",
+        ]
       : [
           "id",
           "canonical_id",
@@ -749,6 +792,7 @@ function compactListRow(row: Record<string, unknown>, list: "activity" | "except
           "observed_at",
           "owner",
           "priority",
+          "lead_id",
         ];
   const out: Record<string, unknown> = {};
   for (const key of keys) {
