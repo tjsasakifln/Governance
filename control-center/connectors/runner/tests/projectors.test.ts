@@ -970,6 +970,26 @@ test("infrastructure services keep the collector's identity, function and endpoi
   assert.equal(infra.payload.monitored_service_count, 2);
 });
 
+test("infrastructure summary keeps the worst state regardless of service order", () => {
+  const service = (id: string, status: string) => ({
+    service_id: id,
+    display_name: id,
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    status,
+    confidence: 0.9,
+    checks: [],
+  });
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [service("first-degraded", "degraded"), service("later-down", "unhealthy")],
+    }),
+  );
+  assert.ok(infra);
+  assert.equal(infra.payload.status, "down");
+});
+
 test("identical catalog entries collapse into one card and keep the worst state", () => {
   const row = {
     service_id: "cfg-health",

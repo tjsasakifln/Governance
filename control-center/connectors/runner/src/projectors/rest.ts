@@ -346,6 +346,10 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   const grouped = groupServices(projected);
   const statuses = projected.map((service) => service.status);
   const partial = statuses.some((status) => status !== "healthy") && statuses.some((status) => status === "healthy");
+  const overallStatus = statuses.reduce<HealthStatus>(
+    (worst, status) => (STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst),
+    normalizeHealthStatus(first.status),
+  );
   const catalogErrors = projected.filter((service) => service.anonymous).length + grouped.ambiguousIds;
   return {
     projector_version: PROJECTOR_VERSION,
@@ -356,7 +360,9 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
       projector_version: PROJECTOR_VERSION,
       availability,
       service_name: first.service_name ?? "control-center-infrastructure",
-      status: partial ? "degraded" : normalizeHealthStatus(first.status),
+      // The snapshot summary is a decision signal, so it carries the worst
+      // observed service state. Array order must never hide a later outage.
+      status: partial ? "degraded" : overallStatus,
       partial_outage: partial,
       monitored_service_count: grouped.services.length,
       catalog_error_count: catalogErrors,
