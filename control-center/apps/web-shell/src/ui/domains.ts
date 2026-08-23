@@ -230,6 +230,93 @@ function metricRate(value: unknown): string {
   return `${pct} (${num}/${den})${tiny}`;
 }
 
+function observedCount(value: unknown): string {
+  return typeof value === "number" && Number.isInteger(value)
+    ? String(value)
+    : "UNKNOWN / dados ainda incompletos";
+}
+
+function controlledEmailCohort(ops: Record<string, unknown>): string {
+  const root = ops.controlled_email && typeof ops.controlled_email === "object"
+    ? (ops.controlled_email as Record<string, unknown>)
+    : {};
+  const current = root.current && typeof root.current === "object"
+    ? (root.current as Record<string, unknown>)
+    : null;
+  const rows = Array.isArray(root.rows) ? root.rows : [];
+  if (!current) {
+    return `<article class="card" data-controlled-email="unknown">
+      <h3>Primeiro cohort real</h3>
+      <p class="constraint">Nenhum grant bounded foi observado. Ausência não é autorização.</p>
+      ${fact("Telemetria", escapeHtml(String(root.availability ?? "UNKNOWN")))}
+      ${fact("Última atualização", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+    </article>`;
+  }
+  const dispatch = current.dispatch && typeof current.dispatch === "object"
+    ? (current.dispatch as Record<string, unknown>)
+    : {};
+  const outcomes = current.outcomes && typeof current.outcomes === "object"
+    ? (current.outcomes as Record<string, unknown>)
+    : {};
+  const distribution = current.route_class_distribution && typeof current.route_class_distribution === "object"
+    ? (current.route_class_distribution as Record<string, unknown>)
+    : {};
+  const routeFacts = Object.entries(distribution)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([route, count]) => fact(`Rota ${route}`, observedCount(count)))
+    .join("");
+  const window = dispatch.window_start && dispatch.window_end
+    ? `${String(dispatch.window_start)}–${String(dispatch.window_end)} ${String(dispatch.timezone ?? "")}`.trim()
+    : "UNKNOWN";
+  const outcomeRows = rows
+    .filter((item) => item && typeof item === "object")
+    .map((item) => item as Record<string, unknown>)
+    .map((row) => `<article class="card" data-controlled-email-route="${escapeHtml(String(row.route_class ?? "UNKNOWN"))}">
+      <h3>${escapeHtml(String(row.route_class ?? "UNKNOWN"))}</h3>
+      <dl class="facts">
+        ${fact("Provider", escapeHtml(String(row.provider ?? "UNKNOWN")))}
+        ${fact("Attempted", observedCount(row.attempted))}
+        ${fact("SMTP accepted", observedCount(row.provider_accepted))}
+        ${fact("Delivered", observedCount(row.delivered))}
+        ${fact("Hard bounce", observedCount(row.hard_bounce))}
+        ${fact("Soft bounce", observedCount(row.soft_bounce))}
+        ${fact("Replies", observedCount(row.reply))}
+        ${fact("Positive replies", observedCount(row.positive_reply))}
+        ${fact("Opt-outs", observedCount(row.opt_out))}
+        ${fact("Complaints", observedCount(row.spam_complaint))}
+      </dl>
+    </article>`)
+    .join("");
+  return `<section class="stack" aria-labelledby="controlled-email-title" data-controlled-email="observed">
+    <h2 id="controlled-email-title">Primeiro cohort real de e-mail</h2>
+    <article class="card">
+      <h3>${escapeHtml(String(current.cohort_id ?? "UNKNOWN"))}</h3>
+      <dl class="facts">
+        ${fact("Cohort hash", escapeHtml(String(current.cohort_hash ?? "UNKNOWN")))}
+        ${fact("Policy version", escapeHtml(String(current.policy_version ?? "UNKNOWN")))}
+        ${fact("Quantidade autorizada", observedCount(current.authorized_quantity))}
+        ${fact("Enviados", observedCount(current.sent))}
+        ${fact("Reservados", observedCount(current.reserved))}
+        ${fact("SMTP accepted", observedCount(outcomes.provider_accepted))}
+        ${fact("Hard bounce", observedCount(outcomes.hard_bounce))}
+        ${fact("Soft bounce", observedCount(outcomes.soft_bounce))}
+        ${fact("Replies", observedCount(outcomes.reply))}
+        ${fact("Positive replies", observedCount(outcomes.positive_reply))}
+        ${fact("Opt-outs", observedCount(outcomes.opt_out))}
+        ${fact("Estado da autorização", escapeHtml(String(current.authorization_state ?? "UNKNOWN")))}
+        ${fact("GO review", escapeHtml(String(current.go_review_verdict ?? "UNKNOWN")))}
+        ${fact("Estado do dispatch", escapeHtml(String(dispatch.state ?? "UNKNOWN")))}
+        ${fact("Cap diário", observedCount(current.max_daily_volume))}
+        ${fact("Janela", escapeHtml(window))}
+        ${fact("Última atualização", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+        ${routeFacts}
+      </dl>
+      <p class="constraint">SMTP accepted não é delivery. Métricas sem evento reconciliado permanecem UNKNOWN.</p>
+    </article>
+    <div class="cards">${outcomeRows || `<p class="banner empty">Nenhum evento comercial real observado para esta cohort. Ausência não é zero.</p>`}</div>
+  </section>`;
+}
+
 export function commercialSubnav(surface: string | null): string {
   const items = [
     ["visao", "Visão"],
@@ -387,11 +474,13 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
           <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
           <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
         </article>
-        <article class="card" data-dispatch-moved="true">
-          <h3>Controles de disparo do Warmbly</h3>
-          <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
-        </article>
-      </section>`;
+      </section>
+      ${controlledEmailCohort(ops)}
+      <article class="card" data-dispatch-moved="true">
+        <h3>Controles de disparo do Warmbly</h3>
+        <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
+      </article>
+      `;
   } else if (current === "atividade") {
     body = renderFilteredList({
       spec: ACTIVITY_LIST,

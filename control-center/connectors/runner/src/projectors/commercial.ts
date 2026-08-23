@@ -163,6 +163,88 @@ function sourceIdOf(row: Record<string, unknown>): string | null {
   return typeof row.id === "string" && row.id.trim() !== "" ? row.id.trim() : null;
 }
 
+const CONTROLLED_EMAIL_METRICS = [
+  "attempted",
+  "provider_accepted",
+  "delivered",
+  "hard_bounce",
+  "soft_bounce",
+  "reply",
+  "positive_reply",
+  "routed_or_forwarded_reply",
+  "opt_out",
+  "spam_complaint",
+] as const;
+
+function controlledCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function controlledEmailOperation(
+  reportValue: unknown,
+  status: Record<string, unknown>,
+  dispatch: Record<string, unknown>,
+  observedAt: string,
+): Record<string, unknown> {
+  const report = asRecord(reportValue);
+  const rows = asArray(report?.controlled_email)
+    .map((value) => asRecord(value))
+    .filter((value): value is Record<string, unknown> => value !== null)
+    .map((row) => {
+      const out: Record<string, unknown> = {
+        route_class: typeof row.route_class === "string" ? row.route_class : "UNKNOWN",
+        provider: typeof row.provider === "string" ? row.provider : "UNKNOWN",
+        cohort_id: typeof row.cohort_id === "string" ? row.cohort_id : "UNKNOWN",
+        policy_version: typeof row.policy_version === "string" ? row.policy_version : "UNKNOWN",
+      };
+      for (const metric of CONTROLLED_EMAIL_METRICS) {
+        out[metric] = controlledCount(row[metric]);
+      }
+      return out;
+    });
+  const readiness = asRecord(status.readiness) ?? {};
+  const grant = asRecord(readiness.latest_bounded_cohort);
+  const cohortID = typeof grant?.cohort_id === "string" ? grant.cohort_id : null;
+  const cohortRows = cohortID === null ? rows : rows.filter((row) => row.cohort_id === cohortID);
+  const totals: Record<string, number | null> = {};
+  for (const metric of CONTROLLED_EMAIL_METRICS) {
+    const values = cohortRows.map((row) => row[metric]);
+    totals[metric] =
+      values.length > 0 && values.every((value) => typeof value === "number")
+        ? (values as number[]).reduce((sum, value) => sum + value, 0)
+        : null;
+  }
+  return {
+    availability: report ? "OBSERVED" : "UNKNOWN",
+    last_update_at: observedAt,
+    current: grant
+      ? {
+          authorization_id: typeof grant.authorization_id === "string" ? grant.authorization_id : null,
+          cohort_id: cohortID,
+          cohort_hash: typeof grant.cohort_hash === "string" ? grant.cohort_hash : null,
+          policy_version: typeof grant.policy_version === "string" ? grant.policy_version : null,
+          allowed_route_classes: asArray(grant.allowed_route_classes).filter(
+            (value): value is string => typeof value === "string",
+          ),
+          route_class_distribution: asRecord(grant.route_class_distribution),
+          authorized_quantity: controlledCount(grant.authorized_quantity),
+          sent: controlledCount(grant.sent),
+          reserved: controlledCount(grant.reserved),
+          max_daily_volume: controlledCount(grant.max_daily_volume),
+          authorized_at: typeof grant.authorized_at === "string" ? grant.authorized_at : null,
+          expires_at: typeof grant.expires_at === "string" ? grant.expires_at : null,
+          authorization_state: typeof grant.state === "string" ? grant.state : "UNKNOWN",
+          go_review_verdict:
+            typeof grant.go_review_verdict === "string" ? grant.go_review_verdict : "UNKNOWN",
+          go_review_at: typeof grant.go_review_at === "string" ? grant.go_review_at : null,
+          dispatch,
+          outcomes: totals,
+        }
+      : null,
+    rows,
+  };
+}
+
 function firstText(row: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = row[key];
@@ -301,6 +383,7 @@ function operationsFromWarmbly(
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
+  const report = nested.intel_report ?? payload.intel_report ?? payload.confenge_intel_report;
   const organic =
     nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
   const intelExceptionsPresent = intelExceptions.length > 0 || intelExceptionsSourcePresent(nested, payload);
@@ -313,6 +396,11 @@ function operationsFromWarmbly(
     scoreboard,
     executive,
   });
+  const dispatch = asRecord(nested.dispatch) ?? {
+    state: "UNKNOWN",
+    observed: false,
+    why: "the collector produced no dispatch reading; the kill-switch state is not known",
+  };
 
   const operations = {
     schema_version: "control-center.commercial-operations.v1",
@@ -321,11 +409,7 @@ function operationsFromWarmbly(
     // rebuilds most of `operations` from the raw payload, so a block that only
     // the connector computes has to be forwarded explicitly or it silently
     // disappears between the mapper and the surface that renders it.
-    dispatch: asRecord(nested.dispatch) ?? {
-      state: "UNKNOWN",
-      observed: false,
-      why: "the collector produced no dispatch reading; the kill-switch state is not known",
-    },
+    dispatch,
     authority: {
       catalog_authority: "governance",
       commercial_runtime: "warmbly",
@@ -342,6 +426,12 @@ function operationsFromWarmbly(
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
     },
     cohorts,
+    controlled_email: controlledEmailOperation(
+      report,
+      status,
+      dispatch,
+      observedAt,
+    ),
     activity,
     pipeline,
     exceptions,
