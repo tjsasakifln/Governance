@@ -19,6 +19,7 @@
  */
 import { formatLocal } from "./datetime";
 import { formatMoney } from "./money";
+import { sourceKindLabel, sourceSystemLabel } from "./provenance";
 import type { FreshnessStatus, Money, SourceRef } from "./types";
 
 export const DOMAIN_CARD_IDS = [
@@ -94,12 +95,16 @@ export interface HojeDomainCard {
 
 export interface HojeIntegration {
   system: string;
+  system_label: string;
+  source_kind: string;
+  source_locator: string;
   state: DomainState;
   state_label: string;
   detail: string;
   observed_at_local: string;
   freshness_status: FreshnessStatus;
   error_code: string | null;
+  error_message: string | null;
 }
 
 export interface HojeOutbound {
@@ -624,19 +629,23 @@ function integrationsFrom(envelope: Record<string, unknown>): HojeIntegration[] 
     else if (freshness === "STALE") state = "atencao";
     else state = "saudavel";
     const observedAt = strOf(row.observed_at);
-    const detail =
-      errorCode !== null
-        ? `Erro na origem: ${(error ? strOf(error.message) : null) ?? "origem respondeu com erro"}`
-        : `${source.kind} · ${source.locator}`;
+    const errorMessage = error ? strOf(error.message) : null;
+    const detail = errorCode !== null
+      ? "Erro na origem: a leitura falhou."
+      : `Leitura recebida: ${sourceKindLabel(source.kind)}.`;
     const previous = bySystem.get(source.system);
     const candidate: HojeIntegration = {
       system: source.system,
+      system_label: sourceSystemLabel(source.system),
+      source_kind: source.kind,
+      source_locator: source.locator,
       state,
       state_label: STATE_LABELS[state],
       detail,
       observed_at_local: observedAt ? formatLocal(observedAt) : "sem leitura registrada",
       freshness_status: freshness,
       error_code: errorCode,
+      error_message: errorMessage,
     };
     // Worst reading per system wins: one healthy probe must not hide a broken one.
     if (

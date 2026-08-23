@@ -88,17 +88,26 @@ function priorityCard(item: PriorityRecommendation, now: string): string {
 }
 
 function sessionCard(item: AgentSession): string {
+  const requested = item.requested_scopes.map(scopeLabel);
+  const granted = item.granted_scopes.map(scopeLabel);
   return `
-    <article class="card session" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
+    <article class="card session" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-requested-scopes="${escapeHtml(item.requested_scopes.join(" "))}" data-granted-scopes="${escapeHtml(item.granted_scopes.join(" "))}">
       <header>
         <p class="kicker">${statusPill(item.status, agentSessionStatusLabel(item.status))} <span class="scope">${escapeHtml(item.agent_id)}</span></p>
         <h3>${escapeHtml(item.agent_id)}</h3>
       </header>
       <p>${escapeHtml(item.purpose)}</p>
       <dl class="facts">
-        <div><dt>Escopos pedidos</dt><dd>${escapeHtml(item.requested_scopes.join(", ") || "—")}</dd></div>
-        <div><dt>Escopos concedidos</dt><dd>${escapeHtml(item.granted_scopes.join(", ") || "nenhum")}</dd></div>
+        <div><dt>Escopos pedidos</dt><dd>${escapeHtml(requested.join(", ") || "—")}</dd></div>
+        <div><dt>Escopos concedidos</dt><dd>${escapeHtml(granted.join(", ") || "nenhum")}</dd></div>
       </dl>
+      ${technicalDetails(
+        [
+          { term: "requested_scopes", value: item.requested_scopes.join(",") },
+          { term: "granted_scopes", value: item.granted_scopes.join(",") },
+        ],
+        "agent-session-scopes",
+      )}
     </article>
   `;
 }

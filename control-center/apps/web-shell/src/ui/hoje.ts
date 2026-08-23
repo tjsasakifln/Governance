@@ -183,9 +183,19 @@ function domainCard(card: HojeDomainCard): string {
 function integrationRow(row: HojeIntegration): string {
   return `<li data-integration="${escapeHtml(row.system)}" data-domain-state="${escapeHtml(row.state)}" data-freshness="${escapeHtml(row.freshness_status)}" data-integration-error="${escapeHtml(row.error_code ?? "")}">
     <span class="pill pill-state-${escapeHtml(row.state)}">${escapeHtml(row.state_label)}</span>
-    <strong>${escapeHtml(row.system)}</strong> — ${escapeHtml(row.detail)}
+    <strong>${escapeHtml(row.system_label)}</strong> — ${escapeHtml(row.detail)}
     ${freshnessPill(row.freshness_status)}
     <span class="prov-inline">última leitura ${escapeHtml(row.observed_at_local)}</span>
+    ${technicalDetails(
+      [
+        { term: "sistema", value: row.system },
+        { term: "tipo_de_origem", value: row.source_kind },
+        { term: "locator", value: row.source_locator },
+        { term: "error_code", value: row.error_code ?? "" },
+        { term: "error_message", value: row.error_message ?? "" },
+      ],
+      "hoje-integration",
+    )}
   </li>`;
 }
 

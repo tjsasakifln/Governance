@@ -53,9 +53,15 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
 /** Rótulo visível seguro; sistema, tipo e locator crus ficam no detalhe técnico. */
 export function sourcePresentationLabel(source: Provenance["source"]): string {
   if (source.label) return source.label;
-  const system = SOURCE_SYSTEM_LABELS[source.system] ?? "Sistema de origem";
-  const kind = SOURCE_KIND_LABELS[source.kind] ?? "leitura operacional";
-  return `${system} · ${kind}`;
+  return `${sourceSystemLabel(source.system)} · ${sourceKindLabel(source.kind)}`;
+}
+
+export function sourceSystemLabel(system: string): string {
+  return SOURCE_SYSTEM_LABELS[system] ?? "Sistema de origem";
+}
+
+export function sourceKindLabel(kind: string): string {
+  return SOURCE_KIND_LABELS[kind] ?? "leitura operacional";
 }
 
 export function freshnessLabel(status: FreshnessStatus): string {

@@ -17,6 +17,19 @@ function cloneFixture(): Record<string, unknown> {
   return structuredClone(OPERATIONAL_ENVELOPE_FIXTURE) as Record<string, unknown>;
 }
 
+function visibleText(html: string): string {
+  let collapsed = html;
+  let prior: string;
+  do {
+    prior = collapsed;
+    collapsed = collapsed.replace(
+      /<details\b[^>]*>((?:(?!<details\b)[\s\S])*?)<\/details>/gi,
+      (_whole, body: string) => body.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i)?.[1] ?? " ",
+    );
+  } while (collapsed !== prior);
+  return collapsed.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+}
+
 function cardOf(id: string): HojeDomainCard {
   const summary = summarizeDomains(OPERATIONAL_ENVELOPE_FIXTURE);
   const card = summary.cards.find((row) => row.id === id);
@@ -194,6 +207,55 @@ test("critical integrations are rolled up worst-first and an errored source is n
   for (const row of summary.integrations) {
     if (row.freshness_status !== "FRESH") assert.notEqual(row.state, "saudavel");
   }
+});
+
+test("Hoje integrations quarantine future source identity and upstream error prose", () => {
+  const envelope = cloneFixture();
+  envelope.source_observations = [
+    {
+      source: {
+        system: "FUTURE_SYSTEM",
+        kind: "FUTURE_KIND",
+        locator: "FUTURE_LOCATOR",
+      },
+      observed_at: "2026-08-20T17:45:00Z",
+      freshness_status: "FRESH",
+    },
+    {
+      source: {
+        system: "FUTURE_ERROR_SYSTEM",
+        kind: "FUTURE_ERROR_KIND",
+        locator: "FUTURE_ERROR_LOCATOR",
+      },
+      observed_at: "2026-08-20T17:46:00Z",
+      freshness_status: "ERROR",
+      error: { code: "FUTURE_ERROR_CODE", message: "FUTURE_UPSTREAM_MESSAGE" },
+    },
+  ];
+  const view = composeHoje({
+    generated_at: "2026-08-20T18:00:00Z",
+    headline: "cockpit",
+    priorities: [],
+    incidents: [],
+    clients: [],
+    commercial: null,
+    finance: null,
+    engineering: null,
+    infra: [],
+    activities: [],
+    operational_envelope: envelope,
+  });
+  const html = renderHoje(view);
+  const shown = visibleText(html);
+  assert.match(shown, /Sistema de origem/);
+  assert.match(shown, /Leitura recebida: leitura operacional/);
+  assert.match(shown, /Erro na origem: a leitura falhou/);
+  assert.doesNotMatch(shown, /FUTURE_(?:SYSTEM|KIND|LOCATOR|ERROR|UPSTREAM)/);
+  assert.match(html, /data-integration="FUTURE_SYSTEM"/);
+  assert.match(html, /sistema=FUTURE_SYSTEM/);
+  assert.match(html, /tipo_de_origem=FUTURE_KIND/);
+  assert.match(html, /locator=FUTURE_LOCATOR/);
+  assert.match(html, /error_message=FUTURE_UPSTREAM_MESSAGE/);
 });
 
 test("a missing envelope produces desconhecido everywhere, never six healthy cards", () => {

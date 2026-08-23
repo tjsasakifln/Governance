@@ -99,7 +99,8 @@ test("live ranked items paint severity, impact, origin, owner, age and deadline 
   assert.match(card, /O que fazer agora/);
   assert.match(card, /Tratar o recebível vencido/);
   assert.match(card, /class="alert-open" href="#\/financeiro">Abrir Financeiro</);
-  assert.doesNotMatch(withoutDisclosures(card), /receivable-read|crm-read-model|repo-read/);
+  const frontText = withoutDisclosures(card).replace(/<[^>]*>/g, " ");
+  assert.doesNotMatch(frontText, /receivable-read|crm-read-model|repo-read|finance\/receivables/);
 });
 
 test("the scoring formula appears only inside the collapsed 'Como foi priorizado'", async () => {

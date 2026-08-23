@@ -2,6 +2,7 @@ import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
+import { sourceSystemLabel } from "../provenance";
 import type {
   AgentActivity,
   ClientIdentityException,
@@ -181,26 +182,26 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
   }
   const attribution =
     growth.attribution && typeof growth.attribution === "object" ? (growth.attribution as Record<string, unknown>) : {};
-  const note = String(
-    attribution.note ??
-      "Etapa sem identificador durável fica como desconhecida ou bloqueada. Nenhum cruzamento entre sistemas é inventado. " +
-        "As etapas de busca e clique seguem bloqueadas enquanto não houver ingestão de dados de busca.",
-  );
+  const attributionNote = typeof attribution.note === "string" ? attribution.note : "";
+  const note = growthAttributionLabel(attributionNote);
   const organic =
     growth.organic_scoreboard && typeof growth.organic_scoreboard === "object"
       ? (growth.organic_scoreboard as Record<string, unknown>)
       : {};
+  const organicNote = typeof organic.note === "string" ? organic.note : "";
   const organicConfigured = organic.configured === true;
   const organicWindows = Array.isArray(organic.windows) ? organic.windows : [];
   const organicBlock = organicConfigured
-    ? `<article class="card" data-organic-scoreboard="true">
+      ? `<article class="card" data-organic-scoreboard="true">
         <h3>Placar de crescimento orgânico (Warmbly)</h3>
-        <p>${escapeHtml(String(organic.note ?? "Inteligência de crescimento orgânico mantida pelo Warmbly."))}</p>
+        <p>${escapeHtml(organicNoteLabel(organicNote))}</p>
         ${technicalDetails(
           [
             { term: "schema", value: String(organic.schema ?? "") },
             { term: "real_empty", value: organic.real_empty === undefined ? "" : String(organic.real_empty) },
             { term: "availability", value: String(organic.availability ?? "") },
+            { term: "note", value: organicNote },
+            { term: "attribution_note", value: attributionNote },
           ],
           "organic-scoreboard",
         )}
@@ -219,12 +220,23 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
                   const first = slices[0] && typeof slices[0] === "object" ? (slices[0] as Record<string, unknown>) : {};
                   const layers = Array.isArray(first.layers) ? first.layers : [];
                   return `<article class="card" data-organic-window="${escapeHtml(String(row.id ?? ""))}">
-                    <h4>Janela ${escapeHtml(String(row.id ?? "—"))}</h4>
+                    <h4>Janela ${escapeHtml(organicWindowLabel(String(row.id ?? "")))}</h4>
                     <ul>${layers
                       .map((layer) => {
                         const ly = layer && typeof layer === "object" ? (layer as Record<string, unknown>) : {};
                         const layerStatus = String(ly.status ?? "UNKNOWN");
-                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}" data-layer-status="${escapeHtml(layerStatus)}">${escapeHtml(String(ly.id ?? "camada"))}: ${escapeHtml(availabilityLabel(layerStatus))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
+                        const layerId = String(ly.id ?? "");
+                        const layerLabel = layerId === "LEAD_VALID" ? "Leads válidos" : "camada não reconhecida";
+                        const observation = typeof ly.observation === "string" ? ly.observation : "";
+                        return `<li data-organic-layer="${escapeHtml(layerId)}" data-layer-status="${escapeHtml(layerStatus)}">${escapeHtml(layerLabel)}: ${escapeHtml(availabilityLabel(layerStatus))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})${observation ? ` · ${escapeHtml(organicObservationLabel(observation))}` : ""}${technicalDetails(
+                          [
+                            { term: "layer_id", value: layerId },
+                            { term: "layer_status", value: layerStatus },
+                            { term: "observation", value: observation },
+                            { term: "window_id", value: String(row.id ?? "") },
+                          ],
+                          "organic-layer",
+                        )}</li>`;
                       })
                       .join("")}</ul>
                   </article>`;
@@ -237,6 +249,7 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
     <section class="stack domain-crescimento" aria-labelledby="crescimento-funil" data-domain="growth">
       <h2 id="crescimento-funil">Funil de crescimento</h2>
       <p class="constraint">${escapeHtml(note)}</p>
+      ${technicalDetails([{ term: "attribution_note", value: attributionNote }], "growth-attribution")}
       ${organicBlock}
       <ol class="growth-hops">
         ${hops
@@ -291,6 +304,78 @@ function observedCount(value: unknown): string {
   return typeof value === "number" && Number.isInteger(value)
     ? String(value)
     : "desconhecido / dados ainda incompletos";
+}
+
+function growthAttributionLabel(value: string): string {
+  if (
+    value ===
+    "Hops without a durable ID stay UNKNOWN/BLOCKED. Scoreboard stages 1-2 stay BLOCKED without GSC/URL-index ingest. OrganicScoreboard is Warmbly-owned."
+  ) {
+    return "Etapas sem identificador durável permanecem desconhecidas ou bloqueadas. Busca e clique dependem de ingestão própria; o placar orgânico pertence ao Warmbly.";
+  }
+  return value === ""
+    ? "Etapa sem identificador durável fica como desconhecida ou bloqueada. Nenhum cruzamento entre sistemas é inventado."
+    : "Nota de atribuição não reconhecida; consulte o detalhe técnico.";
+}
+
+function organicNoteLabel(value: string): string {
+  if (value === "Warmbly-owned organic/growth intelligence. Control Center does not recompute it.") {
+    return "Inteligência de crescimento orgânico mantida pelo Warmbly; o Control Center não a recalcula.";
+  }
+  if (value === "Warmbly OrganicScoreboard was not present on this observation.") {
+    return "O placar orgânico do Warmbly não estava presente nesta observação.";
+  }
+  return value === ""
+    ? "Inteligência de crescimento orgânico mantida pelo Warmbly."
+    : "Nota do placar orgânico não reconhecida; consulte o detalhe técnico.";
+}
+
+function organicWindowLabel(value: string): string {
+  const days = /^(\d+)d$/.exec(value);
+  if (days) return `${days[1]} dias`;
+  if (value === "open") return "aberta";
+  return "não reconhecida";
+}
+
+function organicObservationLabel(value: string): string {
+  if (value === "no ingest") return "sem ingestão observada";
+  return "observação não reconhecida";
+}
+
+const COHORT_MIXING_LABELS: Record<string, string> = {
+  acquisition_cohorts_and_event_period_metrics_are_labeled_separately:
+    "Coortes de aquisição e métricas por período são apresentadas separadamente.",
+};
+
+const COHORT_KIND_LABELS: Record<string, string> = {
+  acquisition_cohort: "coorte de aquisição",
+  event_period_funnel: "funil por período do evento",
+};
+
+const COHORT_ANCHOR_LABELS: Record<string, string> = {
+  "Acquisition cohort: contact created_at. Not an event-period metric.":
+    "Coorte de aquisição ancorada na criação do contato; não é uma métrica por período do evento.",
+  "Warmbly inbound-truth scoreboard. Not an acquisition cohort.":
+    "Placar de mensagens recebidas do Warmbly; não é uma coorte de aquisição.",
+};
+
+function cohortMixingLabel(value: string): string {
+  return COHORT_MIXING_LABELS[value] ?? "Regra de separação não reconhecida.";
+}
+
+function cohortKindLabel(value: string): string {
+  return COHORT_KIND_LABELS[value] ?? "tipo de coorte não reconhecido";
+}
+
+function cohortWindowLabel(value: string): string {
+  const days = /^(\d+)d$/.exec(value);
+  if (days) return `${days[1]} dias`;
+  if (value === "open") return "aberta";
+  return "não reconhecida";
+}
+
+function cohortAnchorLabel(value: string): string {
+  return COHORT_ANCHOR_LABELS[value] ?? "Referência da métrica não reconhecida.";
 }
 
 function controlledEmailCohort(ops: Record<string, unknown>): string {
@@ -589,16 +674,20 @@ function commercialOps(
   if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];
     const inbound = cohorts.inbound_truth && typeof cohorts.inbound_truth === "object" ? (cohorts.inbound_truth as Record<string, unknown>) : {};
+    const mixingRule = String(cohorts.mixing_rule ?? "");
     body = `
       <section class="stack" aria-labelledby="cohorts-title">
         <h2 id="cohorts-title">Coortes</h2>
-        <p class="constraint">${escapeHtml(String(cohorts.mixing_rule ?? "Coortes de aquisição e métricas de período são rotuladas em separado."))}</p>
+        <p class="constraint">${mixingRule ? escapeHtml(cohortMixingLabel(mixingRule)) : "Coortes de aquisição e métricas por período são apresentadas separadamente."}</p>
+        ${technicalDetails([{ term: "mixing_rule", value: mixingRule }], "cohort-mixing-rule")}
         <div class="cards">${acquisition
           .map((item) => {
             const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}">
-              <h3>Janela ${escapeHtml(String(row.window))} · ${escapeHtml(String(row.kind))}</h3>
-              <p>${escapeHtml(String(row.anchor_label ?? row.anchor_event ?? ""))}</p>
+            const kind = String(row.kind ?? "");
+            const anchorLabel = String(row.anchor_label ?? "");
+            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}" data-cohort-kind="${escapeHtml(kind)}">
+              <h3>Janela ${escapeHtml(cohortWindowLabel(String(row.window ?? "")))} · ${escapeHtml(cohortKindLabel(kind))}</h3>
+              <p>${anchorLabel ? escapeHtml(cohortAnchorLabel(anchorLabel)) : "Referência da métrica não informada."}</p>
               <dl class="facts">
                 ${fact("População", String(row.population ?? "—"))}
                 ${fact("Contactados", String(row.contacted ?? "—"))}
@@ -607,17 +696,30 @@ function commercialOps(
                 ${fact("Conversão em oportunidade", metricRate(row.opportunity_conversion))}
                 ${fact("Conversão em fechamento", metricRate(row.win_conversion))}
               </dl>
+              ${technicalDetails(
+                [
+                  { term: "kind", value: kind },
+                  { term: "window", value: String(row.window ?? "") },
+                  { term: "anchor_event", value: String(row.anchor_event ?? "") },
+                  { term: "anchor_label", value: anchorLabel },
+                  { term: "source", value: String(row.source ?? "") },
+                ],
+                "acquisition-cohort",
+              )}
             </article>`;
           })
           .join("")}</div>
         <article class="card">
           <h3>Origem das mensagens recebidas (Warmbly)</h3>
-          <p>${escapeHtml(String(inbound.anchor_label ?? "Placar do Warmbly, quando presente. Não é coorte de aquisição."))}</p>
+          <p>${inbound.anchor_label ? escapeHtml(cohortAnchorLabel(String(inbound.anchor_label))) : "Placar do Warmbly, quando presente. Não é coorte de aquisição."}</p>
           <p>${inbound.configured === true ? "Configurado no Warmbly." : "Não configurado no Warmbly."}</p>
           ${technicalDetails(
             [
               { term: "configured", value: inbound.configured === undefined ? "" : String(inbound.configured) },
               { term: "schema", value: String(inbound.schema ?? "") },
+              { term: "kind", value: String(inbound.kind ?? "") },
+              { term: "anchor_event", value: String(inbound.anchor_event ?? "") },
+              { term: "anchor_label", value: String(inbound.anchor_label ?? "") },
             ],
             "inbound-truth",
           )}
@@ -872,8 +974,7 @@ export function clientCard(item: ClientStatus): string {
  * offered none of the three.
  */
 export function clientIdentityQueueCard(entry: ClientIdentityException): string {
-  const origin = `${entry.origin.system} · ${entry.origin.locator}`;
-  const codes = entry.reason_codes.length > 0 ? entry.reason_codes.join(", ") : "não declarado";
+  const origin = sourceSystemLabel(entry.origin.system);
   return `
     <article class="card data-quality" data-queue="client-identity" data-id="${escapeHtml(entry.id)}" data-operational-client="false" data-status="${escapeHtml(entry.status)}">
       <header>
@@ -885,9 +986,17 @@ export function clientIdentityQueueCard(entry: ClientIdentityException): string 
         ${fact("Origem", escapeHtml(origin))}
         ${entry.source_id ? fact("Registro na origem", escapeHtml(entry.source_id)) : ""}
         ${fact("Motivo", escapeHtml(entry.why))}
-        ${fact("Código do motivo", escapeHtml(codes))}
         ${fact("Ação necessária", escapeHtml(entry.recommended_next_action))}
       </dl>
+      ${technicalDetails(
+        [
+          { term: "sistema", value: entry.origin.system },
+          { term: "locator", value: entry.origin.locator },
+          { term: "reason_codes", value: entry.reason_codes.join(",") },
+          { term: "source_id", value: entry.source_id ?? "" },
+        ],
+        "client-identity-queue",
+      )}
       ${entry.provenance ? provenanceBlock(entry.provenance) : ""}
     </article>
   `;
@@ -974,9 +1083,7 @@ export function healthCard(item: ServiceHealth): string {
         )}. O estado abaixo vem da evidência do próprio serviço.</p>`
       : "";
   const catalogError = item.catalog_error
-    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
-        item.catalog_error,
-      )}. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
+    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
     : "";
   const duplicates =
     item.duplicate_count && item.duplicate_count > 1
@@ -1052,6 +1159,7 @@ export function healthCard(item: ServiceHealth): string {
           { term: "service_name", value: item.service_name },
           { term: "status", value: item.status },
           { term: "scope", value: item.scope },
+          { term: "catalog_error", value: item.catalog_error ?? "" },
           { term: "partial_outage", value: item.partial_outage === undefined ? "" : String(item.partial_outage) },
         ],
         "service-health",
@@ -1162,7 +1270,7 @@ export function activityCard(item: AgentActivity): string {
       ${staleRunning}
       <dl class="facts">
         <div><dt>Agente / provedor</dt><dd>${escapeHtml(item.agent_id)}${item.provider ? ` / ${escapeHtml(item.provider)}` : ""}</dd></div>
-        <div><dt>Repositório / escopo</dt><dd>${escapeHtml(item.repo ?? item.scope)}</dd></div>
+        <div><dt>Repositório / escopo</dt><dd>${escapeHtml(item.repo ?? scopeLabel(item.scope))}</dd></div>
         <div><dt>Objetivo / campanha</dt><dd>${escapeHtml(item.goal)}${item.campaign ? ` · ${escapeHtml(item.campaign)}` : ""}</dd></div>
         ${listFact("Evidência", item.evidence_refs)}
         ${listFact("Bloqueios", item.blockers)}

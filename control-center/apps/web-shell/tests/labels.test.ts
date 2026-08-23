@@ -3,8 +3,9 @@ import { test } from "node:test";
 import { createMemoryRuntime, mount } from "../src/app";
 import { createMockAdapter } from "../src/adapters/index";
 import { DESTINATIONS } from "../src/destinations";
-import type { CommercialSnapshot } from "../src/types";
-import { commercialBlock, growthFunnelBlock } from "../src/ui/domains";
+import { CLIENT_FIXTURES } from "../src/fixtures/catalog";
+import type { ClientStatus, CommercialSnapshot } from "../src/types";
+import { clientCard, commercialBlock, growthFunnelBlock } from "../src/ui/domains";
 import { renderShell } from "../src/ui/render";
 import {
   AGENT_ACTIVITY_PRESENTATION_STATUSES,
@@ -187,7 +188,38 @@ test("future availability and funnel status stay raw only in attributes and tech
             { id: "FUTURE_HOP_ID", status: "PRESENT" },
           ],
         },
-        organic_scoreboard: { configured: false, availability: "FUTURE_AVAIL" },
+        attribution: { note: "FUTURE_ATTRIBUTION" },
+        organic_scoreboard: {
+          configured: true,
+          availability: "FUTURE_AVAIL",
+          schema: "FUTURE_SCHEMA",
+          note: "FUTURE_NOTE",
+          windows: [
+            {
+              id: "FUTURE_WINDOW",
+              by_source: [
+                {
+                  layers: [
+                    {
+                      id: "LEAD_VALID",
+                      status: "UNKNOWN",
+                      count: 0,
+                      denominator: 0,
+                      observation: "no ingest",
+                    },
+                    {
+                      id: "FUTURE_LAYER",
+                      status: "FUTURE_AVAIL",
+                      count: 1,
+                      denominator: 2,
+                      observation: "FUTURE_OBSERVATION",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       },
     },
   } as unknown as CommercialSnapshot;
@@ -196,8 +228,21 @@ test("future availability and funnel status stay raw only in attributes and tech
   assert.match(shown, /disponibilidade não reconhecida/);
   assert.match(shown, /estado não reconhecido/);
   assert.match(shown, /Etapa não reconhecida/);
-  assert.doesNotMatch(shown, /FUTURE_AVAIL|FUTURE_HOP/);
-  assert.match(html, /data-availability="FUTURE_AVAIL"/);
+  assert.match(shown, /camada não reconhecida/);
+  assert.match(shown, /Leads válidos/);
+  assert.match(shown, /sem ingestão observada/);
+  assert.match(shown, /Nota do placar orgânico não reconhecida/);
+  assert.match(shown, /Nota de atribuição não reconhecida/);
+  assert.match(shown, /Janela não reconhecida/);
+  assert.match(shown, /observação não reconhecida/);
+  assert.doesNotMatch(shown, /FUTURE_(?:AVAIL|HOP|LAYER|NOTE|ATTRIBUTION|WINDOW|OBSERVATION|SCHEMA)/);
+  assert.doesNotMatch(shown, /LEAD_VALID|no ingest/);
+  assert.match(html, /data-organic-layer="FUTURE_LAYER"/);
+  assert.match(html, /data-organic-layer="LEAD_VALID"/);
+  assert.match(html, /data-layer-status="FUTURE_AVAIL"/);
+  assert.match(html, /layer_id=FUTURE_LAYER/);
+  assert.match(html, /note=FUTURE_NOTE/);
+  assert.match(html, /attribution_note=FUTURE_ATTRIBUTION/);
   assert.match(html, /data-hop-status="FUTURE_HOP"/);
   assert.match(html, /data-growth-hop="FUTURE_HOP_ID"/);
   assert.match(html, /status=FUTURE_HOP/);
@@ -208,7 +253,20 @@ test("scope keeps its identifier and gains a Portuguese word", () => {
   assert.equal(scopeLabel("infrastructure"), "infraestrutura");
   assert.equal(scopeLabel("client:acme-industria"), "cliente acme-industria");
   assert.equal(scopeLabel("repo:tjsasakifln/Governance"), "repositório tjsasakifln/Governance");
-  assert.equal(scopeLabel("weird:thing"), "weird:thing");
+  assert.equal(scopeLabel("weird:thing"), "escopo não reconhecido");
+  assert.equal(scopeLabel("FUTURE_SCOPE"), "escopo não reconhecido");
+});
+
+test("client cards keep unknown scopes raw only in data and technical details", () => {
+  const fixture = CLIENT_FIXTURES[0];
+  assert.ok(fixture);
+  for (const scope of ["FUTURE_SCOPE", "future_namespace:item"]) {
+    const html = clientCard({ ...fixture, scope } as ClientStatus);
+    assert.match(visibleText(html), /escopo não reconhecido/);
+    assert.doesNotMatch(visibleText(html), new RegExp(scope));
+    assert.match(html, new RegExp(`data-scope="${scope}"`));
+    assert.match(html, new RegExp(`scope=${scope}`));
+  }
 });
 
 test("confidence is spoken as a word, without hiding the number", () => {

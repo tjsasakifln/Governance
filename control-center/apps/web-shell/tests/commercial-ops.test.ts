@@ -49,6 +49,73 @@ test("commercial surfaces render cohort, pipeline, activity and exception operat
   }
 });
 
+test("cohort contract tokens receive authored labels and future values stay technical", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.ok(initial.ok && !initial.loading && initial.page.commercial);
+  if (!initial.ok || initial.loading || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: {
+      mixing_rule: "acquisition_cohorts_and_event_period_metrics_are_labeled_separately",
+      acquisition: [
+        {
+          window: "7d",
+          kind: "acquisition_cohort",
+          anchor_event: "contact.created_at",
+          anchor_label: "Acquisition cohort: contact created_at. Not an event-period metric.",
+          source: "control-center.derived_from_warmbly_crm_reads",
+          population: 3,
+        },
+        {
+          window: "future",
+          kind: "FUTURE_KIND",
+          anchor_event: "FUTURE_EVENT",
+          anchor_label: "FUTURE_ANCHOR",
+          source: "FUTURE_SOURCE",
+          population: 1,
+        },
+      ],
+      inbound_truth: {
+        configured: true,
+        kind: "event_period_funnel",
+        anchor_event: "warmbly_inbound_truth_scoreboard",
+        anchor_label: "Warmbly inbound-truth scoreboard. Not an acquisition cohort.",
+      },
+    },
+  };
+  const adapter = {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /Coortes de aquisição e métricas por período são apresentadas separadamente/);
+  assert.match(shown, /coorte de aquisição/);
+  assert.match(shown, /Coorte de aquisição ancorada na criação do contato/);
+  assert.match(shown, /Placar de mensagens recebidas do Warmbly/);
+  assert.match(shown, /tipo de coorte não reconhecido/);
+  assert.match(shown, /Referência da métrica não reconhecida/);
+  assert.match(shown, /Janela não reconhecida/);
+  assert.doesNotMatch(
+    shown,
+    /acquisition_cohorts_and_event_period_metrics_are_labeled_separately|acquisition_cohort|Acquisition cohort|event_period_funnel|FUTURE_(?:KIND|EVENT|ANCHOR|SOURCE)/,
+  );
+  assert.match(root.innerHTML, /mixing_rule=acquisition_cohorts_and_event_period_metrics_are_labeled_separately/);
+  assert.match(root.innerHTML, /data-cohort-kind="FUTURE_KIND"/);
+  assert.match(root.innerHTML, /anchor_label=FUTURE_ANCHOR/);
+  assert.match(root.innerHTML, /window=future/);
+
+  (commercial.operations.cohorts as Record<string, unknown>).mixing_rule = "FUTURE_MIXING_RULE";
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  assert.match(visibleText(root.innerHTML), /Regra de separação não reconhecida/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_MIXING_RULE/);
+  assert.match(root.innerHTML, /mixing_rule=FUTURE_MIXING_RULE/);
+});
+
 test("parseHash keeps commercial surfaces and client resources", () => {
   assert.equal(parseHash("#/comercial/atividade").surface, "atividade");
   assert.equal(parseHash("#/clientes/acme-industria").resource, "acme-industria");

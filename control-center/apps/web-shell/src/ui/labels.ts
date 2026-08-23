@@ -223,7 +223,7 @@ export function scopeLabel(scope: string): string {
     if (prefix === "repo") return `repositório ${id}`;
     if (prefix === "client") return `cliente ${id}`;
   }
-  return scope;
+  return "escopo não reconhecido";
 }
 
 /**

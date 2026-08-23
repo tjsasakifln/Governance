@@ -1,5 +1,6 @@
 import { formatLocal } from "./datetime";
 import { DESTINATIONS, type DestinationId } from "./destinations";
+import { sourcePresentationLabel } from "./provenance";
 import type {
   AlertRanking,
   AttentionItem,
@@ -276,9 +277,7 @@ export function splitEngineReason(reason: string): { plain: string; technical: s
 }
 
 function originOf(provenance: Provenance): string {
-  const label = provenance.source.label;
-  if (label !== undefined && label.length > 0) return label;
-  return `${provenance.source.system} · ${provenance.source.kind}`;
+  return sourcePresentationLabel(provenance.source);
 }
 
 function nextStepFor(recommended: string | undefined, owner: AlertOwner): string {
