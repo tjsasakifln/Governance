@@ -1,4 +1,6 @@
 import { withQueryParams } from "./destinations";
+import type { OperationalTruth } from "@confenge/control-center-contracts";
+import { parseOperationalTruth } from "./ui/operational-truth";
 
 /**
  * Search, filter, sort and pagination for the long operational lists.
@@ -81,6 +83,7 @@ export interface RemoteListResult {
   readonly view: ListView;
   readonly facetValues: Readonly<Record<string, readonly string[]>>;
   readonly unavailableFacets: readonly string[];
+  readonly truth: OperationalTruth | null;
 }
 
 export const PERIODS: readonly PeriodSpec[] = [
@@ -112,6 +115,7 @@ const SHARED_FACETS: readonly FacetSpec[] = [
 export const ACTIVITY_LIST: ListSpec = {
   id: "atividade",
   facets: [
+    { id: "condicao", label: "Condição de triagem", fields: ["conditions"] },
     { id: "estado", label: "Estado", fields: ["state", "status"] },
     { id: "tipo", label: "Tipo de evento", fields: ["event", "kind"] },
     { id: "origem", label: "Origem", fields: ["source", "provider", "channel"] },
@@ -148,6 +152,7 @@ export const EXCEPTION_LIST: ListSpec = {
 /** Every param this module owns. Anything else in the query string is left alone. */
 export const LIST_PARAM_IDS: readonly string[] = [
   "q",
+  "condicao",
   "estado",
   "tipo",
   "origem",
@@ -227,11 +232,21 @@ function primitiveText(value: unknown): string {
 
 /** First non-empty primitive among the candidate fields, or "" when none is present. */
 export function fieldText(row: Record<string, unknown>, fields: readonly string[]): string {
+  return fieldTexts(row, fields)[0] ?? "";
+}
+
+/** All primitive values carried by the first matching field (multi-valued facets included). */
+export function fieldTexts(row: Record<string, unknown>, fields: readonly string[]): string[] {
   for (const field of fields) {
-    const text = primitiveText(row[field]);
-    if (text !== "") return text;
+    const value = row[field];
+    if (Array.isArray(value)) {
+      const texts = value.map(primitiveText).filter((text) => text !== "");
+      if (texts.length > 0) return texts;
+    }
+    const text = primitiveText(value);
+    if (text !== "") return [text];
   }
-  return "";
+  return [];
 }
 
 /** Distinct values a facet actually takes in the observed rows, sorted for a stable select. */
@@ -241,8 +256,7 @@ export function facetValues(
 ): string[] {
   const set = new Set<string>();
   for (const row of rows) {
-    const value = fieldText(row, facet.fields);
-    if (value !== "") set.add(value);
+    for (const value of fieldTexts(row, facet.fields)) set.add(value);
   }
   return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
@@ -255,7 +269,7 @@ export function matchesFacets(
   for (const facet of spec.facets) {
     const wanted = facets[facet.id] ?? "all";
     if (wanted === "all") continue;
-    if (fieldText(row, facet.fields) !== wanted) return false;
+    if (!fieldTexts(row, facet.fields).includes(wanted)) return false;
   }
   return true;
 }
@@ -551,6 +565,7 @@ export function remoteListResultOf(value: unknown, spec: ListSpec): RemoteListRe
     },
     facetValues: values,
     unavailableFacets: unavailable,
+    truth: parseOperationalTruth(rec.truth),
   };
 }
 

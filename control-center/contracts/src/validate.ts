@@ -91,7 +91,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function issue(pathExpr: string, message: string, keyword?: string): ValidationIssue {
-  return { path: pathExpr, message, keyword };
+  return { path: pathExpr, message, ...(keyword === undefined ? {} : { keyword }) };
 }
 
 function collectSecretKeyIssues(value: unknown, pathExpr: string, acc: ValidationIssue[]): void {
@@ -524,7 +524,7 @@ export function validate(type: ResourceTypeName, data: unknown): ValidationResul
   return {
     ok: schemaOk && unique.length === 0,
     type,
-    schema_version,
+    ...(schema_version === undefined ? {} : { schema_version }),
     errors: unique,
   };
 }

@@ -102,6 +102,28 @@
     }
   },
   "$defs": {
+    "operational_truth": {
+      "type": "object",
+      "description": "Evidential state of an operational value. ZERO is measured; ABSENT is missing; UNKNOWN is inconclusive; STALE is too old; ERROR is collection failure; HEALTHY is fresh trusted evidence. This is not a business-severity scale.",
+      "additionalProperties": false,
+      "required": ["state", "as_of", "source", "confidence", "reason"],
+      "properties": {
+        "state": { "type": "string", "enum": ["ZERO", "ABSENT", "UNKNOWN", "STALE", "ERROR", "HEALTHY"] },
+        "as_of": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime"
+        },
+        "source": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/source_ref"
+        },
+        "confidence": {
+          "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/confidence"
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["confirmed_zero", "source_absent", "recency_unknown", "partial_payload", "observation_stale", "collection_error", "fresh_observation"]
+        }
+      }
+    },
     "absence_reason": {
       "type": "string",
       "enum": ["no_data", "not_configured", "upstream_error"]
@@ -184,6 +206,7 @@
         "presence": { "type": "string", "enum": ["present", "absent"] },
         "absence_reason": { "$ref": "#/$defs/absence_reason" },
         "healthy": { "type": "boolean" },
+        "truth": { "$ref": "#/$defs/operational_truth" },
         "snapshot": {
           "oneOf": [
             { "type": "null" },

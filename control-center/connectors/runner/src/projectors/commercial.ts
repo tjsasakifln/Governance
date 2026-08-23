@@ -384,6 +384,7 @@ function operationsFromWarmbly(
     .map((item) => asRecord(item))
     .filter((row): row is Record<string, unknown> => row !== null);
   const attentionSet = new Set(attentionRecords);
+  const inboundSet = new Set(inboundRecords);
   const allActivity = [...deals, ...tasks, ...inboundRecords, ...attentionRecords]
       .map((item) => asRecord(item))
       .filter((row): row is Record<string, unknown> => row !== null)
@@ -392,6 +393,24 @@ function operationsFromWarmbly(
         const entityRef = attentionSet.has(row) ? asRecord(row.entity_ref) : null;
         const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
         const kind = typeof row.kind === "string" ? row.kind : "";
+        const state = typeof row.status === "string" ? row.status : typeof row.commercial_state === "string" ? row.commercial_state : null;
+        const stateLower = (state ?? "").toLowerCase();
+        const owner = firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]);
+        const dueAt = isoOr(row.due_at ?? row.deadline_at, "");
+        const ageSeconds = Math.max(0, Math.floor((now - (parseTime(at) ?? now)) / 1000));
+        const isInbound = inboundSet.has(row) || /(?:^|[_-])inbound(?:$|[_-])/i.test(kind);
+        const conditions: string[] = [];
+        if (isInbound && !row.read_at && !["read", "triaged", "resolved"].includes(stateLower)) conditions.push("unread");
+        if ((dueAt && (parseTime(dueAt) ?? now) < now) || stateLower.includes("overdue")) conditions.push("overdue");
+        if (!owner) conditions.push("unassigned");
+        if (stateLower.includes("block") || row.blocked === true) conditions.push("blocked");
+        const triageState = conditions.includes("blocked")
+          ? "blocked"
+          : conditions.includes("unread")
+            ? "unread"
+            : ["triaged", "read", "reviewed"].includes(stateLower)
+              ? "triaged"
+              : "new";
         const inboundLeadId =
           attentionSet.has(row) &&
           /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
@@ -402,7 +421,7 @@ function operationsFromWarmbly(
         return {
           at,
           lead_or_account: displayName(row),
-          source_id: typeof row.id === "string" ? row.id : typeof row.lead_id === "string" ? row.lead_id : "unknown",
+          source_id: typeof row.id === "string" ? row.id : typeof row.lead_id === "string" ? row.lead_id : null,
           event:
             typeof row.kind === "string"
               ? row.kind
@@ -411,11 +430,18 @@ function operationsFromWarmbly(
                 : typeof row.status === "string"
                   ? row.status
                   : "activity",
-          state: typeof row.status === "string" ? row.status : typeof row.commercial_state === "string" ? row.commercial_state : null,
+          state,
+          triage_state: triageState,
+          conditions,
+          age_seconds: ageSeconds,
+          due_at: dueAt || null,
+          next_action: firstText(row, ["next_action", "recommended_next_action", "recommended_action"]),
           evidence: typeof row.why === "string" ? row.why : typeof row.why_now === "string" ? row.why_now : typeof row.title === "string" ? row.title : null,
           source: sourceSystem,
-          owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
+          owner,
           priority: firstText(row, ["priority", "severity"]),
+          sync_status: firstText(row, ["sync_status", "synchronization_status"]) ?? "observed",
+          sync_detail: firstText(row, ["sync_detail", "synchronization_error"]),
           ...(inboundLeadId
             ? { operator_target_kind: "inbound_lead", operator_target_id: inboundLeadId }
             : {}),
@@ -542,12 +568,30 @@ function intelExceptionsSourcePresent(nested: Record<string, unknown>, payload: 
 
 function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: string): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
-  const seen = new Set<string>();
+  const grouped = new Map<string, Record<string, unknown>>();
+  const now = Date.parse(observedAt);
+  const workflowState = (raw: unknown): "new" | "acknowledged" | "in_progress" | "resolved" | "discarded" => {
+    const state = typeof raw === "string" ? raw.toLowerCase() : "";
+    if (["ack", "acked", "acknowledged", "snoozed", "muted"].includes(state)) return "acknowledged";
+    if (["in_progress", "processing", "working", "investigating"].includes(state)) return "in_progress";
+    if (["resolved", "closed", "done", "completed"].includes(state)) return "resolved";
+    if (["discarded", "dismissed", "ignored", "false_positive"].includes(state)) return "discarded";
+    return "new";
+  };
+  const safeResolutionHref = (row: Record<string, unknown>): string | null => {
+    const raw = firstText(row, ["resolution_url", "operator_url", "deep_link"]);
+    if (!raw || raw.length > 1000) return null;
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || url.username || url.password) return null;
+      return url.toString();
+    } catch {
+      return null;
+    }
+  };
   const push = (row: Record<string, unknown>, source: "warmbly.intel.exceptions" | "warmbly.attention") => {
     const rawId = typeof row.id === "string" && row.id.trim() ? row.id.trim() : "";
     const id = rawId || `${source}:${out.length}`;
-    if (seen.has(id)) return;
-    seen.add(id);
     const slug = id.replace(/[^A-Za-z0-9._~-]+/g, "-");
     const kind =
       typeof row.kind === "string"
@@ -566,20 +610,37 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
       typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
         ? entityRef.id.trim()
         : null;
-    out.push({
+    const why =
+      typeof row.why === "string"
+        ? row.why
+        : typeof row.reason === "string"
+          ? row.reason
+          : typeof row.title === "string"
+            ? row.title
+            : typeof row.code === "string"
+              ? row.code
+              : "exception";
+    const sourceId = typeof row.source_id === "string" ? row.source_id : id;
+    const groupKey = firstText(row, ["group_key", "dedupe_key"]) ?? `${kind}|${sourceId}|${why}`.toLowerCase();
+    const existing = grouped.get(groupKey);
+    if (existing) {
+      existing.occurrence_count = Number(existing.occurrence_count ?? 1) + 1;
+      const ids = Array.isArray(existing.occurrence_ids) ? existing.occurrence_ids as string[] : [];
+      ids.push(id);
+      existing.occurrence_ids = ids;
+      return;
+    }
+    const observed = isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt);
+    const resolutionHref = safeResolutionHref(row);
+    const impact = firstText(row, ["impact", "business_impact"])
+      ?? (String(row.priority ?? row.severity ?? "").toLowerCase().match(/critical|high|p0|p1/)
+        ? "Pode interromper ou atrasar o atendimento comercial."
+        : "Pode degradar a qualidade ou a continuidade do funil comercial.");
+    const projected: Record<string, unknown> = {
       id,
       canonical_id: `cc:attention-item:${slug}`,
-      source_id: typeof row.source_id === "string" ? row.source_id : id,
-      why:
-        typeof row.why === "string"
-          ? row.why
-          : typeof row.reason === "string"
-            ? row.reason
-            : typeof row.title === "string"
-              ? row.title
-              : typeof row.code === "string"
-                ? row.code
-                : "exception",
+      source_id: sourceId,
+      why,
       kind,
       recommended_next_action:
         typeof row.recommended_next_action === "string"
@@ -590,13 +651,26 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
               ? row.recommended_action
               : null,
       status: typeof row.status === "string" ? row.status : "open",
+      workflow_state: workflowState(row.status),
       source,
       owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
       priority: firstText(row, ["priority", "severity"]),
-      observed_at: isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt),
+      observed_at: observed,
+      age_seconds: Math.max(0, Math.floor((now - (parseTime(observed) ?? now)) / 1000)),
+      impact,
+      occurrence_count: 1,
+      occurrence_ids: [id],
+      group_key: groupKey,
+      resolution_kind: explicitLeadId ? "warmbly_action" : resolutionHref ? "deep_link" : "unsupported",
+      resolution_target: explicitLeadId,
+      resolution_href: resolutionHref,
+      sync_status: firstText(row, ["sync_status", "synchronization_status"]) ?? "observed",
+      sync_detail: firstText(row, ["sync_detail", "synchronization_error"]),
       ...(explicitLeadId ? { lead_id: explicitLeadId } : {}),
       evidence: stripIdentity(row),
-    });
+    };
+    grouped.set(groupKey, projected);
+    out.push(projected);
   };
   for (const item of intel) {
     const row = asRecord(item);
@@ -909,12 +983,19 @@ function compactListRow(row: Record<string, unknown>, list: "activity" | "except
           "source_id",
           "event",
           "state",
+          "triage_state",
+          "conditions",
+          "age_seconds",
+          "due_at",
+          "next_action",
           "evidence",
           "source",
           "owner",
           "priority",
           "operator_target_kind",
           "operator_target_id",
+          "sync_status",
+          "sync_detail",
         ]
       : [
           "id",
@@ -924,11 +1005,22 @@ function compactListRow(row: Record<string, unknown>, list: "activity" | "except
           "kind",
           "recommended_next_action",
           "status",
+          "workflow_state",
           "source",
           "observed_at",
+          "age_seconds",
+          "impact",
           "owner",
           "priority",
           "lead_id",
+          "occurrence_count",
+          "occurrence_ids",
+          "group_key",
+          "resolution_kind",
+          "resolution_target",
+          "resolution_href",
+          "sync_status",
+          "sync_detail",
         ];
   const out: Record<string, unknown> = {};
   for (const key of keys) {
@@ -936,6 +1028,11 @@ function compactListRow(row: Record<string, unknown>, list: "activity" | "except
     if (value === undefined) continue;
     if (typeof value === "string") {
       out[key] = value.slice(0, 4000);
+    } else if (Array.isArray(value)) {
+      out[key] = value
+        .filter((item): item is string => typeof item === "string")
+        .slice(0, 100)
+        .map((item) => item.slice(0, 512));
     } else if (value === null || typeof value === "number" || typeof value === "boolean") {
       out[key] = value;
     }

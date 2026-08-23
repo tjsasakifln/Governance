@@ -107,7 +107,7 @@ test("the fields the list filters read are the fields the Warmbly projector emit
   // Object-literal keys, shorthand (`at,`) or explicit (`status: ...`).
   const emits = (key: string): boolean => new RegExp(`\\n\\s+${key}[,:]`).test(source);
 
-  const ACTIVITY_KEYS = ["at", "lead_or_account", "source_id", "event", "state", "evidence"];
+  const ACTIVITY_KEYS = ["at", "lead_or_account", "source_id", "event", "state", "conditions", "evidence"];
   const EXCEPTION_KEYS = [
     "id",
     "canonical_id",

@@ -21,6 +21,11 @@ export const MIGRATIONS = [
     up: 'sql/migrations/004_operator_actions.up.sql',
     down: 'sql/migrations/004_operator_actions.down.sql',
   },
+  {
+    id: '005_operational_workflow_actions',
+    up: 'sql/migrations/005_operational_workflow_actions.up.sql',
+    down: 'sql/migrations/005_operational_workflow_actions.down.sql',
+  },
 ] as const;
 
 export const REQUIRED_TABLES = [

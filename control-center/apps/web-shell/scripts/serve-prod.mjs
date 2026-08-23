@@ -61,24 +61,52 @@ function injectIdentity(html) {
   return next;
 }
 
+function readProxyBody(req, limit = 64 * 1024) {
+  if (req.method === "GET" || req.method === "HEAD") return Promise.resolve(undefined);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let rejected = false;
+    req.on("data", (chunk) => {
+      if (rejected) return;
+      size += chunk.length;
+      if (size > limit) {
+        rejected = true;
+        chunks.length = 0;
+        reject(new Error("proxy_request_too_large"));
+        req.resume();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (!rejected) resolve(Buffer.concat(chunks));
+    });
+    req.on("error", reject);
+  });
+}
+
 export const server = createServer((req, res) => {
   applySecurityHeaders(res);
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
   if (contextUpstream && url.pathname.startsWith("/v1/")) {
-    void fetch(`${contextUpstream}${url.pathname}${url.search}`, {
-      method: req.method,
-      headers: copyActorHeaders(req),
-    })
+    void readProxyBody(req)
+      .then((body) => fetch(`${contextUpstream}${url.pathname}${url.search}`, {
+        method: req.method,
+        headers: copyActorHeaders(req),
+        ...(body === undefined ? {} : { body }),
+      }))
       .then(async (upstream) => {
         const body = Buffer.from(await upstream.arrayBuffer());
         res.statusCode = upstream.status;
         res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
         res.end(body);
       })
-      .catch(() => {
-        res.statusCode = 502;
+      .catch((err) => {
+        const tooLarge = err instanceof Error && err.message === "proxy_request_too_large";
+        res.statusCode = tooLarge ? 413 : 502;
         res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify({ error: "context_upstream_unavailable" }));
+        res.end(JSON.stringify({ error: tooLarge ? "request_too_large" : "context_upstream_unavailable" }));
       });
     return;
   }

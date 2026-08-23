@@ -110,3 +110,26 @@ test("same idempotency key with a conflicting payload fails closed at PostgreSQL
   );
   assert.equal(counted.rows[0]?.n, 1);
 });
+
+test("daily triage and exception workflow actions are allowed but remain append-only local receipts", async () => {
+  const observedAt = new Date("2026-08-22T12:00:00.000Z");
+  for (const actionType of ["ASSIGN_TRIAGE", "MARK_TRIAGED", "START_EXCEPTION_WORK"] as const) {
+    const result = await ctx.persistence.recordOperatorAction({
+      actionType,
+      targetCanonicalId: `cc:attention-item:${actionType.toLowerCase()}`,
+      targetSourceId: actionType.toLowerCase(),
+      actorId: "human:founder",
+      occurredAt: observedAt,
+      correlationId: `corr-${actionType}`,
+      idempotencyKey: `workflow-${actionType}`,
+      scope: "commercial",
+      source: { system: "control-center", kind: "operator-action", locator: actionType },
+      observedAt,
+      freshnessStatus: "FRESH",
+      confidence: 1,
+      note: "fixture sandbox",
+    });
+    assert.equal(result.inserted, true);
+    assert.equal(result.action.actionType, actionType);
+  }
+});

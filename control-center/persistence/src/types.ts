@@ -246,6 +246,9 @@ export const OPERATOR_ACTION_TYPES = [
   'REJECT_NEXT_ACTION',
   'RECORD_NOTE',
   'MARK_REVIEWED',
+  'ASSIGN_TRIAGE',
+  'MARK_TRIAGED',
+  'START_EXCEPTION_WORK',
 ] as const;
 export type OperatorActionType = (typeof OPERATOR_ACTION_TYPES)[number];
 

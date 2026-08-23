@@ -20,6 +20,7 @@ import {
   statusPill,
   technicalDetails,
 } from "./labels";
+import { operationalTruthBlock, parseOperationalTruth } from "./operational-truth";
 
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const tone = row.freshness_tone || freshnessTone(row.freshness_status);
@@ -138,11 +139,12 @@ function domainCard(card: HojeDomainCard): string {
       <header>
         <p class="kicker">
           <span class="pill pill-state-${escapeHtml(card.state)}">${escapeHtml(card.state_label)}</span>
-          <span class="pill pill-${escapeHtml(card.freshness_status.toLowerCase())}">${escapeHtml(card.freshness_status)}</span>${absence}
+          ${freshnessPill(card.freshness_status)}${absence}
         </p>
         <h3>${escapeHtml(card.label)}</h3>
       </header>
       <p class="domain-reason">${escapeHtml(card.state_reason)}</p>
+      ${card.truth === undefined ? "" : operationalTruthBlock(parseOperationalTruth(card.truth))}
       <p class="domain-indicator"><strong>Indicador:</strong> ${escapeHtml(card.indicator)}</p>
       ${pendingList(card)}
       <p class="prov-inline">
@@ -168,7 +170,8 @@ function integrationRow(row: HojeIntegration): string {
   return `<li data-integration="${escapeHtml(row.system)}" data-domain-state="${escapeHtml(row.state)}" data-freshness="${escapeHtml(row.freshness_status)}">
     <span class="pill pill-state-${escapeHtml(row.state)}">${escapeHtml(row.state_label)}</span>
     <strong>${escapeHtml(row.system)}</strong> — ${escapeHtml(row.detail)}
-    <span class="prov-inline">última leitura ${escapeHtml(row.observed_at_local)}</span>
+    <span class="prov-inline">${freshnessPill(row.freshness_status)} · última leitura ${escapeHtml(row.observed_at_local)}</span>
+    ${technicalDetails([{ term: "error_code", value: row.error_code ?? "" }], "integration-error")}
   </li>`;
 }
 

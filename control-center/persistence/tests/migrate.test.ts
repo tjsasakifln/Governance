@@ -29,6 +29,7 @@ test('migrate up then down then up recreates named tables and current-state obje
     '002_current_state',
     '003_durable_operational_data_plane',
     '004_operator_actions',
+    '005_operational_workflow_actions',
   ]);
   const afterFirstUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {
@@ -87,6 +88,7 @@ test('migrate up then down then up recreates named tables and current-state obje
 
   const down = await migrateDown(ctx.pool);
   assert.deepEqual(down, [
+    '005_operational_workflow_actions',
     '004_operator_actions',
     '003_durable_operational_data_plane',
     '002_current_state',
@@ -106,6 +108,7 @@ test('migrate up then down then up recreates named tables and current-state obje
     '002_current_state',
     '003_durable_operational_data_plane',
     '004_operator_actions',
+    '005_operational_workflow_actions',
   ]);
   const afterSecondUp = await ctx.persistence.listNamedObjects();
   for (const table of REQUIRED_TABLES) {

@@ -3,6 +3,7 @@ import {
   rankAttention,
   type AttentionSignal,
 } from "@confenge/control-center-attention";
+import { operationalTruth } from "@confenge/control-center-contracts";
 import { toUtcIso, type Clock } from "../clock.ts";
 import type { RepoDomainMap } from "../scope.ts";
 import type { FreshnessStatus, Scope } from "../types.ts";
@@ -422,6 +423,13 @@ function presentSlot(domain: OperationalDomain, row: OperationalSnapshotRow): Do
     confidence: row.confidence,
     presence: "present",
     healthy,
+    truth: operationalTruth({
+      as_of: row.observed_at,
+      source: row.source,
+      confidence: row.confidence,
+      freshness_status: row.freshness_status,
+      presence: "present",
+    }),
     snapshot: body,
   };
 }
@@ -450,6 +458,13 @@ function absentSlot(
     presence: "absent",
     absence_reason: reason,
     healthy: false,
+    truth: operationalTruth({
+      as_of: run?.observed_at ?? generatedAt,
+      source,
+      confidence: 0,
+      freshness_status: freshness,
+      presence: "absent",
+    }),
     snapshot: null,
   };
 }

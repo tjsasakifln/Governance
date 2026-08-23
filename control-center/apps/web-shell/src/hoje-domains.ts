@@ -90,6 +90,8 @@ export interface HojeDomainCard {
   href_label: string;
   presence: "present" | "absent";
   absence_reason: AbsenceReason | null;
+  /** Canonical #62 evidential state, carried without reinterpretation. */
+  truth?: unknown;
 }
 
 export interface HojeIntegration {
@@ -99,6 +101,7 @@ export interface HojeIntegration {
   detail: string;
   observed_at_local: string;
   freshness_status: FreshnessStatus;
+  error_code?: string;
 }
 
 export interface HojeOutbound {
@@ -201,6 +204,7 @@ interface DomainSlot {
   observed_at: string | null;
   source: SourceRef | null;
   snapshot: Record<string, unknown> | null;
+  truth?: unknown;
 }
 
 function slotOf(value: unknown): DomainSlot | null {
@@ -217,6 +221,7 @@ function slotOf(value: unknown): DomainSlot | null {
     observed_at: strOf(rec.observed_at),
     source: sourceOf(rec.source),
     snapshot: asRecord(rec.snapshot),
+    ...(rec.truth === undefined ? {} : { truth: rec.truth }),
   };
 }
 
@@ -484,6 +489,7 @@ function warmblyCard(
     href_label: seed.href_label,
     presence: commercial?.presence ?? "absent",
     absence_reason: commercial?.absence_reason ?? null,
+    ...(commercial?.truth === undefined ? {} : { truth: commercial.truth }),
   };
 }
 
@@ -596,6 +602,7 @@ function standardCard(seed: CardSeed, slot: DomainSlot | null, alerts: AlertCoun
     href_label: seed.href_label,
     presence: slot?.presence ?? "absent",
     absence_reason: slot?.absence_reason ?? null,
+    ...(slot?.truth === undefined ? {} : { truth: slot.truth }),
   };
 }
 
@@ -625,7 +632,7 @@ function integrationsFrom(envelope: Record<string, unknown>): HojeIntegration[] 
     const observedAt = strOf(row.observed_at);
     const detail =
       errorCode !== null
-        ? `${errorCode}: ${(error ? strOf(error.message) : null) ?? "origem respondeu com erro"}`
+        ? `erro na origem: ${(error ? strOf(error.message) : null) ?? "a origem respondeu com erro"}`
         : `${source.kind} · ${source.locator}`;
     const previous = bySystem.get(source.system);
     const candidate: HojeIntegration = {
@@ -635,6 +642,7 @@ function integrationsFrom(envelope: Record<string, unknown>): HojeIntegration[] 
       detail,
       observed_at_local: observedAt ? formatLocal(observedAt) : "sem leitura registrada",
       freshness_status: freshness,
+      ...(errorCode === null ? {} : { error_code: errorCode }),
     };
     // Worst reading per system wins: one healthy probe must not hide a broken one.
     if (

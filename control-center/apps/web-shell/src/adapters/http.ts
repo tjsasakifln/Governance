@@ -68,6 +68,35 @@ function dispatchMessage(body: Record<string, unknown>, status: number): string 
   return `O canal respondeu HTTP ${status} sem explicação legível.`;
 }
 
+function stringValue(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+async function operatorIdempotencyKey(input: {
+  action_type: string;
+  target_canonical_id: string;
+  target_source_id: string;
+  note: string;
+}): Promise<string> {
+  const material = new TextEncoder().encode(JSON.stringify([
+    input.action_type,
+    input.target_canonical_id,
+    input.target_source_id,
+    input.note,
+  ]));
+  if (globalThis.crypto?.subtle) {
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", material));
+    const token = [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 32);
+    return `cc-web:${input.action_type}:${token}`;
+  }
+  // Test/legacy fallback only. A collision is rejected by the server's
+  // conflicting-payload guard; no operator prose is copied into the key.
+  let hash = 0x811c9dc5;
+  for (const byte of material) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return `cc-web:${input.action_type}:fnv-${hash.toString(16).padStart(8, "0")}`;
+}
+
 export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   readonly mode = "http" as const;
   readonly actions: readonly AdapterAction[] = ADAPTER_ACTIONS;
@@ -180,6 +209,17 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         ...(typeof body.confirmation_token === "string"
           ? { confirmationToken: body.confirmation_token }
           : {}),
+        ...(stringValue(body, "correlation_id") && stringValue(body, "recorded_at")
+          ? {
+              receipt: {
+                id: stringValue(body, "ledger_id") ?? stringValue(body, "correlation_id")!,
+                correlation_id: stringValue(body, "correlation_id")!,
+                occurred_at: stringValue(body, "recorded_at")!,
+                outcome: stringValue(body, "outcome") ?? (response.ok ? "executed" : "refused"),
+                writes_to: "warmbly" as const,
+              },
+            }
+          : {}),
       };
       this.lastOperatorResult = result;
       return result;
@@ -228,7 +268,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       return denied;
     }
     try {
-      const idempotency = input.idempotency_key ?? `${input.action_type}:${input.target_canonical_id}:${input.note}`;
+      const idempotency = input.idempotency_key ?? await operatorIdempotencyKey(input);
       const response = await this.fetchImpl(`${this.baseUrl}/v1/operator-actions`, {
         method: "POST",
         headers: {
@@ -247,21 +287,48 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
           scope: "commercial",
         }),
       });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       if (!response.ok) {
+        const error = body.error && typeof body.error === "object" && !Array.isArray(body.error)
+          ? (body.error as Record<string, unknown>)
+          : {};
+        const detail = stringValue(body, "message") ?? stringValue(body, "reason") ?? stringValue(error, "message");
         const denied: AdapterWriteResult = {
           ok: false,
           path: "/v1/operator-actions",
           kind: "nota",
-          message: `recusado (${response.status})`,
+          message: `recusado (${response.status})${detail ? `: ${detail}` : ""}`,
+          outcome: "refused",
+          code: `http_${response.status}`,
+          status: response.status,
         };
         this.lastOperatorResult = denied;
         return denied;
       }
+      const actor = body.actor && typeof body.actor === "object" && !Array.isArray(body.actor)
+        ? (body.actor as Record<string, unknown>)
+        : {};
       const accepted: AdapterWriteResult = {
         ok: true,
         path: "/v1/operator-actions",
         kind: "nota",
-        message: "reconhecido no Control Center; Warmbly não foi alterado",
+        message: body.resulting_status === "duplicate"
+          ? "requisição duplicada: o receipt original foi preservado; Warmbly não foi alterado"
+          : "ação registrada no Control Center; Warmbly não foi alterado",
+        ...(stringValue(body, "id") && stringValue(body, "correlation_id") && stringValue(body, "occurred_at")
+          ? {
+              outcome: stringValue(body, "resulting_status") ?? "accepted",
+              receipt: {
+                id: stringValue(body, "id")!,
+                correlation_id: stringValue(body, "correlation_id")!,
+                occurred_at: stringValue(body, "occurred_at")!,
+                outcome: stringValue(body, "resulting_status") ?? "accepted",
+                ...(stringValue(actor, "id") ? { actor_id: stringValue(actor, "id")! } : {}),
+                target: stringValue(body, "target_canonical_id") ?? input.target_canonical_id,
+                writes_to: "control-center" as const,
+              },
+            }
+          : {}),
       };
       this.lastOperatorResult = accepted;
       return accepted;
@@ -271,6 +338,8 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         path: "/v1/operator-actions",
         kind: "nota",
         message: err instanceof Error ? err.message : "gravação indisponível",
+        outcome: "unknown",
+        code: "browser_transport",
       };
       this.lastOperatorResult = failed;
       return failed;

@@ -31,6 +31,7 @@ import {
   clientLifecycleLabel,
   directiveKindLabel,
   directiveStatusLabel,
+  exceptionKindLabel,
   freshnessLabel,
   healthLabel,
   helpTerm,
@@ -279,7 +280,7 @@ function metricRate(value: unknown): string {
 function observedCount(value: unknown): string {
   return typeof value === "number" && Number.isInteger(value)
     ? String(value)
-    : "UNKNOWN / dados ainda incompletos";
+    : "desconhecido / dados ainda incompletos";
 }
 
 function controlledEmailCohort(ops: Record<string, unknown>): string {
@@ -295,8 +296,8 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     return `<article class="card" data-controlled-email="unknown">
       <h3>Cohort controlado de e-mail</h3>
       <p class="constraint">Nenhum grant bounded foi observado. Ausência não é autorização.</p>
-      ${fact("Telemetria", escapeHtml(String(root.availability ?? "UNKNOWN")))}
-      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+      ${fact("Telemetria", escapeHtml(availabilityLabel(String(root.availability ?? "UNKNOWN"))))}
+      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "não informado")))}
     </article>`;
   }
   const dispatch = current.dispatch && typeof current.dispatch === "object"
@@ -314,7 +315,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     .join("");
   const window = dispatch.window_start && dispatch.window_end
     ? `${String(dispatch.window_start)}–${String(dispatch.window_end)} ${String(dispatch.timezone ?? "")}`.trim()
-    : "UNKNOWN";
+    : "não informada";
   const integrityLabels: Record<string, string> = {
     grant_revoked: "grant observado como revogado",
     grant_expired: "grant expirado no instante desta coleta",
@@ -329,23 +330,23 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     : "";
   const telemetryWarning = telemetryObserved
     ? ""
-    : `<p class="banner" data-controlled-email-telemetry="unproven">O grant foi observado, mas o relatório não comprovou telemetria real com include_synthetic=false. Outcomes permanecem UNKNOWN.</p>`;
+    : `<p class="banner" data-controlled-email-telemetry="unproven">A autorização foi observada, mas o relatório não comprovou telemetria real sem dados sintéticos. Os desfechos permanecem desconhecidos.</p>`;
   const outcomeRows = rows
     .filter((item) => item && typeof item === "object")
     .map((item) => item as Record<string, unknown>)
     .map((row) => `<article class="card" data-controlled-email-route="${escapeHtml(String(row.route_class ?? "UNKNOWN"))}">
-      <h3>${escapeHtml(String(row.route_class ?? "UNKNOWN"))}</h3>
+      <h3>${escapeHtml(String(row.route_class ?? "rota não informada"))}</h3>
       <dl class="facts">
-        ${fact("Provider", escapeHtml(String(row.provider ?? "UNKNOWN")))}
-        ${fact("Attempted", observedCount(row.attempted))}
-        ${fact("SMTP accepted", observedCount(row.provider_accepted))}
-        ${fact("Delivered", observedCount(row.delivered))}
-        ${fact("Hard bounce", observedCount(row.hard_bounce))}
-        ${fact("Soft bounce", observedCount(row.soft_bounce))}
-        ${fact("Replies", observedCount(row.reply))}
-        ${fact("Positive replies", observedCount(row.positive_reply))}
-        ${fact("Opt-outs", observedCount(row.opt_out))}
-        ${fact("Complaints", observedCount(row.spam_complaint))}
+        ${fact("Provedor", escapeHtml(String(row.provider ?? "não informado")))}
+        ${fact("Tentativas", observedCount(row.attempted))}
+        ${fact("Aceitos pelo SMTP", observedCount(row.provider_accepted))}
+        ${fact("Entregues", observedCount(row.delivered))}
+        ${fact("Rejeições permanentes", observedCount(row.hard_bounce))}
+        ${fact("Rejeições temporárias", observedCount(row.soft_bounce))}
+        ${fact("Respostas", observedCount(row.reply))}
+        ${fact("Respostas positivas", observedCount(row.positive_reply))}
+        ${fact("Descadastros", observedCount(row.opt_out))}
+        ${fact("Denúncias", observedCount(row.spam_complaint))}
       </dl>
     </article>`)
     .join("");
@@ -354,31 +355,31 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     ${telemetryWarning}
     ${integrityWarning}
     <article class="card">
-      <h3>${escapeHtml(String(current.cohort_id ?? "UNKNOWN"))}</h3>
+      <h3>${escapeHtml(String(current.cohort_id ?? "coorte não informada"))}</h3>
       <dl class="facts">
-        ${fact("Cohort hash", escapeHtml(String(current.cohort_hash ?? "UNKNOWN")))}
-        ${fact("Policy version", escapeHtml(String(current.policy_version ?? "UNKNOWN")))}
-        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "UNKNOWN")))}
+        ${fact("Identificador técnico da coorte", escapeHtml(String(current.cohort_hash ?? "não informado")))}
+        ${fact("Versão da política", escapeHtml(String(current.policy_version ?? "não informada")))}
+        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "não informado")))}
         ${fact("Quantidade autorizada", observedCount(current.authorized_quantity))}
         ${fact("Enviados", observedCount(current.sent))}
         ${fact("Reservados", observedCount(current.reserved))}
-        ${fact("SMTP accepted", observedCount(outcomes.provider_accepted))}
-        ${fact("Hard bounce", observedCount(outcomes.hard_bounce))}
-        ${fact("Soft bounce", observedCount(outcomes.soft_bounce))}
-        ${fact("Replies", observedCount(outcomes.reply))}
-        ${fact("Positive replies", observedCount(outcomes.positive_reply))}
-        ${fact("Opt-outs", observedCount(outcomes.opt_out))}
-        ${fact("Estado da autorização", escapeHtml(String(current.authorization_state ?? "UNKNOWN")))}
-        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "UNKNOWN")))}
-        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "UNKNOWN")))}
-        ${fact("GO review", escapeHtml(String(current.go_review_verdict ?? "UNKNOWN")))}
-        ${fact("Estado do dispatch", escapeHtml(String(dispatch.state ?? "UNKNOWN")))}
+        ${fact("Aceitos pelo SMTP", observedCount(outcomes.provider_accepted))}
+        ${fact("Rejeições permanentes", observedCount(outcomes.hard_bounce))}
+        ${fact("Rejeições temporárias", observedCount(outcomes.soft_bounce))}
+        ${fact("Respostas", observedCount(outcomes.reply))}
+        ${fact("Respostas positivas", observedCount(outcomes.positive_reply))}
+        ${fact("Descadastros", observedCount(outcomes.opt_out))}
+        ${fact("Estado da autorização", escapeHtml(availabilityLabel(String(current.authorization_state ?? "UNKNOWN"))))}
+        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "não informado")))}
+        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "não informado")))}
+        ${fact("Revisão de liberação", escapeHtml(availabilityLabel(String(current.go_review_verdict ?? "UNKNOWN"))))}
+        ${fact("Estado do disparo", escapeHtml(availabilityLabel(String(dispatch.state ?? "UNKNOWN"))))}
         ${fact("Cap diário", observedCount(current.max_daily_volume))}
         ${fact("Janela", escapeHtml(window))}
-        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "não informado")))}
         ${routeFacts}
       </dl>
-      <p class="constraint">SMTP accepted não é delivery. Métricas sem evento reconciliado permanecem UNKNOWN.</p>
+      <p class="constraint">Aceite pelo SMTP não comprova entrega. Métricas sem evento reconciliado permanecem desconhecidas.</p>
     </article>
     <div class="cards">${outcomeRows || `<p class="banner empty">Nenhum evento comercial real observado para esta cohort. Ausência não é zero.</p>`}</div>
   </section>`;
@@ -484,30 +485,105 @@ function activityOpsCard(
   const focusAttributes = rowId
     ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
-  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
-    <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
+  const triage = String(row.triage_state ?? row.state ?? "new");
+  const triageLabels: Record<string, string> = { new: "nova", unread: "não lida", triaged: "triada", blocked: "bloqueada" };
+  const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
+  const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
+  const sync = String(row.sync_status ?? "observed");
+  const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
+  const canonical = String(row.canonical_id ?? rowId);
+  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}" data-triage-state="${escapeHtml(triage)}">
+    <p class="kicker">${statusPill(triage, triageLabels[triage] ?? triage)} · ${escapeHtml(String(row.event ?? "evento"))}</p>
     <h3>${heading}</h3>
-    <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
-    <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-      <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />
+    <p>${escapeHtml(String(row.evidence ?? "Sem descrição adicional da origem."))}</p>
+    <dl class="facts">
+      ${fact("Idade", escapeHtml(age))}
+      ${fact("Origem", escapeHtml(String(row.source ?? "Warmbly")))}
+      ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
+      ${fact("Prioridade", escapeHtml(String(row.priority ?? "não informada")))}
+      ${fact("Próximo passo", escapeHtml(String(row.next_action ?? "abrir o detalhe e definir a próxima ação")))}
+      ${fact("Sincronização", escapeHtml(syncLabels[sync] ?? sync))}
+    </dl>
+    ${row.sync_detail ? `<p class="banner error" role="alert">Falha de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: confirme no Warmbly antes de repetir.</p>` : ""}
+    ${technicalDetails([
+      { term: "source_id", value: rowId },
+      { term: "state", value: String(row.state ?? "") },
+      { term: "triage_state", value: triage },
+      { term: "sync_status", value: sync },
+    ], "daily-triage")}
+    <div class="lead-actions" data-write-boundary="control-center">
+    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-      <button type="submit">Validar atividade</button>
+      <label>Nota de atribuição <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <button type="submit">Atribuir a mim</button>
     </form>
+    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
+      <label>Nota de triagem <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que isto registra a triagem no Control Center e não altera o Warmbly.</label>
+      <button type="submit">Marcar como triado</button>
+    </form>
+    </div>
   </article>`;
 }
 
 function exceptionOpsCard(row: Record<string, unknown>): string {
-  return `<article class="card" data-exception-id="${escapeHtml(String(row.id ?? ""))}" data-exception-status="${escapeHtml(String(row.status ?? ""))}">
-    <p class="kicker">${escapeHtml(String(row.kind ?? "exception"))}</p>
+  const id = String(row.id ?? "");
+  const canonical = String(row.canonical_id ?? id);
+  const sourceId = String(row.source_id ?? id);
+  const workflow = String(row.workflow_state ?? "new");
+  const stateLabels: Record<string, string> = { new: "nova", acknowledged: "reconhecida", in_progress: "em tratamento", resolved: "resolvida", discarded: "descartada" };
+  const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
+  const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
+  const count = typeof row.occurrence_count === "number" ? row.occurrence_count : 1;
+  const resolutionKind = String(row.resolution_kind ?? "unsupported");
+  let resolution: string;
+  if (resolutionKind === "warmbly_action") {
+    resolution = `<a class="alert-open" href="${escapeHtml(leadDetailHash("excecoes", null, id))}">Abrir detalhe e corrigir no Warmbly</a>`;
+  } else if (resolutionKind === "deep_link" && typeof row.resolution_href === "string" && /^https:\/\/[^\s]+$/i.test(row.resolution_href)) {
+    resolution = `<a class="alert-open" href="${escapeHtml(row.resolution_href)}" target="_blank" rel="noreferrer noopener">Abrir ponto exato de correção no Warmbly</a>`;
+  } else {
+    resolution = `<p class="constraint">Correção upstream não suportada pelo allowlist atual. Próxima ação: use a orientação abaixo e registre o desfecho; não marque como resolvida só por reconhecer.</p>`;
+  }
+  const open = workflow !== "resolved" && workflow !== "discarded";
+  return `<article class="card" data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
+    <p class="kicker">${statusPill(workflow, stateLabels[workflow] ?? workflow)} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
     <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
-    <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
-    <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
-      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
-      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
-      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-      <button type="submit">Reconhecer no Control Center</button>
-    </form>
+    <dl class="facts">
+      ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
+      ${fact("Idade", escapeHtml(age))}
+      ${fact("Impacto", escapeHtml(String(row.impact ?? "impacto não informado pela origem")))}
+      ${fact("Ação recomendada", escapeHtml(String(row.recommended_next_action ?? "investigar a evidência e definir correção")))}
+      ${fact("Ocorrências agrupadas", String(count))}
+      ${fact("Sincronização", escapeHtml(String(row.sync_status ?? "observada na origem")))}
+    </dl>
+    ${row.sync_detail ? `<p class="banner error" role="alert">Erro de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: releia a origem antes de repetir.</p>` : ""}
+    ${resolution}
+    ${technicalDetails([
+      { term: "id", value: id },
+      { term: "canonical_id", value: canonical },
+      { term: "source_id", value: sourceId },
+      { term: "workflow_state", value: workflow },
+      { term: "group_key", value: String(row.group_key ?? "") },
+      { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
+    ], "resolvable-exception")}
+    ${open ? `<div class="lead-actions" data-write-boundary="control-center">
+      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form">
+        <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+        <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
+        <label>Nota <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que reconhecer não resolve nem remove a exceção.</label>
+        <button type="submit">Reconhecer sem resolver</button>
+      </form>
+      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" class="operator-form">
+        <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+        <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
+        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <button type="submit">Iniciar tratamento</button>
+      </form>
+    </div>` : `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(stateLabels[workflow] ?? workflow)}.</p>`}
   </article>`;
 }
 
@@ -903,8 +979,8 @@ export function healthCard(item: ServiceHealth): string {
   const runbook = degraded ? item.runbook_url : undefined;
   const inconclusive = presented.conclusive
     ? ""
-    : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: freshness ${escapeHtml(
-        item.provenance.freshness_status,
+    : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: atualização ${escapeHtml(
+        freshnessLabel(item.provenance.freshness_status),
       )}, confiança ${escapeHtml(confidence)}. Nenhum estado conclusivo é afirmado para este serviço.</p>`;
   // Doubt about the collector run is stated, never folded into the service's
   // own status: one probe that timed out must not repaint a host that answered.
@@ -913,7 +989,7 @@ export function healthCard(item: ServiceHealth): string {
       ? `<p class="constraint" data-snapshot-evidence="${escapeHtml(
           item.snapshot_evidence.freshness_status,
         )}">Coleta que trouxe este serviço: ${escapeHtml(
-          item.snapshot_evidence.freshness_status,
+          freshnessLabel(item.snapshot_evidence.freshness_status),
         )}, confiança ${escapeHtml(
           item.snapshot_evidence.confidence.toFixed(2).replace(".", ","),
         )}. O estado abaixo vem da evidência do próprio serviço.</p>`
@@ -955,7 +1031,7 @@ export function healthCard(item: ServiceHealth): string {
           "Última verificação",
           `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
         )}
-        ${fact("Estado avaliado", escapeHtml(`${presented.status} · ${HEALTH_LABELS[presented.status]}`))}
+        ${fact("Estado avaliado", escapeHtml(HEALTH_LABELS[presented.status]))}
         ${fact(
           item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
           item.latency_ms !== undefined
@@ -1026,10 +1102,10 @@ export function infraCatalogBlock(summary: InfraCatalogSummary): string {
   return `
     <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
       ${fact("Serviços monitorados", escapeHtml(String(summary.monitored_service_count ?? "desconhecido")))}
-      ${fact("Evidência da coleta", escapeHtml(`${summary.freshness_status} · confiança ${confidence}`))}
+      ${fact("Evidência da coleta", escapeHtml(`${freshnessLabel(summary.freshness_status)} · confiança ${confidence}`))}
       ${
         reasonLabel
-          ? fact("Motivo", escapeHtml(`${reason} · ${reasonLabel}`))
+          ? fact("Motivo", escapeHtml(reasonLabel), ` data-reason="${escapeHtml(reason ?? "")}"`)
           : fact("Motivo", escapeHtml("coleta íntegra"), ` data-absent="true"`)
       }
       ${

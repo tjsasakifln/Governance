@@ -14,6 +14,7 @@ import {
   type ListSpec,
   type ListView,
 } from "../filter";
+import { operationalTruthBlock } from "./operational-truth";
 
 export interface ListChromeInput {
   readonly spec: ListSpec;
@@ -44,6 +45,13 @@ function option(value: string, label: string, selected: boolean): string {
   return `<option value="${escapeHtml(value)}"${selected ? " selected" : ""}>${escapeHtml(label)}</option>`;
 }
 
+const FACET_VALUE_LABELS: Readonly<Record<string, string>> = {
+  unread: "não lido",
+  overdue: "vencido",
+  unassigned: "sem responsável",
+  blocked: "bloqueado",
+};
+
 function facetField(
   spec: ListSpec,
   facet: FacetSpec,
@@ -56,7 +64,7 @@ function facetField(
       <label for="${escapeHtml(id)}">${escapeHtml(facet.label)}</label>
       <select id="${escapeHtml(id)}" name="${escapeHtml(facet.id)}">
         ${option("all", `Todos · ${facet.label}`, current === "all")}
-        ${values.map((value) => option(value, value, current === value)).join("")}
+        ${values.map((value) => option(value, FACET_VALUE_LABELS[value] ?? value, current === value)).join("")}
       </select>
     </div>`;
 }
@@ -195,6 +203,7 @@ export function renderFilteredList(input: ListChromeInput): string {
     <section class="list-surface" aria-labelledby="${escapeHtml(headingId)}" data-list="${escapeHtml(spec.id)}" data-list-total="${view.total}" data-list-matched="${view.matched}" data-list-page="${view.page}" data-list-pages="${view.pageCount}" data-list-sort="${escapeHtml(view.query.ordem)}">
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(heading)}</h2>
       ${input.intro ?? ""}
+      ${operationalTruthBlock(remote?.truth)}
       ${filters}
       <p class="count" role="status" tabindex="-1" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
       ${coverageWarning}

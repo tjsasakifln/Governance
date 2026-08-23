@@ -101,14 +101,14 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
   const root = { innerHTML: "" };
   paintShell(root, adapter as never, "#/comercial/cohorts");
   assert.match(root.innerHTML, /Enviados<\/dt><dd>0<\/dd>/);
-  assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>0<\/dd>/);
-  assert.match(root.innerHTML, /Hard bounce<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
-  assert.match(root.innerHTML, /SMTP accepted não é delivery/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>0<\/dd>/);
+  assert.match(root.innerHTML, /Rejeições permanentes<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
+  assert.match(root.innerHTML, /Aceite pelo SMTP não comprova entrega/);
   assert.match(root.innerHTML, /Mês do relatório<\/dt><dd>2026-08<\/dd>/);
   assert.match(root.innerHTML, /Autorizado em<\/dt><dd>2026-08-22T10:00:00.000Z<\/dd>/);
   assert.match(root.innerHTML, /Expira em<\/dt><dd>2026-08-23T10:00:00.000Z<\/dd>/);
   assert.match(root.innerHTML, /Instante de coleta\/observação/);
-  assert.doesNotMatch(root.innerHTML, /Hard bounce<\/dt><dd>0<\/dd>/);
+  assert.doesNotMatch(root.innerHTML, /Rejeições permanentes<\/dt><dd>0<\/dd>/);
 });
 
 test("cohort view does not present unproven telemetry as real outcomes", () => {
@@ -142,7 +142,7 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   assert.match(root.innerHTML, /data-controlled-email="unknown"/);
   assert.match(root.innerHTML, /telemetria real não comprovada/);
   assert.match(root.innerHTML, /grant observado como revogado/);
-  assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
+  assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
   assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
   assert.doesNotMatch(root.innerHTML, /Primeiro cohort real de e-mail/);
 });

@@ -55,4 +55,5 @@ export {
   forbiddenHttpPaths,
 } from "./docs.js";
 export * from "./taxonomy.js";
+export * from "./operational-truth.js";
 export type * from "./types.js";

@@ -189,7 +189,8 @@ test("critical integrations are rolled up worst-first and an errored source is n
   assert.deepEqual(systems, ["github", "asaas", "collector", "warmbly"]);
   const github = summary.integrations[0]!;
   assert.equal(github.state, "erro_coleta");
-  assert.match(github.detail, /UPSTREAM_ERROR/);
+  assert.match(github.detail, /erro na origem/);
+  assert.equal(github.error_code, "UPSTREAM_ERROR");
   for (const row of summary.integrations) {
     if (row.freshness_status !== "FRESH") assert.notEqual(row.state, "saudavel");
   }

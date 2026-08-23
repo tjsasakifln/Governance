@@ -96,6 +96,20 @@ export interface AdapterWriteResult {
   code?: string;
   /** HTTP status the channel answered with, absent when the call never left the browser. */
   status?: number;
+  /**
+   * Sanitized read-back of the append-only receipt. It is deliberately small:
+   * enough for an operator to identify the actor/session, target and outcome,
+   * without leaking provider payloads or authentication material.
+   */
+  receipt?: {
+    id: string;
+    correlation_id: string;
+    occurred_at: string;
+    outcome: string;
+    actor_id?: string;
+    target?: string;
+    writes_to: "control-center" | "warmbly";
+  };
 }
 
 /**

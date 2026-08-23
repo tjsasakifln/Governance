@@ -8,7 +8,8 @@
     ".": "./src/index.ts",
     "./ids": "./src/ids.ts",
     "./taxonomy": "./src/taxonomy.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./operational-truth": "./src/operational-truth.ts"
   },
   "bin": {
     "cc-contracts-validate": "./src/cli.ts"

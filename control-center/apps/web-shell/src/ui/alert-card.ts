@@ -21,7 +21,7 @@ export function classPill(alert: AlertPresentation): string {
 }
 
 export function freshnessPill(status: FreshnessStatus): string {
-  return `<span class="pill pill-${escapeHtml(status.toLowerCase())}">${escapeHtml(status)} · ${escapeHtml(freshnessLabel(status))}</span>`;
+  return `<span class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}">${escapeHtml(freshnessLabel(status))}</span>`;
 }
 
 function fact(term: string, value: string, extra = ""): string {

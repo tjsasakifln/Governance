@@ -559,6 +559,37 @@ test("intel exceptions feed Commercial Exceptions and organic scoreboard feeds C
   assert.equal(ops.growth.scoreboard.configured, true);
 });
 
+test("equivalent exceptions group without losing occurrence evidence or workflow state", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      attention: [
+        { id: "att-duplicate", group_key: "owner-gap:acme", kind: "missing_owner", why: "sem owner", status: "acknowledged" },
+      ],
+      operations: {
+        intel_exceptions: [
+          { id: "intel-original", group_key: "owner-gap:acme", code: "missing_owner", reason: "sem owner", status: "acknowledged" },
+        ],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    exceptions: Array<Record<string, unknown>>;
+  };
+  assert.equal(ops.exceptions.length, 1);
+  assert.equal(ops.exceptions[0]?.occurrence_count, 2);
+  assert.deepEqual(ops.exceptions[0]?.occurrence_ids, ["intel-original", "att-duplicate"]);
+  assert.equal(ops.exceptions[0]?.workflow_state, "acknowledged");
+  assert.equal(ops.exceptions[0]?.resolution_kind, "unsupported");
+});
+
 test("absent intel sources stay NO_DATA and a data wrapper is never configured", () => {
   const projected = projectCollector({
     collector: "warmbly",

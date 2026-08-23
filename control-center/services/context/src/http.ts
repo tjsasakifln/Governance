@@ -143,7 +143,7 @@ function optionalQuerySource(url: URL): string | undefined {
 
 function listParams(url: URL): Readonly<Record<string, string>> {
   const allowed = new Set([
-    "q", "estado", "tipo", "origem", "responsavel", "prioridade",
+    "q", "condicao", "estado", "tipo", "origem", "responsavel", "prioridade",
     "periodo", "ordem", "pagina", "por_pagina",
   ]);
   const out: Record<string, string> = {};
