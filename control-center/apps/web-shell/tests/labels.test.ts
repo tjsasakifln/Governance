@@ -33,22 +33,30 @@ import {
   agentSessionStatusLabel,
   agentStatusLabel,
   attentionStatusLabel,
+  authorizationStateLabel,
   authorityLabel,
   availabilityLabel,
   clientLifecycleLabel,
+  commercialEventLabel,
+  commercialStateLabel,
   confidenceWord,
   directiveKindLabel,
   directiveStatusLabel,
+  dispatchStateLabel,
   exceptionKindLabel,
   freshnessLabel,
+  goReviewVerdictLabel,
   healthLabel,
   helpTerm,
   hopStatusLabel,
   operatorActionLabel,
   operatorOutcomeLabel,
+  pipelineStageLabel,
   priorityHorizonLabel,
+  providerLabel,
   providerMutationLabel,
   severityLabel,
+  routeClassLabel,
   scopeLabel,
   statusPill,
   technicalDetails,
@@ -177,15 +185,55 @@ test("every enum label helper hides future tokens behind an authored fallback", 
   }
 });
 
+test("label catalogues treat Object.prototype names as unknown external tokens", () => {
+  const cases: Array<[(value: string) => string, string]> = [
+    [agentStatusLabel, "estado do agente não reconhecido"],
+    [agentSessionStatusLabel, "estado da sessão não reconhecido"],
+    [healthLabel, "estado de saúde não reconhecido"],
+    [clientLifecycleLabel, "ciclo do cliente não reconhecido"],
+    [severityLabel, "gravidade não reconhecida"],
+    [attentionStatusLabel, "estado de atenção não reconhecido"],
+    [priorityHorizonLabel, "horizonte não reconhecido"],
+    [directiveKindLabel, "tipo de diretiva não reconhecido"],
+    [directiveStatusLabel, "estado da diretiva não reconhecido"],
+    [availabilityLabel, "disponibilidade não reconhecida"],
+    [authorityLabel, "autoridade não reconhecida"],
+    [providerMutationLabel, "regra de mutação não reconhecida"],
+    [exceptionKindLabel, "tipo não reconhecido"],
+    [viewKindLabel, "estado da vista não reconhecido"],
+    [operatorActionLabel, "ação não reconhecida"],
+    [operatorOutcomeLabel, "resultado não reconhecido"],
+    [commercialEventLabel, "estado não reconhecido"],
+    [commercialStateLabel, "estado não reconhecido"],
+    [pipelineStageLabel, "estado não reconhecido"],
+    [routeClassLabel, "classe de rota não reconhecida"],
+    [providerLabel, "provedor não reconhecido"],
+    [authorizationStateLabel, "estado não reconhecido"],
+    [goReviewVerdictLabel, "veredito não reconhecido"],
+    [dispatchStateLabel, "estado não reconhecido"],
+    [hopStatusLabel, "estado não reconhecido"],
+    [scopeLabel, "escopo não reconhecido"],
+  ];
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    assert.equal(freshnessLabel(poisoned as never), "atualização não reconhecida");
+    for (const [label, fallback] of cases) {
+      assert.equal(label(poisoned), fallback, `${label.name} aceitou a propriedade herdada ${poisoned}`);
+    }
+  }
+});
+
 test("future availability and funnel status stay raw only in attributes and technical details", () => {
   const snapshot = {
     operations: {
       growth: {
-        funnel_contract: ["lead", "FUTURE_HOP_ID"],
+        funnel_contract: ["lead", "FUTURE_HOP_ID", "constructor", "toString", "__proto__"],
         scoreboard: {
           stages: [
             { id: "lead", status: "FUTURE_HOP" },
             { id: "FUTURE_HOP_ID", status: "PRESENT" },
+            { id: "constructor", status: "constructor" },
+            { id: "toString", status: "toString" },
+            { id: "__proto__", status: "__proto__" },
           ],
         },
         attribution: { note: "FUTURE_ATTRIBUTION" },
@@ -236,6 +284,7 @@ test("future availability and funnel status stay raw only in attributes and tech
   assert.match(shown, /Janela não reconhecida/);
   assert.match(shown, /observação não reconhecida/);
   assert.doesNotMatch(shown, /FUTURE_(?:AVAIL|HOP|LAYER|NOTE|ATTRIBUTION|WINDOW|OBSERVATION|SCHEMA)/);
+  assert.doesNotMatch(shown, /constructor|toString|__proto__/);
   assert.doesNotMatch(shown, /LEAD_VALID|no ingest/);
   assert.match(html, /data-organic-layer="FUTURE_LAYER"/);
   assert.match(html, /data-organic-layer="LEAD_VALID"/);
@@ -246,6 +295,9 @@ test("future availability and funnel status stay raw only in attributes and tech
   assert.match(html, /data-hop-status="FUTURE_HOP"/);
   assert.match(html, /data-growth-hop="FUTURE_HOP_ID"/);
   assert.match(html, /status=FUTURE_HOP/);
+  assert.match(html, /data-growth-hop="constructor"/);
+  assert.match(html, /data-growth-hop="toString"/);
+  assert.match(html, /data-growth-hop="__proto__"/);
 });
 
 test("scope keeps its identifier and gains a Portuguese word", () => {

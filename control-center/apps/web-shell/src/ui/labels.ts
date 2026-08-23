@@ -22,6 +22,7 @@
  * `ERROR→erro de coleta`); ele não é duplicado aqui.
  */
 import { escapeHtml } from "../escape";
+import { ownMapValue } from "../own-map";
 import { freshnessLabel } from "../provenance";
 import type {
   AgentActivityPresentationStatus,
@@ -214,7 +215,7 @@ export const SCOPE_LABELS: Record<string, string> = {
 };
 
 export function scopeLabel(scope: string): string {
-  const known = SCOPE_LABELS[scope];
+  const known = ownMapValue(SCOPE_LABELS, scope);
   if (known !== undefined) return known;
   const separator = scope.indexOf(":");
   if (separator > 0) {
@@ -407,7 +408,7 @@ export const DISPATCH_STATE_LABELS: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 function lookup(table: Record<string, string>, value: string, fallback: string): string {
-  return table[value] ?? fallback;
+  return ownMapValue(table, value) ?? fallback;
 }
 
 export function agentStatusLabel(status: string): string {
@@ -459,7 +460,7 @@ export function providerMutationLabel(value: string): string {
 }
 
 export function exceptionKindLabel(kind: string): string {
-  return EXCEPTION_KIND_LABELS[kind] ?? "tipo não reconhecido";
+  return lookup(EXCEPTION_KIND_LABELS, kind, "tipo não reconhecido");
 }
 
 export function viewKindLabel(kind: string): string {
@@ -476,46 +477,46 @@ export function operatorOutcomeLabel(outcome: string): string {
 
 export function commercialEventLabel(event: string): string {
   return (
-    COMMERCIAL_EVENT_LABELS[event] ??
-    COMMERCIAL_EVENT_LABELS[event.toLowerCase()] ??
+    ownMapValue(COMMERCIAL_EVENT_LABELS, event) ??
+    ownMapValue(COMMERCIAL_EVENT_LABELS, event.toLowerCase()) ??
     UNRECOGNIZED_COMMERCIAL_STATE_LABEL
   );
 }
 
 export function commercialStateLabel(state: string): string {
   return (
-    COMMERCIAL_STATE_LABELS[state] ??
-    COMMERCIAL_STATE_LABELS[state.toLowerCase()] ??
+    ownMapValue(COMMERCIAL_STATE_LABELS, state) ??
+    ownMapValue(COMMERCIAL_STATE_LABELS, state.toLowerCase()) ??
     UNRECOGNIZED_COMMERCIAL_STATE_LABEL
   );
 }
 
 export function pipelineStageLabel(stage: string): string {
   return (
-    PIPELINE_STAGE_LABELS[stage] ??
-    PIPELINE_STAGE_LABELS[stage.toLowerCase()] ??
+    ownMapValue(PIPELINE_STAGE_LABELS, stage) ??
+    ownMapValue(PIPELINE_STAGE_LABELS, stage.toLowerCase()) ??
     UNRECOGNIZED_COMMERCIAL_STATE_LABEL
   );
 }
 
 export function routeClassLabel(value: string): string {
-  return ROUTE_CLASS_LABELS[value] ?? "classe de rota não reconhecida";
+  return lookup(ROUTE_CLASS_LABELS, value, "classe de rota não reconhecida");
 }
 
 export function providerLabel(value: string): string {
-  return PROVIDER_LABELS[value] ?? "provedor não reconhecido";
+  return lookup(PROVIDER_LABELS, value, "provedor não reconhecido");
 }
 
 export function authorizationStateLabel(value: string): string {
-  return AUTHORIZATION_STATE_LABELS[value] ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+  return lookup(AUTHORIZATION_STATE_LABELS, value, UNRECOGNIZED_COMMERCIAL_STATE_LABEL);
 }
 
 export function goReviewVerdictLabel(value: string): string {
-  return GO_REVIEW_VERDICT_LABELS[value] ?? "veredito não reconhecido";
+  return lookup(GO_REVIEW_VERDICT_LABELS, value, "veredito não reconhecido");
 }
 
 export function dispatchStateLabel(value: string): string {
-  return DISPATCH_STATE_LABELS[value] ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+  return lookup(DISPATCH_STATE_LABELS, value, UNRECOGNIZED_COMMERCIAL_STATE_LABEL);
 }
 
 /**

@@ -2,6 +2,7 @@ import { alertBody, alertDataAttributes } from "./alert-card";
 import { escapeHtml } from "../escape";
 import { formatMoney } from "../money";
 import { sourcePresentationLabel } from "../provenance";
+import { ownMapValue } from "../own-map";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
 import { WRITE_SHORTCUT_LABELS } from "../adapters/paths";
 import { freshnessTone } from "../freshness-tone";
@@ -85,7 +86,7 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
 function shortcutForm(section: HojeSection): string {
   return section.shortcuts
     .map((shortcut) => {
-      const label = WRITE_SHORTCUT_LABELS[shortcut.kind];
+      const label = ownMapValue(WRITE_SHORTCUT_LABELS, shortcut.kind) ?? "Atalho operacional";
       return `
         <form class="shortcut-form" data-shortcut-form="${escapeHtml(shortcut.kind)}" data-write-path="/v1/directives">
           <h3>${escapeHtml(label)}</h3>
@@ -137,7 +138,7 @@ function domainCard(card: HojeDomainCard): string {
     upstream_error: "erro na origem",
   } as const;
   const absence = card.absence_reason
-    ? ` ${statusPill(card.absence_reason, absenceLabels[card.absence_reason])}`
+    ? ` ${statusPill(card.absence_reason, ownMapValue(absenceLabels, card.absence_reason) ?? "motivo não reconhecido")}`
     : "";
   return `
     <article class="card domain-card" data-domain-card="${escapeHtml(card.id)}" data-domain-state="${escapeHtml(card.state)}" data-freshness="${escapeHtml(card.freshness_status)}" data-tone="${escapeHtml(tone)}" data-presence="${escapeHtml(card.presence)}" data-action-count="${escapeHtml(String(card.action_count))}">

@@ -16,6 +16,7 @@
 
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
+import { ownMapValue } from "../own-map";
 import {
   DEFAULT_WARMBLY_SURFACE,
   WARMBLY_SURFACES,
@@ -292,9 +293,11 @@ export function classifyDispatchOutcome(result: AdapterWriteResult): DispatchOut
   const code = typeof result.code === "string" && result.code !== "" ? result.code : null;
   const status = typeof result.status === "number" ? result.status : null;
   const rule =
-    (code ? OUTCOME_BY_CODE[code] : undefined) ??
-    (result.outcome ? OUTCOME_BY_CHANNEL_OUTCOME[result.outcome] : undefined) ??
-    (status !== null ? OUTCOME_BY_STATUS[status] : undefined) ??
+    (code ? ownMapValue(OUTCOME_BY_CODE, code) : undefined) ??
+    (result.outcome ? ownMapValue(OUTCOME_BY_CHANNEL_OUTCOME, result.outcome) : undefined) ??
+    (status !== null
+      ? ownMapValue(OUTCOME_BY_STATUS as unknown as Record<string, OutcomeRule>, String(status))
+      : undefined) ??
     (result.ok
       ? OUTCOME_BY_CHANNEL_OUTCOME.executed!
       : {
@@ -316,7 +319,7 @@ export function classifyDispatchOutcome(result: AdapterWriteResult): DispatchOut
 function outcomeBlock(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const view = classifyDispatchOutcome(result);
-  const tone = OUTCOME_TONE[view.kind];
+  const tone = ownMapValue(OUTCOME_TONE, view.kind) ?? "stale";
   const role = view.kind === "executed" || view.kind === "challenged" ? "status" : "alert";
   const summary: Record<DispatchOutcomeKind, string> = {
     executed: "A ação foi aceita pelo canal de operação.",
@@ -333,9 +336,9 @@ function outcomeBlock(result: AdapterWriteResult | undefined): string {
       data-outcome-code="${escapeHtml(view.code ?? "")}"
       data-outcome-status="${view.status ?? ""}"
     >
-      <p class="kicker"><span class="pill">${escapeHtml(OUTCOME_LABELS[view.kind])}</span></p>
+      <p class="kicker"><span class="pill">${escapeHtml(ownMapValue(OUTCOME_LABELS, view.kind) ?? "DESFECHO NÃO RECONHECIDO")}</span></p>
       <h3>${escapeHtml(view.title)}</h3>
-      <p data-outcome-detail="true">${escapeHtml(summary[view.kind])}</p>
+      <p data-outcome-detail="true">${escapeHtml(ownMapValue(summary, view.kind) ?? "O canal retornou um desfecho não reconhecido.")}</p>
       <p class="constraint" data-outcome-recovery="true">O que fazer agora: ${escapeHtml(view.recovery)}</p>
       ${technicalDetails(
         [
@@ -453,7 +456,7 @@ function ledgerRow(entry: Record<string, unknown>): string {
   const outcome = show(entry.outcome);
   const refusalLabel = refusal === "—"
     ? "sem recusa registrada"
-    : OUTCOME_BY_CODE[refusal]?.title ?? "código de recusa não reconhecido";
+    : ownMapValue(OUTCOME_BY_CODE, refusal)?.title ?? "código de recusa não reconhecido";
   return `
     <article class="card" data-ledger-entry="${escapeHtml(show(entry.outcome))}">
       <p class="kicker"><span class="pill">${escapeHtml(operatorOutcomeLabel(outcome))}</span> <span class="scope">${escapeHtml(operatorActionLabel(action))}</span></p>
@@ -639,7 +642,7 @@ function warmblySubnav(current: WarmblySurface): string {
   return `<nav class="subnav" aria-label="Superfícies de operação Warmbly">${WARMBLY_SURFACES.map(
     (id) =>
       `<a href="#/warmbly/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
-        WARMBLY_SURFACE_LABELS[id],
+        ownMapValue(WARMBLY_SURFACE_LABELS, id) ?? "Operação",
       )}</a>`,
   ).join("")}</nav>`;
 }
@@ -650,5 +653,6 @@ export function resolveWarmblySurface(surface: string | null | undefined): Warmb
 
 export function warmblyBlock(input: WarmblySurfaceInput, surface: string | null | undefined): string {
   const current = resolveWarmblySurface(surface);
-  return `${warmblySubnav(current)}${WARMBLY_SURFACE_RENDERERS[current](input)}`;
+  const render = ownMapValue(WARMBLY_SURFACE_RENDERERS, current) ?? operationSurface;
+  return `${warmblySubnav(current)}${render(input)}`;
 }

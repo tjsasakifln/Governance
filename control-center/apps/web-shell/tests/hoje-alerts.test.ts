@@ -291,6 +291,23 @@ test("SLA, age, owner, class and impact are derived, not invented per card", () 
   assert.match(impactSentence("high", "nao-existe"), /Impacto alto/);
 });
 
+test("alert catalogues ignore inherited property names", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    assert.equal(ownerFor(poisoned, poisoned).label, "Fundador (sem área dedicada)");
+    assert.equal(
+      impactSentence(poisoned as never, poisoned),
+      "Impacto não reconhecido; revise os dados técnicos.",
+    );
+    const deadline = deadlineFor(
+      poisoned as never,
+      "2026-08-20T17:00:00Z",
+      "2026-08-20T18:00:00Z",
+    );
+    assert.match(deadline.label, /gravidade não reconhecida|prazo não reconhecido/);
+    assert.doesNotMatch(deadline.label, new RegExp(poisoned));
+  }
+});
+
 test("a priority with no engine severity is not inflated to critical", () => {
   const first = PRIORITY_FIXTURES[0]!;
   const alert = priorityAlert(first, "2026-08-20T18:00:00Z");

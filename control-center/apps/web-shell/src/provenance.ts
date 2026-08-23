@@ -4,6 +4,7 @@ import {
   type FreshnessStatus,
   type Provenance,
 } from "./types";
+import { ownMapValue } from "./own-map";
 
 export interface ProvenancePresentation {
   sourceSystem: string;
@@ -57,15 +58,15 @@ export function sourcePresentationLabel(source: Provenance["source"]): string {
 }
 
 export function sourceSystemLabel(system: string): string {
-  return SOURCE_SYSTEM_LABELS[system] ?? "Sistema de origem";
+  return ownMapValue(SOURCE_SYSTEM_LABELS, system) ?? "Sistema de origem";
 }
 
 export function sourceKindLabel(kind: string): string {
-  return SOURCE_KIND_LABELS[kind] ?? "leitura operacional";
+  return ownMapValue(SOURCE_KIND_LABELS, kind) ?? "leitura operacional";
 }
 
 export function freshnessLabel(status: FreshnessStatus): string {
-  return FRESHNESS_LABELS[status] ?? "atualização não reconhecida";
+  return ownMapValue(FRESHNESS_LABELS, status) ?? "atualização não reconhecida";
 }
 
 export function isFreshnessStatus(value: string): value is FreshnessStatus {

@@ -1,6 +1,7 @@
 import { attentionAlert, priorityAlert, type AlertPresentation } from "./alerts";
 import { isOperationalClient } from "./client-identity";
 import { formatLocal } from "./datetime";
+import { ownMapValue } from "./own-map";
 import { combinedTone, freshnessTone, type FreshnessTone } from "./freshness-tone";
 import { selectHomepageAttention, selectHomepagePriorities } from "./homepage";
 import type {
@@ -207,7 +208,7 @@ function emptyNote(
 ): string {
   for (const domain of domains) {
     const missing = absenceNoteFor(input.operational_envelope, domain);
-    if (missing !== null) return `${DOMAIN_BAND_LABELS[domain] ?? domain}: ${missing}`;
+    if (missing !== null) return `${ownMapValue(DOMAIN_BAND_LABELS, domain) ?? "Domínio operacional"}: ${missing}`;
   }
   return noOccurrences;
 }
@@ -699,7 +700,7 @@ function composeAgents(input: HojeComposeInput): HojeSection {
 function composeShortcuts(): HojeSection {
   const shortcuts: HojeShortcut[] = WRITE_SHORTCUT_KINDS.map((kind) => ({
     kind,
-    label: WRITE_SHORTCUT_LABELS[kind],
+    label: ownMapValue(WRITE_SHORTCUT_LABELS, kind) ?? "Atalho operacional",
     hint: "Grava no serviço de contexto do Control Center. Não altera Warmbly, Asaas nem GitHub.",
   }));
   return {

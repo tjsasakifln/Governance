@@ -114,6 +114,22 @@ test("cohort contract tokens receive authored labels and future values stay tech
   assert.match(visibleText(root.innerHTML), /Regra de separação não reconhecida/);
   assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_MIXING_RULE/);
   assert.match(root.innerHTML, /mixing_rule=FUTURE_MIXING_RULE/);
+
+  const cohorts = commercial.operations.cohorts as Record<string, unknown>;
+  const futureRow = (cohorts.acquisition as Record<string, unknown>[])[1];
+  assert.ok(futureRow);
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    cohorts.mixing_rule = poisoned;
+    futureRow.kind = poisoned;
+    futureRow.anchor_label = poisoned;
+    paintShell(root, adapter as never, "#/comercial/cohorts");
+    const reading = visibleText(root.innerHTML);
+    assert.match(reading, /Regra de separação não reconhecida/);
+    assert.match(reading, /tipo de coorte não reconhecido/);
+    assert.match(reading, /Referência da métrica não reconhecida/);
+    assert.doesNotMatch(reading, new RegExp(poisoned));
+    assert.match(root.innerHTML, new RegExp(`mixing_rule=${poisoned}`));
+  }
 });
 
 test("parseHash keeps commercial surfaces and client resources", () => {
@@ -206,7 +222,7 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
       current: {
         policy_version: "controlled-email.v1",
         outcomes: { provider_accepted: 99 },
-        integrity_flags: ["grant_revoked", "FUTURE_FLAG"],
+        integrity_flags: ["grant_revoked", "FUTURE_FLAG", "constructor", "toString", "__proto__"],
       },
       rows: [{ route_class: "SHOULD_NOT_RENDER", provider_accepted: 99 }],
     },
@@ -222,8 +238,8 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   assert.match(root.innerHTML, /autorização observada como revogada/);
   assert.match(visibleText(root.innerHTML), /verificação não reconhecida/);
   assert.match(visibleText(root.innerHTML), /Coorte não identificada/);
-  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_FLAG|UNKNOWN/);
-  assert.match(root.innerHTML, /integrity_flags=grant_revoked,FUTURE_FLAG/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_FLAG|UNKNOWN|constructor|toString|__proto__/);
+  assert.match(root.innerHTML, /integrity_flags=grant_revoked,FUTURE_FLAG,constructor,toString,__proto__/);
   assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
   assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
   assert.doesNotMatch(root.innerHTML, /Primeira coorte real de e-mail/);

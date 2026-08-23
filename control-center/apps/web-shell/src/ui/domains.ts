@@ -2,6 +2,7 @@ import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
+import { ownMapValue } from "../own-map";
 import { sourceSystemLabel } from "../provenance";
 import type {
   AgentActivity,
@@ -258,10 +259,7 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
             const status = hopStatusFor(hop, row);
             const absent = !row;
             const detail = row && row.observation ? String(row.observation) : absent ? "etapa ausente nesta observação" : "";
-            const label =
-              hop in GROWTH_HOP_LABELS
-                ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]]
-                : "Etapa não reconhecida";
+            const label = ownMapValue(GROWTH_HOP_LABELS, hop) ?? "Etapa não reconhecida";
             const shown =
               status === "BLOCKED"
                 ? helpTerm(hopStatusLabel(status), BLOCKED_HELP)
@@ -360,11 +358,11 @@ const COHORT_ANCHOR_LABELS: Record<string, string> = {
 };
 
 function cohortMixingLabel(value: string): string {
-  return COHORT_MIXING_LABELS[value] ?? "Regra de separação não reconhecida.";
+  return ownMapValue(COHORT_MIXING_LABELS, value) ?? "Regra de separação não reconhecida.";
 }
 
 function cohortKindLabel(value: string): string {
-  return COHORT_KIND_LABELS[value] ?? "tipo de coorte não reconhecido";
+  return ownMapValue(COHORT_KIND_LABELS, value) ?? "tipo de coorte não reconhecido";
 }
 
 function cohortWindowLabel(value: string): string {
@@ -375,7 +373,7 @@ function cohortWindowLabel(value: string): string {
 }
 
 function cohortAnchorLabel(value: string): string {
-  return COHORT_ANCHOR_LABELS[value] ?? "Referência da métrica não reconhecida.";
+  return ownMapValue(COHORT_ANCHOR_LABELS, value) ?? "Referência da métrica não reconhecida.";
 }
 
 function controlledEmailCohort(ops: Record<string, unknown>): string {
@@ -421,7 +419,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     ? current.integrity_flags.filter((flag): flag is string => typeof flag === "string")
     : [];
   const integrityWarning = integrityFlags.length > 0
-    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? "verificação não reconhecida").join("; "))}.</p>`
+    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => ownMapValue(integrityLabels, flag) ?? "verificação não reconhecida").join("; "))}.</p>`
     : "";
   const telemetryWarning = telemetryObserved
     ? ""
@@ -1100,8 +1098,8 @@ export function healthCard(item: ServiceHealth): string {
   return `
     <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker">${statusPill(presented.status, HEALTH_LABELS[presented.status])} <span class="sr-only">${escapeHtml(
-          HEALTH_LABELS[presented.status],
+        <p class="kicker">${statusPill(presented.status, ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido")} <span class="sr-only">${escapeHtml(
+          ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido",
         )}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
@@ -1119,7 +1117,7 @@ export function healthCard(item: ServiceHealth): string {
           "Última verificação",
           `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
         )}
-        ${fact("Estado avaliado", escapeHtml(HEALTH_LABELS[presented.status]))}
+        ${fact("Estado avaliado", escapeHtml(ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido"))}
         ${fact(
           item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
           item.latency_ms !== undefined
@@ -1186,7 +1184,7 @@ const CATALOG_REASON_LABELS: Record<string, string> = {
  */
 export function infraCatalogBlock(summary: InfraCatalogSummary): string {
   const reason = summary.unavailability_reason ?? summary.availability;
-  const reasonLabel = reason ? (CATALOG_REASON_LABELS[reason] ?? "motivo não reconhecido") : undefined;
+  const reasonLabel = reason ? (ownMapValue(CATALOG_REASON_LABELS, reason) ?? "motivo não reconhecido") : undefined;
   const confidence = summary.confidence.toFixed(2).replace(".", ",");
   return `
     <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
@@ -1307,7 +1305,7 @@ export function memoriaGroups(directives: Directive[]): string {
     .map((kind) => {
       const rows = directives.filter((item) => item.kind === kind);
       if (rows.length === 0) return "";
-      return `<section aria-labelledby="memoria-${kind}" data-memory-kind="${kind}"><h2 id="memoria-${kind}">${labels[kind]}</h2><div class="stack">${rows.map(directiveCard).join("")}</div></section>`;
+      return `<section aria-labelledby="memoria-${kind}" data-memory-kind="${kind}"><h2 id="memoria-${kind}">${ownMapValue(labels, kind) ?? "Registros"}</h2><div class="stack">${rows.map(directiveCard).join("")}</div></section>`;
     })
     .join("");
 }

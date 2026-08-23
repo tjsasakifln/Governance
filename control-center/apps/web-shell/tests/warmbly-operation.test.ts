@@ -163,6 +163,22 @@ test("every recorded channel response is classified as executed, refused, failed
   }
 });
 
+test("dispatch outcome catalogues ignore inherited property names", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    const view = classifyDispatchOutcome({
+      ok: false,
+      path: "/v1/warmbly/operator/actions",
+      kind: "nota",
+      message: poisoned,
+      code: poisoned,
+      outcome: poisoned,
+    });
+    assert.equal(view.kind, "unknown");
+    assert.equal(view.title, "Desfecho não classificado");
+    assert.equal(view.code, poisoned);
+  }
+});
+
 test("an executed pause reads as executed, not as a bare HTTP 200", async () => {
   const { adapter } = adapterReplaying(recordedCase("executed"));
   const result = await adapter.warmblyDispatch({ action: "pause", reason: "pico de bounce" });

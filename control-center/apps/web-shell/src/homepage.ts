@@ -1,4 +1,5 @@
 import type { AttentionItem, AttentionSeverity, PriorityRecommendation } from "./types";
+import { ownMapValue } from "./own-map";
 
 /** Homepage consumes ranks 1–3. Duplicated from contracts v1; do not import the other workstream. */
 export const HOMEPAGE_PRIORITY_LIMIT = 3;
@@ -17,7 +18,9 @@ export function selectHomepageAttention(items: readonly AttentionItem[]): Attent
     .filter((item) => item.homepage_eligible && HOMEPAGE_STATUSES.has(item.status))
     .slice()
     .sort((a, b) => {
-      const severity = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity];
+      const severity =
+        (ownMapValue(SEVERITY_RANK, a.severity) ?? Number.MAX_SAFE_INTEGER) -
+        (ownMapValue(SEVERITY_RANK, b.severity) ?? Number.MAX_SAFE_INTEGER);
       if (severity !== 0) return severity;
       if (a.detected_at === b.detected_at) return a.id.localeCompare(b.id);
       return a.detected_at < b.detected_at ? 1 : -1;

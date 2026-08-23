@@ -1,4 +1,5 @@
 import { withQueryParams } from "./destinations";
+import { ownMapValue } from "./own-map";
 
 /**
  * Search, filter, sort and pagination for the long operational lists.
@@ -353,7 +354,7 @@ function stateRank(row: Record<string, unknown>, spec: ListSpec): number {
 
 function priorityRank(row: Record<string, unknown>, spec: ListSpec): number {
   const raw = fieldText(row, spec.priorityFields).toLowerCase();
-  return PRIORITY_RANK[raw] ?? 2;
+  return ownMapValue(PRIORITY_RANK, raw) ?? 2;
 }
 
 export function identityOf(row: Record<string, unknown>, spec: ListSpec): string {

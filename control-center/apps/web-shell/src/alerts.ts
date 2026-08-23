@@ -1,6 +1,7 @@
 import { formatLocal } from "./datetime";
 import { DESTINATIONS, type DestinationId } from "./destinations";
 import { sourcePresentationLabel } from "./provenance";
+import { ownMapValue } from "./own-map";
 import type {
   AlertRanking,
   AttentionItem,
@@ -106,7 +107,7 @@ function destinationLabel(id: DestinationId): string {
 function destinationFromScope(scope: string): DestinationId {
   if (scope.startsWith("client:")) return "clientes";
   if (scope.startsWith("repo:")) return "engenharia";
-  const direct = OWNER_BY_DOMAIN[scope];
+  const direct = ownMapValue(OWNER_BY_DOMAIN, scope);
   return direct ?? "hoje";
 }
 
@@ -119,7 +120,7 @@ function destinationFromScope(scope: string): DestinationId {
  * whole point is provenance.
  */
 export function ownerFor(scope: string, domain?: string): AlertOwner {
-  const fromDomain = domain !== undefined ? OWNER_BY_DOMAIN[domain] : undefined;
+  const fromDomain = domain !== undefined ? ownMapValue(OWNER_BY_DOMAIN, domain) : undefined;
   const destination = fromDomain ?? destinationFromScope(scope);
   if (destination === "hoje") {
     return { label: "Fundador (sem área dedicada)", destination: "hoje", href: "#/hoje" };
@@ -140,10 +141,10 @@ export function alertClassOf(severity: AttentionSeverity, category?: string): Al
 
 export function impactSentence(severity: AttentionSeverity, category?: string): string {
   if (category !== undefined) {
-    const known = CATEGORY_IMPACT[category];
+    const known = ownMapValue(CATEGORY_IMPACT, category);
     if (known !== undefined) return known;
   }
-  return SEVERITY_IMPACT[severity];
+  return ownMapValue(SEVERITY_IMPACT, severity) ?? "Impacto não reconhecido; revise os dados técnicos.";
 }
 
 function minutesBetween(fromIso: string, toIso: string): number | null {
@@ -184,13 +185,18 @@ export function deadlineFor(
   detectedAt: string,
   now: string,
 ): AlertDeadline {
-  const minutes = ALERT_SLA_MINUTES[severity];
+  const minutes = ownMapValue(ALERT_SLA_MINUTES as Record<string, number | null>, severity);
+  const severityLabel = ownMapValue(ALERT_SEVERITY_LABELS, severity) ?? "gravidade não reconhecida";
+  const slaLabel = ownMapValue(ALERT_SLA_LABELS, severity) ?? "prazo não reconhecido";
+  if (minutes === undefined) {
+    return { label: `Prazo indeterminado (SLA ${severityLabel}: ${slaLabel})`, overdue: false };
+  }
   if (minutes === null) {
     return { label: `Sem prazo — entra no backlog (política do cockpit)`, overdue: false };
   }
   const detected = Date.parse(detectedAt);
   if (Number.isNaN(detected)) {
-    return { label: `Prazo indeterminado (SLA ${ALERT_SEVERITY_LABELS[severity]}: ${ALERT_SLA_LABELS[severity]})`, overdue: false };
+    return { label: `Prazo indeterminado (SLA ${severityLabel}: ${slaLabel})`, overdue: false };
   }
   const due = new Date(detected + minutes * 60_000).toISOString();
   const remaining = minutesBetween(now, due);
@@ -199,7 +205,7 @@ export function deadlineFor(
     ? `vencido ${remaining === null ? "" : `há ${humanDuration(remaining)}`}`.trim()
     : `faltam ${remaining === null ? "?" : humanDuration(remaining)}`;
   return {
-    label: `até ${formatLocal(due)} — ${suffix} (SLA ${ALERT_SEVERITY_LABELS[severity]}: ${ALERT_SLA_LABELS[severity]}, política do cockpit)`,
+    label: `até ${formatLocal(due)} — ${suffix} (SLA ${severityLabel}: ${slaLabel}, política do cockpit)`,
     overdue,
     due_at: due,
   };
@@ -327,9 +333,9 @@ function presentation(input: {
   return {
     id: input.id,
     severity: input.severity,
-    severity_label: ALERT_SEVERITY_LABELS[input.severity],
+    severity_label: ownMapValue(ALERT_SEVERITY_LABELS, input.severity) ?? "Gravidade não reconhecida",
     klass,
-    klass_label: ALERT_CLASS_LABELS[klass],
+    klass_label: ownMapValue(ALERT_CLASS_LABELS, klass) ?? "Classe não reconhecida",
     impact: impactSentence(input.severity, category),
     description,
     origin: originOf(input.provenance),

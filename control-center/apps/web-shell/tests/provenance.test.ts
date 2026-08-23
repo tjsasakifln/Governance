@@ -3,7 +3,14 @@ import { test } from "node:test";
 import { FINANCE_SNAPSHOT, FRESHNESS_SAMPLES } from "../src/fixtures/catalog";
 import { PRESENTATION_TIME_ZONE } from "../src/datetime";
 import { formatMoney } from "../src/money";
-import { mapProvenance, provenanceFromPresentation, sourcePresentationLabel } from "../src/provenance";
+import {
+  mapProvenance,
+  provenanceFromPresentation,
+  freshnessLabel,
+  sourceKindLabel,
+  sourcePresentationLabel,
+  sourceSystemLabel,
+} from "../src/provenance";
 import { FRESHNESS_STATUSES } from "../src/types";
 
 test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation model", () => {
@@ -53,6 +60,18 @@ test("source presentation translates known kinds and never exposes an unknown so
   });
   assert.equal(unknown, "Sistema de origem · leitura operacional");
   assert.doesNotMatch(unknown, /FUTURE_SOURCE/);
+});
+
+test("provenance catalogues ignore inherited Object.prototype properties", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    assert.equal(sourceSystemLabel(poisoned), "Sistema de origem");
+    assert.equal(sourceKindLabel(poisoned), "leitura operacional");
+    assert.equal(freshnessLabel(poisoned as never), "atualização não reconhecida");
+    assert.equal(
+      sourcePresentationLabel({ system: poisoned, kind: poisoned, locator: `locator:${poisoned}` }),
+      "Sistema de origem · leitura operacional",
+    );
+  }
 });
 
 test("finance money formats integer cents plus currency", () => {

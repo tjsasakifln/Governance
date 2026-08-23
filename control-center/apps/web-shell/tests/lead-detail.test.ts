@@ -265,6 +265,32 @@ test("lead detail gives future provenance and history sources authored fallbacks
   }
 });
 
+test("lead detail treats inherited property names as unknown provenance and history sources", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    const operations = representativeOperations();
+    for (const row of operations.activity as Record<string, unknown>[]) row.source = poisoned;
+    for (const row of operations.exceptions as Record<string, unknown>[]) row.source = poisoned;
+    const snapshot = snapshotWith(operations);
+    snapshot.provenance.source = {
+      system: poisoned,
+      kind: poisoned,
+      locator: `locator:${poisoned}`,
+    };
+    const root = { innerHTML: "" };
+
+    assert.doesNotThrow(() => {
+      paintShell(root, adapterFor(snapshot), `#/comercial/atividade?resource=${DEAL_ID}`);
+    });
+    const reading = readingTextOf(root.innerHTML);
+    assert.match(reading, /Sistema de origem · leitura operacional/);
+    assert.match(reading, /Sistema de origem · atividade comercial/);
+    assert.match(reading, /Sistema de origem · exceção comercial/);
+    assert.doesNotMatch(reading, new RegExp(`(?:locator:)?${poisoned}`));
+    assert.match(root.innerHTML, new RegExp(`locator:${poisoned}`));
+    assert.match(root.innerHTML, new RegExp(`data-history-source="${poisoned}"`));
+  }
+});
+
 test("an unnamed item is titled honestly and its handle only exists in the technical block", () => {
   const snapshot = snapshotWith(representativeOperations());
   const model = leadDetailView({ snapshot, resource: OPAQUE });

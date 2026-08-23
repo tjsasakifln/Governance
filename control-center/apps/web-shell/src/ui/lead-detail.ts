@@ -29,6 +29,7 @@
 import { formatLocal } from "../datetime";
 import { escapeHtml } from "../escape";
 import { formatMoney, isMoney } from "../money";
+import { ownMapValue } from "../own-map";
 import { sourcePresentationLabel, sourceSystemLabel } from "../provenance";
 import type { CommercialSnapshot } from "../types";
 import {
@@ -472,7 +473,8 @@ function historyOriginLabel(
   fallbackSystem: string,
   subject: "atividade comercial" | "exceção comercial",
 ): string {
-  if (rawSource && HISTORY_SOURCE_LABELS[rawSource]) return HISTORY_SOURCE_LABELS[rawSource];
+  const known = rawSource ? ownMapValue(HISTORY_SOURCE_LABELS, rawSource) : undefined;
+  if (known) return known;
   const namespace = rawSource?.split(".", 1)[0] ?? fallbackSystem;
   return `${sourceSystemLabel(namespace)} · ${subject}`;
 }
@@ -812,9 +814,10 @@ function confirmationControls(action: LeadAction): string {
 }
 
 function localActionForm(action: LeadAction, resource: string, canonicalId: string): string {
+  const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   return `
     <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
-      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(RISK_LABEL[action.risk])}</span></h4>
+      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonicalId)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(resource)}" />
@@ -825,9 +828,10 @@ function localActionForm(action: LeadAction, resource: string, canonicalId: stri
 }
 
 function warmblyActionForm(action: LeadAction, targetId: string): string {
+  const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   return `
     <form data-warmbly-dispatch="acknowledge" data-writes-to="warmbly" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
-      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(RISK_LABEL[action.risk])}</span></h4>
+      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_id" value="${escapeHtml(targetId)}" />
       <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está reconhecendo" /></label>
