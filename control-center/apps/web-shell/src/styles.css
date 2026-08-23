@@ -498,6 +498,19 @@ h2 {
 .money dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts.catalog {
+  margin-bottom: 0.9rem;
+}
+
+/* Endpoints and runbook URLs are long and arbitrary; they wrap instead of
+   pushing the 360px viewport into horizontal scroll. */
+.wrap-any {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .compact {

@@ -16,23 +16,40 @@
     {
       "id": "netcup-vps-1",
       "display_name": "Netcup VPS",
+      "role": "Host VPS: alcance, métricas, containers, TLS e backup",
+      "runbook_url": "/runbooks/infra/netcup-vps-1",
       "host": "vps.internal.example",
       "port": 443,
-      "checks": ["reachability", "host_metrics", "docker", "tls", "backup", "uptime"]
+      "checks": [
+        "reachability",
+        "host_metrics",
+        "docker",
+        "tls",
+        "backup",
+        "uptime"
+      ]
     },
     {
       "id": "extra-contracts",
       "display_name": "extra-contracts HTTP",
+      "role": "Serviço extra-contracts: endpoint de health",
+      "runbook_url": "/runbooks/infra/extra-contracts",
       "url": "http://127.0.0.1:18080/health",
       "expect_status": 200,
-      "checks": ["http"]
+      "checks": [
+        "http"
+      ]
     },
     {
       "id": "cfg-health",
       "display_name": "cfg-health HTTP",
+      "role": "Serviço cfg-health: endpoint de health",
+      "runbook_url": "/runbooks/infra/cfg-health",
       "url": "http://127.0.0.1:18081/health",
       "expect_status": 200,
-      "checks": ["http"]
+      "checks": [
+        "http"
+      ]
     }
   ]
 }

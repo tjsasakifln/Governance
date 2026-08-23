@@ -55,6 +55,16 @@ export interface ServiceCheck {
 export interface ServiceHealth {
   readonly service_id: string;
   readonly display_name: string;
+  /**
+   * What the service does, so two rows are never distinguishable only by
+   * position. Declared in the catalog, else derived from the checks it runs.
+   */
+  readonly role: string;
+  /**
+   * The logical address the checks address. Credential-free by construction:
+   * userinfo and query string are stripped before it leaves the collector.
+   */
+  readonly endpoint: string;
   readonly source: string;
   readonly observed_at: string;
   readonly freshness_status: FreshnessStatus;
@@ -63,6 +73,14 @@ export interface ServiceHealth {
   readonly uptime_seconds?: number;
   readonly restart_count?: number;
   readonly confidence?: number;
+  /** Round trip of the most end-to-end timing probe this service runs. */
+  readonly latency_ms?: number;
+  /** Which check produced latency_ms. TCP connect and HTTP are not the same measure. */
+  readonly latency_check?: CheckKind;
+  /** Summary of the worst non-healthy check, in the collector's own words. */
+  readonly last_error?: string;
+  /** Operator runbook for this service, from the catalog. Never invented. */
+  readonly runbook_url?: string;
 }
 
 export interface ActionableException {
@@ -109,6 +127,13 @@ export interface AllowlistThresholds {
 export interface AllowlistTarget {
   readonly id: string;
   readonly display_name: string;
+  /** What this target does. Free text from the catalog; no secrets. */
+  readonly role?: string;
+  /**
+   * Operator runbook for this target: a same-origin absolute path, or an
+   * http(s) URL with no credentials. Validated when the allowlist is parsed.
+   */
+  readonly runbook_url?: string;
   readonly checks: readonly CheckKind[];
   readonly host?: string;
   /** TCP connect address (IP or hostname). Independent of TLS/HTTP identity. */

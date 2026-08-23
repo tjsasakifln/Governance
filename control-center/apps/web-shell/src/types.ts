@@ -354,17 +354,58 @@ export interface ServiceHealth {
   status: HealthStatus;
   provenance: Provenance;
   checked_at: UtcDateTime;
+  /** Catalog id of the monitored dependency, when the catalog names one. */
+  service_id?: string;
+  /** What the service does. */
+  role?: string;
+  /** Logical address the checks address. Never carries credentials. */
+  endpoint?: string;
+  /** Worst non-healthy check, in the collector's own words. */
+  last_error?: string;
+  /** Same-origin path or credential-free http(s) URL for the runbook. */
+  runbook_url?: string;
+  /** How many identical catalog entries collapsed into this card. */
+  duplicate_count?: number;
+  /** Set when the row itself is a catalog/telemetry defect. */
+  catalog_error?: string;
+  /** False when freshness or confidence cannot support a conclusion. */
+  evidence_conclusive?: boolean;
+  /**
+   * Freshness and confidence of the collector run that carried this row. The
+   * row's own state is never rewritten from it — one arbitrary probe must not
+   * declare the whole fleet down — but doubt about the run is shown as a caveat.
+   */
+  snapshot_evidence?: { freshness_status: FreshnessStatus; confidence: number; conclusive: boolean };
   latency_ms?: number;
+  /** Which check produced latency_ms. TCP connect and HTTP are different measures. */
+  latency_check?: string;
   message?: string;
   checks?: ServiceHealthCheck[];
   http?: { status?: string; detail?: string };
   tls?: { status?: string; detail?: string };
   docker?: { status?: string; detail?: string };
   backup?: { status?: string; detail?: string };
+  host_metrics?: { status?: string; detail?: string };
   disk?: { used_pct?: number; detail?: string };
   memory?: { used_pct?: number; detail?: string };
   pncp_freshness?: { freshness_status: FreshnessStatus; observed_at?: UtcDateTime; detail?: string };
   partial_outage?: boolean;
+}
+
+/**
+ * Catalog-level truth about the Infra route: how many dependencies are being
+ * watched, how many entries are defective, and why the evidence is weak when it
+ * is. Without it "confiança 0,00" is indistinguishable between "never
+ * configured" and "the probe failed".
+ */
+export interface InfraCatalogSummary {
+  freshness_status: FreshnessStatus;
+  confidence: number;
+  monitored_service_count?: number;
+  catalog_error_count?: number;
+  duplicate_group_count?: number;
+  availability?: string;
+  unavailability_reason?: string;
 }
 
 export interface AgentActivity {

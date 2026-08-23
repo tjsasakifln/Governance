@@ -25,14 +25,23 @@ export function looksHealthy(freshness: FreshnessStatus, presence: "present" | "
   return presence === "present" && freshness === "FRESH";
 }
 
+/**
+ * Confidence is trust, freshness is recency, and "healthy" claims both. A
+ * confidence of zero means no evidence was gathered at all — not configured,
+ * blocked, or failed — so it can no more support a healthy conclusion than a
+ * stale observation can. Callers that have a confidence pass it; callers that
+ * only know recency keep the two-argument form.
+ */
 export function demoteHealthStatus(
   freshness: FreshnessStatus,
   status: string | undefined,
+  confidence?: number,
 ): string | undefined {
   if (status === undefined) {
     return undefined;
   }
-  if (freshness === "FRESH") {
+  const evidenced = confidence === undefined || confidence > 0;
+  if (freshness === "FRESH" && evidenced) {
     return status;
   }
   if (status === "healthy") {
