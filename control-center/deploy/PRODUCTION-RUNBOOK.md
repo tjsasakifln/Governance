@@ -29,7 +29,8 @@ Caddy never binds host `:80`/`:443` and never issues public ACME.
 - Compose project: `confenge-control-center`
 - Canonical overlay: `control-center/deploy/overlays/production-edge/docker-compose.production-edge.yml`
 - Caddyfile: `overlays/production-edge/Caddyfile` (must contain `forward_auth`; the open `deploy/Caddyfile` is not this pack)
-- Optional Warmbly join: `docker-compose.warmbly-collector.override.yml`
+- Optional read-only collector join: `docker-compose.warmbly-collector.override.yml`
+- Warmbly human-gate join: `docker-compose.warmbly-human-gate.override.yml`
 - Nginx vhost templates: `control-center/deploy/nginx/`
 - Secrets contract: `control-center/security/production/secrets/manifest.json` + `generate-local.sh`
 - Host secrets directory: `/etc/confenge/control-center/secrets` (dir `0700`, files `0600`)
@@ -59,7 +60,8 @@ Caddy uses `tls internal` on optional `127.0.0.1:18443` only.
 
 ## Secrets
 
-Generate on the host from the shipped manifest (never git, never logs, never URLs):
+For a first installation only, generate on the host from the shipped manifest
+(never git, never logs, never URLs):
 
 ```bash
 # If CC_OPERATOR_PASSWORD is unset, generate-local.sh may read:
@@ -69,7 +71,56 @@ umask 077
   /etc/confenge/control-center/secrets
 ```
 
-Names must match `manifest.json`. Print no values. Recover the operator password **only** from the bootstrap path above.
+Do **not** rerun `generate-local.sh` on an existing installation: it rotates the
+database, Authelia session/storage, MCP and backup material. Names must match
+`manifest.json`. Recover the operator password **only** from the bootstrap path
+above.
+
+The Warmbly gate uses a separate API key. Create it through Warmbly's audited
+`POST /v1/api-keys` as the configured loopback operator after the Warmbly release
+is healthy. Its exact permissions are decimal `196`:
+
+```
+READ_CONTACTS (4) | WRITE_CAMPAIGNS (64) | WRITE_CONTACTS (128)
+```
+
+It must not contain `SEND_CAMPAIGNS` (`16384`), API-key management, bulk, inbox,
+CRM, or email-account permissions. Use name `control-center-human-gate`, a finite
+expiry/rotation date, and keep the one-time `secret` response in a mode-0600
+temporary file. Install only that file, without passing the secret in argv or
+environment:
+
+```bash
+/opt/confenge-control-center/control-center/security/production/secrets/install-warmbly-operator-token.sh \
+  /root/.confenge/control-center/warmbly-human-gate.one-time \
+  /etc/confenge/control-center/secrets
+```
+
+The installer is atomic, does not print the value and does not touch any other
+secret. Remove the one-time source after `/v1/me` proves `permissions=196` and
+the absence of `send_campaigns`. Never reuse the collector's broader read key.
+
+On an upgraded installation, preserve the current password hash and add `admins`
+to the authorized operator's existing `users.yml` groups beside `operators`.
+Back up the file first, validate YAML and restart only Authelia. Never regenerate
+the secret pack to make this group change.
+
+## Ordered Warmbly prerequisite
+
+Merge and deploy the backward-compatible Warmbly human-gate API before the
+Control Center release. Apply migration `000116_confenge_human_gate` with the
+normal Warmbly deploy path; verify schema is `116`, `/ready` is ready, and all of
+these remain false/true as shown:
+
+```
+CONFENGE_AUTO_SEND_ENABLED=false
+CONFENGE_GREEN_AUTORUN_ENABLED=false
+CONFENGE_REQUIRE_HUMAN_APPROVAL=true
+```
+
+Keep the dispatch kill switch engaged for deployment and sandbox verification.
+The migration is additive and its down migration drops only the four human-gate
+tables. Do not expose the Control Center override until this prerequisite passes.
 
 ## Deploy (production-edge)
 
@@ -89,8 +140,12 @@ docker compose -f docker-compose.production-edge.yml up -d postgres redis nats
 # 3. Authelia (own DB/role, Redis sessions, default deny, operators require 2FA)
 docker compose -f docker-compose.production-edge.yml up -d authelia
 # 4. context, MCP, collector, web, Caddy
-docker compose -f docker-compose.production-edge.yml up -d context mcp collector web caddy
-# optional: -f docker-compose.warmbly-collector.override.yml for collector Warmbly network
+docker compose \
+  -f docker-compose.production-edge.yml \
+  -f docker-compose.warmbly-human-gate.override.yml \
+  up -d context mcp collector web caddy
+# optional additional -f docker-compose.warmbly-collector.override.yml only for
+# the collector's existing read-only observations.
 ```
 
 After Caddy is up, `ss -lntp` must show nginx on `:80`/`:443` and Caddy on `127.0.0.1:18080` only.
@@ -130,7 +185,9 @@ GitHub/infra/PNCP/Warmbly/Asaas persist honestly. `UNKNOWN`/`STALE`/`ERROR`/`BLO
 
 - PNCP consumes only `PNCP_CONTRACT_FRESHNESS/1.0`. Never `--live`/ingest/recrawl/backfill as a Control Center side effect.
 - Asaas is read-only (zero POST/PUT/PATCH/DELETE/refund/checkout).
-- Warmbly is observed only; do not redeploy Warmbly or flip `CONFENGE_AUTO_SEND_ENABLED`.
+- The generic Warmbly collector remains read-only. The explicit human-gate control
+  plane may write only immutable gate records through its fixed endpoint allowlist;
+  it has no send endpoint and no send permission. Never flip auto-send or autorun.
 - Collector DB URL host is `cc-postgres`.
 
 ## Backup
@@ -165,9 +222,15 @@ Mechanical requirement: `same_content=true` (SHA-256 of restored dump equals pla
 
 1. Preserve evidence and volumes (`confenge-cc-postgres-edge`).
 2. Take ops/auth vhosts out of traffic if the edge is the cause (restore nginx backup; `nginx -t` before reload).
-3. Roll back only Control Center compose/images.
-4. Do not alter Warmbly, host Postgres, or extra-cli.
-5. Prove `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health` remains READY and `auto_send_enabled=false`.
+3. Remove `docker-compose.warmbly-human-gate.override.yml` and roll back the
+   Control Center compose/images first. Keep persisted gate records inert.
+4. Revoke the `control-center-human-gate` API key. Do not alter the collector key,
+   host PostgreSQL, or extra-cli.
+5. Roll back Warmbly only after Control Center no longer calls the new contract.
+   Keep migration 116 data for evidence; run its down migration only after export
+   and only if schema rollback is explicitly required.
+6. Prove `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health`
+   remains READY and `auto_send_enabled=false`.
 
 ## Nginx vhost activation
 
@@ -187,6 +250,9 @@ Backup `/etc/nginx` first. Install only `ops.confenge.com.br` and `auth.ops.conf
 - context/web/collector/MCP healthy
 - `api.confenge.com.br` inbound READY
 - Warmbly `/ready` live=true ready=true, `CONFENGE_AUTO_SEND_ENABLED=false`
+- Human-gate credential `/v1/me`: exact mask `196`, no `SEND_CAMPAIGNS`; do not log its value
+- authenticated `operators` can GET/list/review; only `admins` can GO/NO-GO
+- production smoke is GET-only; all POST verification uses fixtures/sandbox and `.invalid` recipients
 - GitHub collector FRESH when token+allowlist are set; otherwise honest ERROR/UNKNOWN
 
 ## `/intranet`
@@ -195,6 +261,8 @@ Activate `https://confenge.com.br/intranet` → `https://ops.confenge.com.br/` *
 
 ## Restart
 
-Restart **only** Control Center services. Not Warmbly, not host PostgreSQL, not extra-cli.
+For an ordinary Control Center restart, restart **only** Control Center services,
+not Warmbly, host PostgreSQL, or extra-cli. A coordinated human-gate release is
+the explicit exception described in the ordered prerequisite above.
 
 After restart, prove `/healthz` `/ready` twice and that directives, Governance context, AgentActivity, collector history, and latest observations persist.

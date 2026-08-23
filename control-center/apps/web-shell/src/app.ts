@@ -8,6 +8,11 @@ import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths
 import { parseHash } from "./destinations";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
 import {
+  humanGateIdempotencyKey,
+  settleHumanGateIntent,
+  type HumanGateIntent,
+} from "./human-gate-idempotency";
+import {
   armPendingResumeConfirmation,
   clearPendingResumeConfirmation as clearPendingResume,
   pendingResumeConfirmation as readPendingResume,
@@ -91,7 +96,7 @@ export interface MountableRoot {
   querySelectorAll?(selector: string): ArrayLike<{
     addEventListener(type: string, listener: (event: Event) => void): void;
     getAttribute(name: string): string | null;
-    querySelector(selector: string): { value: string } | null;
+    querySelector(selector: string): { value: string; checked?: boolean } | null;
     focus?(options?: { preventScroll?: boolean }): void;
     scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
   }>;
@@ -505,16 +510,23 @@ function bindWarmblyHumanGate(
       event.preventDefault();
       const decision = form.querySelector('[name="decision"]')?.value;
       const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
-      const key = `cc-human-gate:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${i}`}`;
-      void Promise.resolve(adapter.warmblyGate?.({
+      const acknowledgement = form.querySelector('[name="ack"]')?.checked === true;
+      const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
+      const intent: HumanGateIntent = {
         action: raw,
-        idempotency_key: key,
         ...(form.getAttribute("data-version") ? { version_id: form.getAttribute("data-version")! } : {}),
         ...(form.getAttribute("data-candidate") ? { candidate_id: form.getAttribute("data-candidate")! } : {}),
         ...(limit > 0 ? { limit } : {}),
         ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
         ...(form.querySelector('[name="reason"]')?.value ? { reason: form.querySelector('[name="reason"]')!.value } : {}),
+        ...(decision === "APPROVE" ? { acknowledged: acknowledgement } : {}),
+        ...(raw === "decide" && confirmation ? { confirmation } : {}),
+      };
+      void Promise.resolve(adapter.warmblyGate?.({
+        ...intent,
+        idempotency_key: humanGateIdempotencyKey(intent),
       })).then((result) => {
+        settleHumanGateIntent(intent, result?.outcome);
         if (result) adapter.lastOperatorResult = result;
         onDone();
       });

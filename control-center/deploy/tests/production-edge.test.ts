@@ -19,6 +19,7 @@ const OVERLAY = join(PACK_ROOT, "overlays", "production-edge");
 const COMPOSE = join(OVERLAY, "docker-compose.production-edge.yml");
 const CADDY = join(OVERLAY, "Caddyfile");
 const COLLECTOR_OVERRIDE = join(OVERLAY, "docker-compose.warmbly-collector.override.yml");
+const HUMAN_GATE_OVERRIDE = join(OVERLAY, "docker-compose.warmbly-human-gate.override.yml");
 const NGINX_ROOT = join(PACK_ROOT, "nginx");
 const OPS_VHOST = join(NGINX_ROOT, "conf.d", "ops.confenge.com.br.conf");
 const AUTH_VHOST = join(NGINX_ROOT, "conf.d", "auth.ops.confenge.com.br.conf");
@@ -165,6 +166,34 @@ test("Warmbly collector override adds only an external network and no datastore 
     .filter((line) => !line.trim().startsWith("#"))
     .join("\n");
   assert.doesNotMatch(uncommented, /postgres|redis|nats|cc_postgres_data/);
+  assert.match(text, /warmbly-confenge_default/);
+});
+
+test("Warmbly human-gate override gives only context a file credential and application network", () => {
+  const text = readFileSync(HUMAN_GATE_OVERRIDE, "utf8");
+  const doc = parseYaml(text);
+  assert.ok(isRecord(doc) && isRecord(doc.services));
+  assert.deepEqual(Object.keys(doc.services), ["context"]);
+  const context = doc.services.context;
+  assert.ok(isRecord(context));
+  assert.equal(context.volumes, undefined);
+  assert.ok(serviceNetworks(context).includes("warmbly_net"));
+  const env = isRecord(context.environment) ? context.environment : {};
+  assert.equal(env.CC_WARMBLY_OPERATOR_ENABLED, "true");
+  assert.match(String(env.CC_WARMBLY_BASE_URL), /backend:8080/);
+  assert.equal(env.CC_WARMBLY_OPERATOR_TOKEN_FILE, "/run/secrets/warmbly_operator_credential");
+  assert.match(String(env.CC_WARMBLY_OPERATOR_TRUSTED_HOPS), /10\.89\.0\.2\/32/);
+  assert.equal(env.CC_WARMBLY_OPERATOR_TOKEN, undefined);
+  assert.ok(isRecord(doc.networks) && isRecord(doc.networks.warmbly_net));
+  assert.equal(doc.networks.warmbly_net.external, true);
+  assert.match(String(doc.networks.warmbly_net.name), /warmbly-confenge_default/);
+  assert.ok(isRecord(doc.secrets) && isRecord(doc.secrets.warmbly_operator_credential));
+  assert.match(String(doc.secrets.warmbly_operator_credential.file), /CC_WARMBLY_OPERATOR_TOKEN/);
+  const uncommented = text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"))
+    .join("\n");
+  assert.doesNotMatch(uncommented, /send|dispatch|postgres|redis|nats|volume/i);
 });
 
 test("nginx ops/auth templates TLS-proxy loopback Caddy, strip Remote-*, rate-limit, ignore XFF as identity", () => {
@@ -303,4 +332,43 @@ test("docker compose config of the production-edge overlay interpolates loopback
   assert.match(result.stdout, /CC_ACTOR_KIND: human/);
   assert.match(result.stdout, /interpolation-only-founder/);
   assert.doesNotMatch(result.stdout, /human:operator/);
+});
+
+test("docker compose config accepts the canonical human-gate overlay and keeps the credential file-backed", () => {
+  const docker = spawnSync("docker", ["compose", "version"], { encoding: "utf8" });
+  if (docker.status !== 0) {
+    assert.ok(existsSync(HUMAN_GATE_OVERRIDE));
+    return;
+  }
+  const secretDir = scratchDir("cc-human-gate-compose-");
+  for (const name of [
+    "POSTGRES_PASSWORD",
+    "authelia_jwt",
+    "authelia_session",
+    "authelia_storage",
+    "authelia_postgres_password",
+    "users.yml",
+    "CC_WARMBLY_OPERATOR_TOKEN",
+  ]) {
+    writeFileSync(join(secretDir, name), "interpolation-only\n", { mode: 0o600 });
+  }
+  const env = {
+    ...process.env,
+    CC_SECRET_DIR: secretDir,
+    CONTROL_CENTER_DATABASE_URL: "postgres://control_center:interpolation-only@cc-postgres:5432/control_center",
+    CONTROL_CENTER_BACKUP_KEY: "0".repeat(64),
+    CONFENGE_MCP_AUTH_TOKEN: "interpolation-only-mcp-token",
+    CONTROL_CENTER_FOUNDER_ACTOR_ID: "interpolation-only-founder",
+    CC_TRUSTED_PROXY_CIDRS: "10.89.0.0/24,127.0.0.1/32,::1/128",
+  };
+  const result = spawnSync(
+    "docker",
+    ["compose", "-f", COMPOSE, "-f", HUMAN_GATE_OVERRIDE, "--project-name", "cc-edge-gate-configcheck", "config"],
+    { encoding: "utf8", env, cwd: OVERLAY },
+  );
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /CC_WARMBLY_OPERATOR_ENABLED: "true"/);
+  assert.match(result.stdout, /CC_WARMBLY_OPERATOR_TOKEN_FILE: \/run\/secrets\/warmbly_operator_credential/);
+  assert.match(result.stdout, /warmbly-confenge_default/);
+  assert.doesNotMatch(result.stdout, /CC_WARMBLY_OPERATOR_TOKEN:/);
 });

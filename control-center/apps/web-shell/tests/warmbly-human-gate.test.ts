@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseHash, WARMBLY_SURFACES } from "../src/destinations";
+import { HttpControlCenterAdapter } from "../src/adapters/http";
 import { warmblyBlock } from "../src/ui/warmbly";
 
 const version="11111111-1111-4111-8111-111111111111";
@@ -32,4 +33,38 @@ test("cohort filters select observed freshness and decisions",()=>{
   const html=warmblyBlock({...input,query:"freshness=STALE&decision=GO",gate:{list:{data:[cohort,stale]}}},"cohorts");
   assert.match(html,/33333333-3333-4333-8333-333333333333/);
   assert.doesNotMatch(html,/11111111-1111-4111-8111-111111111111/);
+});
+
+test("HTTP adapter enforces and forwards human confirmations", async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const adapter = new HttpControlCenterAdapter({
+    baseUrl: "http://control-center.fixture",
+    fetchImpl: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ receipt: "fixture:r1" }), { status: 200 });
+    }) as typeof fetch,
+  });
+  const missingAck = await adapter.warmblyGate({
+    action: "review", version_id: version, candidate_id: candidate.candidate_id,
+    decision: "APPROVE", reason: "fixture", idempotency_key: "idem-review-fixture",
+  });
+  assert.equal(missingAck.code, "approval_acknowledgement_required");
+  assert.equal(calls.length, 0);
+  await adapter.warmblyGate({
+    action: "review", version_id: version, candidate_id: candidate.candidate_id,
+    decision: "APPROVE", reason: "fixture", acknowledged: true, idempotency_key: "idem-review-fixture",
+  });
+  const missingVersion = await adapter.warmblyGate({
+    action: "decide", version_id: version, decision: "NO_GO", reason: "fixture",
+    idempotency_key: "idem-decision-fixture",
+  });
+  assert.equal(missingVersion.code, "cohort_version_confirmation_required");
+  await adapter.warmblyGate({
+    action: "decide", version_id: version, decision: "NO_GO", reason: "fixture",
+    confirmation: " V3 ", idempotency_key: "idem-decision-fixture",
+  });
+  assert.deepEqual(calls.map((body) => ({ acknowledged: body.acknowledged, confirmation: body.confirmation })), [
+    { acknowledged: true, confirmation: undefined },
+    { acknowledged: undefined, confirmation: "v3" },
+  ]);
 });

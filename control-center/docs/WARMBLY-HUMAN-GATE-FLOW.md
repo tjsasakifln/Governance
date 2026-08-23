@@ -59,7 +59,8 @@ cohort/version imutável
 
 ## Falhas e concorrência
 
-- POSTs exigem `Idempotency-Key`; retry, duas abas e restart devolvem o mesmo
+- POSTs exigem `Idempotency-Key`; acknowledgement e confirmação de versão fazem
+  parte da intenção; retry, duas abas e restart devolvem o mesmo
   receipt, ou 409 se a chave for reutilizada com payload diferente.
 - Timeout depois de write é mostrado como desfecho desconhecido; a tela relê o
   recurso pelo correlation id/receipt antes de permitir repetição.

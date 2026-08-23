@@ -145,6 +145,8 @@ export interface WarmblyGateInput {
   limit?: number;
   decision?: "APPROVE" | "REJECT" | "HOLD" | "GO" | "NO_GO";
   reason?: string;
+  acknowledged?: boolean;
+  confirmation?: string;
   idempotency_key: string;
 }
 

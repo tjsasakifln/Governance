@@ -1,0 +1,25 @@
+# REQUIRED for the Warmbly human gate. Apply only after the additive Warmbly
+# API release is healthy and the least-privilege credential has been installed.
+# This attaches context (not web) to Warmbly's application network. It grants no
+# datastore volume and publishes no port. There is deliberately no send route.
+
+services:
+  context:
+    environment:
+      CC_WARMBLY_OPERATOR_ENABLED: "true"
+      CC_WARMBLY_BASE_URL: "${CC_WARMBLY_BASE_URL:-http://backend:8080}"
+      CC_WARMBLY_OPERATOR_TOKEN_FILE: /run/secrets/warmbly_operator_credential
+      CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "${CC_WARMBLY_OPERATOR_TRUSTED_HOPS:-10.89.0.2/32}"
+    secrets:
+      - warmbly_operator_credential
+    networks:
+      warmbly_net: {}
+
+networks:
+  warmbly_net:
+    external: true
+    name: ${WARMBLY_DOCKER_NETWORK:-warmbly-confenge_default}
+
+secrets:
+  warmbly_operator_credential:
+    file: ${CC_SECRET_DIR}/CC_WARMBLY_OPERATOR_TOKEN

@@ -8,14 +8,18 @@
    denominadores (considerados, elegíveis, excluídos, finais). Crie no máximo 10.
 3. Abra a versão em **Revisão**. Para cada candidato, revele o preview exato,
    confira recipient/route/provenance/subject/body e solicite validation.
-4. VALID vigente permite APPROVE. RISKY/INVALID/UNKNOWN/STALE ficam bloqueados;
+4. VALID vigente permite APPROVE depois da ciência explícita. A UI e o Warmbly
+   exigem `acknowledged=true`; RISKY/INVALID/UNKNOWN/STALE ficam bloqueados;
    registre HOLD ou REJECT com motivo. Se recipient, copy, policy, evidence ou
    suppression mudar, a aprovação aparece inválida e deve ser refeita.
 5. GO exige todos aprovados, source fresh e a confirmação digitada da versão.
+   O Warmbly compara o valor (por exemplo `v3`) à versão imutável; o proxy não
+   consegue remover ou fabricar essa confirmação.
    Use NO_GO para interromper/revogar. GO cria a autoridade bounded exata em
    `READY_FOR_LIVE_PREFLIGHT`; não enfileira, não envia e não liga auto-send.
 6. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
-   e correlation id. Só depois repita com a mesma intenção.
+   e correlation id. O frontend preserva a idempotency key da intenção incerta;
+   só depois repita a mesma intenção.
 
 ## Métricas e alertas
 
@@ -49,9 +53,14 @@ denominadores, ou qualquer indício de auto-send/green autorun habilitado.
    Control Center.
 2. Governance `feat/cc-warmbly-human-gate`: proxy autenticado, RBAC, rotas e UI.
    Depende do contrato Warmbly já implantado; até lá o canal falha fechado.
-   Regenere o secret Authelia (ou acrescente `admins` ao operador autorizado)
-   antes do rollout; `operators` sozinho continua podendo revisar, mas recebe
-   403 em GO/NO-GO.
-3. Habilite a credencial de menor escopo e faça apenas smoke GET em produção.
+   Preserve o hash existente e acrescente `admins` ao operador autorizado em
+   `users.yml`, com backup e validação; jamais rode `generate-local.sh` para isso.
+   `operators` sozinho continua podendo revisar, mas recebe 403 em GO/NO-GO.
+3. Crie pelo endpoint auditado `/v1/api-keys` uma credencial separada com máscara
+   decimal exata `196` (`read_contacts|write_contacts|write_campaigns`), prazo de
+   rotação e sem `send_campaigns`. Instale-a atomicamente com
+   `install-warmbly-operator-token.sh`; não altere a chave do collector.
+4. Aplique `docker-compose.warmbly-human-gate.override.yml` e faça apenas smoke
+   GET em produção.
    Valide POST exclusivamente no sandbox. Auto-send e GREEN autorun permanecem
    OFF durante e depois do rollout.

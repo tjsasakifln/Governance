@@ -225,6 +225,26 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         code: "client_precondition",
       };
     }
+    if (input.action === "review" && input.decision === "APPROVE" && input.acknowledged !== true) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "APPROVE exige ciência explícita do destinatário, mensagem, policy e evidência",
+        outcome: "refused",
+        code: "approval_acknowledgement_required",
+      };
+    }
+    if (input.action === "decide" && !input.confirmation?.trim()) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "GO/NO-GO exige a confirmação digitada da versão imutável",
+        outcome: "refused",
+        code: "cohort_version_confirmation_required",
+      };
+    }
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method: "POST",
@@ -235,6 +255,8 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
           ...(input.limit ? { limit: input.limit } : {}),
           ...(input.decision ? { decision: input.decision } : {}),
           ...(input.reason ? { reason: input.reason } : {}),
+          ...(input.acknowledged === true ? { acknowledged: true } : {}),
+          ...(input.confirmation ? { confirmation: input.confirmation.trim().toLowerCase() } : {}),
         }),
       });
       const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
@@ -246,7 +268,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         outcome: response.ok ? "executed" : response.status === 503 ? "unknown" : "refused",
         message: response.ok
           ? `Decisão registrada. Receipt: ${String(body.receipt ?? "—")}`
-          : String(body.reason ?? body.message ?? `HTTP ${response.status}`),
+          : String(body.message ?? (Array.isArray(body.reason) ? body.reason.join(", ") : body.reason) ?? `HTTP ${response.status}`),
         ...(typeof body.code === "string" ? { code: body.code } : {}),
       };
       this.lastOperatorResult = result;

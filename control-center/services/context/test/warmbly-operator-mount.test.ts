@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -126,6 +127,56 @@ test("mounting is off by default and stays off when enabled but unconfigured", a
     undefined,
     "fully configured must mount",
   );
+});
+
+test("production can mount from a file-backed credential without putting it in env", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cc-warmbly-credential-"));
+  const file = join(dir, "credential");
+  writeFileSync(file, "wmbly_fixture_file_only_123456\n", { mode: 0o600 });
+  try {
+    const handler = await createWarmblyOperatorHandlerFromEnv(
+      {
+        CC_WARMBLY_OPERATOR_ENABLED: "true",
+        CC_WARMBLY_BASE_URL: "http://x",
+        CC_WARMBLY_OPERATOR_TOKEN_FILE: file,
+        CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "10.89.0.2/32",
+      },
+      { logger: silentLogger },
+    );
+    assert.notEqual(handler, undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an unreadable or empty file-backed credential fails closed even if a legacy env value exists", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cc-warmbly-empty-"));
+  const empty = join(dir, "empty");
+  writeFileSync(empty, "\n", { mode: 0o600 });
+  const base = {
+    CC_WARMBLY_OPERATOR_ENABLED: "true",
+    CC_WARMBLY_BASE_URL: "http://x",
+    CC_WARMBLY_OPERATOR_TOKEN: "must-not-be-used-as-fallback",
+    CC_WARMBLY_OPERATOR_TRUSTED_HOPS: "10.89.0.2/32",
+  };
+  try {
+    assert.equal(
+      await createWarmblyOperatorHandlerFromEnv(
+        { ...base, CC_WARMBLY_OPERATOR_TOKEN_FILE: empty },
+        { logger: silentLogger },
+      ),
+      undefined,
+    );
+    assert.equal(
+      await createWarmblyOperatorHandlerFromEnv(
+        { ...base, CC_WARMBLY_OPERATOR_TOKEN_FILE: join(dir, "missing") },
+        { logger: silentLogger },
+      ),
+      undefined,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("the connector is never a static import, so a disabled feature cannot crash boot", () => {
