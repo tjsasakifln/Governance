@@ -13,9 +13,9 @@
  * 2. **Nada é apagado.** Todo identificador, nome de schema, locator e enum
  *    cru que sai da superfície principal reaparece em `technicalDetails()`,
  *    recolhido e selecionável para cópia.
- * 3. **Código desconhecido aparece como veio.** Um `code` de texto livre que
- *    o upstream inventou não é traduzido por adivinhação: cai no fallback e
- *    segue visível, porque inventar rótulo esconde dado.
+ * 3. **Código livre desconhecido aparece como veio.** Enums comerciais são a
+ *    exceção: um valor novo recebe o rótulo honesto “estado não reconhecido” e
+ *    o token continua disponível somente nos dados e no detalhe técnico.
  *
  * O mapa de atualização é semeado por `freshnessLabel` de `../provenance`
  * (`FRESH→fresco`, `STALE→defasado`, `UNKNOWN→desconhecido`,
@@ -292,6 +292,13 @@ export const COMMERCIAL_EVENT_LABELS: Record<string, string> = {
   unread: "mensagem não lida",
   awaiting_reply: "aguardando resposta",
   awaiting_agent_draft: "aguardando revisão do rascunho",
+  replied: "resposta recebida",
+  dnc: "contato proibido",
+  do_not_contact: "contato proibido",
+  needs_attention: "exige atenção",
+  scheduled_pending: "agendamento pendente",
+  snoozed: "adiado",
+  ready: "pronto",
   active: "atividade ativa",
   paused: "atividade pausada",
   handled: "atividade tratada",
@@ -315,6 +322,13 @@ export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
   unread: "não lido",
   awaiting_reply: "aguardando resposta",
   awaiting_agent_draft: "aguardando revisão do rascunho",
+  replied: "respondido",
+  dnc: "não contatar",
+  do_not_contact: "não contatar",
+  needs_attention: "exige atenção",
+  scheduled_pending: "agendamento pendente",
+  snoozed: "adiado",
+  ready: "pronto",
   active: "ativo",
   paused: "pausado",
   handled: "tratado",
@@ -327,16 +341,22 @@ export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
   unknown: "desconhecido",
 };
 
-/** Estágios enum conhecidos; nomes autorais de estágio permanecem intactos. */
+/** Estágios conhecidos; qualquer valor novo segue o fallback seguro abaixo. */
 export const PIPELINE_STAGE_LABELS: Record<string, string> = {
   ...COMMERCIAL_STATE_LABELS,
   qualified: "qualificado",
+  qualification: "qualificação",
+  discovery: "descoberta",
   proposal: "proposta",
   negotiation: "negociação",
+  closed_won: "encerrado como ganho",
+  closed_lost: "encerrado como perdido",
 };
 
+export const UNRECOGNIZED_COMMERCIAL_STATE_LABEL = "estado não reconhecido";
+
 /* ------------------------------------------------------------------ */
-/* Consultas tolerantes: valor desconhecido volta como veio.           */
+/* Consultas tolerantes: cada catálogo define seu fallback seguro.     */
 /* ------------------------------------------------------------------ */
 
 function lookup(table: Record<string, string>, value: string): string {
@@ -408,15 +428,27 @@ export function operatorOutcomeLabel(outcome: string): string {
 }
 
 export function commercialEventLabel(event: string): string {
-  return COMMERCIAL_EVENT_LABELS[event] ?? COMMERCIAL_EVENT_LABELS[event.toLowerCase()] ?? event;
+  return (
+    COMMERCIAL_EVENT_LABELS[event] ??
+    COMMERCIAL_EVENT_LABELS[event.toLowerCase()] ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
 }
 
 export function commercialStateLabel(state: string): string {
-  return COMMERCIAL_STATE_LABELS[state] ?? COMMERCIAL_STATE_LABELS[state.toLowerCase()] ?? state;
+  return (
+    COMMERCIAL_STATE_LABELS[state] ??
+    COMMERCIAL_STATE_LABELS[state.toLowerCase()] ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
 }
 
 export function pipelineStageLabel(stage: string): string {
-  return PIPELINE_STAGE_LABELS[stage] ?? PIPELINE_STAGE_LABELS[stage.toLowerCase()] ?? stage;
+  return (
+    PIPELINE_STAGE_LABELS[stage] ??
+    PIPELINE_STAGE_LABELS[stage.toLowerCase()] ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
 }
 
 /**

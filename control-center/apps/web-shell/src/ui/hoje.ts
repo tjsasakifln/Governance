@@ -27,17 +27,17 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   return `
     <article class="card ${sectionId === "incidents" ? "attention" : "hoje-row"}" data-id="${escapeHtml(row.id)}" data-freshness="${escapeHtml(row.freshness_status)}" data-tone="${escapeHtml(tone)}"${row.severity ? ` data-severity="${escapeHtml(row.severity)}"` : ""}>
       <header>
-        <p class="kicker">${severity}${freshnessPill(row.freshness_status)} <span class="sr-only">${escapeHtml(freshnessLabel(row.freshness_status))}</span></p>
+        <div class="kicker">${severity}${freshnessPill(row.freshness_status)} <span class="sr-only">${escapeHtml(freshnessLabel(row.freshness_status))}</span></div>
         <h3>${escapeHtml(row.title)}</h3>
       </header>
       <p>${escapeHtml(row.summary)}</p>
       ${money}
-      <p class="prov-inline">
+      <div class="prov-inline">
         <span>Origem: ${escapeHtml(row.source.system)}</span>
         · Observado <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
         <span class="sr-only">UTC ${escapeHtml(row.observed_at)}</span>
         · ${helpTerm("confiança", CONFIDENCE_HELP)} ${escapeHtml(confidence)}
-      </p>
+      </div>
       ${technicalDetails(
         [
           { term: "id", value: row.id },

@@ -241,7 +241,7 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
                 : escapeHtml(hopStatusLabel(status));
             return `<li class="card" data-growth-hop="${escapeHtml(hop)}" data-hop-status="${escapeHtml(status)}"${absent ? ` data-absent="true"` : ""}>
               <h3>${escapeHtml(label)}</h3>
-              <p>${shown}${detail ? ` · ${escapeHtml(detail)}` : ""}</p>
+              <div class="help-line">${shown}${detail ? ` · ${escapeHtml(detail)}` : ""}</div>
               ${technicalDetails(
                 [
                   { term: "hop", value: hop },
@@ -502,11 +502,13 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
               const event = String(row.event ?? "activity");
               const state = row.state === undefined || row.state === null ? "" : String(row.state);
-              const statePill = state.length > 0 && state !== event
-                ? ` ${statusPill(state, commercialStateLabel(state))}`
+              const eventLabel = commercialEventLabel(event);
+              const stateLabel = commercialStateLabel(state);
+              const statePill = state.length > 0 && state !== event && stateLabel !== eventLabel
+                ? ` ${statusPill(state, stateLabel)}`
                 : "";
               return `<article class="card" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}">
-                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, commercialEventLabel(event))}${statePill}</p>
+                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, eventLabel)}${statePill}</p>
                 <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
                 <p>${escapeHtml(String(row.evidence ?? "Sem evidência descritiva."))}</p>
                 ${technicalDetails(

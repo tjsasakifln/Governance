@@ -58,6 +58,22 @@ function visibleText(html: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** Detecta a serialização inválida que faria o parser HTML fechar `<p>` implicitamente. */
+function hasDetailsInsideParagraph(html: string): boolean {
+  let insideParagraph = false;
+  for (const match of html.matchAll(/<\/?p\b[^>]*>|<details\b[^>]*>/gi)) {
+    const token = match[0].toLowerCase();
+    if (token.startsWith("</p")) {
+      insideParagraph = false;
+    } else if (token.startsWith("<p")) {
+      insideParagraph = true;
+    } else if (insideParagraph) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function mountedHtml(hash: string): string {
   const root = { innerHTML: "" };
   const handle = mount(root, createMockAdapter(), createMemoryRuntime(hash));
@@ -177,12 +193,22 @@ test("productive commercial routes label the actual activity and pipeline shapes
         deals: [
           {
             id: "deal-1",
-            company: "Empresa Exemplo",
+            name: "Empresa Exemplo",
             status: "open",
             stage_name: "qualified",
             updated_at: observedAt,
             next_action: "Preparar proposta",
             value: 1000,
+            currency: "BRL",
+          },
+          {
+            id: "deal-future-stage",
+            name: "Empresa em estágio futuro",
+            status: "open",
+            stage_name: "future_stage",
+            updated_at: observedAt,
+            next_action: "Interpretar estágio",
+            value: 500,
             currency: "BRL",
           },
         ],
@@ -196,10 +222,9 @@ test("productive commercial routes label the actual activity and pipeline shapes
         ],
         inbound: [
           {
-            id: "lead-1",
-            name: "Contato recebido",
-            status: "NEW",
-            updated_at: observedAt,
+            lead_id: "lead-1",
+            company: "Contato recebido",
+            status: "do_not_contact",
           },
         ],
       },
@@ -207,9 +232,62 @@ test("productive commercial routes label the actual activity and pipeline shapes
         {
           id: "attention-1",
           kind: "overdue_task",
-          status: "open",
+          title: "Retorno atrasado",
           why: "Prazo vencido",
-          detected_at: observedAt,
+          severity: "high",
+          entity_ref: { type: "task", id: "task-1" },
+          commercial_state: "in_progress",
+          provenance: {
+            source: { system: "warmbly", kind: "commercial", locator: "tasks" },
+            observed_at: observedAt,
+            freshness_status: "FRESH",
+            confidence: 0.9,
+          },
+        },
+        {
+          id: "attention-2",
+          kind: "confenge_attention",
+          title: "Conta exige revisão",
+          why: "Revisar próximo passo",
+          severity: "high",
+          entity_ref: { type: "account", id: "account-1" },
+          commercial_state: "needs_attention",
+          provenance: {
+            source: { system: "warmbly", kind: "commercial", locator: "attention" },
+            observed_at: observedAt,
+            freshness_status: "FRESH",
+            confidence: 0.9,
+          },
+        },
+        {
+          id: "attention-future",
+          kind: "future_signal",
+          title: "Evento futuro",
+          why: "Requer interpretação humana",
+          severity: "high",
+          entity_ref: { type: "account", id: "account-2" },
+          commercial_state: "needs_attention",
+          provenance: {
+            source: { system: "warmbly", kind: "commercial", locator: "attention" },
+            observed_at: observedAt,
+            freshness_status: "FRESH",
+            confidence: 0.9,
+          },
+        },
+        {
+          id: "attention-future-state",
+          kind: "confenge_attention",
+          title: "Estado futuro",
+          why: "Requer interpretação humana",
+          severity: "high",
+          entity_ref: { type: "account", id: "account-3" },
+          commercial_state: "future_state",
+          provenance: {
+            source: { system: "warmbly", kind: "commercial", locator: "attention" },
+            observed_at: observedAt,
+            freshness_status: "FRESH",
+            confidence: 0.9,
+          },
         },
       ],
     },
@@ -241,12 +319,24 @@ test("productive commercial routes label the actual activity and pipeline shapes
   assert.match(activity, /event=overdue_task/);
   assert.match(visibleText(activity), /tarefa atrasada/);
   assert.match(visibleText(activity), /em andamento/);
-  assert.match(visibleText(activity), /novo contato/);
-  assert.doesNotMatch(visibleText(activity), /\b(?:overdue_task|in_progress|open|NEW)\b/);
+  assert.match(visibleText(activity), /contato proibido/);
+  assert.match(visibleText(activity), /exige atenção/);
+  assert.match(visibleText(activity), /estado não reconhecido/);
+  assert.doesNotMatch(
+    visibleText(activity),
+    /\b(?:overdue_task|in_progress|do_not_contact|needs_attention|future_signal|future_state)\b/,
+  );
+  assert.match(activity, /event=do_not_contact/);
+  assert.match(activity, /state=needs_attention/);
+  assert.match(activity, /event=future_signal/);
+  assert.match(activity, /state=future_state/);
   assert.match(pipeline, /data-stage="qualified"/);
   assert.match(pipeline, /stage=qualified/);
+  assert.match(pipeline, /data-stage="future_stage"/);
+  assert.match(pipeline, /stage=future_stage/);
   assert.match(visibleText(pipeline), /qualificado/);
-  assert.doesNotMatch(visibleText(pipeline), /\b(?:qualified|open)\b/);
+  assert.match(visibleText(pipeline), /estado não reconhecido/);
+  assert.doesNotMatch(visibleText(pipeline), /\b(?:qualified|future_stage|open)\b/);
 });
 
 test("statusPill shows the Portuguese label and keeps the raw token in data-raw", () => {
@@ -362,4 +452,15 @@ test("the concepts the issue names as unavoidable carry contextual help wherever
   assert.match(crescimento, /data-help="Bloqueado é medição impedida[^"]*"/);
   const clientes = mountedHtml("#/clientes");
   assert.match(clientes, /data-help="Ausente é dado que não chegou[^"]*"/);
+});
+
+test("contextual disclosures are never serialized inside a paragraph", () => {
+  for (const { hash, html } of everyMainRouteHtml()) {
+    assert.equal(hasDetailsInsideParagraph(html), false, `${hash} contém <details> dentro de <p>`);
+  }
+  const hoje = mountedHtml("#/hoje");
+  assert.match(hoje, /<div class="kicker">[\s\S]*?<details class="term-help freshness-help">/);
+  assert.match(hoje, /<div class="prov-inline">[\s\S]*?<details class="term-help">/);
+  const crescimento = mountedHtml("#/crescimento");
+  assert.match(crescimento, /<div class="help-line"><details class="term-help">/);
 });
