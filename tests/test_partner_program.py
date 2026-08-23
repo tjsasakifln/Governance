@@ -114,6 +114,46 @@ def test_refund_reduces_commission():
     assert capped == 50000
 
 
+def test_caller_cap_can_only_reduce_the_canonical_ceiling():
+    receipt = 20_000_000
+    assert _happy_commission(eligible_net_fee_receipt_cents=receipt) == v.REFERRAL_CAP_CENTS
+    assert _happy_commission(
+        eligible_net_fee_receipt_cents=receipt,
+        cap_cents=v.REFERRAL_CAP_CENTS * 10,
+    ) == v.REFERRAL_CAP_CENTS
+    assert _happy_commission(eligible_net_fee_receipt_cents=receipt, cap_cents=250_000) == 250_000
+    assert _happy_commission(eligible_net_fee_receipt_cents=receipt, cap_cents=-1) == 0
+
+
+def test_cosell_commission_requires_an_accepted_versioned_content_pin():
+    base = {
+        "modality": "COSELL_SPECIALIZED",
+        "rate_bps": v.COSELL_MAX_RATE_BPS,
+        "eligible_net_fee_receipt_cents": 1_000_000,
+    }
+    valid_hash = "sha256:" + "a" * 64
+    assert _happy_commission(**base) == 0
+    assert _happy_commission(**base, cosell_addendum_accepted=True) == 0
+    assert _happy_commission(
+        **base,
+        cosell_addendum_accepted=True,
+        cosell_addendum_version=v.PACKAGE_VERSION,
+        cosell_addendum_hash="not-a-content-hash",
+    ) == 0
+    assert _happy_commission(
+        **base,
+        cosell_addendum_accepted=True,
+        cosell_addendum_version="referral-cosell-v2",
+        cosell_addendum_hash=valid_hash,
+    ) == 0
+    assert _happy_commission(
+        **base,
+        cosell_addendum_accepted=True,
+        cosell_addendum_version=v.PACKAGE_VERSION,
+        cosell_addendum_hash=valid_hash,
+    ) == 150_000
+
+
 def test_oab_and_not_eligible_cannot_approve_standard_commission():
     assert _happy_commission(professional_flag="PROFESSIONAL_RULE_REVIEW_REQUIRED") == 0
     assert _happy_commission(modality="NOT_ELIGIBLE", rate_bps=1000) == 0
@@ -259,6 +299,31 @@ def test_partner_event_is_never_received_revenue_without_evidence():
     }
     assert v.partner_commission_may_be_marked_paid(paid) is True
     assert v.partner_event_is_received_revenue(paid) is False
+
+
+def test_paid_commission_requires_the_explicit_success_outcome():
+    event = {
+        "type": "partner_commission_paid",
+        "receipt_evidence": True,
+        "human_approval_actor": "founder",
+        "eligible_receipt_cents": 800000,
+    }
+    for outcome in (None, "UNKNOWN", "PENDING", "FAILED", "REJECTED", "APPROVED", "paid"):
+        assert v.partner_commission_may_be_marked_paid({**event, "outcome": outcome}) is False
+    assert v.partner_commission_may_be_marked_paid({**event, "outcome": "PAID"}) is True
+
+
+def test_paid_commission_rejects_truthy_but_malformed_evidence():
+    event = {
+        "type": "partner_commission_paid",
+        "outcome": "PAID",
+        "receipt_evidence": True,
+        "human_approval_actor": "founder",
+        "eligible_receipt_cents": 800000,
+    }
+    assert v.partner_commission_may_be_marked_paid({**event, "receipt_evidence": "true"}) is False
+    assert v.partner_commission_may_be_marked_paid({**event, "human_approval_actor": True}) is False
+    assert v.partner_commission_may_be_marked_paid({**event, "eligible_receipt_cents": True}) is False
 
 
 def test_public_influence_and_cargo_copy_fail():

@@ -513,15 +513,34 @@ def partner_event_is_received_revenue(event: Mapping[str, Any] | str) -> bool:
 def partner_commission_may_be_marked_paid(event: Mapping[str, Any]) -> bool:
     if event.get("type") != "partner_commission_paid":
         return False
-    if event.get("outcome") in {None, "UNKNOWN"}:
+    # Payment is a positive assertion, so an arbitrary non-UNKNOWN outcome is
+    # not enough.  Only the canonical terminal success outcome may cross this
+    # gate; FAILED, REJECTED, PENDING and future/unknown values fail closed.
+    if event.get("outcome") != "PAID":
         return False
-    if not event.get("receipt_evidence"):
+    if event.get("receipt_evidence") is not True:
         return False
-    if not (event.get("human_approval_actor") or event.get("approval_actor")):
+    actor = event.get("human_approval_actor") or event.get("approval_actor")
+    if not isinstance(actor, str) or not actor.strip():
         return False
-    if int(event.get("eligible_receipt_cents") or 0) <= 0:
+    eligible_receipt = event.get("eligible_receipt_cents")
+    if type(eligible_receipt) is not int or eligible_receipt <= 0:
         return False
     return True
+
+
+def cosell_addendum_pin_is_verifiable(
+    *,
+    accepted: bool,
+    version: str | None,
+    content_hash: str | None,
+) -> bool:
+    """Require an accepted, versioned and content-addressed co-sell addendum."""
+    if accepted is not True or version != PACKAGE_VERSION:
+        return False
+    if not isinstance(content_hash, str):
+        return False
+    return re.fullmatch(r"sha256:[0-9a-f]{64}", content_hash) is not None
 
 
 def commission_amount_cents(
@@ -541,6 +560,9 @@ def commission_amount_cents(
     professional_flag: str | None = None,
     due_diligence_state: str = "APPROVED",
     cap_cents: int | None = None,
+    cosell_addendum_accepted: bool = False,
+    cosell_addendum_version: str | None = None,
+    cosell_addendum_hash: str | None = None,
 ) -> int:
     """Shipped commission math. Tests must call this function."""
     if not receipt_evidence:
@@ -567,6 +589,12 @@ def commission_amount_cents(
         return 0
     if modality not in {"REFERRAL_QUALIFIED", "COSELL_SPECIALIZED"}:
         return 0
+    if modality == "COSELL_SPECIALIZED" and not cosell_addendum_pin_is_verifiable(
+        accepted=cosell_addendum_accepted,
+        version=cosell_addendum_version,
+        content_hash=cosell_addendum_hash,
+    ):
+        return 0
     max_rate = max_rate_for_modality(modality)
     if rate_bps <= 0 or rate_bps > max_rate:
         return 0
@@ -576,7 +604,11 @@ def commission_amount_cents(
         raise ValidationError("previously paid cannot be negative")
     net = max(0, int(eligible_net_fee_receipt_cents) - int(refund_or_chargeback_cents))
     raw = net * int(rate_bps) // 10_000
-    cap = int(cap_cents if cap_cents is not None else cap_for_modality(modality))
+    canonical_cap = cap_for_modality(modality)
+    # An opportunity may negotiate a lower cap, but caller input can never
+    # raise the immutable ceiling carried by the canonical schedule.
+    requested_cap = canonical_cap if cap_cents is None else max(0, int(cap_cents))
+    cap = min(canonical_cap, requested_cap)
     remaining = max(0, cap - int(previously_paid_or_accrued_cents))
     return max(0, min(raw, remaining))
 
