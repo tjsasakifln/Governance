@@ -14,10 +14,14 @@ const SCOREBOARD = {
 };
 
 const EXECUTIVE = {
-  schema_version: "confenge.executive_intel.v1",
+  schema_version: "confenge.commercial_intel.v1",
   month: "2026-08",
+  include_synthetic: false,
+  causal_proof: false,
+  real_empty: false,
   qco: 3,
   inbound_qualified_pipeline: 1,
+  weekly_revenue_chains: [],
 };
 
 const REPORT = {
@@ -131,6 +135,22 @@ describe("normalizeIntelEnvelope (shipped rule)", () => {
     );
     assert.equal(contradictory.ok, false);
     if (!contradictory.ok) assert.match(contradictory.reason, /real_empty/);
+  });
+
+  it("rejects invented or synthetic executive contracts before revenue facts are mapped", () => {
+    const candidates = [
+      { ...EXECUTIVE, schema_version: "confenge.executive_intel.v1" },
+      { ...EXECUTIVE, include_synthetic: true },
+      { ...EXECUTIVE, causal_proof: true },
+      { ...EXECUTIVE, month: "2026-13" },
+      { ...EXECUTIVE, weekly_revenue_chains: [{ synthetic: true }] },
+      { ...EXECUTIVE, real_empty: true, weekly_revenue_chains: [{ synthetic: false }] },
+    ];
+    for (const candidate of candidates) {
+      const result = normalizeIntelEnvelope({ data: candidate }, "intel_executive");
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.code, "CONTRACT_DRIFT");
+    }
   });
 });
 

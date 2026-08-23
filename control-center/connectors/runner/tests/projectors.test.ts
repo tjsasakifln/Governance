@@ -76,6 +76,195 @@ test("Warmbly counts project to commercial snapshot with labeled acquisition coh
   assert.ok(clients);
 });
 
+test("Warmbly weekly revenue facts project under one opaque correlation and preserve UNKNOWN", () => {
+  const snapshot = collectFromWarmblyPayload(
+    {
+      health: { status: "ok" },
+      confenge_intel_executive: {
+        schema_version: "confenge.commercial_intel.v1",
+        month: "2026-08",
+        include_synthetic: false,
+        causal_proof: false,
+        real_empty: false,
+        weekly_revenue_chains: [
+          {
+            schema_version: "confenge.weekly_revenue_chain.v1",
+            canonical_identity: {
+              correlation_id: "corr_extra_sbx_week_2026_34",
+              account_id: "acc_extra_sbx_001",
+              opportunity_id: "opp_extra_sbx_001",
+              offer_id: "CFG-DIAG-EXP-v1",
+              proposal_id: "prop_extra_sbx_001",
+              charge_id: "charge_asaas_sbx_001",
+              payment_id: "UNKNOWN",
+            },
+            latest_deliverable: { availability: "OBSERVED", value: "deliverable_weekly_sbx_001" },
+            latest_evidence: { availability: "OBSERVED", value: "evidence_sandbox_fixture_001" },
+            decision: { availability: "OBSERVED", value: "WAIT" },
+            responsible: { availability: "OBSERVED", value: "role_commercial_owner" },
+            deadline: { availability: "OBSERVED", value: "2026-08-24T20:59:59Z" },
+            next_action: { availability: "OBSERVED", value: "human_review_commercial_terms" },
+            proposal: { availability: "OBSERVED", value: "prop_extra_sbx_001" },
+            charge: {
+              availability: "OBSERVED",
+              id: "charge_asaas_sbx_001",
+              status: "confirmed",
+              amount_cents: 800000,
+              currency: "BRL",
+            },
+            receipt: { availability: "UNKNOWN", amount_cents: 0 },
+            held: false,
+            synthetic: false,
+          },
+          {
+            canonical_identity: { correlation_id: "free form display name" },
+            synthetic: false,
+          },
+        ],
+      },
+    },
+    { now: new Date(now) },
+  );
+  const commercial = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: snapshot as unknown as Record<string, unknown>,
+  }).find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const operations = commercial.payload.operations as {
+    weekly_revenue_chains: Array<Record<string, unknown>>;
+  };
+  assert.equal(operations.weekly_revenue_chains.length, 1);
+  const chain = operations.weekly_revenue_chains[0] as Record<string, unknown>;
+  assert.deepEqual(chain.receipt, { availability: "UNKNOWN" });
+  assert.deepEqual(chain.decision, { availability: "OBSERVED", value: "WAIT" });
+  assert.deepEqual(chain.authority, {
+    operation_and_visualization: "governance-control-center",
+    action_and_outcome: "warmbly",
+    financial_facts: "asaas",
+  });
+  assert.deepEqual(chain.source, {
+    system: "warmbly",
+    surface: "GET /v1/confenge/intel/executive?include_synthetic=0",
+    contract: "confenge.commercial_intel.v1",
+    month: "2026-08",
+    observed_at: now,
+    include_synthetic: false,
+  });
+  assert.equal(
+    (chain.canonical_identity as Record<string, unknown>).correlation_id,
+    "corr_extra_sbx_week_2026_34",
+  );
+});
+
+test("weekly revenue projection fails closed on authority drift, collisions, and unbound money", () => {
+  const identity = {
+    correlation_id: "corr_real_2026_34",
+    account_id: "acc_real_001",
+    opportunity_id: "opp_real_001",
+    offer_id: "CFG-DIAG-EXP-v1",
+    proposal_id: "prop_real_001",
+    charge_id: "charge_asaas_real_001",
+    payment_id: "payment_asaas_real_001",
+  };
+  const chain = {
+    schema_version: "confenge.weekly_revenue_chain.v1",
+    canonical_identity: identity,
+    latest_deliverable: { availability: "UNKNOWN" },
+    latest_evidence: { availability: "UNKNOWN" },
+    decision: { availability: "OBSERVED", value: "WAIT", observed_at: "2050-01-01T00:00:00Z" },
+    responsible: { availability: "OBSERVED", value: "role_commercial_owner" },
+    deadline: {
+      availability: "OBSERVED",
+      value: "2026-08-24T20:59:59Z",
+      observed_at: "2026-02-30T12:00:00Z",
+    },
+    next_action: { availability: "UNKNOWN" },
+    proposal: { availability: "OBSERVED", value: "different_proposal" },
+    charge: {
+      availability: "OBSERVED",
+      id: "different_charge",
+      status: "CONFIRMED",
+      amount_cents: 800000,
+      currency: "BRL",
+    },
+    receipt: {
+      availability: "OBSERVED",
+      id: "payment_asaas_real_001",
+      status: "RECEIVED",
+      amount_cents: 0,
+    },
+    held: false,
+    synthetic: false,
+  };
+  const executive = {
+    schema_version: "confenge.commercial_intel.v1",
+    month: "2026-08",
+    include_synthetic: false,
+    causal_proof: false,
+    real_empty: false,
+    weekly_revenue_chains: [chain],
+  };
+  const project = (candidate: Record<string, unknown>) => {
+    const snapshot = collectFromWarmblyPayload(
+      { health: { status: "ok" }, confenge_intel_executive: candidate },
+      { now: new Date(now) },
+    );
+    const commercial = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: snapshot as unknown as Record<string, unknown>,
+    }).find((row) => row.snapshot_kind === "commercial");
+    assert.ok(commercial);
+    return (commercial.payload.operations as { weekly_revenue_chains: Array<Record<string, unknown>> })
+      .weekly_revenue_chains;
+  };
+
+  for (const drifted of [
+    { ...executive, schema_version: "consumer.invented.v1" },
+    { ...executive, include_synthetic: true },
+    { ...executive, causal_proof: true },
+  ]) {
+    assert.deepEqual(project(drifted), []);
+  }
+
+  const [projected] = project(executive);
+  assert.ok(projected);
+  assert.deepEqual(projected.proposal, { availability: "UNKNOWN" });
+  assert.deepEqual(projected.charge, { availability: "UNKNOWN" });
+  assert.deepEqual(projected.decision, { availability: "OBSERVED", value: "WAIT" });
+  assert.deepEqual(projected.deadline, {
+    availability: "OBSERVED",
+    value: "2026-08-24T20:59:59Z",
+  });
+  assert.deepEqual(projected.receipt, {
+    availability: "OBSERVED",
+    id: "payment_asaas_real_001",
+    status: "RECEIVED",
+  });
+
+  const denominatedZero = {
+    ...chain,
+    receipt: { ...chain.receipt, currency: "BRL" },
+  };
+  const [zero] = project({ ...executive, weekly_revenue_chains: [denominatedZero] });
+  assert.deepEqual(zero?.receipt, {
+    availability: "OBSERVED",
+    id: "payment_asaas_real_001",
+    status: "RECEIVED",
+    amount_cents: 0,
+    currency: "BRL",
+  });
+
+  assert.deepEqual(project({ ...executive, weekly_revenue_chains: [chain, chain] }), []);
+});
+
 test("real Warmbly mapping selects controlled-email telemetry by cohort and policy", () => {
   const normalized = collectFromWarmblyPayload({
     counts: { deals_open: 0, inbound_now: 0 },

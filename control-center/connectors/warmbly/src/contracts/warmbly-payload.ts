@@ -262,6 +262,52 @@ export type WarmblyDispatchStatus = {
   active_leases?: number;
 };
 
+export type WarmblyObservedText = {
+  availability?: "OBSERVED" | "UNKNOWN";
+  value?: string;
+  observed_at?: string;
+};
+
+export type WarmblyObservedMoney = WarmblyObservedText & {
+  id?: string;
+  status?: string;
+  amount_cents?: number;
+  currency?: string;
+};
+
+export type WarmblyWeeklyRevenueChain = {
+  schema_version?: string;
+  canonical_identity?: {
+    correlation_id?: string;
+    account_id?: string;
+    opportunity_id?: string;
+    offer_id?: string;
+    proposal_id?: string;
+    charge_id?: string;
+    payment_id?: string;
+  };
+  latest_deliverable?: WarmblyObservedText;
+  latest_evidence?: WarmblyObservedText;
+  decision?: WarmblyObservedText;
+  responsible?: WarmblyObservedText;
+  deadline?: WarmblyObservedText;
+  next_action?: WarmblyObservedText;
+  proposal?: WarmblyObservedText;
+  charge?: WarmblyObservedMoney;
+  receipt?: WarmblyObservedMoney;
+  held?: boolean;
+  synthetic?: boolean;
+};
+
+export type WarmblyIntelExecutive = Record<string, unknown> & {
+  schema_version?: string;
+  month?: string;
+  include_synthetic?: boolean;
+  causal_proof?: boolean;
+  real_empty?: boolean;
+  weekly_revenue_chains?: WarmblyWeeklyRevenueChain[];
+};
+
 export type WarmblyPayload = {
   health?: WarmblyHealth;
   api_version?: string;
@@ -282,7 +328,7 @@ export type WarmblyPayload = {
   confenge_inbound?: WarmblyInboundItem[] | WarmblyList<WarmblyInboundItem>;
   confenge_dispatch_status?: WarmblyDispatchStatus | { data: WarmblyDispatchStatus };
   confenge_intel_scoreboard?: Record<string, unknown>;
-  confenge_intel_executive?: Record<string, unknown>;
+  confenge_intel_executive?: WarmblyIntelExecutive;
   confenge_intel_report?: Record<string, unknown>;
   confenge_intel_exceptions?: unknown;
   confenge_intel_organic_scoreboard?: Record<string, unknown>;
