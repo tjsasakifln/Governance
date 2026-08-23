@@ -20,6 +20,8 @@ import {
   authorityLabel,
   availabilityLabel,
   clientLifecycleLabel,
+  commercialEventLabel,
+  commercialStateLabel,
   directiveKindLabel,
   directiveStatusLabel,
   exceptionKindLabel,
@@ -30,6 +32,7 @@ import {
   MEMORY_GROUP_TITLES,
   operatorActionLabel,
   operatorOutcomeLabel,
+  pipelineStageLabel,
   providerMutationLabel,
   scopeLabel,
   statusPill,
@@ -425,12 +428,12 @@ function dispatchPanel(ops: Record<string, unknown>): string {
         <p class="constraint" data-operator-scope="warmbly-write">Estas três ações escrevem no Warmbly. Não existe controle de envio aqui: pausar, retomar e reconhecer é toda a autoridade desta superfície.</p>
         <form data-warmbly-dispatch="pause" class="operator-form">
           <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">PAUSAR OUTBOUND</button>
+          <button type="submit">Pausar disparos</button>
         </form>
         <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
           <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
           <p class="constraint">Retomar libera e-mail frio para empresas reais. Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>
-          <button type="submit">RETOMAR OUTBOUND (dois passos)</button>
+          <button type="submit">Retomar disparos (confirmação em duas etapas)</button>
         </form>
         <form data-warmbly-dispatch="acknowledge" class="operator-form">
           <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
@@ -497,10 +500,15 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         : activity
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card" data-activity-event="${escapeHtml(String(row.event ?? ""))}">
-                <p class="kicker">${escapeHtml(String(row.at ?? ""))}</p>
+              const event = String(row.event ?? "activity");
+              const state = row.state === undefined || row.state === null ? "" : String(row.state);
+              const statePill = state.length > 0 && state !== event
+                ? ` ${statusPill(state, commercialStateLabel(state))}`
+                : "";
+              return `<article class="card" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}">
+                <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, commercialEventLabel(event))}${statePill}</p>
                 <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
-                <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
+                <p>${escapeHtml(String(row.evidence ?? "Sem evidência descritiva."))}</p>
                 ${technicalDetails(
                   [
                     { term: "event", value: String(row.event ?? "") },
@@ -526,8 +534,10 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null): st
         : pipeline
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
-                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· dado defasado" : ""}</p>
+              const stage = String(row.stage ?? row.status ?? "unknown");
+              const status = String(row.status ?? "unknown");
+              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}" data-stage="${escapeHtml(stage)}" data-status="${escapeHtml(status)}">
+                <p class="kicker">${statusPill(stage, pipelineStageLabel(stage))} ${row.stale === true ? "· dado defasado" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "negócio"))}</h3>
                 ${dealMoneyLine(row.value)}
                 <dl class="facts">

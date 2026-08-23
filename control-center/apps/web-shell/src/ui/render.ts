@@ -1,4 +1,5 @@
 import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
+import { WARMBLY_DISPATCH_PATHS } from "../adapters/paths";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -102,7 +103,19 @@ function viewBanner(view: ViewState<DestinationPage>): string {
     return `<div class="banner loading" role="status">${escapeHtml(DEFAULT_LOADING_LABEL)}</div>`;
   }
   if (view.kind === "error") {
-    return `<div class="banner error" role="alert"><p>${escapeHtml(view.message)}</p>${technicalDetails([{ term: "codigo_do_erro", value: view.code }], "view-error")}</div>`;
+    const message =
+      view.code === "UNKNOWN_DESTINATION"
+        ? "Este destino não existe."
+        : view.code === "CONTEXT_UNAVAILABLE"
+          ? "Não foi possível carregar este recorte."
+          : "Não foi possível exibir este recorte.";
+    return `<div class="banner error" role="alert"><p>${escapeHtml(message)}</p>${technicalDetails(
+      [
+        { term: "codigo_do_erro", value: view.code },
+        { term: "mensagem_original", value: view.message },
+      ],
+      "view-error",
+    )}</div>`;
   }
   if (view.kind === "empty") {
     return `<div class="banner empty" role="status">${escapeHtml(view.message)}</div>`;
@@ -117,7 +130,26 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const cls = result.ok ? "ok" : "error";
   const role = result.ok ? "status" : "alert";
-  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}"><p>${escapeHtml(result.message)}</p></div>`;
+  const message = !result.ok
+    ? "A ação não foi concluída. Consulte o detalhe técnico antes de tentar novamente."
+    : result.path === WARMBLY_DISPATCH_PATHS.pause
+      ? "Disparos pausados."
+      : result.path === WARMBLY_DISPATCH_PATHS.resume_confirm
+        ? "Confirmação registrada. Envie novamente para retomar os disparos."
+        : result.path === WARMBLY_DISPATCH_PATHS.resume
+          ? "Disparos retomados."
+          : result.path === WARMBLY_DISPATCH_PATHS.acknowledge
+            ? "Alerta reconhecido."
+            : result.path === "/v1/operator-actions"
+              ? "Ação registrada no Control Center."
+              : "Ação concluída.";
+  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}"><p>${escapeHtml(message)}</p>${technicalDetails(
+    [
+      { term: "caminho", value: result.path },
+      { term: "mensagem_original", value: result.message },
+    ],
+    "operator-result",
+  )}</div>`;
 }
 
 function hojeBody(page: DestinationPage): string {

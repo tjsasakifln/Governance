@@ -3,6 +3,9 @@ import { test } from "node:test";
 import { createMemoryRuntime, mount } from "../src/app";
 import { createMockAdapter } from "../src/adapters/index";
 import { DESTINATIONS } from "../src/destinations";
+import type { CommercialSnapshot } from "../src/types";
+import { commercialBlock } from "../src/ui/domains";
+import { renderShell } from "../src/ui/render";
 import {
   AGENT_ACTIVITY_PRESENTATION_STATUSES,
   AGENT_SESSION_STATUSES,
@@ -45,6 +48,7 @@ import {
 function visibleText(html: string): string {
   return html
     .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
+    .replace(/<span class="term-help-text"[^>]*>[\s\S]*?<\/span>/g, " ")
     .replace(/<[^>]*>/g, " ")
     .replaceAll("&amp;", "&")
     .replaceAll("&lt;", "<")
@@ -142,11 +146,107 @@ test("technicalDetails is collapsed, copyable, escaped, and drops empty rows", (
   assert.equal(technicalDetails([{ term: "só", value: "" }]), "");
 });
 
-test("helpTerm carries the explanation in title and data-help, escaped", () => {
+test("helpTerm exposes escaped contextual help through native keyboard and touch semantics", () => {
   const html = helpTerm("confiança", `1 < 2 & "aspas"`);
+  assert.match(html, /^<details class="term-help"><summary class="term"/);
   assert.match(html, /data-help="1 &lt; 2 &amp; &quot;aspas&quot;"/);
   assert.match(html, /title="1 &lt; 2 &amp; &quot;aspas&quot;"/);
+  assert.match(html, /<span class="term-help-text" role="note">1 &lt; 2 &amp; &quot;aspas&quot;<\/span><\/details>$/);
+  assert.match(html, /abrir ajuda contextual/);
+  assert.doesNotMatch(html, /tabindex="-1"/);
   assert.match(html, />confiança</);
+});
+
+test("productive commercial routes label the actual activity and pipeline shapes emitted by the projector", async () => {
+  const projectorUrl = new URL(
+    "../../../connectors/runner/src/projectors/project.ts",
+    import.meta.url,
+  ).href;
+  const projector = (await import(projectorUrl)) as {
+    projectCollector(envelope: Record<string, unknown>): Array<{ snapshot_kind: string; payload: Record<string, unknown> }>;
+  };
+  const observedAt = "2026-08-22T12:00:00Z";
+  const projected = projector.projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: observedAt,
+    confidence: 0.9,
+    source: { system: "warmbly", kind: "snapshot", locator: "operations" },
+    payload: {
+      operations: {
+        deals: [
+          {
+            id: "deal-1",
+            company: "Empresa Exemplo",
+            status: "open",
+            stage_name: "qualified",
+            updated_at: observedAt,
+            next_action: "Preparar proposta",
+            value: 1000,
+            currency: "BRL",
+          },
+        ],
+        tasks: [
+          {
+            id: "task-1",
+            title: "Retornar ao contato",
+            status: "in_progress",
+            updated_at: observedAt,
+          },
+        ],
+        inbound: [
+          {
+            id: "lead-1",
+            name: "Contato recebido",
+            status: "NEW",
+            updated_at: observedAt,
+          },
+        ],
+      },
+      attention: [
+        {
+          id: "attention-1",
+          kind: "overdue_task",
+          status: "open",
+          why: "Prazo vencido",
+          detected_at: observedAt,
+        },
+      ],
+    },
+  });
+  const commercial = projected.find((item) => item.snapshot_kind === "commercial");
+  assert.ok(commercial, "o projetor deveria produzir o recorte comercial");
+  const snapshot = {
+    ...commercial.payload,
+    schema_version: "control-center.commercial-snapshot.v1",
+    id: "cc:commercial:company",
+    scope: "commercial",
+    generated_at: observedAt,
+    provenance: {
+      source: { system: "warmbly", kind: "snapshot", locator: "operations" },
+      observed_at: observedAt,
+      freshness_status: "FRESH",
+      confidence: 0.9,
+    },
+    authority: {
+      catalog_authority: "governance",
+      commercial_runtime: "warmbly",
+      this_document: "read_model",
+    },
+  } as unknown as CommercialSnapshot;
+
+  const activity = commercialBlock(snapshot, "atividade");
+  const pipeline = commercialBlock(snapshot, "pipeline");
+  assert.match(activity, /data-activity-event="overdue_task"/);
+  assert.match(activity, /event=overdue_task/);
+  assert.match(visibleText(activity), /tarefa atrasada/);
+  assert.match(visibleText(activity), /em andamento/);
+  assert.match(visibleText(activity), /novo contato/);
+  assert.doesNotMatch(visibleText(activity), /\b(?:overdue_task|in_progress|open|NEW)\b/);
+  assert.match(pipeline, /data-stage="qualified"/);
+  assert.match(pipeline, /stage=qualified/);
+  assert.match(visibleText(pipeline), /qualificado/);
+  assert.doesNotMatch(visibleText(pipeline), /\b(?:qualified|open)\b/);
 });
 
 test("statusPill shows the Portuguese label and keeps the raw token in data-raw", () => {
@@ -154,6 +254,23 @@ test("statusPill shows the Portuguese label and keeps the raw token in data-raw"
   assert.match(html, /data-raw="BLOCKED_BY_SECRET"/);
   assert.match(html, />bloqueado por credencial ausente</);
   assert.doesNotMatch(visibleText(html), /BLOCKED_BY_SECRET/);
+});
+
+test("an authored read error is not exposed as the operator-facing banner", () => {
+  const html = renderShell({
+    destination: "hoje",
+    viewKind: "error",
+    view: {
+      kind: "error",
+      code: "CONTEXT_UNAVAILABLE",
+      message: "context payload is not an object at /internal/read-model",
+    },
+    mockScenario: "http",
+    adapterMode: "http",
+  });
+  assert.match(visibleText(html), /Não foi possível carregar este recorte\./);
+  assert.doesNotMatch(visibleText(html), /context payload|internal\/read-model/);
+  assert.match(html, /mensagem_original=context payload is not an object at \/internal\/read-model/);
 });
 
 /**
@@ -235,6 +352,12 @@ test("the concepts the issue names as unavoidable carry contextual help wherever
   const hoje = mountedHtml("#/hoje");
   assert.match(hoje, /data-help="Atualização é há quanto tempo o dado foi observado[^"]*"/);
   assert.match(hoje, /data-help="Confiança é quanto o dado merece crédito[^"]*"/);
+  assert.doesNotMatch(hoje, /<span[^>]+data-help=/);
+  assert.equal(
+    [...hoje.matchAll(/data-help=/g)].length,
+    [...hoje.matchAll(/<summary[^>]+data-help=/g)].length,
+    "toda ajuda contextual deve estar num summary nativo acionável",
+  );
   const crescimento = mountedHtml("#/crescimento");
   assert.match(crescimento, /data-help="Bloqueado é medição impedida[^"]*"/);
   const clientes = mountedHtml("#/clientes");

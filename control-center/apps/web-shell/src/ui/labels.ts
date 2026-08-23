@@ -268,6 +268,73 @@ export const OPERATOR_OUTCOME_LABELS: Record<string, string> = {
   duplicate: "duplicada",
 };
 
+/**
+ * Valores que o projetor comercial realmente publica em `operations.activity`.
+ * O token continua em `data-*` e no detalhe técnico; esta tabela cuida apenas
+ * da leitura humana.
+ */
+export const COMMERCIAL_EVENT_LABELS: Record<string, string> = {
+  activity: "atividade",
+  overdue_task: "tarefa atrasada",
+  next_action: "próxima ação",
+  stalled_deal: "negócio parado",
+  exception_state: "estado excepcional",
+  inbox_signal: "sinal da caixa de entrada",
+  campaign_signal: "sinal de campanha",
+  inbound_lead: "lead recebido",
+  confenge_attention: "atenção da CONFENGE",
+  open: "abertura",
+  pending: "tarefa pendente",
+  in_progress: "tarefa em andamento",
+  completed: "tarefa concluída",
+  cancelled: "tarefa cancelada",
+  new: "novo contato",
+  unread: "mensagem não lida",
+  awaiting_reply: "aguardando resposta",
+  awaiting_agent_draft: "aguardando revisão do rascunho",
+  active: "atividade ativa",
+  paused: "atividade pausada",
+  handled: "atividade tratada",
+  done: "atividade concluída",
+  closed: "encerramento",
+  won: "negócio ganho",
+  lost: "negócio perdido",
+  failed: "falha",
+  error: "erro",
+  unknown: "atividade desconhecida",
+};
+
+/** Estados de negócio, tarefa e caixa de entrada emitidos pelo Warmbly. */
+export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
+  open: "aberto",
+  pending: "pendente",
+  in_progress: "em andamento",
+  completed: "concluído",
+  cancelled: "cancelado",
+  new: "novo",
+  unread: "não lido",
+  awaiting_reply: "aguardando resposta",
+  awaiting_agent_draft: "aguardando revisão do rascunho",
+  active: "ativo",
+  paused: "pausado",
+  handled: "tratado",
+  done: "concluído",
+  closed: "encerrado",
+  won: "ganho",
+  lost: "perdido",
+  failed: "falhou",
+  error: "falhou",
+  unknown: "desconhecido",
+};
+
+/** Estágios enum conhecidos; nomes autorais de estágio permanecem intactos. */
+export const PIPELINE_STAGE_LABELS: Record<string, string> = {
+  ...COMMERCIAL_STATE_LABELS,
+  qualified: "qualificado",
+  proposal: "proposta",
+  negotiation: "negociação",
+};
+
 /* ------------------------------------------------------------------ */
 /* Consultas tolerantes: valor desconhecido volta como veio.           */
 /* ------------------------------------------------------------------ */
@@ -340,6 +407,18 @@ export function operatorOutcomeLabel(outcome: string): string {
   return lookup(OPERATOR_OUTCOME_LABELS, outcome);
 }
 
+export function commercialEventLabel(event: string): string {
+  return COMMERCIAL_EVENT_LABELS[event] ?? COMMERCIAL_EVENT_LABELS[event.toLowerCase()] ?? event;
+}
+
+export function commercialStateLabel(state: string): string {
+  return COMMERCIAL_STATE_LABELS[state] ?? COMMERCIAL_STATE_LABELS[state.toLowerCase()] ?? state;
+}
+
+export function pipelineStageLabel(stage: string): string {
+  return PIPELINE_STAGE_LABELS[stage] ?? PIPELINE_STAGE_LABELS[stage.toLowerCase()] ?? stage;
+}
+
 /**
  * Estado de um hop do funil. Aceita tanto os enums de atualização quanto
  * `BLOCKED`/`UNKNOWN`, que é o que `hopStatusFor` produz.
@@ -353,12 +432,11 @@ export function hopStatusLabel(status: string): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Termo com ajuda contextual. O texto de ajuda vai em `title` (dica do
- * navegador) e em `data-help` — assim um teste consegue afirmar que a ajuda
- * existe sem depender de hover.
+ * Termo com ajuda contextual. `details/summary` oferece o mesmo conteúdo a
+ * mouse, teclado e toque sem depender de JavaScript ou de hover.
  */
 export function helpTerm(term: string, help: string): string {
-  return `<span class="term" data-help="${escapeHtml(help)}" title="${escapeHtml(help)}">${escapeHtml(term)}</span>`;
+  return `<details class="term-help"><summary class="term" data-help="${escapeHtml(help)}" title="${escapeHtml(help)}">${escapeHtml(term)}<span class="sr-only"> — abrir ajuda contextual</span></summary><span class="term-help-text" role="note">${escapeHtml(help)}</span></details>`;
 }
 
 /**
@@ -371,12 +449,11 @@ export function statusPill(raw: string, label: string, extraClass = ""): string 
 }
 
 /**
- * Pílula de atualização. Carrega a ajuda contextual em `title`/`data-help`
- * porque "atualização" é um dos conceitos que a issue exige explicar em toda
- * superfície onde aparece, e ela aparece em quase todas.
+ * Pílula de atualização com a mesma divulgação nativa acessível de
+ * `helpTerm()`. O enum cru permanece em `data-raw`.
  */
 export function freshnessPill(status: FreshnessStatus): string {
-  return `<span class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}" data-help="${escapeHtml(FRESHNESS_HELP)}" title="${escapeHtml(FRESHNESS_HELP)}">${escapeHtml(freshnessLabel(status))}</span>`;
+  return `<details class="term-help freshness-help"><summary class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}" data-help="${escapeHtml(FRESHNESS_HELP)}" title="${escapeHtml(FRESHNESS_HELP)}">${escapeHtml(freshnessLabel(status))}<span class="sr-only"> — abrir ajuda sobre atualização</span></summary><span class="term-help-text" role="note">${escapeHtml(FRESHNESS_HELP)}</span></details>`;
 }
 
 /* ------------------------------------------------------------------ */
