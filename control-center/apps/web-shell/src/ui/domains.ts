@@ -244,8 +244,8 @@ function observedCount(value: unknown): string {
 }
 
 function controlledEmailCohort(ops: Record<string, unknown>): string {
-  const root = ops.controlled_email && typeof ops.controlled_email === "object"
-    ? (ops.controlled_email as Record<string, unknown>)
+  const root = ops.controlled_outbound && typeof ops.controlled_outbound === "object"
+    ? (ops.controlled_outbound as Record<string, unknown>)
     : {};
   const current = root.current && typeof root.current === "object"
     ? (root.current as Record<string, unknown>)
