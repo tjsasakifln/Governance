@@ -230,6 +230,81 @@ async function assertFilled(page, minChars = 80) {
   return { box, filled };
 }
 
+/**
+ * The CONFENGE mark has to be fetched and decoded by a real browser from the
+ * real production server: a wrong Content-Type, a missing file in dist, or a
+ * CSP that rejects the origin all leave naturalWidth at 0 while the markup
+ * still looks right.
+ */
+async function assertBrand(page) {
+  const brand = page.locator("header.topbar a.brand");
+  if ((await brand.count()) !== 1) {
+    throw new Error("topbar does not carry exactly one CONFENGE brand link");
+  }
+  const href = await brand.getAttribute("href");
+  if (href !== "#/hoje") {
+    throw new Error(`brand link href is ${href}, expected #/hoje`);
+  }
+  const logo = brand.locator("img.brand-logo");
+  if (!(await logo.isVisible())) {
+    throw new Error("CONFENGE mark is not visible in the topbar");
+  }
+  const alt = await logo.getAttribute("alt");
+  if (alt !== "CONFENGE") {
+    throw new Error(`brand logo alt is ${JSON.stringify(alt)}, expected "CONFENGE"`);
+  }
+  const info = await logo.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return {
+      src: el.currentSrc || el.src,
+      complete: el.complete,
+      naturalWidth: el.naturalWidth,
+      naturalHeight: el.naturalHeight,
+      width: box.width,
+      height: box.height,
+      filter: style.filter,
+      opacity: Number.parseFloat(style.opacity),
+    };
+  });
+  if (!info.complete || info.naturalWidth < 1 || info.naturalHeight < 1) {
+    throw new Error(`CONFENGE mark did not decode from ${info.src}`);
+  }
+  if (info.height < 14) {
+    throw new Error(`CONFENGE mark rendered too small to read: ${info.height}px tall`);
+  }
+  const natural = info.naturalWidth / info.naturalHeight;
+  const rendered = info.width / info.height;
+  if (Math.abs(rendered - natural) > 0.02 * natural) {
+    throw new Error(
+      `CONFENGE mark distorted: rendered ratio ${rendered.toFixed(3)} vs intrinsic ${natural.toFixed(3)}`,
+    );
+  }
+  if (info.filter !== "none" || info.opacity < 1) {
+    throw new Error(`CONFENGE mark recoloured: filter=${info.filter} opacity=${info.opacity}`);
+  }
+  const product = brand.locator(".brand-product");
+  // textContent, not innerText: the label is uppercased by CSS only.
+  const productText = (await product.textContent())?.trim();
+  if (productText !== "Control Center") {
+    throw new Error(`secondary product name is ${JSON.stringify(productText)}`);
+  }
+  const secondary = await product.evaluate((el) => {
+    const logoEl = el.closest("a.brand")?.querySelector("img.brand-logo");
+    const logoBox = logoEl.getBoundingClientRect();
+    return {
+      fontSize: Number.parseFloat(getComputedStyle(el).fontSize),
+      logoHeight: logoBox.height,
+    };
+  });
+  if (secondary.fontSize >= secondary.logoHeight) {
+    throw new Error(
+      `product name (${secondary.fontSize}px) is not subordinate to the CONFENGE mark (${secondary.logoHeight}px)`,
+    );
+  }
+  return info;
+}
+
 try {
   const response = await page.goto(baseUrl, { waitUntil: "networkidle" });
   const status = response?.status() ?? 0;
@@ -257,6 +332,11 @@ try {
     if (count < 1) throw new Error(`missing nav label ${label}`);
   }
   console.log(`nav_labels=${labels.length}`);
+
+  const brand = await assertBrand(page);
+  console.log(
+    `brand_logo=loaded src=${brand.src} natural=${brand.naturalWidth}x${brand.naturalHeight} rendered=${Math.round(brand.width)}x${Math.round(brand.height)}`,
+  );
 
   const dest = await page.locator("[data-destination]").getAttribute("data-destination");
   if (dest !== "hoje") throw new Error(`expected hoje, got ${dest}`);
@@ -323,6 +403,10 @@ try {
     if (overflow > 1) {
       throw new Error(`viewport ${vp.name} accidental horizontal overflow ${overflow}px`);
     }
+    const vpBrand = await assertBrand(page);
+    console.log(
+      `brand_logo viewport=${vp.name} rendered=${Math.round(vpBrand.width)}x${Math.round(vpBrand.height)}`,
+    );
     const metrics = await layoutMetrics(page);
     assertSingleScrollContext(metrics, `viewport ${vp.name}`);
     assertContentColumn(metrics, `viewport ${vp.name}`);
