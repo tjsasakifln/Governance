@@ -11,6 +11,10 @@ export default defineConfig({
     // prefix-matches `/taxonomy` and `/types` into `index.ts/taxonomy`.
     alias: [
       {
+        find: /^@confenge\/control-center-contracts\/ids$/,
+        replacement: path.resolve(here, "../../contracts/src/ids.ts"),
+      },
+      {
         find: /^@confenge\/control-center-contracts\/taxonomy$/,
         replacement: path.resolve(here, "../../contracts/src/taxonomy.ts"),
       },

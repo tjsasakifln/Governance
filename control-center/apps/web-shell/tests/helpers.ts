@@ -109,7 +109,24 @@ export function operationalRouter(): (url: string) => unknown {
       }
       return commercial;
     }
-    if (path.endsWith("/v1/domains/clients")) return { items: [client] };
+    // The real service answers {domain, snapshot}; `{items: [...]}` is a shape it
+    // never returns. Stubbing the convenient shape is what let the adapter's
+    // snapshot-envelope fallback ship unnoticed.
+    if (path.endsWith("/v1/domains/clients")) {
+      return {
+        domain: "clients",
+        snapshot: {
+          schema_version: "control-center.clients-snapshot.v1",
+          id: "cc:clients-snapshot:company-roll-up",
+          clients: [client],
+          client_count: 1,
+          at_risk_client_count: 0,
+          open_blocker_count: 0,
+          unidentified_record_count: 0,
+        },
+        generated_at: "2026-08-20T18:00:00Z",
+      };
+    }
     if (path.endsWith("/v1/domains/finance")) return finance;
     if (path.endsWith("/v1/domains/engineering")) return engineering;
     if (path.endsWith("/v1/domains/infrastructure")) return { items: [health] };

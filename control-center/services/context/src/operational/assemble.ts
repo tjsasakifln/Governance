@@ -218,7 +218,20 @@ function mapClients(payload: Record<string, unknown>, id: string): Record<string
     schema_version: "control-center.clients-snapshot.v1",
     id,
   };
-  for (const key of ["client_slug", "display_name", "lifecycle", "at_risk_client_count", "open_blocker_count", "clients"]) {
+  for (const key of [
+    "client_slug",
+    "display_name",
+    "lifecycle",
+    "at_risk_client_count",
+    "open_blocker_count",
+    "clients",
+    "client_count",
+    // The data-quality / join queue for records without an identity. It carries
+    // origin, reason and required action, and must reach the surface — dropping
+    // it here is what left the placeholder with no correction path.
+    "data_quality",
+    "unidentified_record_count",
+  ]) {
     if (payload[key] !== undefined) {
       out[key] = payload[key];
     }

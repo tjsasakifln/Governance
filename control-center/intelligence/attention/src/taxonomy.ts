@@ -20,7 +20,7 @@ export const CURRENCY_PATTERN = "^[A-Z]{3}$";
 export const CURRENCY_RE = new RegExp(CURRENCY_PATTERN);
 
 export const SCOPE_PATTERN =
-  "^(company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:[a-z0-9]+(?:-[a-z0-9]+)*|[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$";
+  "^(company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:(?!(?:anonimo|anonymous|client|cliente|default|desconhecido|na|n-a|nao-identificado|nao-informado|no-name|none|null|placeholder|sem-identidade|sem-nome|tbd|undefined|unidentified|unknown)(?:,|$))[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)$";
 
 export const SCOPE_RE = new RegExp(SCOPE_PATTERN);
 

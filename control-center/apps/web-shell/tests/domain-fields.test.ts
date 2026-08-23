@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createMemoryRuntime, mount } from "../src/app";
-import { createMockAdapter } from "../src/adapters/index";
+import { createHttpAdapter, createMockAdapter } from "../src/adapters/index";
 import { httpAdapterFor } from "./helpers";
 import { renderShell } from "../src/ui/render";
 import { presentAgentStatus } from "../src/adapters/map";
@@ -217,4 +217,156 @@ test("weighted pipeline without reliable probability is omitted", () => {
     },
   });
   assert.match(html, /omitido — sem base confiável para ponderar/);
+});
+
+/**
+ * Identity tests drive the real HttpControlCenterAdapter against the wire shape
+ * the context service actually returns ({domain, snapshot}). Injecting
+ * `view.data.clients` directly, as an earlier version of these tests did, skips
+ * the adapter — which is where the placeholder was being manufactured.
+ */
+function clientsAdapter(snapshot: Record<string, unknown>) {
+  const fetchImpl = (async (url: string) => {
+    const path = String(url);
+    if (path.includes("/v1/domains/clients")) {
+      return new Response(JSON.stringify({ domain: "clients", snapshot, generated_at: "2026-08-20T18:00:00Z" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({}), { status: 200, headers: { "content-type": "application/json" } });
+  }) as unknown as typeof fetch;
+  return createHttpAdapter("http://127.0.0.1:8787", fetchImpl, { kind: "human", id: "founder-local" });
+}
+
+async function clientesPage(snapshot: Record<string, unknown>) {
+  const result = await clientsAdapter(snapshot).readDestination("clientes");
+  if (!result.ok || result.loading) throw new Error("clientes did not load");
+  return result.page;
+}
+
+function renderClientes(page: Awaited<ReturnType<typeof clientesPage>>, resource?: string): string {
+  return renderShell({
+    destination: "clientes",
+    viewKind: "ready",
+    mockScenario: "http",
+    adapterMode: "http",
+    ...(resource ? { resource } : {}),
+    view: { kind: "ready", data: page },
+  });
+}
+
+const REAL_CLIENT = {
+  schema_version: "control-center.client-status.v1",
+  id: "cc:client-status:acct-77",
+  scope: "client:acct-77",
+  client_slug: "acct-77",
+  display_name: "Acme Indústria",
+  lifecycle: "active",
+  provenance: {
+    source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+    observed_at: "2026-08-20T18:00:00Z",
+    freshness_status: "FRESH",
+    confidence: 0.8,
+  },
+};
+
+const IDENTITY_QUEUE_ENTRY = {
+  id: "client-identity:deal-7",
+  source_id: "deal-7",
+  kind: "client_identity_missing",
+  why: "o negócio não está vinculado a nenhuma conta/empresa na origem",
+  reason_codes: ["missing_client_key"],
+  recommended_next_action: "Vincular o registro a uma conta/empresa na origem (client_id, account_id ou organization_id) e reprocessar.",
+  status: "open",
+  origin: { system: "warmbly", kind: "commercial-deal", locator: "deal-7" },
+  observed_at: "2026-08-20T18:00:00Z",
+};
+
+test("a clients snapshot with no clients yields no clients — the envelope is never mapped into one", async () => {
+  // Exactly the shape services/context ships today (representative.ts): a
+  // clients roll-up with counts and no `clients` array.
+  const page = await clientesPage({
+    schema_version: "control-center.clients-snapshot.v1",
+    id: "cc:clients-snapshot:company-roll-up",
+    at_risk_client_count: 1,
+    open_blocker_count: 1,
+  });
+  assert.deepEqual(page.clients, []);
+  const html = renderClientes(page);
+  assert.doesNotMatch(html, /client:unknown/);
+  assert.doesNotMatch(html, /class="card client"/);
+  assert.doesNotMatch(html, /<h2 id="clientes-title">Clientes<\/h2>/);
+});
+
+test("the rendered identity queue is the producer's, with its origin, reason code and correction", async () => {
+  const page = await clientesPage({
+    schema_version: "control-center.clients-snapshot.v1",
+    clients: [],
+    client_count: 0,
+    unidentified_record_count: 1,
+    data_quality: {
+      queue: "client_identity",
+      origin: "warmbly.commercial.pipeline",
+      unidentified_record_count: 1,
+      required_action: "acao geral",
+      counts_as_client: false,
+      raises_client_risk: false,
+      entries: [IDENTITY_QUEUE_ENTRY],
+    },
+  });
+  assert.equal(page.client_data_quality?.length, 1);
+  const html = renderClientes(page);
+  assert.match(html, /data-queue="client-identity"/);
+  assert.match(html, /data-operational-client="false"/);
+  assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
+  // Origin is the producer, not the reader's base URL.
+  assert.match(html, /warmbly · deal-7/);
+  assert.doesNotMatch(html, /control-center · http/);
+  assert.match(html, /não está vinculado a nenhuma conta\/empresa/);
+  assert.match(html, /missing_client_key/);
+  assert.match(html, /Vincular o registro a uma conta\/empresa/);
+});
+
+test("a published row that fails the identity rule is queued, never rendered as a client", async () => {
+  const page = await clientesPage({
+    schema_version: "control-center.clients-snapshot.v1",
+    clients: [
+      REAL_CLIENT,
+      {
+        schema_version: "control-center.client-status.v1",
+        id: "cc:client-status:unknown",
+        scope: "client:unknown",
+        client_slug: "unknown",
+        display_name: "Cliente",
+        lifecycle: "unknown",
+        provenance: REAL_CLIENT.provenance,
+      },
+    ],
+    client_count: 1,
+  });
+  assert.deepEqual(page.clients?.map((row) => row.client_slug), ["acct-77"]);
+  assert.equal(page.client_data_quality?.length, 1);
+  const html = renderClientes(page);
+  assert.match(html, /Acme Indústria/);
+  assert.match(html, /class="card client"/);
+  assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
+  assert.doesNotMatch(html, /client:unknown/);
+  // The queue names the row's own declared source, not the HTTP reader.
+  assert.match(html, /warmbly · commercial\/pipeline/);
+});
+
+test("drilling into one client does not show the whole identity queue", async () => {
+  const page = await clientesPage({
+    schema_version: "control-center.clients-snapshot.v1",
+    clients: [REAL_CLIENT],
+    client_count: 1,
+    unidentified_record_count: 1,
+    data_quality: { queue: "client_identity", unidentified_record_count: 1, entries: [IDENTITY_QUEUE_ENTRY] },
+  });
+  const all = renderClientes(page);
+  assert.match(all, /Qualidade de dados — identidade de cliente \(1\)/);
+  const drill = renderClientes(page, "acct-77");
+  assert.match(drill, /Acme Indústria/);
+  assert.doesNotMatch(drill, /Qualidade de dados — identidade de cliente/);
 });

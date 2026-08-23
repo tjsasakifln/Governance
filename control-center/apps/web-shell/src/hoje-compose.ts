@@ -1,3 +1,4 @@
+import { isOperationalClient } from "./client-identity";
 import { formatLocal } from "./datetime";
 import { combinedTone, freshnessTone, type FreshnessTone } from "./freshness-tone";
 import { selectHomepageAttention, selectHomepagePriorities } from "./homepage";
@@ -211,7 +212,9 @@ function clientNeedsAttention(client: ClientStatus): boolean {
 }
 
 function composeClients(input: HojeComposeInput): HojeSection {
-  const rows = input.clients.filter(clientNeedsAttention).map((client) =>
+  // A record without a usable identity is a data-quality exception, not a client
+  // that needs attention. It must not raise a client alert on Hoje.
+  const rows = input.clients.filter(isOperationalClient).filter(clientNeedsAttention).map((client) =>
     rowFrom(
       {
         id: client.id,
@@ -272,7 +275,10 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
         {
           id: `${snap.id}:at-risk`,
           title: "Clientes em risco no recorte comercial",
-          summary: `${snap.at_risk_client_count} cliente(s) at-risk`,
+          // Declared by the commercial source. It is not identity-resolved and
+          // is not the Clientes roll-up: saying so keeps it from reading as a
+          // count of identified clients at risk.
+          summary: `${snap.at_risk_client_count} cliente(s) at-risk declarados pelo comercial (identidade não resolvida; ver Clientes)`,
           kind: "at-risk",
         },
         snap.provenance,

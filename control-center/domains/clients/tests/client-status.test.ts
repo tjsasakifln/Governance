@@ -6,7 +6,10 @@ import {
   collectKeys,
   createClientOps,
   findSensitiveHits,
+  isReservedClientSlug,
   isUtcDateTime,
+  MIN_CLIENT_SLUG_LENGTH,
+  RESERVED_CLIENT_SLUGS,
   serializeClientStatus,
   toHomepageAttention,
   type ClientStatus,
@@ -288,5 +291,48 @@ describe("fixtures stay PII-free", () => {
     ]) {
       assert.equal(findSensitiveHits(payload).length, 0);
     }
+  });
+});
+
+describe("minimum client identity", () => {
+  function draft(overrides: Record<string, unknown>): Record<string, unknown> {
+    return {
+      client_slug: "norte-engenharia",
+      display_name: "Norte Engenharia",
+      source: "manual",
+      observed_at: "2026-08-20T14:00:00.000Z",
+      freshness_status: "fresh",
+      confidence: 1,
+      ...overrides,
+    };
+  }
+
+  test("accepts a real client identity", () => {
+    const ops = createClientOps({ now: FIXED_NOW });
+    assert.doesNotThrow(() => ops.ingest(draft({})));
+  });
+
+  test("refuses a placeholder slug — that record is a data-quality exception, not a client", () => {
+    for (const slug of RESERVED_CLIENT_SLUGS) {
+      const ops = createClientOps({ now: FIXED_NOW });
+      assert.throws(() => ops.ingest(draft({ client_slug: slug })), ClientOpsError, `slug ${slug}`);
+    }
+  });
+
+  test("refuses a one-character slug", () => {
+    const ops = createClientOps({ now: FIXED_NOW });
+    assert.throws(() => ops.ingest(draft({ client_slug: "a" })), ClientOpsError);
+  });
+
+  test("refuses a placeholder display_name", () => {
+    const ops = createClientOps({ now: FIXED_NOW });
+    assert.throws(() => ops.ingest(draft({ display_name: "Cliente" })), ClientOpsError);
+  });
+
+  test("names the reserved tokens it refuses", () => {
+    assert.equal(isReservedClientSlug("unknown"), true);
+    assert.equal(isReservedClientSlug("UNKNOWN"), true);
+    assert.equal(isReservedClientSlug("norte-engenharia"), false);
+    assert.equal(MIN_CLIENT_SLUG_LENGTH, 2);
   });
 });
