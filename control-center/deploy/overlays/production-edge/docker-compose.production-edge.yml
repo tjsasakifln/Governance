@@ -188,8 +188,21 @@ services:
     build:
       context: ../../..
       dockerfile: services/context/Dockerfile
-    image: confenge-control-center-context:local
+      # Stamp the release onto the image itself. A ":local" tag is reusable and
+      # says nothing about its contents, so "health 200" could never prove which
+      # code was running. The default stays "local" because compose interpolates
+      # this file on every command, and a required variable here would block an
+      # operator running `docker compose ps` or an emergency restart. The release
+      # is enforced instead by verify-release.sh, which refuses a container whose
+      # label does not match the deployed repository SHA.
+      labels:
+        org.opencontainers.image.revision: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.version: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.source: "https://github.com/tjsasakifln/Governance"
+        br.com.confenge.service: "context"
+    image: confenge-control-center-context:${CC_RELEASE_SHA:-local}
     environment:
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
       HOST: 0.0.0.0
       PORT: "8080"
       NODE_ENV: production
@@ -223,7 +236,19 @@ services:
     build:
       context: ../../..
       dockerfile: services/mcp/Dockerfile
-    image: confenge-control-center-mcp:local
+      # Stamp the release onto the image itself. A ":local" tag is reusable and
+      # says nothing about its contents, so "health 200" could never prove which
+      # code was running. The default stays "local" because compose interpolates
+      # this file on every command, and a required variable here would block an
+      # operator running `docker compose ps` or an emergency restart. The release
+      # is enforced instead by verify-release.sh, which refuses a container whose
+      # label does not match the deployed repository SHA.
+      labels:
+        org.opencontainers.image.revision: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.version: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.source: "https://github.com/tjsasakifln/Governance"
+        br.com.confenge.service: "mcp"
+    image: confenge-control-center-mcp:${CC_RELEASE_SHA:-local}
     environment:
       HOST: 0.0.0.0
       CONFENGE_MCP_HTTP_HOST: 0.0.0.0
@@ -249,7 +274,19 @@ services:
     build:
       context: ../../..
       dockerfile: connectors/runner/Dockerfile
-    image: confenge-control-center-collector:local
+      # Stamp the release onto the image itself. A ":local" tag is reusable and
+      # says nothing about its contents, so "health 200" could never prove which
+      # code was running. The default stays "local" because compose interpolates
+      # this file on every command, and a required variable here would block an
+      # operator running `docker compose ps` or an emergency restart. The release
+      # is enforced instead by verify-release.sh, which refuses a container whose
+      # label does not match the deployed repository SHA.
+      labels:
+        org.opencontainers.image.revision: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.version: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.source: "https://github.com/tjsasakifln/Governance"
+        br.com.confenge.service: "collector"
+    image: confenge-control-center-collector:${CC_RELEASE_SHA:-local}
     environment:
       HOST: 0.0.0.0
       PORT: "8080"
@@ -274,8 +311,21 @@ services:
     build:
       context: ../../..
       dockerfile: apps/web-shell/Dockerfile
-    image: confenge-control-center-web:local
+      # Stamp the release onto the image itself. A ":local" tag is reusable and
+      # says nothing about its contents, so "health 200" could never prove which
+      # code was running. The default stays "local" because compose interpolates
+      # this file on every command, and a required variable here would block an
+      # operator running `docker compose ps` or an emergency restart. The release
+      # is enforced instead by verify-release.sh, which refuses a container whose
+      # label does not match the deployed repository SHA.
+      labels:
+        org.opencontainers.image.revision: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.version: "${CC_RELEASE_SHA:-local}"
+        org.opencontainers.image.source: "https://github.com/tjsasakifln/Governance"
+        br.com.confenge.service: "web"
+    image: confenge-control-center-web:${CC_RELEASE_SHA:-local}
     environment:
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
       HOST: 0.0.0.0
       PORT: "8080"
       CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"
