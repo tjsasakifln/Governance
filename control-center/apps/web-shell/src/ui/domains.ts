@@ -13,6 +13,13 @@ import type {
   InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
+import {
+  leadDetailBlock,
+  leadDetailHash,
+  leadTitleOf,
+  queueFocusDomId,
+  queueFocusToken,
+} from "./lead-detail";
 import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 
@@ -243,19 +250,20 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
   const current = root.current && typeof root.current === "object"
     ? (root.current as Record<string, unknown>)
     : null;
-  const rows = Array.isArray(root.rows) ? root.rows : [];
+  const telemetryObserved = root.availability === "OBSERVED";
+  const rows = telemetryObserved && Array.isArray(root.rows) ? root.rows : [];
   if (!current) {
     return `<article class="card" data-controlled-email="unknown">
-      <h3>Primeiro cohort real</h3>
+      <h3>Cohort controlado de e-mail</h3>
       <p class="constraint">Nenhum grant bounded foi observado. Ausência não é autorização.</p>
       ${fact("Telemetria", escapeHtml(String(root.availability ?? "UNKNOWN")))}
-      ${fact("Última atualização", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
     </article>`;
   }
   const dispatch = current.dispatch && typeof current.dispatch === "object"
     ? (current.dispatch as Record<string, unknown>)
     : {};
-  const outcomes = current.outcomes && typeof current.outcomes === "object"
+  const outcomes = telemetryObserved && current.outcomes && typeof current.outcomes === "object"
     ? (current.outcomes as Record<string, unknown>)
     : {};
   const distribution = current.route_class_distribution && typeof current.route_class_distribution === "object"
@@ -268,6 +276,21 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
   const window = dispatch.window_start && dispatch.window_end
     ? `${String(dispatch.window_start)}–${String(dispatch.window_end)} ${String(dispatch.timezone ?? "")}`.trim()
     : "UNKNOWN";
+  const integrityLabels: Record<string, string> = {
+    grant_revoked: "grant observado como revogado",
+    grant_expired: "grant expirado no instante desta coleta",
+    authorized_quantity_exceeded: "enviados + reservados excedem a quantidade autorizada",
+    daily_cap_unexpected: "cap diário diverge do limite esperado de 10",
+  };
+  const integrityFlags = Array.isArray(current.integrity_flags)
+    ? current.integrity_flags.filter((flag): flag is string => typeof flag === "string")
+    : [];
+  const integrityWarning = integrityFlags.length > 0
+    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? flag).join("; "))}.</p>`
+    : "";
+  const telemetryWarning = telemetryObserved
+    ? ""
+    : `<p class="banner" data-controlled-email-telemetry="unproven">O grant foi observado, mas o relatório não comprovou telemetria real com include_synthetic=false. Outcomes permanecem UNKNOWN.</p>`;
   const outcomeRows = rows
     .filter((item) => item && typeof item === "object")
     .map((item) => item as Record<string, unknown>)
@@ -287,13 +310,16 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
       </dl>
     </article>`)
     .join("");
-  return `<section class="stack" aria-labelledby="controlled-email-title" data-controlled-email="observed">
-    <h2 id="controlled-email-title">Primeiro cohort real de e-mail</h2>
+  return `<section class="stack" aria-labelledby="controlled-email-title" data-controlled-email="${telemetryObserved ? "observed" : "unknown"}">
+    <h2 id="controlled-email-title">${telemetryObserved ? "Primeiro cohort real de e-mail" : "Cohort controlado — telemetria real não comprovada"}</h2>
+    ${telemetryWarning}
+    ${integrityWarning}
     <article class="card">
       <h3>${escapeHtml(String(current.cohort_id ?? "UNKNOWN"))}</h3>
       <dl class="facts">
         ${fact("Cohort hash", escapeHtml(String(current.cohort_hash ?? "UNKNOWN")))}
         ${fact("Policy version", escapeHtml(String(current.policy_version ?? "UNKNOWN")))}
+        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "UNKNOWN")))}
         ${fact("Quantidade autorizada", observedCount(current.authorized_quantity))}
         ${fact("Enviados", observedCount(current.sent))}
         ${fact("Reservados", observedCount(current.reserved))}
@@ -304,11 +330,13 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
         ${fact("Positive replies", observedCount(outcomes.positive_reply))}
         ${fact("Opt-outs", observedCount(outcomes.opt_out))}
         ${fact("Estado da autorização", escapeHtml(String(current.authorization_state ?? "UNKNOWN")))}
+        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "UNKNOWN")))}
+        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "UNKNOWN")))}
         ${fact("GO review", escapeHtml(String(current.go_review_verdict ?? "UNKNOWN")))}
         ${fact("Estado do dispatch", escapeHtml(String(dispatch.state ?? "UNKNOWN")))}
         ${fact("Cap diário", observedCount(current.max_daily_volume))}
         ${fact("Janela", escapeHtml(window))}
-        ${fact("Última atualização", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
+        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "UNKNOWN")))}
         ${routeFacts}
       </dl>
       <p class="constraint">SMTP accepted não é delivery. Métricas sem evento reconciliado permanecem UNKNOWN.</p>
@@ -337,6 +365,8 @@ export function commercialSubnav(surface: string | null): string {
 export function commercialBlock(
   snapshot: CommercialSnapshot,
   surface: string | null = "visao",
+  resource: string | null = null,
+  query: string | null = null,
   hash = "#/comercial",
 ): string {
   const funnel = snapshot.funnel;
@@ -387,7 +417,7 @@ export function commercialBlock(
   return `
     ${commercialSubnav(current)}
     ${current === "visao" ? recorte : ""}
-    ${commercialOps(snapshot, current, hash)}
+    ${commercialOps(snapshot, current, resource, query, hash)}
   `;
 }
 
@@ -401,14 +431,27 @@ function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
   );
 }
 
-function activityOpsCard(row: Record<string, unknown>): string {
-  return `<article class="card" data-activity-id="${escapeHtml(String(row.source_id ?? ""))}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
+function activityOpsCard(
+  row: Record<string, unknown>,
+  query: string | null,
+  position: { index: number; total: number },
+): string {
+  const rowId = String(row.source_id ?? row.id ?? "");
+  const title = escapeHtml(leadTitleOf(row) ?? "Organização não identificada pela origem");
+  const heading = rowId
+    ? `<a href="${escapeHtml(leadDetailHash("atividade", query, rowId, position))}" data-lead-detail-link="${escapeHtml(rowId)}">${title}</a>`
+    : title;
+  const focusToken = queueFocusToken(rowId, position);
+  const focusAttributes = rowId
+    ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
+    : "";
+  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
     <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>
-    <h3>${escapeHtml(String(row.lead_or_account ?? row.source_id ?? "item"))}</h3>
+    <h3>${heading}</h3>
     <p>${escapeHtml(String(row.evidence ?? row.state ?? ""))}</p>
     <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
-      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? ""))}" />
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
       <label>Nota <textarea name="note" required minlength="2"></textarea></label>
       <button type="submit">Validar atividade</button>
     </form>
@@ -429,7 +472,13 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
   </article>`;
 }
 
-function commercialOps(snapshot: CommercialSnapshot, surface: string | null, hash: string): string {
+function commercialOps(
+  snapshot: CommercialSnapshot,
+  surface: string | null,
+  resource: string | null = null,
+  query: string | null = null,
+  hash = "#/comercial",
+): string {
   const ops = operationsOf(snapshot);
   const listViews = ops.list_views && typeof ops.list_views === "object"
     ? (ops.list_views as Record<string, unknown>)
@@ -481,6 +530,10 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
         <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
       </article>
       `;
+  } else if (current === "atividade" && resource) {
+    // Detail sub-surface (#66). Owns its own back link, so the queue below is
+    // replaced wholesale rather than rendered underneath it.
+    body = leadDetailBlock({ snapshot, resource, query, surface: current });
   } else if (current === "atividade") {
     body = renderFilteredList({
       spec: ACTIVITY_LIST,
@@ -491,7 +544,7 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
       heading: "Atividade recente",
       noun: "atividade(s) observada(s)",
       emptyData: "Sem atividade observada neste recorte. Ausência não é zero.",
-      card: activityOpsCard,
+      card: (row, position) => activityOpsCard(row, query, position),
       remote: listViews.atividade,
       declaredTotal: typeof overview.activity === "number" ? overview.activity : activity.length,
       complete: typeof overview.activity === "number" ? overview.activity === activity.length : true,

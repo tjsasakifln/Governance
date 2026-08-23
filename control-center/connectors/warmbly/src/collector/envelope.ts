@@ -36,6 +36,7 @@ const EXECUTIVE_KEYS = [
   "generated_at",
 ] as const;
 const REPORT_KEYS = ["schema_version", "month", "controlled_email", "real_empty"] as const;
+const REAL_REPORT_SCHEMA = "confenge.observability_report.v1";
 const ORGANIC_KEYS = ["schema_version", "windows", "sources", "recommendation", "generated_at"] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -75,6 +76,34 @@ function validForSurface(value: unknown, surface: IntelSurface): boolean {
     case "intel_organic_scoreboard":
       return looksLikeOrganic(value);
   }
+}
+
+export function realIntelReportDriftReason(value: unknown): string | null {
+  if (!isPlainObject(value)) return "intel_report payload is not an object";
+  if (value.schema_version !== REAL_REPORT_SCHEMA) {
+    return `intel_report schema_version is not ${REAL_REPORT_SCHEMA}`;
+  }
+  if (value.include_synthetic !== false) {
+    return "intel_report does not prove include_synthetic=false";
+  }
+  if (typeof value.real_empty !== "boolean") {
+    return "intel_report real_empty is not boolean";
+  }
+  if (!Array.isArray(value.controlled_email)) {
+    return "intel_report controlled_email is not an array";
+  }
+  if (value.controlled_email.some((row) => !isPlainObject(row))) {
+    return "intel_report controlled_email contains a non-object row";
+  }
+  if (value.real_empty && value.controlled_email.length > 0) {
+    return "intel_report declares real_empty with controlled_email rows";
+  }
+  return null;
+}
+
+function validateRealReport(value: unknown): EnvelopeDrift | null {
+  const reason = realIntelReportDriftReason(value);
+  return reason ? drift(reason) : null;
 }
 
 function looksLikeOrganic(value: unknown): value is Record<string, unknown> {
@@ -120,10 +149,18 @@ export function normalizeIntelEnvelope(json: unknown, surface: IntelSurface): En
     if (!innerValid) {
       return drift(`unwrapped data is not a ${surface} payload`);
     }
+    if (surface === "intel_report") {
+      const reportDrift = validateRealReport(inner);
+      if (reportDrift) return reportDrift;
+    }
     return { ok: true, value: inner };
   }
 
   if (rawLooksValid) {
+    if (surface === "intel_report") {
+      const reportDrift = validateRealReport(json);
+      if (reportDrift) return reportDrift;
+    }
     return { ok: true, value: json };
   }
 

@@ -29,7 +29,10 @@ export interface ListChromeInput {
   /** Shown when the read model observed nothing at all. */
   readonly emptyData: string;
   readonly intro?: string;
-  readonly card: (row: Record<string, unknown>) => string;
+  readonly card: (
+    row: Record<string, unknown>,
+    position: { index: number; total: number },
+  ) => string;
   /** Server-filtered bounded page. Omitted by the mock adapter. */
   readonly remote?: unknown;
   /** Coverage metadata used when talking to an older server without list pages. */
@@ -193,11 +196,13 @@ export function renderFilteredList(input: ListChromeInput): string {
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(heading)}</h2>
       ${input.intro ?? ""}
       ${filters}
-      <p class="count" role="status" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
+      <p class="count" role="status" tabindex="-1" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
       ${coverageWarning}
       ${unavailableNote}
       ${reference}
-      <div class="stack">${view.items.map((row) => input.card(row)).join("")}</div>
+      <div class="stack">${view.items
+        .map((row, index) => input.card(row, { index: view.rangeStart + index, total: view.matched }))
+        .join("")}</div>
       ${emptyState}
       ${pagination(view, hash, heading, spec.id)}
     </section>`;

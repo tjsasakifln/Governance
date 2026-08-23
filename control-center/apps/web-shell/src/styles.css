@@ -704,6 +704,81 @@ h2 {
   }
 }
 
+/* Lead/opportunity detail (#66). Opaque identifiers live in a collapsed,
+   copyable block; the two action groups are visually separated so that a
+   local audit record can never be mistaken for a Warmbly write. */
+.lead-detail {
+  gap: 1rem;
+}
+
+.lead-back a {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+  font-weight: 600;
+}
+
+.lead-detail code,
+.lead-technical code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.lead-technical {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+}
+
+.lead-technical summary {
+  cursor: pointer;
+  min-height: 44px;
+  line-height: 44px;
+  font-weight: 600;
+}
+
+.copy-form textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.lead-actions[data-action-scope="warmbly-write"] {
+  border-left: 4px solid #f97316;
+  padding-left: 0.8rem;
+}
+
+.lead-actions[data-action-scope="control-center-only"] {
+  border-left: 4px solid #64748b;
+  padding-left: 0.8rem;
+}
+
+.lead-action {
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  padding-top: 0.6rem;
+}
+
+.lead-action .confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+
+.pill[data-risk="alto"] {
+  background: rgba(249, 115, 22, 0.18);
+}
+
+.pill[data-risk="medio"] {
+  background: rgba(234, 179, 8, 0.18);
+}
+
+.card[data-queue-focus]:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 /* Long operational lists: search, filters, sorting, count and pagination.
    Every control wraps and every field is width-capped so the filter bar cannot
    push the document sideways at 390px — the launch probe fails the build on more

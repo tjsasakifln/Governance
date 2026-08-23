@@ -76,73 +76,222 @@ test("Warmbly counts project to commercial snapshot with labeled acquisition coh
   assert.ok(clients);
 });
 
-test("controlled-email cohort preserves observed zero and UNKNOWN independently", () => {
+test("real Warmbly mapping selects controlled-email telemetry by cohort and policy", () => {
+  const normalized = collectFromWarmblyPayload({
+    counts: { deals_open: 0, inbound_now: 0 },
+    confenge_status: {
+      readiness: {
+        latest_bounded_cohort: {
+          authorization_id: "auth-10",
+          cohort_id: "cohort-real-10",
+          cohort_hash: "sha256:cohort",
+          policy_version: "controlled-email.v2",
+          allowed_route_classes: ["DIRECT_PERSON"],
+          route_class_distribution: { DIRECT_PERSON: 1 },
+          authorized_quantity: 10,
+          sent: 0,
+          reserved: 0,
+          max_daily_volume: 10,
+          state: "active",
+          authorized_at: "2026-08-21T10:00:00.000Z",
+          expires_at: "2026-08-22T10:00:00.000Z",
+        },
+      },
+    },
+    confenge_intel_report: {
+      schema_version: "confenge.observability_report.v1",
+      month: "2026-08",
+      include_synthetic: false,
+      real_empty: false,
+      controlled_email: [
+        {
+          cohort_id: "cohort-real-10",
+          policy_version: "controlled-email.v1",
+          route_class: "DIRECT_PERSON",
+          provider: "smtp",
+          attempted: 9,
+          provider_accepted: 9,
+          delivered: 9,
+          hard_bounce: 0,
+        },
+        {
+          cohort_id: "cohort-real-10",
+          policy_version: "controlled-email.v2",
+          route_class: "DIRECT_PERSON",
+          provider: "smtp",
+          attempted: 1,
+          provider_accepted: 1,
+          delivered: null,
+          hard_bounce: 0,
+        },
+      ],
+    },
+  }, { now: new Date(now) });
+  assert.equal("confenge_status" in normalized, false, "the mapper must not need a test-only top-level injection");
   const projected = projectCollector({
     collector: "warmbly",
     freshness_status: "FRESH",
     observed_at: now,
     source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
     confidence: 0.9,
-    payload: {
-      counts: { deals_open: 0, inbound_now: 0 },
-      confenge_status: {
-        readiness: {
-          latest_bounded_cohort: {
-            authorization_id: "auth-10",
-            cohort_id: "cohort-real-10",
-            cohort_hash: "sha256:cohort",
-            policy_version: "controlled-email.v1",
-            allowed_route_classes: ["DIRECT_PERSON", "GENERIC_COMPANY"],
-            route_class_distribution: { DIRECT_PERSON: 1, GENERIC_COMPANY: 1 },
-            authorized_quantity: 10,
-            sent: 0,
-            reserved: 0,
-            max_daily_volume: 10,
-            state: "active",
-          },
-        },
-      },
-      confenge_intel_report: {
-        schema_version: "confenge.observability_report.v1",
-        controlled_email: [
-          {
-            cohort_id: "cohort-real-10",
-            policy_version: "controlled-email.v1",
-            route_class: "DIRECT_PERSON",
-            provider: "smtp",
-            attempted: 1,
-            provider_accepted: 1,
-            delivered: null,
-            hard_bounce: 0,
-          },
-          {
-            cohort_id: "cohort-real-10",
-            policy_version: "controlled-email.v1",
-            route_class: "GENERIC_COMPANY",
-            provider: "smtp",
-            attempted: 1,
-            provider_accepted: 1,
-            delivered: null,
-            hard_bounce: null,
-          },
-        ],
-      },
-    },
+    payload: normalized,
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
   const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { sent: number; max_daily_volume: number; outcomes: Record<string, number | null> };
+    report_month: string | null;
+    rows: Array<{ cohort_id: string; policy_version: string; provider_accepted: number }>;
   };
   assert.equal(controlled.current.sent, 0, "an observed reservation-ledger zero must survive");
   assert.equal(controlled.current.max_daily_volume, 10);
-  assert.equal(controlled.current.outcomes.provider_accepted, 2);
+  assert.equal(controlled.current.outcomes.provider_accepted, 1);
   assert.equal(controlled.current.outcomes.delivered, null, "SMTP accepted must not become delivery");
-  assert.equal(
-    controlled.current.outcomes.hard_bounce,
-    null,
-    "one unreconciled route prevents a fabricated aggregate zero",
+  assert.equal(controlled.current.outcomes.hard_bounce, 0, "an observed zero must survive");
+  assert.equal(controlled.report_month, "2026-08");
+  assert.deepEqual(
+    controlled.rows.map((row) => [row.cohort_id, row.policy_version, row.provider_accepted]),
+    [["cohort-real-10", "controlled-email.v2", 1]],
+    "telemetry from another policy revision must not reach the current cohort view",
   );
+});
+
+test("controlled-email aggregation fails closed without a proven policy version", () => {
+  const normalized = collectFromWarmblyPayload({
+    confenge_status: {
+      readiness: {
+        latest_bounded_cohort: {
+          cohort_id: "cohort-ambiguous",
+          sent: 0,
+        },
+      },
+    },
+    confenge_intel_report: {
+      schema_version: "confenge.observability_report.v1",
+      include_synthetic: false,
+      real_empty: false,
+      controlled_email: [
+        {
+          cohort_id: "cohort-ambiguous",
+          policy_version: "controlled-email.v1",
+          route_class: "DIRECT_PERSON",
+          provider_accepted: 9,
+        },
+        {
+          cohort_id: "cohort-ambiguous",
+          policy_version: "controlled-email.v2",
+          route_class: "DIRECT_PERSON",
+          provider_accepted: 1,
+        },
+      ],
+    },
+  }, { now: new Date(now) });
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: normalized,
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    current: { policy_version: string | null; outcomes: Record<string, number | null> };
+    rows: unknown[];
+  };
+  assert.equal(controlled.current.policy_version, null);
+  assert.equal(controlled.current.outcomes.provider_accepted, null);
+  assert.deepEqual(controlled.rows, []);
+});
+
+test("synthetic or unproven reports never publish real controlled-email outcomes", () => {
+  for (const includeSynthetic of [true, undefined]) {
+    const normalized = collectFromWarmblyPayload({
+      confenge_status: {
+        readiness: {
+          latest_bounded_cohort: {
+            cohort_id: "cohort-real-10",
+            policy_version: "controlled-email.v2",
+            sent: 0,
+          },
+        },
+      },
+      confenge_intel_report: {
+        schema_version: "confenge.observability_report.v1",
+        include_synthetic: includeSynthetic,
+        real_empty: false,
+        controlled_email: [{
+          cohort_id: "cohort-real-10",
+          policy_version: "controlled-email.v2",
+          route_class: "DIRECT_PERSON",
+          provider_accepted: 99,
+        }],
+      },
+    }, { now: new Date(now) });
+    const projected = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.9,
+      payload: normalized,
+    });
+    const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+    assert.ok(commercial);
+    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+      availability: string;
+      current: { outcomes: Record<string, number | null> };
+      rows: unknown[];
+    };
+    assert.equal(controlled.availability, "UNKNOWN");
+    assert.equal(controlled.current.outcomes.provider_accepted, null);
+    assert.deepEqual(controlled.rows, []);
+  }
+});
+
+test("controlled-email grant integrity flags expose unsafe observed states without inventing recovery", () => {
+  const normalized = collectFromWarmblyPayload({
+    confenge_status: {
+      readiness: {
+        latest_bounded_cohort: {
+          cohort_id: "cohort-integrity",
+          policy_version: "controlled-email.v1",
+          authorized_quantity: 10,
+          sent: 8,
+          reserved: 3,
+          max_daily_volume: 11,
+          state: "revoked",
+          expires_at: "2026-08-20T00:00:00.000Z",
+        },
+      },
+    },
+    confenge_intel_report: {
+      schema_version: "confenge.observability_report.v1",
+      include_synthetic: false,
+      real_empty: true,
+      controlled_email: [],
+    },
+  }, { now: new Date(now) });
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: normalized,
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    current: { integrity_flags: string[] };
+  };
+  assert.deepEqual(controlled.current.integrity_flags, [
+    "grant_revoked",
+    "grant_expired",
+    "authorized_quantity_exceeded",
+    "daily_cap_unexpected",
+  ]);
 });
 
 test("finance projector keeps paid distinct from effectively_received", () => {

@@ -45,6 +45,8 @@ export interface ShellModel {
   adapterMode?: "mock" | "http";
   surface?: string | null;
   resource?: string | null;
+  /** Raw query string of the current hash. Carries queue filters/position. */
+  query?: string | null;
   operatorResult?: AdapterWriteResult;
   /** Full current location. List chrome reflects search/filters/sort/page in it. */
   hash?: string;
@@ -136,6 +138,7 @@ function pageBody(
   destination: DestinationId,
   surface?: string | null,
   resource?: string | null,
+  query?: string | null,
   hash = `#/${destination}`,
   operatorResult?: AdapterWriteResult,
 ): string {
@@ -181,7 +184,13 @@ function pageBody(
   const extras = [
     destination === "crescimento" ? growthFunnelBlock(page.commercial) : "",
     page.commercial
-      ? commercialBlock(page.commercial, destination === "comercial" ? surface ?? "visao" : "visao", hash)
+      ? commercialBlock(
+          page.commercial,
+          destination === "comercial" ? surface ?? "visao" : "visao",
+          destination === "comercial" ? resource ?? null : null,
+          query ?? null,
+          hash,
+        )
       : "",
     page.finance ? financeBlock(page.finance) : "",
     page.engineering ? engineeringBlock(page.engineering) : "",
@@ -254,6 +263,7 @@ export function renderShell(model: ShellModel): string {
           model.destination,
           model.surface,
           model.resource,
+          model.query,
           model.hash ?? `#/${model.destination}`,
           model.operatorResult,
         )

@@ -1,4 +1,5 @@
 import { resolveClientIdentity } from "@confenge/control-center-contracts";
+import { realIntelReportDriftReason } from "../../../warmbly/src/collector/envelope.ts";
 import { WARMBLY_FULL_OPERATIONS } from "../../../warmbly/src/mapper/normalize.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
@@ -175,6 +176,7 @@ const CONTROLLED_EMAIL_METRICS = [
   "opt_out",
   "spam_complaint",
 ] as const;
+const EXPECTED_FIRST_REAL_COHORT_CAP = 10;
 
 function controlledCount(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
@@ -187,7 +189,8 @@ function controlledEmailOperation(
   observedAt: string,
 ): Record<string, unknown> {
   const report = asRecord(reportValue);
-  const rows = asArray(report?.controlled_email)
+  const reportTrusted = report !== null && realIntelReportDriftReason(report) === null;
+  const rows = asArray(reportTrusted ? report.controlled_email : null)
     .map((value) => asRecord(value))
     .filter((value): value is Record<string, unknown> => value !== null)
     .map((row) => {
@@ -204,8 +207,16 @@ function controlledEmailOperation(
     });
   const readiness = asRecord(status.readiness) ?? {};
   const grant = asRecord(readiness.latest_bounded_cohort);
-  const cohortID = typeof grant?.cohort_id === "string" ? grant.cohort_id : null;
-  const cohortRows = cohortID === null ? rows : rows.filter((row) => row.cohort_id === cohortID);
+  const cohortID = grant ? firstText(grant, ["cohort_id"]) : null;
+  const policyVersion = grant ? firstText(grant, ["policy_version"]) : null;
+  // A cohort id is not globally unique across policy revisions. Aggregate and
+  // expose telemetry only when the grant proves both dimensions; otherwise a
+  // stale/foreign policy could be presented as the currently authorized run.
+  const cohortRows = cohortID && policyVersion
+    ? rows.filter(
+        (row) => row.cohort_id === cohortID && row.policy_version === policyVersion,
+      )
+    : [];
   const totals: Record<string, number | null> = {};
   for (const metric of CONTROLLED_EMAIL_METRICS) {
     const values = cohortRows.map((row) => row[metric]);
@@ -214,26 +225,52 @@ function controlledEmailOperation(
         ? (values as number[]).reduce((sum, value) => sum + value, 0)
         : null;
   }
+  const authorizedQuantity = controlledCount(grant?.authorized_quantity);
+  const sent = controlledCount(grant?.sent);
+  const reserved = controlledCount(grant?.reserved);
+  const maxDailyVolume = controlledCount(grant?.max_daily_volume);
+  const authorizationState = typeof grant?.state === "string" ? grant.state : "UNKNOWN";
+  const expiresAt = typeof grant?.expires_at === "string" ? grant.expires_at : null;
+  const observedMs = Date.parse(observedAt);
+  const expiresMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const integrityFlags: string[] = [];
+  if (authorizationState.toLowerCase() === "revoked") integrityFlags.push("grant_revoked");
+  if (!Number.isNaN(expiresMs) && !Number.isNaN(observedMs) && expiresMs <= observedMs) {
+    integrityFlags.push("grant_expired");
+  }
+  if (
+    authorizedQuantity !== null &&
+    sent !== null &&
+    reserved !== null &&
+    sent + reserved > authorizedQuantity
+  ) {
+    integrityFlags.push("authorized_quantity_exceeded");
+  }
+  if (maxDailyVolume !== null && maxDailyVolume !== EXPECTED_FIRST_REAL_COHORT_CAP) {
+    integrityFlags.push("daily_cap_unexpected");
+  }
   return {
-    availability: report ? "OBSERVED" : "UNKNOWN",
+    availability: reportTrusted ? "OBSERVED" : "UNKNOWN",
+    report_month: reportTrusted && typeof report.month === "string" ? report.month : null,
     last_update_at: observedAt,
     current: grant
       ? {
           authorization_id: typeof grant.authorization_id === "string" ? grant.authorization_id : null,
           cohort_id: cohortID,
           cohort_hash: typeof grant.cohort_hash === "string" ? grant.cohort_hash : null,
-          policy_version: typeof grant.policy_version === "string" ? grant.policy_version : null,
+          policy_version: policyVersion,
           allowed_route_classes: asArray(grant.allowed_route_classes).filter(
             (value): value is string => typeof value === "string",
           ),
           route_class_distribution: asRecord(grant.route_class_distribution),
-          authorized_quantity: controlledCount(grant.authorized_quantity),
-          sent: controlledCount(grant.sent),
-          reserved: controlledCount(grant.reserved),
-          max_daily_volume: controlledCount(grant.max_daily_volume),
+          authorized_quantity: authorizedQuantity,
+          sent,
+          reserved,
+          max_daily_volume: maxDailyVolume,
           authorized_at: typeof grant.authorized_at === "string" ? grant.authorized_at : null,
-          expires_at: typeof grant.expires_at === "string" ? grant.expires_at : null,
-          authorization_state: typeof grant.state === "string" ? grant.state : "UNKNOWN",
+          expires_at: expiresAt,
+          authorization_state: authorizationState,
+          integrity_flags: integrityFlags,
           go_review_verdict:
             typeof grant.go_review_verdict === "string" ? grant.go_review_verdict : "UNKNOWN",
           go_review_at: typeof grant.go_review_at === "string" ? grant.go_review_at : null,
@@ -241,7 +278,7 @@ function controlledEmailOperation(
           outcomes: totals,
         }
       : null,
-    rows,
+    rows: cohortRows,
   };
 }
 
@@ -340,11 +377,28 @@ function operationsFromWarmbly(
       }),
   );
 
-  const allActivity = [...deals, ...tasks, ...inbound, ...attention]
+  const inboundRecords = inbound
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionRecords = attention
+    .map((item) => asRecord(item))
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const attentionSet = new Set(attentionRecords);
+  const allActivity = [...deals, ...tasks, ...inboundRecords, ...attentionRecords]
       .map((item) => asRecord(item))
       .filter((row): row is Record<string, unknown> => row !== null)
       .map((row) => {
         const at = isoOr(row.updated_at ?? row.observed_at ?? row.created_at ?? row.detected_at, observedAt);
+        const entityRef = attentionSet.has(row) ? asRecord(row.entity_ref) : null;
+        const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+        const kind = typeof row.kind === "string" ? row.kind : "";
+        const inboundLeadId =
+          attentionSet.has(row) &&
+          /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+          ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+          typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+            ? entityRef.id.trim()
+            : null;
         return {
           at,
           lead_or_account: displayName(row),
@@ -362,6 +416,9 @@ function operationsFromWarmbly(
           source: sourceSystem,
           owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
           priority: firstText(row, ["priority", "severity"]),
+          ...(inboundLeadId
+            ? { operator_target_kind: "inbound_lead", operator_target_id: inboundLeadId }
+            : {}),
         };
       })
       .sort((a, b) => b.at.localeCompare(a.at));
@@ -375,7 +432,13 @@ function operationsFromWarmbly(
   const exceptionsTotal = Math.max(intelExceptionsTotal, mergedExceptions.length);
   const exceptions = capList(mergedExceptions);
 
-  const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
+  // The production mapper owns this block under `operations`; older direct
+  // projector callers used the top-level field, so retain it only as fallback.
+  const status =
+    asRecord(nested.confenge_status) ??
+    asRecord(payload.confenge_status) ??
+    asRecord(asRecord(payload.health)?.confenge_status) ??
+    {};
   const autoSend =
     status.auto_send_enabled === true
       ? { enabled: true, source: "warmbly.confenge.status", note: "observed enabled; Control Center must not enable sending" }
@@ -486,6 +549,23 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
     if (seen.has(id)) return;
     seen.add(id);
     const slug = id.replace(/[^A-Za-z0-9._~-]+/g, "-");
+    const kind =
+      typeof row.kind === "string"
+        ? row.kind
+        : typeof row.code === "string"
+          ? row.code
+          : source === "warmbly.intel.exceptions"
+            ? "intel_exception"
+            : "exception_state";
+    const entityRef = asRecord(row.entity_ref);
+    const entityType = typeof entityRef?.type === "string" ? entityRef.type.toLowerCase() : "";
+    const explicitLeadId =
+      source === "warmbly.attention" &&
+      /(?:^|[_-])inbound(?:$|[_-])/i.test(kind) &&
+      ["lead", "lead_id", "inbound_lead"].includes(entityType) &&
+      typeof entityRef?.id === "string" && entityRef.id.trim() !== ""
+        ? entityRef.id.trim()
+        : null;
     out.push({
       id,
       canonical_id: `cc:attention-item:${slug}`,
@@ -500,14 +580,7 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
               : typeof row.code === "string"
                 ? row.code
                 : "exception",
-      kind:
-        typeof row.kind === "string"
-          ? row.kind
-          : typeof row.code === "string"
-            ? row.code
-            : source === "warmbly.intel.exceptions"
-              ? "intel_exception"
-              : "exception_state",
+      kind,
       recommended_next_action:
         typeof row.recommended_next_action === "string"
           ? row.recommended_next_action
@@ -521,6 +594,7 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
       owner: firstText(row, ["owner", "owner_name", "assignee", "assigned_to", "responsible", "responsavel"]),
       priority: firstText(row, ["priority", "severity"]),
       observed_at: isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt),
+      ...(explicitLeadId ? { lead_id: explicitLeadId } : {}),
       evidence: stripIdentity(row),
     });
   };
@@ -829,7 +903,19 @@ export const COMMERCIAL_LIST_PAGE_SIZE = 50;
 function compactListRow(row: Record<string, unknown>, list: "activity" | "exceptions"): Record<string, unknown> {
   const keys =
     list === "activity"
-      ? ["at", "lead_or_account", "source_id", "event", "state", "evidence", "source", "owner", "priority"]
+      ? [
+          "at",
+          "lead_or_account",
+          "source_id",
+          "event",
+          "state",
+          "evidence",
+          "source",
+          "owner",
+          "priority",
+          "operator_target_kind",
+          "operator_target_id",
+        ]
       : [
           "id",
           "canonical_id",
@@ -842,6 +928,7 @@ function compactListRow(row: Record<string, unknown>, list: "activity" | "except
           "observed_at",
           "owner",
           "priority",
+          "lead_id",
         ];
   const out: Record<string, unknown> = {};
   for (const key of keys) {

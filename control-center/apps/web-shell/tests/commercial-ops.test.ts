@@ -66,6 +66,7 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
     cohorts: { acquisition: [] },
     controlled_outbound: {
       availability: "OBSERVED",
+      report_month: "2026-08",
       last_update_at: "2026-08-22T18:00:00.000Z",
       current: {
         cohort_id: "cohort-real-10",
@@ -76,6 +77,9 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
         reserved: 0,
         max_daily_volume: 10,
         authorization_state: "active",
+        authorized_at: "2026-08-22T10:00:00.000Z",
+        expires_at: "2026-08-23T10:00:00.000Z",
+        integrity_flags: [],
         route_class_distribution: { DIRECT_PERSON: 1 },
         dispatch: { state: "blocked_outside_window" },
         outcomes: {
@@ -100,5 +104,45 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
   assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>0<\/dd>/);
   assert.match(root.innerHTML, /Hard bounce<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
   assert.match(root.innerHTML, /SMTP accepted não é delivery/);
+  assert.match(root.innerHTML, /Mês do relatório<\/dt><dd>2026-08<\/dd>/);
+  assert.match(root.innerHTML, /Autorizado em<\/dt><dd>2026-08-22T10:00:00.000Z<\/dd>/);
+  assert.match(root.innerHTML, /Expira em<\/dt><dd>2026-08-23T10:00:00.000Z<\/dd>/);
+  assert.match(root.innerHTML, /Instante de coleta\/observação/);
   assert.doesNotMatch(root.innerHTML, /Hard bounce<\/dt><dd>0<\/dd>/);
+});
+
+test("cohort view does not present unproven telemetry as real outcomes", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.equal(initial.ok, true);
+  if (!initial.ok || !initial.page || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: { acquisition: [] },
+    controlled_email: {
+      availability: "UNKNOWN",
+      last_update_at: "2026-08-22T18:00:00.000Z",
+      current: {
+        cohort_id: "cohort-unproven",
+        policy_version: "controlled-email.v1",
+        outcomes: { provider_accepted: 99 },
+        integrity_flags: ["grant_revoked"],
+      },
+      rows: [{ route_class: "SHOULD_NOT_RENDER", provider_accepted: 99 }],
+    },
+  };
+  const adapter = {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as never, "#/comercial/cohorts");
+  assert.match(root.innerHTML, /data-controlled-email="unknown"/);
+  assert.match(root.innerHTML, /telemetria real não comprovada/);
+  assert.match(root.innerHTML, /grant observado como revogado/);
+  assert.match(root.innerHTML, /SMTP accepted<\/dt><dd>UNKNOWN \/ dados ainda incompletos<\/dd>/);
+  assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
+  assert.doesNotMatch(root.innerHTML, /Primeiro cohort real de e-mail/);
 });
