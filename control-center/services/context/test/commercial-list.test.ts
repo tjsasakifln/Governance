@@ -178,6 +178,28 @@ test("real zero, unproven absence and disguised stale remain three different lis
   });
 });
 
+test("a future commercial snapshot cannot outrank the latest credible snapshot", async () => {
+  const rows = projectedRows(1);
+  const current = rows.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(current);
+  const future = {
+    ...structuredClone(current),
+    id: "cc:operational-snapshot:future",
+    observed_at: "2050-01-01T00:00:00.000Z",
+    generated_at: "2050-01-01T00:00:00.000Z",
+    payload: { operations: { activity: [{ source_id: "future-attacker-row" }], overview: { activity: 1 } } },
+  };
+  await withServer([future, ...rows], async (base) => {
+    const response = await fetch(`${base}/v1/domains/commercial/lists/activity?scope=commercial`, {
+      headers: headers(),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal((body.truth as Record<string, unknown>).state, "HEALTHY");
+    assert.equal((body.truth as Record<string, unknown>).as_of, OBSERVED_AT);
+    assert.equal(JSON.stringify(body).includes("future-attacker-row"), false);
+  });
+});
+
 test("explicit facets work when produced and are honestly unavailable when Warmbly has no field", async () => {
   await withServer(projectedRows(70), async (base) => {
     const response = await fetch(

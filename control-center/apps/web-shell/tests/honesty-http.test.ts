@@ -388,6 +388,38 @@ test("operator action fails closed on a successful HTTP response without an exac
   }
 });
 
+test("operator action refuses impossible and future receipt timestamps", async () => {
+  for (const occurredAt of ["2026-02-30T12:00:00Z", "2050-01-01T00:00:00Z", "2026-08-22T12:00:00+00:00"]) {
+    let request: Record<string, unknown> = {};
+    const adapter = createHttpAdapter(
+      "http://127.0.0.1:8787",
+      (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({
+          id: "cc:operator-action:hostile-time",
+          action_type: request.action_type,
+          target_canonical_id: request.target_canonical_id,
+          target_source_id: request.target_source_id,
+          actor: { kind: "human", id: "founder-local" },
+          correlation_id: request.correlation_id,
+          occurred_at: occurredAt,
+          resulting_status: "accepted",
+        }, 201);
+      }) as typeof fetch,
+      { kind: "human", id: "founder-local" },
+    );
+    const result = await adapter.operatorAction({
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      note: "triado",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.outcome, "unknown");
+    assert.equal(result.code, "invalid_operator_receipt");
+  }
+});
+
 test("generated idempotency keys are bounded and never expose the operator note", async () => {
   let requestBody: Record<string, unknown> = {};
   const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {

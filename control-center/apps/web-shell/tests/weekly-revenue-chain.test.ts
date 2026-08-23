@@ -197,6 +197,11 @@ test("lookup herdado, sintético, autoridade falsa e correlação duplicada falh
   const invalidTime = htmlForRows([impossibleSourceDate]);
   assert.match(invalidTime, /data-weekly-revenue-chain-count="0"/);
 
+  const futureSourceDate = chainFor({ availability: "UNKNOWN" });
+  (futureSourceDate.source as Record<string, unknown>).observed_at = "2050-01-01T00:00:00Z";
+  const futureTime = htmlForRows([futureSourceDate]);
+  assert.match(futureTime, /data-weekly-revenue-chain-count="0"/);
+
   const mismatchedProposal = chainFor({ availability: "UNKNOWN" });
   mismatchedProposal.proposal = { availability: "OBSERVED", value: "prop_other_account" };
   const unboundProposal = htmlForRows([mismatchedProposal]);

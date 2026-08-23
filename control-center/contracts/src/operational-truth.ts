@@ -39,6 +39,8 @@ export interface OperationalTruth {
 
 export interface OperationalTruthInput {
   as_of: UtcDateTime;
+  /** Evaluation clock used to reject observations that claim to come from the future. */
+  evaluated_at?: UtcDateTime;
   source: SourceRef;
   confidence: number;
   freshness_status: FreshnessStatus;
@@ -59,6 +61,12 @@ export function operationalTruth(input: OperationalTruthInput): OperationalTruth
   } else if (input.freshness_status === "STALE") {
     state = "STALE";
     reason = "observation_stale";
+  } else if (
+    input.evaluated_at !== undefined &&
+    (!validUtcInstant(input.as_of) || !validUtcInstant(input.evaluated_at) || Date.parse(input.as_of) > Date.parse(input.evaluated_at))
+  ) {
+    state = "UNKNOWN";
+    reason = "recency_unknown";
   } else if (input.freshness_status === "UNKNOWN" || input.confidence <= 0) {
     state = "UNKNOWN";
     reason = "recency_unknown";
@@ -82,4 +90,13 @@ export function operationalTruth(input: OperationalTruthInput): OperationalTruth
     confidence: input.confidence,
     reason,
   };
+}
+
+function validUtcInstant(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value)) return false;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return false;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return inputSecond === parsedSecond;
 }

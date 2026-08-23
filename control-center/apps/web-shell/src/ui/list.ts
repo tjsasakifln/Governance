@@ -39,7 +39,7 @@ export interface ListChromeInput {
   readonly intro?: string;
   readonly card: (
     row: Record<string, unknown>,
-    position: { index: number; total: number },
+    position: { index: number; total: number; writesAllowed: boolean },
   ) => string;
   /** Server-filtered bounded page. Omitted by the mock adapter. */
   readonly remote?: unknown;
@@ -143,6 +143,7 @@ export function renderFilteredList(input: ListChromeInput): string {
     complete: input.complete ?? declaredTotal === rows.length,
   };
   const clearHref = clearListHref(hash);
+  const writesAllowed = remote?.truth?.state === "HEALTHY";
 
   const available = spec.facets
     .map((facet) => ({ facet, values: remote?.facetValues[facet.id] ?? facetValues(rows, facet) }))
@@ -217,17 +218,18 @@ export function renderFilteredList(input: ListChromeInput): string {
     : `<p class="banner stale" data-list-incomplete="true" role="status">A origem declarou ${view.declaredTotal} ${escapeHtml(noun)}, mas esta coleta tornou ${view.total} pesquisáveis. A busca e a contagem abaixo não fingem cobrir os ${view.declaredTotal - view.total} itens ausentes; aguarde uma coleta completa.</p>`;
 
   return `
-    <section class="list-surface" aria-labelledby="${escapeHtml(headingId)}" data-list="${escapeHtml(spec.id)}" data-list-total="${view.total}" data-list-matched="${view.matched}" data-list-page="${view.page}" data-list-pages="${view.pageCount}" data-list-sort="${escapeHtml(view.query.ordem)}">
+    <section class="list-surface" aria-labelledby="${escapeHtml(headingId)}" data-list="${escapeHtml(spec.id)}" data-list-total="${view.total}" data-list-matched="${view.matched}" data-list-page="${view.page}" data-list-pages="${view.pageCount}" data-list-sort="${escapeHtml(view.query.ordem)}" data-list-writes-allowed="${writesAllowed}">
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(heading)}</h2>
       ${input.intro ?? ""}
       ${operationalTruthBlock(remote?.truth)}
+      ${writesAllowed ? "" : `<p class="banner stale" role="status">Ações bloqueadas: atualize a leitura até obter evidência recente e confiável.</p>`}
       ${filters}
       <p class="count" role="status" tabindex="-1" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
       ${coverageWarning}
       ${unavailableNote}
       ${reference}
       <div class="stack">${view.items
-        .map((row, index) => input.card(row, { index: view.rangeStart + index, total: view.matched }))
+        .map((row, index) => input.card(row, { index: view.rangeStart + index, total: view.matched, writesAllowed }))
         .join("")}</div>
       ${emptyState}
       ${pagination(view, hash, heading, spec.id)}

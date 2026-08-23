@@ -39,4 +39,22 @@ test("malformed truth is not silently painted as healthy", () => {
       reason: "fresh_observation",
     }), null);
   }
+  for (const invalid of [
+    { state: "HEALTHY", as_of: "2050-01-01T00:00:00Z", source, confidence: 1, reason: "fresh_observation" },
+    { state: "HEALTHY", as_of: "2026-02-30T20:00:00Z", source, confidence: 1, reason: "fresh_observation" },
+    { state: "HEALTHY", as_of: "2026-08-22T20:00:00+00:00", source, confidence: 1, reason: "fresh_observation" },
+    { state: "HEALTHY", as_of: "2026-08-22T20:00:00Z", source, confidence: 1, reason: "collection_error" },
+    { state: "ZERO", as_of: "2026-08-22T20:00:00Z", source, confidence: 0, reason: "confirmed_zero" },
+  ]) {
+    assert.equal(parseOperationalTruth(invalid, Date.parse("2026-08-23T00:00:00Z")), null);
+  }
+
+  const inheritedSource = Object.create({ system: "warmbly", kind: "commercial", locator: "activity" });
+  assert.equal(parseOperationalTruth({
+    state: "HEALTHY",
+    as_of: "2026-08-22T20:00:00Z",
+    source: inheritedSource,
+    confidence: 1,
+    reason: "fresh_observation",
+  }, Date.parse("2026-08-23T00:00:00Z")), null);
 });

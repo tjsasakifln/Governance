@@ -242,8 +242,9 @@ type WeeklyRevenueRow = {
   correlation: string;
 };
 
-function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected: number } {
+function weeklyRevenueRows(value: unknown, presentedAt: string): { rows: WeeklyRevenueRow[]; rejected: number } {
   const input = Array.isArray(value) ? value : [];
+  const presentationInstantValid = validWeeklyInstant(presentedAt) && Date.parse(presentedAt) <= Date.now();
   const byCorrelation = new Map<string, WeeklyRevenueRow>();
   const duplicates = new Set<string>();
   for (const item of input) {
@@ -283,6 +284,8 @@ function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected
       MONTH.test(String(own(source, "month"))) &&
       typeof own(source, "observed_at") === "string" &&
       validWeeklyInstant(String(own(source, "observed_at"))) &&
+      presentationInstantValid &&
+      Date.parse(String(own(source, "observed_at"))) <= Date.parse(presentedAt) &&
       own(source, "include_synthetic") === false &&
       own(authority, "operation_and_visualization") === "governance-control-center" &&
       own(authority, "action_and_outcome") === "warmbly" &&
@@ -334,8 +337,8 @@ function technicalWeeklyFacts(item: WeeklyRevenueRow): string {
   </details>`;
 }
 
-function weeklyRevenueBlock(operations: Record<string, unknown>): string {
-  const result = weeklyRevenueRows(own(operations, "weekly_revenue_chains"));
+function weeklyRevenueBlock(operations: Record<string, unknown>, presentedAt: string): string {
+  const result = weeklyRevenueRows(own(operations, "weekly_revenue_chains"), presentedAt);
   return `<section class="stack" aria-labelledby="weekly-revenue-title" data-weekly-revenue-chain-count="${result.rows.length}" data-weekly-revenue-rejected="${result.rejected}">
     <h2 id="weekly-revenue-title">Cadeia semanal até receita observável</h2>
     <p class="constraint">O Control Center opera e apresenta os dados. O Warmbly responde pelas ações e pelos resultados comerciais. O Asaas é a autoridade dos fatos financeiros. Esta tela é somente leitura.</p>
@@ -844,7 +847,7 @@ function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
 function activityOpsCard(
   row: Record<string, unknown>,
   query: string | null,
-  position: { index: number; total: number },
+  position: { index: number; total: number; writesAllowed: boolean },
 ): string {
   const rowId = String(row.source_id ?? row.id ?? "");
   const title = escapeHtml(leadTitleOf(row) ?? "Organização não identificada pela origem");
@@ -883,7 +886,7 @@ function activityOpsCard(
       { term: "triage_state", value: triage },
       { term: "sync_status", value: sync },
     ], "daily-triage")}
-    <div class="lead-actions" data-write-boundary="control-center">
+    ${position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
     <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form">
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
@@ -897,11 +900,11 @@ function activityOpsCard(
       <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que isto registra a triagem no Control Center e não altera o Warmbly.</label>
       <button type="submit">Marcar como triado</button>
     </form>
-    </div>
+    </div>` : ""}
   </article>`;
 }
 
-function exceptionOpsCard(row: Record<string, unknown>): string {
+function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean): string {
   const id = String(row.id ?? "");
   const canonical = String(row.canonical_id ?? id);
   const sourceId = String(row.source_id ?? id);
@@ -938,7 +941,7 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
       { term: "group_key", value: String(row.group_key ?? "") },
       { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
     ], "resolvable-exception")}
-    ${open ? `<div class="lead-actions" data-write-boundary="control-center">
+    ${open && writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
       <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form">
         <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
         <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
@@ -952,7 +955,7 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
         <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
         <button type="submit">Iniciar tratamento</button>
       </form>
-    </div>` : `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>`}
+    </div>` : !open ? `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>` : ""}
   </article>`;
 }
 
@@ -1097,7 +1100,7 @@ function commercialOps(
       noun: "exceção(ões) observada(s)",
       emptyData: "Nenhuma exceção observada.",
       intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
-      card: exceptionOpsCard,
+      card: (row, position) => exceptionOpsCard(row, position.writesAllowed),
       remote: listViews.excecoes,
       declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
       complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
@@ -1115,7 +1118,7 @@ function commercialOps(
       </dl>
       ${technicalDetails([{ term: "availability", value: String(availability) }], "commercial-availability")}
     </section>
-    ${weeklyRevenueBlock(ops)}`;
+    ${weeklyRevenueBlock(ops, snapshot.generated_at)}`;
   }
   return body;
 }

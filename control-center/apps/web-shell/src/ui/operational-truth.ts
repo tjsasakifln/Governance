@@ -4,7 +4,7 @@ import {
   type OperationalTruthState,
 } from "@confenge/control-center-contracts/operational-truth";
 import { escapeHtml } from "../escape";
-import { formatLocal } from "../datetime";
+import { formatLocal, isUtcDateTime } from "../datetime";
 import { technicalDetails } from "./labels";
 
 interface TruthCopy {
@@ -55,26 +55,58 @@ export const TRUTH_COPY: Record<OperationalTruthState, TruthCopy> = {
 
 const STATES = new Set<OperationalTruthState>(["ZERO", "ABSENT", "UNKNOWN", "STALE", "ERROR", "HEALTHY"]);
 const REASONS = new Set<string>(OPERATIONAL_TRUTH_REASONS);
+const REASONS_BY_STATE: Readonly<Record<OperationalTruthState, readonly OperationalTruth["reason"][]>> = {
+  ZERO: ["confirmed_zero"],
+  ABSENT: ["source_absent"],
+  UNKNOWN: ["recency_unknown", "partial_payload"],
+  STALE: ["observation_stale"],
+  ERROR: ["collection_error"],
+  HEALTHY: ["fresh_observation"],
+};
 
-export function parseOperationalTruth(value: unknown): OperationalTruth | null {
+function ownString(row: Record<string, unknown>, key: string): string | null {
+  const value = Object.prototype.hasOwnProperty.call(row, key) ? row[key] : undefined;
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+function validTruthInstant(value: string, now: number): boolean {
+  if (!isUtcDateTime(value)) return false;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed) || parsed > now) return false;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return inputSecond === parsedSecond;
+}
+
+export function parseOperationalTruth(value: unknown, now = Date.now()): OperationalTruth | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as Record<string, unknown>;
-  const source = row.source && typeof row.source === "object" && !Array.isArray(row.source)
-    ? row.source as Record<string, unknown>
+  const sourceValue = Object.prototype.hasOwnProperty.call(row, "source") ? row.source : null;
+  const source = sourceValue && typeof sourceValue === "object" && !Array.isArray(sourceValue)
+    ? sourceValue as Record<string, unknown>
     : null;
+  const state = ownString(row, "state") as OperationalTruthState | null;
+  const asOf = ownString(row, "as_of");
+  const reason = ownString(row, "reason") as OperationalTruth["reason"] | null;
+  const confidence = Object.prototype.hasOwnProperty.call(row, "confidence") ? row.confidence : undefined;
   if (
-    typeof row.state !== "string" || !STATES.has(row.state as OperationalTruthState) ||
-    typeof row.as_of !== "string" || typeof row.reason !== "string" || !REASONS.has(row.reason) ||
-    typeof row.confidence !== "number" || !Number.isFinite(row.confidence) ||
-    row.confidence < 0 || row.confidence > 1 || !source ||
-    typeof source.system !== "string" || typeof source.kind !== "string" || typeof source.locator !== "string"
+    !state || !STATES.has(state) || !asOf || !validTruthInstant(asOf, now) ||
+    !reason || !REASONS.has(reason) || !REASONS_BY_STATE[state].includes(reason) ||
+    typeof confidence !== "number" || !Number.isFinite(confidence) ||
+    confidence < 0 || confidence > 1 ||
+    (["ZERO", "ABSENT", "HEALTHY"] as const).includes(state as "ZERO" | "ABSENT" | "HEALTHY") && confidence <= 0 ||
+    !source || !ownString(source, "system") || !ownString(source, "kind") || !ownString(source, "locator")
   ) return null;
   return {
-    state: row.state as OperationalTruthState,
-    as_of: row.as_of,
-    confidence: row.confidence,
-    reason: row.reason as OperationalTruth["reason"],
-    source: { system: source.system, kind: source.kind, locator: source.locator },
+    state,
+    as_of: asOf,
+    confidence,
+    reason,
+    source: {
+      system: ownString(source, "system")!,
+      kind: ownString(source, "kind")!,
+      locator: ownString(source, "locator")!,
+    },
   };
 }
 

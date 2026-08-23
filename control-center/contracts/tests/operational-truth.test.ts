@@ -61,3 +61,17 @@ test("ABSENT is reserved for a fresh, credible observation of source absence", (
   assert.equal(truth.state, "ABSENT");
   assert.equal(truth.reason, "source_absent");
 });
+
+test("a future or impossible observation cannot become healthy", () => {
+  for (const as_of of ["2050-01-01T00:00:00Z", "2026-02-30T00:00:00Z"]) {
+    const truth = operationalTruth({
+      ...base,
+      as_of,
+      evaluated_at: "2026-08-23T00:00:00Z",
+      freshness_status: "FRESH",
+      confidence: 1,
+    });
+    assert.equal(truth.state, "UNKNOWN");
+    assert.equal(truth.reason, "recency_unknown");
+  }
+});

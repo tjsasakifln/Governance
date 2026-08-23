@@ -1,5 +1,6 @@
 import type { DestinationId } from "../destinations";
 import { getDestination, parseHash, queryParamsOf } from "../destinations";
+import { isUtcDateTime } from "../datetime";
 import { LIST_PARAM_IDS } from "../filter";
 import { ownMapValue } from "../own-map";
 import { clientIdentityGapFrom } from "../client-identity";
@@ -72,6 +73,15 @@ function dispatchMessage(body: Record<string, unknown>, status: number): string 
 function stringValue(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function validReceiptInstant(value: string, now = Date.now()): boolean {
+  if (!isUtcDateTime(value)) return false;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed) || parsed > now) return false;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return inputSecond === parsedSecond;
 }
 
 async function operatorIdempotencyKey(input: {
@@ -314,7 +324,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       const occurredAt = stringValue(body, "occurred_at");
       const receiptIsValid =
         (resultingStatus === "accepted" || resultingStatus === "duplicate") &&
-        Boolean(receiptId && correlationId && occurredAt && !Number.isNaN(Date.parse(occurredAt))) &&
+        Boolean(receiptId && correlationId && occurredAt && validReceiptInstant(occurredAt)) &&
         correlationId === idempotency &&
         stringValue(body, "action_type") === input.action_type &&
         stringValue(body, "target_canonical_id") === input.target_canonical_id &&
