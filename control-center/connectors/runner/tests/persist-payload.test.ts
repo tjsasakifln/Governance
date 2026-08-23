@@ -5,6 +5,9 @@ import {
   MAX_JSON_BYTES,
 } from "@confenge/control-center-persistence";
 import { fitPersistPayload, PERSIST_ARRAY_CAP } from "../src/persist-payload.ts";
+import { projectCollector } from "../src/projectors/project.ts";
+
+const observedAt = "2026-08-23T01:43:27.187Z";
 
 test("small payloads pass through without truncation metadata", () => {
   const fitted = fitPersistPayload({
@@ -17,6 +20,50 @@ test("small payloads pass through without truncation metadata", () => {
   assert.equal((fitted.nested as { company: string }).company, "Acme");
   assert.equal("_persist_truncation" in fitted, false);
   assertSanitizedJson(fitted, "small");
+});
+
+test("controlled outbound aggregate survives the real projection and persistence boundary", () => {
+  const [commercial] = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: observedAt,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: {
+      confenge_status: {
+        readiness: {
+          latest_bounded_cohort: {
+            cohort_id: "cohort-real-10",
+            cohort_hash: "sha256:cohort",
+            policy_version: "controlled-email.v1",
+            authorized_quantity: 10,
+            sent: 0,
+            max_daily_volume: 10,
+          },
+        },
+      },
+      confenge_intel_report: {
+        controlled_email: [{
+          cohort_id: "cohort-real-10",
+          route_class: "DIRECT_PERSON",
+          provider: "smtp",
+          attempted: 1,
+          delivered: null,
+        }],
+      },
+    },
+  });
+  assert.ok(commercial);
+
+  const fitted = fitPersistPayload(commercial.payload);
+  const operations = fitted.operations as Record<string, unknown>;
+  const aggregate = operations.controlled_outbound as {
+    current: { sent: number; outcomes: { delivered: number | null } };
+  };
+  assert.ok(aggregate, "the aggregate must not be removed as address-bearing PII");
+  assert.equal(aggregate.current.sent, 0);
+  assert.equal(aggregate.current.outcomes.delivered, null);
+  assertSanitizedJson(fitted, "controlled-outbound");
 });
 
 test("oversized intel exception lists are capped under the persist byte limit", () => {
