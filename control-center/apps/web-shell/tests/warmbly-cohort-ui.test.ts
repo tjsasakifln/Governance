@@ -42,7 +42,6 @@ function candidate(overrides: Record<string, unknown> = {}): Record<string, unkn
     evidence_source: "fixture://diario-oficial",
     evidence_observed_at: "2026-08-22T12:00:00Z",
     content_hash: "content-fixture-001",
-    frozen_hash: "frozen-fixture-001",
     evidence_hash: "evidence-fixture-001",
     composer_version: "composer.v3",
     copy_qa: { failures: ["assunto_generico"] },
@@ -61,6 +60,10 @@ function cohort(overrides: Record<string, unknown> = {}): Record<string, unknown
   return {
     id: COHORT_ID,
     version: 1,
+    // frozen_hash belongs to the version, which is what expected_frozen_hash
+    // guards. A candidate has content_hash and evidence_hash and no frozen
+    // hash of its own.
+    frozen_hash: "frozen-fixture-001",
     source: "extra-cli",
     as_of: "2026-08-23T12:00:00Z",
     freshness: "FRESH",
@@ -1110,3 +1113,4 @@ test("the operation cockpit reads the gate too, because its stepper has to know 
     "#/warmbly must read the cohort list",
   );
 });
+
