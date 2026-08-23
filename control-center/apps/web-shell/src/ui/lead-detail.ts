@@ -231,7 +231,12 @@ function isInboundAlertException(row: Record<string, unknown>): boolean {
   return discriminator !== null && /(?:^|[_-])inbound(?:$|[_-])/i.test(discriminator);
 }
 
-const IDENTITY_KEYS = ["source_id", "id", "canonical_id", "lead_id", "target_id", "deal_id"] as const;
+// These keys identify the record the operator opened. `lead_id` is deliberately
+// absent: it is an operational target carried by some records, not a generic
+// record alias. Treating it as identity lets an ordinary inbound activity join
+// an alert exception for the same lead and inherit an upstream write it did not
+// itself authorize.
+const IDENTITY_KEYS = ["source_id", "id", "canonical_id", "target_id", "deal_id"] as const;
 
 function identitiesOf(row: Record<string, unknown>): string[] {
   const out: string[] = [];

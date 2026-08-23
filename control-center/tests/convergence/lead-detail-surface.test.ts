@@ -282,6 +282,18 @@ test("clicking inbound activity 51 carries the compact operator target through C
       "ordinary inbound collection rows are not operator alerts",
     );
 
+    const rawQueue = await paint(
+      base,
+      "#/comercial/atividade?tipo=new&ordem=identificador",
+    );
+    const rawHref = /href="([^"]*resource=[^"]*)" data-lead-detail-link=/.exec(rawQueue)?.[1]
+      ?.replaceAll("&amp;", "&") ?? "";
+    assert.match(rawHref, /resource=lead-000/, "the test must click the real raw-inbound row");
+    const rawDetail = await paint(base, rawHref);
+    assert.match(rawDetail, /data-lead-detail="found"/);
+    assert.match(rawDetail, /data-warmbly-refusal="not-an-alert"/);
+    assert.equal(/data-warmbly-dispatch=/.test(rawDetail), false);
+
     const queue = await paint(
       base,
       "#/comercial/atividade?tipo=inbound_lead&ordem=identificador&pagina=3",
@@ -343,9 +355,18 @@ test("a lead detail served end-to-end shows context and keeps handles out of the
   });
 });
 
-test("the two write mechanisms stay separate on a real payload", async () => {
+test("pipeline detail stays local while the real alert keeps the two write mechanisms separate", async () => {
   await withServer(async (base) => {
-    const html = await paint(base, `#/comercial/atividade?resource=${DEAL_UUID}`);
+    const dealHtml = await paint(base, `#/comercial/atividade?resource=${DEAL_UUID}`);
+    assert.match(dealHtml, /data-lead-detail="found"/);
+    assert.match(dealHtml, /data-action-scope="control-center-only"/);
+    assert.match(dealHtml, /data-warmbly-refusal="not-an-alert"/);
+    assert.equal(/data-warmbly-dispatch=/.test(dealHtml), false);
+
+    const html = await paint(
+      base,
+      `#/comercial/atividade?resource=${encodeURIComponent(OPAQUE_ALERT_ID)}`,
+    );
     assert.match(html, /data-action-scope="control-center-only"/);
     assert.match(html, /data-action-scope="warmbly-write"/);
     assert.match(html, /Registros no Control Center \(não gravam no Warmbly\)/);
