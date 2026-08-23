@@ -1,0 +1,210 @@
+{
+  "schema_version": "control-center.qa-gate-report.v1",
+  "corpus": "live",
+  "hostile": false,
+  "as_of": "2026-08-20T15:00:00.000Z",
+  "READY_FOR_INTERNAL_PRODUCTION": true,
+  "ready": {
+    "READY_FOR_INTERNAL_PRODUCTION": true,
+    "rule": "fail-closed conjunction of the 14 named attack checks",
+    "named_attack_count": 14,
+    "missing_checks": [],
+    "duplicate_checks": [],
+    "failed_checks": [],
+    "unknown_checks": [],
+    "passed_checks": [
+      "stale data mostrado como saudável",
+      "double counting financeiro",
+      "hypothesis promovida a fact",
+      "agent sobrescrevendo founder decision",
+      "scope leakage entre cliente/repos",
+      "duplicated collector event",
+      "provider mutation acidental",
+      "secret/PII leakage",
+      "timezone boundary",
+      "partial outage",
+      "stale RUNNING agent session",
+      "conflicting directives/supersession",
+      "auth bypass assumptions",
+      "missing provenance"
+    ],
+    "reason": "all 14 named checks are explicitly pass"
+  },
+  "attacks": [
+    {
+      "attack_id": "stale data mostrado como saudável",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "no healthy presentation of stale/expired data",
+      "evidence": {
+        "inspected": 49
+      }
+    },
+    {
+      "attack_id": "double counting financeiro",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "ledger lines are unique per source_payment_id and match totals",
+      "evidence": {
+        "sources": 2
+      }
+    },
+    {
+      "attack_id": "hypothesis promovida a fact",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "hypotheses remain hypotheses unless a human promoted them",
+      "evidence": {
+        "inspected": 11
+      }
+    },
+    {
+      "attack_id": "agent sobrescrevendo founder decision",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "founder decisions were not overwritten by agents",
+      "evidence": {
+        "inspected": 10
+      }
+    },
+    {
+      "attack_id": "scope leakage entre cliente/repos",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "all resource scopes are within granted_scopes",
+      "evidence": {
+        "granted_count": 3,
+        "resource_count": 6
+      }
+    },
+    {
+      "attack_id": "duplicated collector event",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "duplicate collector events were skipped, not re-applied",
+      "evidence": {
+        "inspected": 2
+      }
+    },
+    {
+      "attack_id": "provider mutation acidental",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "no forbidden provider mutations; collectors read-only",
+      "evidence": {
+        "operations_inspected": 2
+      }
+    },
+    {
+      "attack_id": "secret/PII leakage",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "no secret keys or PII patterns on inspected surfaces",
+      "evidence": {
+        "inspected": true
+      }
+    },
+    {
+      "attack_id": "timezone boundary",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "instants are UTC Z and presentation matches America/Sao_Paulo",
+      "evidence": {
+        "inspected": 49
+      }
+    },
+    {
+      "attack_id": "partial outage",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "overall status reflects component failures",
+      "evidence": {
+        "overall_status": "degraded",
+        "failed_components": [
+          "extra-contracts"
+        ]
+      }
+    },
+    {
+      "attack_id": "stale RUNNING agent session",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "no live agent session is past TTL",
+      "evidence": {
+        "inspected": 2
+      }
+    },
+    {
+      "attack_id": "conflicting directives/supersession",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "active directives do not conflict; supersedees are not active",
+      "evidence": {
+        "inspected": 11
+      }
+    },
+    {
+      "attack_id": "auth bypass assumptions",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "auth is fail-closed with an opaque actor and explicit scopes",
+      "evidence": {
+        "action": "get_context"
+      }
+    },
+    {
+      "attack_id": "missing provenance",
+      "case_kind": "live",
+      "state": "pass",
+      "ready_contribution": "ready-component",
+      "reason": "all aggregated records carry source, observed_at, freshness_status, confidence",
+      "evidence": {
+        "inspected": 49
+      }
+    }
+  ],
+  "named_attacks": [
+    "stale data mostrado como saudável",
+    "double counting financeiro",
+    "hypothesis promovida a fact",
+    "agent sobrescrevendo founder decision",
+    "scope leakage entre cliente/repos",
+    "duplicated collector event",
+    "provider mutation acidental",
+    "secret/PII leakage",
+    "timezone boundary",
+    "partial outage",
+    "stale RUNNING agent session",
+    "conflicting directives/supersession",
+    "auth bypass assumptions",
+    "missing provenance"
+  ],
+  "forbidden_side_effects": {
+    "cobranca": false,
+    "checkout": false,
+    "refund": false,
+    "cancelamento": false,
+    "asaas_write": false,
+    "commercial_send": false
+  },
+  "notes": [
+    "Live-runtime corpus: evaluators ran on payloads collected from Postgres, MCP, and production HTTP.",
+    "READY_FOR_INTERNAL_PRODUCTION requires every named check explicitly pass.",
+    "UNKNOWN, unrun, missing, duplicate, or fail is fail-closed (not ready).",
+    "The adversarial fixture corpus remains hostile and is not this gate.",
+    "This entry performs no cobrança, checkout, refund, cancelamento, Asaas write, or commercial send."
+  ]
+}

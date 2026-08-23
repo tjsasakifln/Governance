@@ -1,0 +1,15 @@
+critical-path verification — synthetic/local data only
+contracts: pass=117 fail=0
+persistence: pass=33 fail=0
+collector: pass=68 fail=0
+integration: pass=67 fail=0
+web-shell: pass=238 fail=0
+hardening: pass=23 fail=0
+typecheck: exit=0 all workspaces
+e2e: exit=0 page_errors=0
+e2e: critical_path=triage_to_detail keyboard=Enter result=found
+e2e: critical_path=exception_to_receipt outcome=accepted
+e2e: states=loading,error,stale,empty
+e2e: viewports=7 hashes_per_viewport=16 overflow=0
+qa-adversarial: attacks_detected=14/14 ready=false exit=2_expected
+qa-live: pass=14/14 presentations_inspected=49 forbidden_side_effects=false
