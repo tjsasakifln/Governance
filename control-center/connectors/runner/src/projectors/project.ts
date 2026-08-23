@@ -1,4 +1,4 @@
-import { projectCommercial } from "./commercial.ts";
+import { projectCommercial, projectCommercialListPages } from "./commercial.ts";
 import { projectEngineering } from "./engineering.ts";
 import { projectFinance } from "./finance.ts";
 import { projectClientsFromCommercial, projectInfrastructure, projectPncp } from "./rest.ts";
@@ -12,7 +12,7 @@ export function projectCollector(envelope: CollectorEnvelope): ProjectedSnapshot
   const name = envelope.collector.toLowerCase();
   if (name.includes("warmbly") || name === "commercial") {
     const commercial = projectCommercial(envelope);
-    return [commercial, projectClientsFromCommercial(commercial)];
+    return [commercial, projectClientsFromCommercial(commercial), ...projectCommercialListPages(envelope)];
   }
   if (name.includes("asaas") || name === "finance") {
     return [projectFinance(envelope)];

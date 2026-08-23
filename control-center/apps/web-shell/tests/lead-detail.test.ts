@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { paintShell } from "../src/app";
+import { createMemoryRuntime, mount, paintShell } from "../src/app";
 import type { AdapterReadResult, DestinationPage } from "../src/adapters/contract";
 import type { CommercialSnapshot } from "../src/types";
 import {
@@ -10,6 +10,7 @@ import {
   leadDetailHash,
   leadDetailView,
   leadTitleOf,
+  queueFocusDomId,
   queueBackHash,
 } from "../src/ui/lead-detail";
 
@@ -404,7 +405,7 @@ test("the route reaches the detail and the rendered back link carries the queue 
   assert.equal(backParams.get("q"), "andrade");
   assert.equal(backParams.get("page"), "2");
   assert.equal(backParams.get("resource"), null);
-  assert.match(root.innerHTML, /item 1 de 3/);
+  assert.match(root.innerHTML, /item 1 de 2/, "position follows the filtered queue, not hidden rows");
 });
 
 test("a queue row the origin gave no id is listed but not offered as a dead link", () => {
@@ -417,4 +418,128 @@ test("a queue row the origin gave no id is listed but not offered as a dead link
   paintShell(root, adapter, "#/comercial/atividade");
   assert.match(root.innerHTML, /Sem identificador/);
   assert.equal(/data-lead-detail-link=/.test(root.innerHTML), false);
+});
+
+test("a paginated filtered queue consumes focus only after ready paint and never puts it in selectors or links", async () => {
+  const resource = `lead:unsafe[id]\"><script>`;
+  const row = {
+    at: "2026-08-20T17:30:00Z",
+    lead_or_account: "Conta retornada",
+    source_id: resource,
+    event: "reply",
+    state: "open",
+    evidence: "resposta observada",
+  };
+  const operations = representativeOperations();
+  operations.activity = [row];
+  operations.overview = { activity: 61, activity_shown: 50 };
+  operations.list_views = {
+    atividade: {
+      schema_version: "control-center.commercial-list.v1",
+      loaded_total: 61,
+      declared_total: 61,
+      complete: true,
+      matched: 61,
+      items: [row],
+      page: 3,
+      page_count: 3,
+      page_size: 25,
+      range_start: 51,
+      range_end: 51,
+      filtered: true,
+      facet_values: {
+        estado: ["open"],
+        tipo: ["reply"],
+        origem: [],
+        responsavel: [],
+        prioridade: [],
+      },
+      unavailable_facets: ["origem", "responsavel", "prioridade"],
+      query: {
+        q: "Conta",
+        facets: {
+          estado: "open",
+          tipo: "all",
+          origem: "all",
+          responsavel: "all",
+          prioridade: "all",
+        },
+        periodo: "all",
+        ordem: "recentes",
+        pagina: 3,
+        porPagina: 25,
+      },
+    },
+  };
+
+  const ready = adapterFor(snapshotWith(operations)).readDestination() as AdapterReadResult;
+  const adapter = {
+    ...adapterFor(snapshotWith(operations)),
+    readDestination: async (): Promise<AdapterReadResult> => ready,
+  };
+  let html = "";
+  let focusCalls = 0;
+  let scrollCalls = 0;
+  const selectors: string[] = [];
+  const target = {
+    addEventListener(): void {},
+    getAttribute(name: string): string | null {
+      return name === "id" ? queueFocusDomId(resource) : null;
+    },
+    querySelector(): { value: string } | null {
+      return null;
+    },
+    focus(options?: { preventScroll?: boolean }): void {
+      assert.deepEqual(options, { preventScroll: true });
+      focusCalls += 1;
+    },
+    scrollIntoView(options?: { block?: "center"; inline?: "nearest" }): void {
+      assert.deepEqual(options, { block: "center", inline: "nearest" });
+      scrollCalls += 1;
+    },
+  };
+  const root = {
+    get innerHTML(): string {
+      return html;
+    },
+    set innerHTML(next: string) {
+      html = next;
+    },
+    querySelectorAll(selector: string): typeof target[] {
+      selectors.push(selector);
+      return selector === "[data-queue-focus]" && html.includes(queueFocusDomId(resource))
+        ? [target]
+        : [];
+    },
+  };
+  const initial = `#/comercial/atividade?q=Conta&estado=open&ordem=recentes&pagina=3&por_pagina=25&focus=${encodeURIComponent(resource)}`;
+  const runtime = createMemoryRuntime(initial);
+  const handle = mount(root, adapter, runtime);
+  try {
+    assert.equal(focusCalls, 0, "the loading paint must not consume focus");
+    assert.match(runtime.getHash(), /focus=/, "loading must leave the marker for the ready paint");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(focusCalls, 1);
+    assert.equal(scrollCalls, 1);
+    assert.ok(selectors.includes("[data-queue-focus]"));
+    assert.equal(selectors.some((selector) => selector.includes(resource)), false);
+    assert.match(html, new RegExp(`id="${queueFocusDomId(resource)}" data-queue-focus="true" tabindex="-1"`));
+    assert.match(html, /pos=51&amp;of=61/, "remote page position must reach beyond the preview cap");
+    assert.equal(/href="[^"]*focus=/.test(html), false, "pagination/detail links are rendered from the cleaned hash");
+
+    const consumed = new URLSearchParams(runtime.getHash().split("?")[1]);
+    assert.equal(consumed.get("focus"), null);
+    assert.equal(consumed.get("q"), "Conta");
+    assert.equal(consumed.get("estado"), "open");
+    assert.equal(consumed.get("ordem"), "recentes");
+    assert.equal(consumed.get("pagina"), "3");
+    assert.equal(consumed.get("por_pagina"), "25");
+
+    runtime.setHash("#/comercial/atividade?q=Outra&estado=open&pagina=2&por_pagina=25");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(focusCalls, 1, "a later filter/page paint must not refocus the old row");
+  } finally {
+    handle.unmount();
+  }
 });

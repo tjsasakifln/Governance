@@ -40,6 +40,20 @@ export const LEAD_DETAIL_POSITION_PARAM = "pos";
 export const LEAD_DETAIL_TOTAL_PARAM = "of";
 /** Written on the back link so the queue can restore highlight/scroll. */
 export const QUEUE_FOCUS_PARAM = "focus";
+
+/**
+ * Collision-free DOM id for an opaque queue resource.
+ *
+ * Encoding UTF-16 code units keeps the result inside [0-9a-f-], so callers
+ * never need to interpolate an upstream identifier into a CSS selector.
+ */
+export function queueFocusDomId(resource: string): string {
+  const units: string[] = [];
+  for (let index = 0; index < resource.length; index += 1) {
+    units.push(resource.charCodeAt(index).toString(16).padStart(4, "0"));
+  }
+  return `commercial-queue-row-${units.join("-") || "empty"}`;
+}
 /** Parameters this module owns. Everything else on the hash is queue state. */
 export const LEAD_DETAIL_PARAMS = [
   LEAD_DETAIL_RESOURCE_PARAM,

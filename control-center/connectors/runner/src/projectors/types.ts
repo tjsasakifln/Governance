@@ -24,6 +24,15 @@ export const DOMAIN_SNAPSHOT_KINDS = [
 ] as const;
 export type DomainSnapshotKind = (typeof DOMAIN_SNAPSHOT_KINDS)[number];
 
+/**
+ * Auxiliary snapshots are persisted independently from the compact domain
+ * snapshot. They are never selected as the domain's headline snapshot; the
+ * Context Service consumes them through a bounded list query.
+ */
+export const AUXILIARY_SNAPSHOT_KINDS = ["commercial-list-page"] as const;
+export type AuxiliarySnapshotKind = (typeof AUXILIARY_SNAPSHOT_KINDS)[number];
+export type SnapshotKind = DomainSnapshotKind | AuxiliarySnapshotKind;
+
 export const CONFENGE_OPERATIONAL_REPOS = [
   "tjsasakifln/Governance",
   "tjsasakifln/warmbly",
@@ -56,7 +65,7 @@ export interface CollectorEnvelope {
 
 export interface ProjectedSnapshot {
   projector_version: typeof PROJECTOR_VERSION;
-  snapshot_kind: DomainSnapshotKind;
+  snapshot_kind: SnapshotKind;
   scope: string;
   payload: Record<string, unknown>;
   freshness_status: FreshnessStatus;

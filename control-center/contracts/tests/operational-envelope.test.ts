@@ -66,19 +66,21 @@ describe("operational envelope contract", () => {
     assert.equal(invalid.ok, false);
   });
 
-  it("documents the five GET routes and frozen view names without changing /v1/context", () => {
+  it("documents the bounded commercial-list GET route and frozen view names without changing /v1/context", () => {
     const spec = loadOperationalOpenApi();
     assert.equal(spec.openapi.startsWith("3."), true);
     assert.ok(spec.paths["/v1/operational-snapshots"]);
     assert.ok(spec.paths["/v1/domains/{domain}"]);
+    assert.ok(spec.paths["/v1/domains/commercial/lists/{list}"]);
     assert.ok(spec.paths["/v1/attention"]);
     assert.ok(spec.paths["/v1/today"]);
     assert.ok(spec.paths["/v1/source-observations"]);
     assert.equal(spec.paths[CONTEXT_PATH_UNCHANGED], undefined);
-    assert.equal(OPERATIONAL_GET_ROUTES.length, 5);
+    assert.equal(OPERATIONAL_GET_ROUTES.length, 6);
     assert.deepEqual(OPERATIONAL_HTTP_PATHS, [
       "/v1/operational-snapshots",
       "/v1/domains/{domain}",
+      "/v1/domains/commercial/lists/{list}",
       "/v1/attention",
       "/v1/today",
       "/v1/source-observations",

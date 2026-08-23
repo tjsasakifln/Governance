@@ -270,7 +270,9 @@ test("an alert whose id the channel would refuse gets a refusal, not a broken bu
 
 test("the queue still lists items and every row links into its detail", async () => {
   await withServer(async (base) => {
-    const html = await paint(base, "#/comercial/atividade?q=andrade");
+    // Use non-narrowing queue state here: `q=andrade` now correctly filters the
+    // integrated #81 list and therefore cannot also prove that every row links.
+    const html = await paint(base, "#/comercial/atividade?ordem=recentes");
     assert.match(html, /id="atividade-title"/);
     const links = [...html.matchAll(/data-lead-detail-link="([^"]*)"/g)].map((m) => m[1]);
     assert.ok(links.length >= 2, `expected several queue rows, got ${links.length}`);
@@ -280,7 +282,7 @@ test("the queue still lists items and every row links into its detail", async ()
       (m[1] ?? "").replaceAll("&amp;", "&"),
     );
     for (const href of hrefs) {
-      assert.match(href, /q=andrade/, "the row link must carry the queue filter");
+      assert.match(href, /ordem=recentes/, "the row link must carry the queue sort");
       assert.match(href, /pos=\d+&of=\d+/, "and the queue position");
     }
     // A row the origin did not name must not headline its handle.
