@@ -13,7 +13,7 @@ Evidence date: 2026-08-22. All executions were local, synthetic, and network-fre
 | Control Center contracts | contracts typecheck and test | 118 passed |
 | Warmbly connector | connector typecheck and test | 94 passed |
 | Control Center collector/projector | collector typecheck and focused projector/persistence tests | 54 passed; DB-backed local tests require the host `libpq` runtime |
-| Control Center web shell | web-shell typecheck and full test | 258 passed, including 6 weekly-chain tests |
+| Control Center web shell | web-shell typecheck and full test | 259 passed, including 7 weekly-chain tests |
 | Control Center browser/build path | `npm run test:e2e` | 12 adapter tests and production build passed; this host lacked `libnspr4` for the optional browser launch and used the explicit fallback |
 
 ## Covered failure cases
@@ -35,5 +35,6 @@ Evidence date: 2026-08-22. All executions were local, synthetic, and network-fre
 - raw future tokens remain only in technical metadata while the reading stays in pt-BR;
 - inherited/prototype values cannot authorize a decision or financial state;
 - an observed zero is rendered only when integer cents and an ISO currency arrive together.
+- financial timestamps containing PII, impossible dates, or instants after collection fail closed for both charge and receipt and never reach HTML.
 
 No real smoke was run because the task explicitly prohibits real charge creation, client contact, and PII transmission. The sandbox evidence exercises software behavior only; it is not inserted into the real-only Control Center projection as if it were production telemetry.

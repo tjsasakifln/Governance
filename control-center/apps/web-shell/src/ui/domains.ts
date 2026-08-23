@@ -189,7 +189,7 @@ function validWeeklyInstant(value: string): boolean {
   return inputSecond === parsedSecond;
 }
 
-function weeklyMoney(value: unknown, expectedId: string | null): {
+function weeklyMoney(value: unknown, expectedId: string | null, collectedAt: string): {
   available: boolean;
   id: string | null;
   rawStatus: string | null;
@@ -201,11 +201,21 @@ function weeklyMoney(value: unknown, expectedId: string | null): {
   if (!row || own(row, "availability") !== "OBSERVED") {
     return { available: false, id: null, rawStatus: null, observedAt: null, label: "sem dados" };
   }
+  const hasObservedAt = Object.prototype.hasOwnProperty.call(row, "observed_at");
+  const observedAtCandidate = ownString(row, "observed_at");
+  const observedAtValid = !hasObservedAt || (observedAtCandidate !== null &&
+    validWeeklyInstant(collectedAt) &&
+    validWeeklyInstant(observedAtCandidate) &&
+    Date.parse(observedAtCandidate) <= Date.parse(collectedAt)
+  );
+  if (!observedAtValid) {
+    return { available: false, id: null, rawStatus: null, observedAt: null, label: "sem dados" };
+  }
   const idCandidate = ownString(row, "id");
   const id = idCandidate && OPAQUE_WEEKLY_ID.test(idCandidate) ? idCandidate : null;
   const statusCandidate = ownString(row, "status");
   const rawStatus = statusCandidate && OPAQUE_WEEKLY_ID.test(statusCandidate) ? statusCandidate : null;
-  const observedAt = ownString(row, "observed_at");
+  const observedAt = observedAtCandidate;
   const amount = own(row, "amount_cents");
   const currency = own(row, "currency");
   const linked = id !== null && OPAQUE_WEEKLY_ID.test(id) && expectedId !== null && expectedId !== "UNKNOWN" && id === expectedId;
@@ -292,8 +302,9 @@ function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected
 
 function technicalWeeklyFacts(item: WeeklyRevenueRow): string {
   const { row, identity, source, correlation } = item;
-  const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"));
-  const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"));
+  const collectedAt = ownString(source, "observed_at") as string;
+  const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"), collectedAt);
+  const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"), collectedAt);
   const rawFacts = [
     ["Correlação", correlation],
     ["Conta", ownString(identity, "account_id") ?? "UNKNOWN"],
@@ -338,10 +349,10 @@ function weeklyRevenueBlock(operations: Record<string, unknown>): string {
           const nextAction = observedWeeklyValue(own(row, "next_action"));
           const rawDeadline = observedWeeklyValue(own(row, "deadline"));
           const deadline = rawDeadline && validWeeklyInstant(rawDeadline) ? rawDeadline : null;
-          const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"));
-          const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"));
           const month = ownString(source, "month") as string;
           const observedAt = ownString(source, "observed_at") as string;
+          const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"), observedAt);
+          const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"), observedAt);
           const deliverableObserved = observedWeeklyValue(own(row, "latest_deliverable")) !== null;
           const evidenceObserved = observedWeeklyValue(own(row, "latest_evidence")) !== null;
           const proposalId = ownString(identity, "proposal_id");

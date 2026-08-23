@@ -31,6 +31,7 @@ function chainFor(receipt: Record<string, unknown>, paymentId = "UNKNOWN"): Reco
       status: "confirmed",
       amount_cents: 800000,
       currency: "BRL",
+      observed_at: "2026-08-22T19:58:00Z",
     },
     receipt,
     held: false,
@@ -101,6 +102,7 @@ test("a mesma correlação mostra zero somente quando valor e moeda foram observ
     status: "received",
     amount_cents: 0,
     currency: "BRL",
+    observed_at: "2026-08-22T19:59:00Z",
   }, "payment_asaas_sbx_001");
   assert.match(html, /data-correlation-id="corr_extra_sbx_week_2026_34"/);
   assert.match(html, /Recebimento[\s\S]{0,160}recebido · BRL 0,00/);
@@ -119,6 +121,35 @@ test("fato financeiro só aparece quando o ID do provedor coincide com a identid
   assert.match(beforeTechnical, /data-absent="true"><dt>Recebimento<\/dt><dd>sem dados<\/dd>/);
   assert.doesNotMatch(beforeTechnical, /BRL 99,00/);
   assert.match(html, /ID financeiro do recebimento[\s\S]{0,120}payment_asaas_other_account/);
+});
+
+test("timestamps financeiros hostis, impossíveis ou futuros falham fechados sem vazar no HTML", () => {
+  const invalidInstants = [
+    "person@example.com",
+    "2026-02-30T19:59:00Z",
+    "2026-08-22T20:00:01Z",
+  ];
+  for (const kind of ["charge", "receipt"] as const) {
+    for (const observedAt of invalidInstants) {
+      const paymentId = kind === "receipt" ? "payment_asaas_sbx_001" : "UNKNOWN";
+      const chain = chainFor({ availability: "UNKNOWN" }, paymentId);
+      const fact = {
+        availability: "OBSERVED",
+        id: kind === "charge" ? "charge_asaas_sbx_001" : paymentId,
+        status: kind === "charge" ? "confirmed" : "received",
+        amount_cents: 0,
+        currency: "BRL",
+        observed_at: observedAt,
+      };
+      chain[kind] = fact;
+      const html = htmlForRows([chain]);
+      const label = kind === "charge" ? "Cobrança" : "Recebimento";
+      const beforeTechnical = html.slice(0, html.indexOf("Identificadores e proveniência técnica"));
+      assert.match(beforeTechnical, new RegExp(`data-absent="true"><dt>${label}<\\/dt><dd>sem dados<\\/dd>`));
+      assert.doesNotMatch(beforeTechnical, /BRL 0,00/);
+      assert.doesNotMatch(html, new RegExp(observedAt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+  }
 });
 
 test("tokens futuros ficam autorais e o valor bruto permanece apenas no detalhe técnico", () => {
