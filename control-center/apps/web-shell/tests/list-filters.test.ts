@@ -449,6 +449,11 @@ test("HTTP list response replaces the capped preview and preserves a page beyond
   assert.match(root.innerHTML, /data-list-total="130"/);
   assert.match(root.innerHTML, /data-list-page="5"/);
   assert.match(root.innerHTML, /data-exception-id="exc-0100"/);
+  assert.match(root.innerHTML, /<option value="acknowledged">reconhecido<\/option>/);
+  assert.match(root.innerHTML, /<option value="open">aberto<\/option>/);
+  assert.match(root.innerHTML, /<option value="resolved">resolvido<\/option>/);
+  assert.match(root.innerHTML, /<option value="missing_version">versão de oferta ausente<\/option>/);
+  assert.match(root.innerHTML, /<option value="orphan">registro órfão<\/option>/);
   assert.equal(/data-exception-id="exc-0000"/.test(root.innerHTML), false);
   assert.ok(calls.some((call) => /commercial\/lists\/exceptions\?scope=commercial&pagina=5/.test(call)));
 });

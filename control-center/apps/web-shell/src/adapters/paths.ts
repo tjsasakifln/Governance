@@ -1,5 +1,6 @@
 import type { DestinationId } from "../destinations";
 import { getDestination } from "../destinations";
+import { ownMapValue } from "../own-map";
 
 export const AUTHORIZED_WRITE_PATH = "/v1/directives";
 
@@ -59,7 +60,7 @@ export function readPathsFor(id: DestinationId): readonly string[] {
         q("/v1/domains/pncp", { scope: "inbound" }),
       ];
     default:
-      return [q(`/v1/domains/${DOMAIN_BY_DESTINATION[id]}`, { scope })];
+      return [q(`/v1/domains/${ownMapValue(DOMAIN_BY_DESTINATION, id) ?? "unavailable"}`, { scope })];
   }
 }
 

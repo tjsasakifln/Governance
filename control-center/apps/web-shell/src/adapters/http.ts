@@ -1,6 +1,7 @@
 import type { DestinationId } from "../destinations";
 import { getDestination, parseHash, queryParamsOf } from "../destinations";
 import { LIST_PARAM_IDS } from "../filter";
+import { ownMapValue } from "../own-map";
 import { clientIdentityGapFrom } from "../client-identity";
 import type {
   ActorRef,
@@ -118,7 +119,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   }
 
   async warmblyDispatch(input: WarmblyDispatchInput): Promise<AdapterWriteResult> {
-    const path = WARMBLY_DISPATCH_PATHS[input.action];
+    const path = ownMapValue(WARMBLY_DISPATCH_PATHS, input.action);
     /**
      * A refusal this adapter makes on its own, before anything is written. It
      * carries `outcome: "refused"` because that is provable here: no request
@@ -288,7 +289,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     }
     const observed_at = new Date().toISOString();
     const payload = {
-      kind: WRITE_SHORTCUT_DIRECTIVE_KIND[kind],
+      kind: ownMapValue(WRITE_SHORTCUT_DIRECTIVE_KIND, kind) ?? "fact",
       title,
       body,
       scope: "company",
