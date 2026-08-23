@@ -76,6 +76,75 @@ test("Warmbly counts project to commercial snapshot with labeled acquisition coh
   assert.ok(clients);
 });
 
+test("controlled-email cohort preserves observed zero and UNKNOWN independently", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      confenge_status: {
+        readiness: {
+          latest_bounded_cohort: {
+            authorization_id: "auth-10",
+            cohort_id: "cohort-real-10",
+            cohort_hash: "sha256:cohort",
+            policy_version: "controlled-email.v1",
+            allowed_route_classes: ["DIRECT_PERSON", "GENERIC_COMPANY"],
+            route_class_distribution: { DIRECT_PERSON: 1, GENERIC_COMPANY: 1 },
+            authorized_quantity: 10,
+            sent: 0,
+            reserved: 0,
+            max_daily_volume: 10,
+            state: "active",
+          },
+        },
+      },
+      confenge_intel_report: {
+        schema_version: "confenge.observability_report.v1",
+        controlled_email: [
+          {
+            cohort_id: "cohort-real-10",
+            policy_version: "controlled-email.v1",
+            route_class: "DIRECT_PERSON",
+            provider: "smtp",
+            attempted: 1,
+            provider_accepted: 1,
+            delivered: null,
+            hard_bounce: 0,
+          },
+          {
+            cohort_id: "cohort-real-10",
+            policy_version: "controlled-email.v1",
+            route_class: "GENERIC_COMPANY",
+            provider: "smtp",
+            attempted: 1,
+            provider_accepted: 1,
+            delivered: null,
+            hard_bounce: null,
+          },
+        ],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    current: { sent: number; max_daily_volume: number; outcomes: Record<string, number | null> };
+  };
+  assert.equal(controlled.current.sent, 0, "an observed reservation-ledger zero must survive");
+  assert.equal(controlled.current.max_daily_volume, 10);
+  assert.equal(controlled.current.outcomes.provider_accepted, 2);
+  assert.equal(controlled.current.outcomes.delivered, null, "SMTP accepted must not become delivery");
+  assert.equal(
+    controlled.current.outcomes.hard_bounce,
+    null,
+    "one unreconciled route prevents a fabricated aggregate zero",
+  );
+});
+
 test("finance projector keeps paid distinct from effectively_received", () => {
   const [finance] = projectCollector({
     collector: "asaas",

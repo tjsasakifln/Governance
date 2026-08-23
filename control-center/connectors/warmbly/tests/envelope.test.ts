@@ -20,6 +20,13 @@ const EXECUTIVE = {
   inbound_qualified_pipeline: 1,
 };
 
+const REPORT = {
+  schema_version: "confenge.observability_report.v1",
+  month: "2026-08",
+  real_empty: false,
+  controlled_email: [],
+};
+
 const EXCEPTIONS = [
   { id: "ex-intel-1", code: "orphan_chain", reason: "lead without deal", next_action: "review", status: "open" },
 ];
@@ -111,12 +118,14 @@ describe("fetchWarmblyPayload assignment path", () => {
         "/health": { status: 200, json: { status: "ok" } },
         "/v1/confenge/intel/scoreboard": { status: 200, json: { data: SCOREBOARD } },
         "/v1/confenge/intel/executive": { status: 200, json: { data: EXECUTIVE } },
+        "/v1/confenge/intel/report": { status: 200, json: { data: REPORT } },
         "/v1/confenge/intel/exceptions": { status: 200, json: { data: EXCEPTIONS } },
         "/v1/confenge/intel/organic-scoreboard": { status: 200, json: { data: ORGANIC } },
       }),
     );
     assert.deepEqual(payload.confenge_intel_scoreboard, SCOREBOARD);
     assert.deepEqual(payload.confenge_intel_executive, EXECUTIVE);
+    assert.deepEqual(payload.confenge_intel_report, REPORT);
     assert.deepEqual(payload.confenge_intel_exceptions, EXCEPTIONS);
     assert.deepEqual(payload.confenge_intel_organic_scoreboard, ORGANIC);
     assert.equal(

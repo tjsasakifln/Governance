@@ -153,6 +153,11 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
       if (rec) payload.confenge_intel_executive = rec;
       break;
     }
+    case "confenge_intel_report": {
+      const rec = asRecordOrUndefined(json);
+      if (rec) payload.confenge_intel_report = rec;
+      break;
+    }
     case "confenge_intel_exceptions":
       payload.confenge_intel_exceptions = json;
       break;
