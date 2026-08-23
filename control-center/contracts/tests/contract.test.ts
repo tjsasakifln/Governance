@@ -143,7 +143,15 @@ describe("weekly revenue chain contract", () => {
     charge: { availability: "OBSERVED", id: "charge_asaas_sbx_001", status: "confirmed", amount_cents: 800000, currency: "BRL" },
     receipt: { availability: "UNKNOWN" },
     held: false,
-    synthetic: true,
+    synthetic: false,
+    source: {
+      system: "warmbly",
+      surface: "GET /v1/confenge/intel/executive?include_synthetic=0",
+      contract: "confenge.commercial_intel.v1",
+      month: "2026-08",
+      observed_at: "2026-08-22T12:00:00Z",
+      include_synthetic: false,
+    },
     authority: {
       operation_and_visualization: "governance-control-center",
       action_and_outcome: "warmbly",
@@ -172,6 +180,50 @@ describe("weekly revenue chain contract", () => {
       operations: { weekly_revenue_chains: [zero] },
     });
     assert.equal(zeroResult.ok, false);
+  });
+
+  it("requires every observed money amount to carry its currency and vice versa", () => {
+    for (const receipt of [
+      { availability: "OBSERVED", id: "payment_1", status: "RECEIVED", amount_cents: 0 },
+      { availability: "OBSERVED", id: "payment_1", status: "RECEIVED", currency: "BRL" },
+    ]) {
+      const candidate = clone(chain);
+      candidate.receipt = receipt as never;
+      const result = validate("CommercialSnapshot", {
+        ...base,
+        operations: { weekly_revenue_chains: [candidate] },
+      });
+      assert.equal(result.ok, false);
+    }
+
+    const observedZero = clone(chain);
+    observedZero.receipt = {
+      availability: "OBSERVED",
+      id: "payment_1",
+      status: "RECEIVED",
+      amount_cents: 0,
+      currency: "BRL",
+    } as never;
+    assert.equal(validate("CommercialSnapshot", {
+      ...base,
+      operations: { weekly_revenue_chains: [observedZero] },
+    }).ok, true);
+  });
+
+  it("requires a real-only producer source and keeps synthetic rows out", () => {
+    const synthetic = clone(chain);
+    synthetic.synthetic = true;
+    assert.equal(validate("CommercialSnapshot", {
+      ...base,
+      operations: { weekly_revenue_chains: [synthetic] },
+    }).ok, false);
+
+    const unproven = clone(chain);
+    unproven.source.include_synthetic = true;
+    assert.equal(validate("CommercialSnapshot", {
+      ...base,
+      operations: { weekly_revenue_chains: [unproven] },
+    }).ok, false);
   });
 });
 

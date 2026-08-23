@@ -81,6 +81,11 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
     {
       health: { status: "ok" },
       confenge_intel_executive: {
+        schema_version: "confenge.commercial_intel.v1",
+        month: "2026-08",
+        include_synthetic: false,
+        causal_proof: false,
+        real_empty: false,
         weekly_revenue_chains: [
           {
             schema_version: "confenge.weekly_revenue_chain.v1",
@@ -109,10 +114,11 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
             },
             receipt: { availability: "UNKNOWN", amount_cents: 0 },
             held: false,
-            synthetic: true,
+            synthetic: false,
           },
           {
             canonical_identity: { correlation_id: "free form display name" },
+            synthetic: false,
           },
         ],
       },
@@ -140,10 +146,123 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
     action_and_outcome: "warmbly",
     financial_facts: "asaas",
   });
+  assert.deepEqual(chain.source, {
+    system: "warmbly",
+    surface: "GET /v1/confenge/intel/executive?include_synthetic=0",
+    contract: "confenge.commercial_intel.v1",
+    month: "2026-08",
+    observed_at: now,
+    include_synthetic: false,
+  });
   assert.equal(
     (chain.canonical_identity as Record<string, unknown>).correlation_id,
     "corr_extra_sbx_week_2026_34",
   );
+});
+
+test("weekly revenue projection fails closed on authority drift, collisions, and unbound money", () => {
+  const identity = {
+    correlation_id: "corr_real_2026_34",
+    account_id: "acc_real_001",
+    opportunity_id: "opp_real_001",
+    offer_id: "CFG-DIAG-EXP-v1",
+    proposal_id: "prop_real_001",
+    charge_id: "charge_asaas_real_001",
+    payment_id: "payment_asaas_real_001",
+  };
+  const chain = {
+    schema_version: "confenge.weekly_revenue_chain.v1",
+    canonical_identity: identity,
+    latest_deliverable: { availability: "UNKNOWN" },
+    latest_evidence: { availability: "UNKNOWN" },
+    decision: { availability: "OBSERVED", value: "WAIT", observed_at: "2050-01-01T00:00:00Z" },
+    responsible: { availability: "OBSERVED", value: "role_commercial_owner" },
+    deadline: {
+      availability: "OBSERVED",
+      value: "2026-08-24T20:59:59Z",
+      observed_at: "2026-02-30T12:00:00Z",
+    },
+    next_action: { availability: "UNKNOWN" },
+    proposal: { availability: "OBSERVED", value: "different_proposal" },
+    charge: {
+      availability: "OBSERVED",
+      id: "different_charge",
+      status: "CONFIRMED",
+      amount_cents: 800000,
+      currency: "BRL",
+    },
+    receipt: {
+      availability: "OBSERVED",
+      id: "payment_asaas_real_001",
+      status: "RECEIVED",
+      amount_cents: 0,
+    },
+    held: false,
+    synthetic: false,
+  };
+  const executive = {
+    schema_version: "confenge.commercial_intel.v1",
+    month: "2026-08",
+    include_synthetic: false,
+    causal_proof: false,
+    real_empty: false,
+    weekly_revenue_chains: [chain],
+  };
+  const project = (candidate: Record<string, unknown>) => {
+    const snapshot = collectFromWarmblyPayload(
+      { health: { status: "ok" }, confenge_intel_executive: candidate },
+      { now: new Date(now) },
+    );
+    const commercial = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: snapshot as unknown as Record<string, unknown>,
+    }).find((row) => row.snapshot_kind === "commercial");
+    assert.ok(commercial);
+    return (commercial.payload.operations as { weekly_revenue_chains: Array<Record<string, unknown>> })
+      .weekly_revenue_chains;
+  };
+
+  for (const drifted of [
+    { ...executive, schema_version: "consumer.invented.v1" },
+    { ...executive, include_synthetic: true },
+    { ...executive, causal_proof: true },
+  ]) {
+    assert.deepEqual(project(drifted), []);
+  }
+
+  const [projected] = project(executive);
+  assert.ok(projected);
+  assert.deepEqual(projected.proposal, { availability: "UNKNOWN" });
+  assert.deepEqual(projected.charge, { availability: "UNKNOWN" });
+  assert.deepEqual(projected.decision, { availability: "OBSERVED", value: "WAIT" });
+  assert.deepEqual(projected.deadline, {
+    availability: "OBSERVED",
+    value: "2026-08-24T20:59:59Z",
+  });
+  assert.deepEqual(projected.receipt, {
+    availability: "OBSERVED",
+    id: "payment_asaas_real_001",
+    status: "RECEIVED",
+  });
+
+  const denominatedZero = {
+    ...chain,
+    receipt: { ...chain.receipt, currency: "BRL" },
+  };
+  const [zero] = project({ ...executive, weekly_revenue_chains: [denominatedZero] });
+  assert.deepEqual(zero?.receipt, {
+    availability: "OBSERVED",
+    id: "payment_asaas_real_001",
+    status: "RECEIVED",
+    amount_cents: 0,
+    currency: "BRL",
+  });
+
+  assert.deepEqual(project({ ...executive, weekly_revenue_chains: [chain, chain] }), []);
 });
 
 test("real Warmbly mapping selects controlled-email telemetry by cohort and policy", () => {
@@ -169,7 +288,7 @@ test("real Warmbly mapping selects controlled-email telemetry by cohort and poli
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       month: "2026-08",
       include_synthetic: false,
       real_empty: false,
@@ -208,7 +327,7 @@ test("real Warmbly mapping selects controlled-email telemetry by cohort and poli
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { sent: number; max_daily_volume: number; outcomes: Record<string, number | null> };
     report_month: string | null;
     rows: Array<{ cohort_id: string; policy_version: string; provider_accepted: number }>;
@@ -237,7 +356,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: false,
       controlled_email: [
@@ -266,7 +385,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { policy_version: string | null; outcomes: Record<string, number | null> };
     rows: unknown[];
   };
@@ -288,7 +407,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
         },
       },
       confenge_intel_report: {
-        schema_version: "confenge.observability_report.v1",
+        schema_version: "confenge.inbound_learning_report.v1",
         include_synthetic: includeSynthetic,
         real_empty: false,
         controlled_email: [{
@@ -309,7 +428,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
     });
     const commercial = projected.find((row) => row.snapshot_kind === "commercial");
     assert.ok(commercial);
-    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
       availability: string;
       current: { outcomes: Record<string, number | null> };
       rows: unknown[];
@@ -337,7 +456,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: true,
       controlled_email: [],
@@ -353,7 +472,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { integrity_flags: string[] };
   };
   assert.deepEqual(controlled.current.integrity_flags, [

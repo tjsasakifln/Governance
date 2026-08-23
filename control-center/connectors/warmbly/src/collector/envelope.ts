@@ -36,7 +36,10 @@ const EXECUTIVE_KEYS = [
   "generated_at",
 ] as const;
 const REPORT_KEYS = ["schema_version", "month", "controlled_email", "real_empty"] as const;
-const REAL_REPORT_SCHEMA = "confenge.observability_report.v1";
+const REAL_EXECUTIVE_SCHEMA = "confenge.commercial_intel.v1";
+// Producer-owned contract: Warmbly's report type exposes this exact schema.
+// Keep the consumer strict, but never validate against a consumer-invented name.
+const REAL_REPORT_SCHEMA = "confenge.inbound_learning_report.v1";
 const ORGANIC_KEYS = ["schema_version", "windows", "sources", "recommendation", "generated_at"] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -101,8 +104,52 @@ export function realIntelReportDriftReason(value: unknown): string | null {
   return null;
 }
 
+/**
+ * The collector always requests the real-only executive view. Validate the
+ * producer-owned discriminator and proof flags before its facts can reach a
+ * persisted read model.
+ */
+export function realIntelExecutiveDriftReason(value: unknown): string | null {
+  if (!isPlainObject(value)) return "intel_executive payload is not an object";
+  if (value.schema_version !== REAL_EXECUTIVE_SCHEMA) {
+    return `intel_executive schema_version is not ${REAL_EXECUTIVE_SCHEMA}`;
+  }
+  if (value.include_synthetic !== false) {
+    return "intel_executive does not prove include_synthetic=false";
+  }
+  if (typeof value.month !== "string" || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value.month)) {
+    return "intel_executive month is not YYYY-MM";
+  }
+  if (value.causal_proof !== false) {
+    return "intel_executive does not prove causal_proof=false";
+  }
+  if (typeof value.real_empty !== "boolean") {
+    return "intel_executive real_empty is not boolean";
+  }
+  if (value.weekly_revenue_chains !== undefined) {
+    if (!Array.isArray(value.weekly_revenue_chains)) {
+      return "intel_executive weekly_revenue_chains is not an array";
+    }
+    if (value.weekly_revenue_chains.some((row) => !isPlainObject(row))) {
+      return "intel_executive weekly_revenue_chains contains a non-object row";
+    }
+    if (value.weekly_revenue_chains.some((row) => row.synthetic !== false)) {
+      return "intel_executive real-only response contains an unproven or synthetic weekly revenue chain";
+    }
+    if (value.real_empty && value.weekly_revenue_chains.length > 0) {
+      return "intel_executive declares real_empty with weekly revenue chains";
+    }
+  }
+  return null;
+}
+
 function validateRealReport(value: unknown): EnvelopeDrift | null {
   const reason = realIntelReportDriftReason(value);
+  return reason ? drift(reason) : null;
+}
+
+function validateRealExecutive(value: unknown): EnvelopeDrift | null {
+  const reason = realIntelExecutiveDriftReason(value);
   return reason ? drift(reason) : null;
 }
 
@@ -153,6 +200,10 @@ export function normalizeIntelEnvelope(json: unknown, surface: IntelSurface): En
       const reportDrift = validateRealReport(inner);
       if (reportDrift) return reportDrift;
     }
+    if (surface === "intel_executive") {
+      const executiveDrift = validateRealExecutive(inner);
+      if (executiveDrift) return executiveDrift;
+    }
     return { ok: true, value: inner };
   }
 
@@ -160,6 +211,10 @@ export function normalizeIntelEnvelope(json: unknown, surface: IntelSurface): En
     if (surface === "intel_report") {
       const reportDrift = validateRealReport(json);
       if (reportDrift) return reportDrift;
+    }
+    if (surface === "intel_executive") {
+      const executiveDrift = validateRealExecutive(json);
+      if (executiveDrift) return executiveDrift;
     }
     return { ok: true, value: json };
   }
