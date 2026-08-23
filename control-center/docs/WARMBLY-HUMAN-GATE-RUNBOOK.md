@@ -59,7 +59,9 @@ denominadores, ou qualquer indício de auto-send/green autorun habilitado.
 3. Crie pelo endpoint auditado `/v1/api-keys` uma credencial separada com máscara
    decimal exata `196` (`read_contacts|write_contacts|write_campaigns`), prazo de
    rotação e sem `send_campaigns`. Instale-a atomicamente com
-   `install-warmbly-operator-token.sh`; não altere a chave do collector.
+   `install-warmbly-operator-token.sh SOURCE CC_SECRET_DIR 1000:1000`; o owner
+   numérico corresponde ao usuário `node` do Context e mantém o bind mount
+   legível com modo `0600`. Não altere a chave do collector.
 4. Aplique `docker-compose.warmbly-human-gate.override.yml` e faça apenas smoke
    GET em produção.
    Valide POST exclusivamente no sandbox. Auto-send e GREEN autorun permanecem
