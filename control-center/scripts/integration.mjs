@@ -24,6 +24,7 @@ run("npx", [
   "tests/convergence/dockerfiles.test.ts",
   "tests/convergence/cve-exceptions.test.ts",
   "tests/convergence/web-prod-hardening.test.ts",
+  "tests/convergence/web-brand-asset.test.ts",
   "tests/convergence/importer-apply.test.ts",
   "tests/convergence/importer-apply-db.test.ts",
   "tests/convergence/mcp-context.test.ts",

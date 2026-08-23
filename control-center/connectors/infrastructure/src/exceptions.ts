@@ -95,7 +95,7 @@ function qualifier(obs: SourceObservation): string {
   if (obs.check === "docker" && Array.isArray(obs.payload.services)) {
     const names = obs.payload.services
       .filter((item) => item && typeof item === "object")
-      .map((item) => String((item as Record<string, unknown>).name ?? "service"))
+      .map((item) => String((item as Record<string, unknown>).name ?? "unnamed-container"))
       .join(",");
     return slug(names);
   }

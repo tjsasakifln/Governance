@@ -14,6 +14,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   PriorityRecommendation,
   Provenance,
   ServiceHealth,
@@ -431,6 +432,14 @@ export const CLIENT_FIXTURES: ClientStatus[] = [
   },
 ];
 
+/**
+ * The operator runbook for infrastructure. A real document, on https, with no
+ * credentials in the URL — the catalog supplies it per service and the shell
+ * only renders links it can vouch for.
+ */
+const RUNBOOK_URL =
+  "https://github.com/tjsasakifln/Governance/blob/main/control-center/deploy/RUNBOOK.md";
+
 export const HEALTH_FIXTURES: ServiceHealth[] = [
   {
     schema_version: "control-center.service-health.v1",
@@ -448,6 +457,11 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
       { freshness_window_seconds: 60 },
     ),
     checked_at: "2026-08-20T17:12:00Z",
+    service_id: "context-service",
+    role: "API de contexto operacional (somente leitura)",
+    endpoint: "https://api.confenge.com.br/v1/context",
+    last_error: "http: sonda de saúde retornou erro de transporte",
+    runbook_url: RUNBOOK_URL,
     message: "Última sonda falhou. Sem chute de saúde.",
     checks: [{ name: "ready", status: "unknown", detail: "probe error" }],
     http: { status: "unknown", detail: "probe error" },
@@ -476,6 +490,11 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
     ),
     checked_at: "2026-08-20T16:00:00Z",
     latency_ms: 820,
+    service_id: "web-cfg",
+    role: "Painel de configuração web (edge)",
+    endpoint: "https://cfg.confenge.com.br/health",
+    last_error: "reachability: observação mais antiga que a janela de frescor",
+    duplicate_count: 2,
     checks: [{ name: "ready", status: "degraded", detail: "observation older than window" }],
   },
   {
@@ -495,9 +514,22 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
     ),
     checked_at: "2026-08-20T17:58:00Z",
     latency_ms: 42,
+    service_id: "github-collector",
+    role: "Coletor GitHub (execuções agendadas)",
+    endpoint: "https://api.confenge.com.br/collectors/github/health",
     checks: [{ name: "ready", status: "healthy" }],
   },
 ];
+
+export const INFRA_CATALOG_SUMMARY: InfraCatalogSummary = {
+  freshness_status: "STALE",
+  confidence: 0.55,
+  monitored_service_count: HEALTH_FIXTURES.length,
+  catalog_error_count: 0,
+  duplicate_group_count: 1,
+  availability: "STALE",
+  unavailability_reason: "STALE",
+};
 
 export const DIRECTIVE_FIXTURES: Directive[] = [
   {
@@ -856,6 +888,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       attention: attentionByScope((item) => item.scope === "infrastructure"),
       priorities: [],
       health: HEALTH_FIXTURES,
+      health_summary: INFRA_CATALOG_SUMMARY,
     }),
     crescimento: pageFor("crescimento", {
       headline: "Inbound e visibilidade. Sem atribuição inventada entre sistemas.",

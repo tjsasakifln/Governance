@@ -269,6 +269,68 @@ function mapEngineering(payload: Record<string, unknown>, id: string): Record<st
   return out;
 }
 
+function isFreshnessStatus(value: unknown): value is FreshnessStatus {
+  return value === "FRESH" || value === "STALE" || value === "UNKNOWN" || value === "ERROR";
+}
+
+/**
+ * The envelope forbids painting non-FRESH or unevidenced data as healthy, but
+ * that rule was only applied to the slot's own status: the nested services[]
+ * rode through untouched and reached the cockpit still claiming "healthy" with
+ * a confidence of zero.
+ *
+ * Each row is bounded by ITS OWN evidence, never by the slot's. The slot's
+ * freshness is one arbitrary observation — `result.observations[0]`, picked by
+ * a lexicographic sort of `source:target_id:check` — so folding it into every
+ * row would let one timing-out HTTP probe repaint the host and the TLS
+ * certificate as "fora do ar" while they are answering fresh, and would do so
+ * only when the failing target happens to sort first. Replacing a fabricated
+ * "healthy" with a fabricated "down" is not an improvement; during triage it
+ * is worse. A row with no evidence of its own still inherits the slot's, which
+ * is the case that produced the original bug.
+ *
+ * Doubt about the run that carried the row is real and is reported as
+ * `snapshot_evidence`, for the surface to display as a caveat beside the card.
+ */
+function demoteNestedServices(value: unknown, seed: ProvenanceSeed): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  const snapshotEvidence = {
+    freshness_status: seed.freshness_status,
+    confidence: seed.confidence,
+    conclusive: seed.freshness_status === "FRESH" && seed.confidence > 0,
+  };
+  return value.map((item) => {
+    const row = asRecord(item);
+    if (!row) {
+      return item;
+    }
+    const freshness = isFreshnessStatus(row.freshness_status) ? row.freshness_status : seed.freshness_status;
+    const confidence = typeof row.confidence === "number" ? row.confidence : seed.confidence;
+    const status = demoteHealthStatus(
+      freshness,
+      typeof row.status === "string" ? row.status : undefined,
+      confidence,
+    );
+    const provenance = asRecord(row.provenance);
+    const out: Record<string, unknown> = {
+      ...row,
+      freshness_status: freshness,
+      confidence,
+      evidence_conclusive: freshness === "FRESH" && confidence > 0,
+      snapshot_evidence: snapshotEvidence,
+    };
+    if (status !== undefined) {
+      out.status = status;
+    }
+    if (provenance) {
+      out.provenance = { ...provenance, freshness_status: freshness, confidence };
+    }
+    return out;
+  });
+}
+
 function mapInfraLike(
   payload: Record<string, unknown>,
   seed: ProvenanceSeed,
@@ -276,7 +338,7 @@ function mapInfraLike(
   schema: string,
 ): Record<string, unknown> {
   const rawStatus = typeof payload.status === "string" ? payload.status : undefined;
-  const status = demoteHealthStatus(seed.freshness_status, rawStatus);
+  const status = demoteHealthStatus(seed.freshness_status, rawStatus, seed.confidence);
   const out: Record<string, unknown> = {
     schema_version: schema,
     id,
@@ -287,10 +349,27 @@ function mapInfraLike(
   if (status !== undefined) {
     out.status = status;
   }
-  for (const key of ["services", "partial_outage", "availability", "evidence", "contract_version", "last_update_at", "ingestion_succeeded", "coverage_window", "usable_for_commercial_intelligence_now", "scheduled_job"]) {
+  for (const key of [
+    "partial_outage",
+    "availability",
+    "unavailability_reason",
+    "monitored_service_count",
+    "catalog_error_count",
+    "duplicate_group_count",
+    "evidence",
+    "contract_version",
+    "last_update_at",
+    "ingestion_succeeded",
+    "coverage_window",
+    "usable_for_commercial_intelligence_now",
+    "scheduled_job",
+  ]) {
     if (payload[key] !== undefined) {
       out[key] = payload[key];
     }
+  }
+  if (payload.services !== undefined) {
+    out.services = demoteNestedServices(payload.services, seed);
   }
   return out;
 }

@@ -9,6 +9,7 @@ import type {
   ActorRef,
   AgentActivity,
   AgentActivityPresentationStatus,
+  AlertRanking,
   AttentionItem,
   ClientIdentityException,
   ClientStatus,
@@ -17,6 +18,7 @@ import type {
   EngineeringSnapshot,
   FinanceSnapshot,
   FreshnessStatus,
+  InfraCatalogSummary,
   Money,
   PriorityRecommendation,
   Provenance,
@@ -24,6 +26,7 @@ import type {
   SourceRef,
 } from "../types";
 import { AGENT_ACTIVITY_STATUSES } from "../types";
+import { hasSecretQueryKey } from "../secret-keys";
 import type { DestinationPage } from "./contract";
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
@@ -101,6 +104,67 @@ export function moneyOf(value: unknown): Money | undefined {
   return { amount_cents: rec.amount_cents as number, currency: rec.currency };
 }
 
+const ALERT_SEVERITIES = new Set(["critical", "high", "medium", "low"]);
+
+function alertSeverityOf(value: unknown): AttentionItem["severity"] | undefined {
+  return typeof value === "string" && ALERT_SEVERITIES.has(value)
+    ? (value as AttentionItem["severity"])
+    : undefined;
+}
+
+/**
+ * Attention-engine annotation carried by `GET /v1/attention` and `GET /v1/today`.
+ *
+ * Those routes serve `RankedItem`, which is wider than `attention-item.v1`:
+ * it carries `reason` (the scoring arithmetic in prose), `category`, `domain`
+ * and the evidence locators. Dropping them used to leave the cockpit with the
+ * formula as the only body text it had. Absent on a payload that is a plain
+ * contract body — the caller must treat every field as optional.
+ */
+export function rankingFrom(row: Record<string, unknown>): AlertRanking | undefined {
+  // `reason` only: a plain `priority-recommendation.v1` body carries
+  // `rationale`, which is operator prose, not engine output. Treating it as
+  // engine output would bury the one readable sentence the item has behind
+  // "Como foi priorizado".
+  const reason = str(row.reason);
+  const category = typeof row.category === "string" ? row.category : undefined;
+  const domain = typeof row.domain === "string" ? row.domain : undefined;
+  const severity = alertSeverityOf(row.severity);
+  const forced = typeof row.forced_by_kill_rule === "boolean" ? row.forced_by_kill_rule : undefined;
+  const merge = typeof row.merge_count === "number" ? row.merge_count : undefined;
+  const score = typeof row.score === "number" ? row.score : undefined;
+  const evidence = Array.isArray(row.evidence_refs)
+    ? row.evidence_refs
+        .map((entry) => asRecord(entry))
+        .map((entry) => asRecord(entry?.source))
+        .filter((source): source is Record<string, unknown> => source != null)
+        .map((source) => `${str(source.system)}:${str(source.kind)}:${str(source.locator)}`)
+        .filter((locator) => locator !== "::")
+    : [];
+  if (
+    reason === "" &&
+    category === undefined &&
+    domain === undefined &&
+    severity === undefined &&
+    forced === undefined &&
+    merge === undefined &&
+    score === undefined &&
+    evidence.length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    reason,
+    ...(category !== undefined ? { category } : {}),
+    ...(domain !== undefined ? { domain } : {}),
+    ...(severity !== undefined ? { severity } : {}),
+    ...(forced !== undefined ? { forced_by_kill_rule: forced } : {}),
+    ...(merge !== undefined ? { merge_count: merge } : {}),
+    ...(score !== undefined ? { score } : {}),
+    evidence,
+  };
+}
+
 export function attentionFrom(row: Record<string, unknown>, fallback: Provenance): AttentionItem {
   const prov = provenanceOf(row, fallback);
   const item: AttentionItem = {
@@ -117,6 +181,8 @@ export function attentionFrom(row: Record<string, unknown>, fallback: Provenance
   };
   if (typeof row.recommended_action === "string") item.recommended_action = row.recommended_action;
   if (Array.isArray(row.related_ids)) item.related_ids = row.related_ids.map(String);
+  const ranking = rankingFrom(row);
+  if (ranking) item.ranking = ranking;
   return item;
 }
 
@@ -139,6 +205,9 @@ export function priorityFrom(
   };
   if (Array.isArray(row.attention_item_ids)) item.attention_item_ids = row.attention_item_ids.map(String);
   if (Array.isArray(row.directive_ids)) item.directive_ids = row.directive_ids.map(String);
+  if (typeof row.recommended_action === "string") item.recommended_action = row.recommended_action;
+  const ranking = rankingFrom(row);
+  if (ranking) item.ranking = ranking;
   return item;
 }
 
@@ -522,18 +591,120 @@ export function engineeringFrom(row: Record<string, unknown>, fallback: Provenan
   return snap;
 }
 
+const HEALTH_STATUSES = ["healthy", "degraded", "down", "unknown"] as const;
+
+/**
+ * The infrastructure collector says "unhealthy" where the contract says
+ * "down". Anything unrecognised is unknown — never healthy by omission.
+ */
+function healthStatusOf(value: unknown): ServiceHealth["status"] {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (raw === "unhealthy" || raw === "down") return "down";
+  return (HEALTH_STATUSES as readonly string[]).includes(raw)
+    ? (raw as ServiceHealth["status"])
+    : "unknown";
+}
+
+/**
+ * A runbook href the shell is willing to render: a same-origin absolute path,
+ * or an http(s) URL with no embedded credentials. The projector validates the
+ * same rule; the shell repeats it because a link it cannot vouch for is worse
+ * than no link.
+ */
+export function safeRunbookHref(value: unknown): string | undefined {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (raw === "" || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
+    return undefined;
+  }
+  if (raw.startsWith("/")) {
+    if (raw.includes("@")) return undefined;
+    return hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "") ? undefined : raw;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username !== "" || url.password !== "") return undefined;
+    if (hasSecretQueryKey(url.search)) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Catalog-level truth for the Infra route, read off the domain snapshot. The
+ * operator needs to know whether confidence 0 means "never configured" or "the
+ * probe failed"; both used to look identical on screen.
+ */
+export function infraSummaryFrom(
+  body: Record<string, unknown>,
+  provenance: Provenance,
+): InfraCatalogSummary {
+  const summary: InfraCatalogSummary = {
+    freshness_status: provenance.freshness_status,
+    confidence: provenance.confidence,
+  };
+  for (const key of ["monitored_service_count", "catalog_error_count", "duplicate_group_count"] as const) {
+    const value = body[key];
+    if (typeof value === "number" && Number.isFinite(value)) summary[key] = value;
+  }
+  const availability = str(body.availability);
+  if (availability !== "") summary.availability = availability;
+  const reason = str(body.unavailability_reason);
+  if (reason !== "") summary.unavailability_reason = reason;
+  return summary;
+}
+
 export function healthFrom(row: Record<string, unknown>, fallback: Provenance): ServiceHealth {
   const prov = provenanceOf(row, fallback);
+  // The collector emits service_id/display_name; earlier payloads used
+  // id/service_name. Reading only one pair is what produced a wall of cards
+  // all called "service", so every known spelling is consulted before the row
+  // is declared nameless — and a nameless row is labelled as a catalog defect
+  // rather than given a generic name that hides it.
+  const identity =
+    str(row.service_name) || str(row.display_name) || str(row.service_id) || str(row.target_id);
   const item: ServiceHealth = {
     schema_version: "control-center.service-health.v1",
-    id: str(row.id, "cc:service-health:unknown"),
+    id: str(row.id, `cc:service-health:${identity !== "" ? identity : "sem-identidade"}`),
     scope: str(row.scope, "infrastructure"),
-    service_name: str(row.service_name, "service"),
-    status: (row.status as ServiceHealth["status"]) ?? "unknown",
+    service_name: identity !== "" ? identity : "serviço sem identidade no catálogo",
+    status: healthStatusOf(row.status),
     provenance: prov,
     checked_at: str(row.checked_at, prov.observed_at),
   };
+  const serviceId = str(row.service_id);
+  if (serviceId !== "") item.service_id = serviceId;
+  const role = str(row.role);
+  if (role !== "") item.role = role;
+  const endpoint = str(row.endpoint);
+  if (endpoint !== "") item.endpoint = endpoint;
+  const lastError = str(row.last_error);
+  if (lastError !== "") item.last_error = lastError;
+  const runbook = safeRunbookHref(row.runbook_url);
+  if (runbook) item.runbook_url = runbook;
+  if (typeof row.duplicate_count === "number" && row.duplicate_count > 1) {
+    item.duplicate_count = row.duplicate_count;
+  }
+  const catalogError = str(row.catalog_error) || (identity === "" ? "missing_service_identity" : "");
+  if (catalogError !== "") item.catalog_error = catalogError;
+  if (typeof row.evidence_conclusive === "boolean") item.evidence_conclusive = row.evidence_conclusive;
+  const snapshotEvidence = asRecord(row.snapshot_evidence);
+  if (snapshotEvidence && isFreshness(snapshotEvidence.freshness_status)) {
+    const evidenceConfidence =
+      typeof snapshotEvidence.confidence === "number" ? snapshotEvidence.confidence : 0;
+    item.snapshot_evidence = {
+      freshness_status: snapshotEvidence.freshness_status,
+      confidence: evidenceConfidence,
+      conclusive:
+        typeof snapshotEvidence.conclusive === "boolean"
+          ? snapshotEvidence.conclusive
+          : snapshotEvidence.freshness_status === "FRESH" && evidenceConfidence > 0,
+    };
+  }
   if (typeof row.latency_ms === "number") item.latency_ms = row.latency_ms;
+  const latencyCheck = str(row.latency_check);
+  if (latencyCheck !== "") item.latency_check = latencyCheck;
   if (typeof row.message === "string") item.message = row.message;
   if (Array.isArray(row.checks)) {
     item.checks = row.checks.map((check) => {
@@ -571,6 +742,13 @@ export function healthFrom(row: Record<string, unknown>, fallback: Provenance): 
     item.backup = {
       ...(typeof backup.status === "string" ? { status: backup.status } : {}),
       ...(typeof backup.detail === "string" ? { detail: backup.detail } : {}),
+    };
+  }
+  const hostMetrics = asRecord(row.host_metrics);
+  if (hostMetrics) {
+    item.host_metrics = {
+      ...(typeof hostMetrics.status === "string" ? { status: hostMetrics.status } : {}),
+      ...(typeof hostMetrics.detail === "string" ? { detail: hostMetrics.detail } : {}),
     };
   }
   const disk = asRecord(row.disk);

@@ -8,15 +8,358 @@ import {
   type ClientIdentityBasis,
   type ClientIdentityReasonCode,
 } from "@confenge/control-center-contracts";
+// A leaf module with no imports of its own: this does not pull the collector's
+// runtime into the runner's import graph, only the one rule both must obey.
+import { hasSecretQueryKey } from "../../../infrastructure/src/secret-keys.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
+  FRESHNESS,
   PROJECTOR_VERSION,
   asArray,
   asRecord,
   capList,
+  finiteNumber,
+  isoOr,
   type CollectorEnvelope,
+  type FreshnessStatus,
   type ProjectedSnapshot,
 } from "./types.ts";
+
+const HEALTH_STATUS = ["healthy", "degraded", "down", "unknown"] as const;
+type HealthStatus = (typeof HEALTH_STATUS)[number];
+
+/**
+ * The collector speaks healthy/degraded/unhealthy/unknown; the contract and the
+ * cockpit speak healthy/degraded/down/unknown. Anything unrecognised is
+ * unknown, never healthy.
+ */
+function normalizeHealthStatus(value: unknown): HealthStatus {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (raw === "unhealthy" || raw === "down") return "down";
+  if (raw === "healthy" || raw === "degraded" || raw === "unknown") return raw;
+  return "unknown";
+}
+
+const STATUS_SEVERITY: Record<HealthStatus, number> = { down: 3, degraded: 2, unknown: 1, healthy: 0 };
+const FRESHNESS_SEVERITY: Record<FreshnessStatus, number> = { ERROR: 3, STALE: 2, UNKNOWN: 1, FRESH: 0 };
+
+function asFreshness(value: unknown, fallback: FreshnessStatus): FreshnessStatus {
+  return typeof value === "string" && (FRESHNESS as readonly string[]).includes(value)
+    ? (value as FreshnessStatus)
+    : fallback;
+}
+
+/**
+ * A DOM/resource-id-safe rendering of a catalog id. Lossy on purpose — target
+ * ids legally contain "." and "_" (allowlist TARGET_ID) — so it is used only to
+ * build an id, never to decide whether two rows are the same service. Two
+ * distinct ids that slug alike are reported as an ambiguity, not merged.
+ */
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "sem-identidade"
+  );
+}
+
+function textOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/** A ServiceCheck from the collector, shaped as the cockpit's {status, detail}. */
+function checkSlot(checks: readonly Record<string, unknown>[], kind: string): Record<string, unknown> | undefined {
+  const found = checks.find((check) => check.check === kind || check.name === kind);
+  if (!found) return undefined;
+  const detail = textOrUndefined(found.summary) ?? textOrUndefined(found.detail);
+  return {
+    status: normalizeHealthStatus(found.status),
+    ...(detail ? { detail } : {}),
+  };
+}
+
+interface InfraService {
+  /** Exact identity. Never a slug: a slug merges services that are not the same. */
+  readonly key: string;
+  readonly slug: string;
+  readonly row: Record<string, unknown>;
+  readonly status: HealthStatus;
+  readonly freshness: FreshnessStatus;
+  readonly latency: number | undefined;
+  readonly lastError: string | undefined;
+  readonly anonymous: boolean;
+}
+
+/**
+ * One monitored dependency, named. The collector emits service_id/display_name
+ * (connectors/infrastructure ServiceHealth); older payloads used id/service_name.
+ * A row that carries neither is a catalog defect and is labelled as one instead
+ * of being rendered as yet another nameless "service" card.
+ */
+function projectService(
+  item: unknown,
+  index: number,
+  envelope: CollectorEnvelope,
+  fallbackFreshness: FreshnessStatus,
+): InfraService {
+  const raw = asRecord(item) ?? {};
+  const checks = asArray(raw.checks)
+    .map((check) => asRecord(check))
+    .filter((check): check is Record<string, unknown> => check !== null);
+  const serviceId = textOrUndefined(raw.service_id) ?? textOrUndefined(raw.id);
+  const displayName = textOrUndefined(raw.display_name) ?? textOrUndefined(raw.service_name);
+  const anonymous = serviceId === undefined && displayName === undefined;
+  // Identity is compared verbatim. Anonymous rows are each their own service:
+  // two defects are two defects, not a duplicate of one another.
+  const key = anonymous
+    ? `anonymous:${index}`
+    : serviceId !== undefined
+      ? `service_id:${serviceId}`
+      : `display_name:${String(displayName)}`;
+  const slug = anonymous ? `sem-identidade-${index + 1}` : slugify(serviceId ?? String(displayName));
+  const freshness = asFreshness(raw.freshness_status, fallbackFreshness);
+  const status = normalizeHealthStatus(raw.status);
+  const observedAt = isoOr(raw.observed_at, envelope.observed_at);
+  const confidence = finiteNumber(raw.confidence) ?? envelope.confidence;
+  const latency = finiteNumber(raw.latency_ms);
+  const latencyCheck = textOrUndefined(raw.latency_check);
+  const lastError = textOrUndefined(raw.last_error);
+  const runbook = safeRunbookUrl(raw.runbook_url);
+  const http = checkSlot(checks, "http");
+  const tls = checkSlot(checks, "tls");
+  const docker = checkSlot(checks, "docker");
+  const backup = checkSlot(checks, "backup");
+  const hostMetrics = checkSlot(checks, "host_metrics");
+  const row: Record<string, unknown> = {
+    schema_version: "control-center.service-health.v1",
+    id: `cc:service-health:${slug}`,
+    scope: "infrastructure",
+    service_id: serviceId ?? null,
+    service_name: displayName ?? serviceId ?? "serviço sem identidade no catálogo",
+    role: textOrUndefined(raw.role) ?? "função não declarada no catálogo",
+    endpoint: textOrUndefined(raw.endpoint) ?? "endpoint não declarado no catálogo",
+    status,
+    freshness_status: freshness,
+    observed_at: observedAt,
+    checked_at: observedAt,
+    confidence,
+    partial_outage: raw.partial_outage === true,
+    checks: capList(
+      checks.map((check) => ({
+        name: String(check.check ?? check.name ?? "check"),
+        status: normalizeHealthStatus(check.status),
+        ...(textOrUndefined(check.summary) ? { detail: textOrUndefined(check.summary) } : {}),
+      })),
+    ),
+    provenance: {
+      source: envelope.source,
+      observed_at: observedAt,
+      freshness_status: freshness,
+      confidence,
+    },
+    ...(latency !== undefined ? { latency_ms: latency } : {}),
+    ...(latencyCheck ? { latency_check: latencyCheck } : {}),
+    ...(lastError ? { last_error: lastError, message: lastError } : {}),
+    ...(runbook ? { runbook_url: runbook } : {}),
+    ...(http ? { http } : {}),
+    ...(tls ? { tls } : {}),
+    ...(docker ? { docker } : {}),
+    ...(backup ? { backup } : {}),
+    ...(hostMetrics ? { host_metrics: hostMetrics } : {}),
+    ...(anonymous ? { catalog_error: "missing_service_identity" } : {}),
+  };
+  return { key, slug, row, status, freshness, latency, lastError, anonymous };
+}
+
+/**
+ * Two entries for the same catalog id collapse into one card. Every dimension
+ * is rolled up independently — worst status, worst freshness, lowest
+ * confidence, highest latency, first recorded error — because picking whichever
+ * member row looked worse "overall" silently discarded the other's evidence: a
+ * down+FRESH row losing to a healthy+STALE one took its 503 with it.
+ */
+function mergeDuplicates(members: readonly InfraService[]): Record<string, unknown> {
+  const base = members[0];
+  if (!base) {
+    throw new Error("mergeDuplicates called with no members");
+  }
+  if (members.length === 1) {
+    return base.row;
+  }
+  const worstStatus = members.reduce(
+    (worst, member) => (STATUS_SEVERITY[member.status] > STATUS_SEVERITY[worst] ? member.status : worst),
+    base.status,
+  );
+  const worstFreshness = members.reduce(
+    (worst, member) => (FRESHNESS_SEVERITY[member.freshness] > FRESHNESS_SEVERITY[worst] ? member.freshness : worst),
+    base.freshness,
+  );
+  const confidences = members
+    .map((member) => finiteNumber(member.row.confidence))
+    .filter((value): value is number => value !== undefined);
+  // The check that produced the surviving number travels with it. Keeping the
+  // base row's latency_check while taking another member's max reported, for
+  // example, 120 ms "(http)" for a figure measured by reachability.
+  const timed = members
+    .filter((member): member is InfraService & { latency: number } => member.latency !== undefined)
+    .sort((a, b) => b.latency - a.latency);
+  const slowest = timed[0];
+  const errors = members
+    .map((member) => member.lastError)
+    .filter((value): value is string => value !== undefined);
+  // Preserve every distinct probe carried by duplicate catalog rows. For a
+  // repeated probe kind, retain the worst result and its detail. Selecting the
+  // checks from one "overall worst" row loses independent evidence (for
+  // example HTTP from one row and TLS from another).
+  const checksByName = new Map<string, Record<string, unknown>>();
+  for (const member of members) {
+    for (const rawCheck of asArray(member.row.checks)) {
+      const check = asRecord(rawCheck);
+      if (!check) continue;
+      const name = textOrUndefined(check.name) ?? "check";
+      const candidateStatus = normalizeHealthStatus(check.status);
+      const current = checksByName.get(name);
+      const currentStatus = normalizeHealthStatus(current?.status);
+      if (!current || STATUS_SEVERITY[candidateStatus] > STATUS_SEVERITY[currentStatus]) {
+        checksByName.set(name, { ...check, name, status: candidateStatus });
+      }
+    }
+  }
+  const mergedChecks = capList([...checksByName.values()]);
+  const freshestWorstMembers = members.filter((member) => member.freshness === worstFreshness);
+  const evidenceMember = [...freshestWorstMembers].sort((a, b) => {
+    const aObserved = String(a.row.observed_at ?? "");
+    const bObserved = String(b.row.observed_at ?? "");
+    return aObserved.localeCompare(bObserved);
+  })[0] ?? base;
+  const merged: Record<string, unknown> = {
+    ...base.row,
+    checks: mergedChecks,
+    status: worstStatus,
+    freshness_status: worstFreshness,
+    observed_at: evidenceMember.row.observed_at,
+    checked_at: evidenceMember.row.checked_at,
+    partial_outage: members.some((member) => member.row.partial_outage === true),
+    duplicate_count: members.length,
+  };
+  for (const kind of ["http", "tls", "docker", "backup", "host_metrics"] as const) {
+    const slot = checkSlot(mergedChecks, kind);
+    if (slot) merged[kind] = slot;
+    else delete merged[kind];
+  }
+  if (confidences.length > 0) {
+    merged.confidence = Math.min(...confidences);
+  }
+  if (slowest) {
+    merged.latency_ms = slowest.latency;
+    const check = slowest.row.latency_check;
+    if (typeof check === "string" && check !== "") {
+      merged.latency_check = check;
+    } else {
+      delete merged.latency_check;
+    }
+  }
+  const joined = [...new Set(errors)].join(" | ");
+  if (joined !== "") {
+    merged.last_error = joined;
+    merged.message = joined;
+  }
+  const provenance = asRecord(merged.provenance);
+  if (provenance) {
+    merged.provenance = {
+      ...provenance,
+      observed_at: evidenceMember.row.observed_at,
+      freshness_status: worstFreshness,
+      ...(confidences.length > 0 ? { confidence: Math.min(...confidences) } : {}),
+    };
+  }
+  return merged;
+}
+
+interface GroupedServices {
+  readonly services: Record<string, unknown>[];
+  readonly duplicateGroups: number;
+  readonly ambiguousIds: number;
+}
+
+/**
+ * Grouping is by exact catalog identity. Two different ids that happen to slug
+ * alike (cfg-health and cfg.health) are two services, and losing one of them to
+ * a merge would delete a monitored dependency from the cockpit and from the
+ * count. They keep separate cards, separate ids, and are flagged so the
+ * ambiguity is fixed in the catalog rather than hidden here.
+ */
+function groupServices(services: readonly InfraService[]): GroupedServices {
+  const byKey = new Map<string, InfraService[]>();
+  for (const service of services) {
+    const bucket = byKey.get(service.key);
+    if (bucket) {
+      bucket.push(service);
+    } else {
+      byKey.set(service.key, [service]);
+    }
+  }
+  const groups = [...byKey.values()];
+  const slugCounts = new Map<string, number>();
+  for (const members of groups) {
+    const slug = members[0]?.slug ?? "sem-identidade";
+    slugCounts.set(slug, (slugCounts.get(slug) ?? 0) + 1);
+  }
+  const seenBySlug = new Map<string, number>();
+  let ambiguousIds = 0;
+  const rows = groups.map((members) => {
+    const merged = mergeDuplicates(members);
+    const slug = members[0]?.slug ?? "sem-identidade";
+    if ((slugCounts.get(slug) ?? 0) > 1) {
+      const ordinal = (seenBySlug.get(slug) ?? 0) + 1;
+      seenBySlug.set(slug, ordinal);
+      ambiguousIds += 1;
+      return {
+        ...merged,
+        id: `cc:service-health:${slug}-${ordinal}`,
+        catalog_error: merged.catalog_error ?? "ambiguous_service_id",
+      };
+    }
+    return merged;
+  });
+  return {
+    services: rows,
+    duplicateGroups: groups.filter((members) => members.length > 1).length,
+    ambiguousIds,
+  };
+}
+
+/**
+ * A runbook link the cockpit may render. Same-origin absolute path, or an
+ * http(s) URL with no credentials and no secret-looking query key — the same
+ * rule, from the same module, that the allowlist parser applies, because a link
+ * the operator cannot trust is worse than no link. Anything else is dropped.
+ *
+ * The decode lives inside hasSecretQueryKey: a malformed escape such as
+ * `?%ZZ=1` used to throw URIError out of here, past projectCollector and past
+ * runSource's try/finally, so the whole infra snapshot went unpersisted for
+ * that run over a config typo.
+ */
+function safeRunbookUrl(value: unknown): string | undefined {
+  const raw = textOrUndefined(value);
+  if (!raw || raw.length > 512 || /[\s<>"'\\]/.test(raw) || raw.startsWith("//")) {
+    return undefined;
+  }
+  if (raw.startsWith("/")) {
+    if (raw.includes("@")) return undefined;
+    return hasSecretQueryKey(raw.includes("?") ? raw.slice(raw.indexOf("?") + 1) : "") ? undefined : raw;
+  }
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.username || url.password) return undefined;
+    if (hasSecretQueryKey(url.search)) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSnapshot {
   const availability = availabilityFromEnvelope(envelope);
@@ -24,8 +367,20 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   const payload = asRecord(envelope.payload) ?? {};
   const health = asArray(payload.service_health).length > 0 ? asArray(payload.service_health) : asArray(payload.health);
   const first = asRecord(health[0]) ?? payload;
-  const statuses = health.map((item) => String(asRecord(item)?.status ?? "unknown"));
-  const partial = statuses.some((status) => status !== "healthy") && statuses.some((status) => status === "healthy");
+  const projected = health.map((item, index) => projectService(item, index, envelope, freshness));
+  const grouped = groupServices(projected);
+  // Availability is a property of the distinct monitored services, not of raw
+  // duplicate catalog rows. UNKNOWN is inconclusive and must not be described
+  // as an outage merely because another service is healthy.
+  const statuses = grouped.services.map((service) => normalizeHealthStatus(service.status));
+  const partial =
+    statuses.some((status) => status === "degraded" || status === "down") &&
+    statuses.some((status) => status === "healthy");
+  const overallStatus = statuses.reduce<HealthStatus>(
+    (worst, status) => (STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst),
+    normalizeHealthStatus(first.status),
+  );
+  const catalogErrors = projected.filter((service) => service.anonymous).length + grouped.ambiguousIds;
   return {
     projector_version: PROJECTOR_VERSION,
     snapshot_kind: "infrastructure",
@@ -35,24 +390,21 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
       projector_version: PROJECTOR_VERSION,
       availability,
       service_name: first.service_name ?? "control-center-infrastructure",
-      status: partial ? "degraded" : first.status ?? (availability === "FRESH" ? "unknown" : "unknown"),
+      // The snapshot summary is a decision signal, so it carries the worst
+      // observed service state. Array order must never hide a later outage.
+      status: partial ? "degraded" : overallStatus,
       partial_outage: partial,
-      services: capList(
-        health.map((item) => {
-          const row = asRecord(item) ?? {};
-          return {
-            id: row.id,
-            service_name: row.service_name ?? row.id,
-            status: row.status,
-            freshness_status: row.freshness_status,
-            partial_outage: row.partial_outage === true,
-            http: row.http,
-            tls: row.tls,
-            disk: row.disk,
-            memory: row.memory,
-          };
-        }),
-      ),
+      monitored_service_count: grouped.services.length,
+      catalog_error_count: catalogErrors,
+      duplicate_group_count: grouped.duplicateGroups,
+      // Present whenever the run is not fully trustworthy, not only when the
+      // collector threw. A probe that failed while the collector itself ran
+      // fine is the common case, and it used to leave the operator with a bare
+      // confidence of 0 and nothing to distinguish it from "never configured".
+      ...(envelope.error || availability !== "FRESH"
+        ? { unavailability_reason: envelope.error?.code ?? availability }
+        : {}),
+      services: capList(grouped.services),
     },
     freshness_status: freshness,
     availability,
