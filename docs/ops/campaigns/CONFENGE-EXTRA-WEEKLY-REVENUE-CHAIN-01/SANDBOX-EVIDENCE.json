@@ -1,0 +1,30 @@
+{
+  "schema_version": "confenge.extra_weekly_revenue_evidence.v1",
+  "mode": "sandbox",
+  "pii_transmitted": false,
+  "client_contacted": false,
+  "real_charge_created": false,
+  "correlation_id": "corr_extra_sbx_week_2026_34",
+  "canonical_identity": {
+    "account_id": "acc_extra_sbx_001",
+    "opportunity_id": "opp_extra_sbx_001",
+    "offer_id": "CFG-DIAG-EXP-v1",
+    "proposal_id": "prop_extra_sbx_001",
+    "charge_id": "charge_asaas_sbx_001",
+    "payment_id": "payment_asaas_sbx_001"
+  },
+  "before_received": {
+    "receipt": { "availability": "UNKNOWN" }
+  },
+  "after_received": {
+    "receipt": {
+      "availability": "OBSERVED",
+      "id": "payment_asaas_sbx_001",
+      "status": "received",
+      "amount_cents": 800000,
+      "currency": "BRL"
+    }
+  },
+  "commercial_decision": "WAIT",
+  "verdict": "SANDBOX_RECONCILED_WAITING_HUMAN_GATE"
+}

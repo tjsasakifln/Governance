@@ -97,6 +97,67 @@ function dealMoneyLine(value: unknown): string {
     ? `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`
     : "";
 }
+
+function observedValue(value: unknown): string {
+  if (!value || typeof value !== "object") return "UNKNOWN";
+  const row = value as Record<string, unknown>;
+  return row.availability === "OBSERVED" && typeof row.value === "string" && row.value.length > 0
+    ? row.value
+    : "UNKNOWN";
+}
+
+function weeklyMoneyValue(value: unknown): string {
+  if (!value || typeof value !== "object") return "UNKNOWN";
+  const row = value as Record<string, unknown>;
+  if (row.availability !== "OBSERVED" || typeof row.id !== "string") return "UNKNOWN";
+  const money = readableMoney(row);
+  const status = typeof row.status === "string" ? row.status : "UNKNOWN";
+  return money
+    ? `${row.id} · ${status} · ${formatMoney(money)}`
+    : `${row.id} · ${status} · valor UNKNOWN`;
+}
+
+function weeklyRevenueBlock(operations: Record<string, unknown>): string {
+  const rows = Array.isArray(operations.weekly_revenue_chains)
+    ? rowsOf(operations.weekly_revenue_chains)
+    : [];
+  return `<section class="stack" aria-labelledby="weekly-revenue-title" data-weekly-revenue-chain-count="${rows.length}">
+    <h2 id="weekly-revenue-title">Cadeia semanal até receita observável</h2>
+    <p class="constraint">Control Center opera e visualiza. Warmbly detém ação e outcome. Asaas é a autoridade financeira. Esta superfície não cria nem altera cobranças.</p>
+    <div class="cards">${rows.length === 0
+      ? `<p class="banner empty">Nenhuma cadeia semanal observada. Todos os fatos permanecem UNKNOWN.</p>`
+      : rows.map((row) => {
+          const identity = row.canonical_identity && typeof row.canonical_identity === "object"
+            ? (row.canonical_identity as Record<string, unknown>)
+            : {};
+          const correlation = String(identity.correlation_id ?? "UNKNOWN");
+          const decision = observedValue(row.decision);
+          return `<article class="card" data-correlation-id="${escapeHtml(correlation)}" data-commercial-decision="${escapeHtml(decision)}" data-synthetic="${row.synthetic === true ? "true" : "false"}">
+            <p class="kicker">correlation_id</p>
+            <h3>${escapeHtml(correlation)}</h3>
+            ${decision === "WAIT" ? `<p class="banner" data-human-gate="WAIT">Gate humano visível: WAIT. Nenhuma conclusão comercial foi inferida.</p>` : ""}
+            <dl class="facts">
+              ${fact("Account ID", escapeHtml(String(identity.account_id ?? "UNKNOWN")))}
+              ${fact("Opportunity ID", escapeHtml(String(identity.opportunity_id ?? "UNKNOWN")))}
+              ${fact("Offer ID", escapeHtml(String(identity.offer_id ?? "UNKNOWN")))}
+              ${fact("Proposal ID", escapeHtml(String(identity.proposal_id ?? "UNKNOWN")))}
+              ${fact("Charge ID", escapeHtml(String(identity.charge_id ?? "UNKNOWN")))}
+              ${fact("Payment ID", escapeHtml(String(identity.payment_id ?? "UNKNOWN")))}
+              ${fact("Entregável mais recente", escapeHtml(observedValue(row.latest_deliverable)))}
+              ${fact("Evidência mais recente", escapeHtml(observedValue(row.latest_evidence)))}
+              ${fact("Decisão", escapeHtml(decision))}
+              ${fact("Responsável", escapeHtml(observedValue(row.responsible)))}
+              ${fact("Prazo", escapeHtml(observedValue(row.deadline)))}
+              ${fact("Próxima ação", escapeHtml(observedValue(row.next_action)))}
+              ${fact("Proposta", escapeHtml(observedValue(row.proposal)))}
+              ${fact("Cobrança", escapeHtml(weeklyMoneyValue(row.charge)))}
+              ${fact("Recebimento", escapeHtml(weeklyMoneyValue(row.receipt)))}
+            </dl>
+          </article>`;
+        }).join("")}
+    </div>
+  </section>`;
+}
 function listFact(label: string, items: string[] | undefined): string {
   if (!items || items.length === 0) return "";
   return fact(label, escapeHtml(items.join(", ")));
@@ -595,7 +656,8 @@ function commercialOps(
         ${fact("Inbound a tratar", String(overview.inbound_requiring_attention ?? "—"))}
         ${fact("Oportunidades a agir", String(overview.opportunities_requiring_action ?? "—"))}
       </dl>
-    </section>`;
+    </section>
+    ${weeklyRevenueBlock(ops)}`;
   }
   return body;
 }
