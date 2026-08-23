@@ -36,7 +36,9 @@ const EXECUTIVE_KEYS = [
   "generated_at",
 ] as const;
 const REPORT_KEYS = ["schema_version", "month", "controlled_email", "real_empty"] as const;
-const REAL_REPORT_SCHEMA = "confenge.observability_report.v1";
+// Producer-owned contract: Warmbly's report type exposes this exact schema.
+// Keep the consumer strict, but never validate against a consumer-invented name.
+const REAL_REPORT_SCHEMA = "confenge.inbound_learning_report.v1";
 const ORGANIC_KEYS = ["schema_version", "windows", "sources", "recommendation", "generated_at"] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
