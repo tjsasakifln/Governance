@@ -1,4 +1,5 @@
 import { resolveClientIdentity } from "@confenge/control-center-contracts";
+import { realIntelReportDriftReason } from "../../../warmbly/src/collector/envelope.ts";
 import { WARMBLY_FULL_OPERATIONS } from "../../../warmbly/src/mapper/normalize.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
@@ -163,6 +164,124 @@ function sourceIdOf(row: Record<string, unknown>): string | null {
   return typeof row.id === "string" && row.id.trim() !== "" ? row.id.trim() : null;
 }
 
+const CONTROLLED_EMAIL_METRICS = [
+  "attempted",
+  "provider_accepted",
+  "delivered",
+  "hard_bounce",
+  "soft_bounce",
+  "reply",
+  "positive_reply",
+  "routed_or_forwarded_reply",
+  "opt_out",
+  "spam_complaint",
+] as const;
+const EXPECTED_FIRST_REAL_COHORT_CAP = 10;
+
+function controlledCount(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function controlledEmailOperation(
+  reportValue: unknown,
+  status: Record<string, unknown>,
+  dispatch: Record<string, unknown>,
+  observedAt: string,
+): Record<string, unknown> {
+  const report = asRecord(reportValue);
+  const reportTrusted = report !== null && realIntelReportDriftReason(report) === null;
+  const rows = asArray(reportTrusted ? report.controlled_email : null)
+    .map((value) => asRecord(value))
+    .filter((value): value is Record<string, unknown> => value !== null)
+    .map((row) => {
+      const out: Record<string, unknown> = {
+        route_class: typeof row.route_class === "string" ? row.route_class : "UNKNOWN",
+        provider: typeof row.provider === "string" ? row.provider : "UNKNOWN",
+        cohort_id: typeof row.cohort_id === "string" ? row.cohort_id : "UNKNOWN",
+        policy_version: typeof row.policy_version === "string" ? row.policy_version : "UNKNOWN",
+      };
+      for (const metric of CONTROLLED_EMAIL_METRICS) {
+        out[metric] = controlledCount(row[metric]);
+      }
+      return out;
+    });
+  const readiness = asRecord(status.readiness) ?? {};
+  const grant = asRecord(readiness.latest_bounded_cohort);
+  const cohortID = grant ? firstText(grant, ["cohort_id"]) : null;
+  const policyVersion = grant ? firstText(grant, ["policy_version"]) : null;
+  // A cohort id is not globally unique across policy revisions. Aggregate and
+  // expose telemetry only when the grant proves both dimensions; otherwise a
+  // stale/foreign policy could be presented as the currently authorized run.
+  const cohortRows = cohortID && policyVersion
+    ? rows.filter(
+        (row) => row.cohort_id === cohortID && row.policy_version === policyVersion,
+      )
+    : [];
+  const totals: Record<string, number | null> = {};
+  for (const metric of CONTROLLED_EMAIL_METRICS) {
+    const values = cohortRows.map((row) => row[metric]);
+    totals[metric] =
+      values.length > 0 && values.every((value) => typeof value === "number")
+        ? (values as number[]).reduce((sum, value) => sum + value, 0)
+        : null;
+  }
+  const authorizedQuantity = controlledCount(grant?.authorized_quantity);
+  const sent = controlledCount(grant?.sent);
+  const reserved = controlledCount(grant?.reserved);
+  const maxDailyVolume = controlledCount(grant?.max_daily_volume);
+  const authorizationState = typeof grant?.state === "string" ? grant.state : "UNKNOWN";
+  const expiresAt = typeof grant?.expires_at === "string" ? grant.expires_at : null;
+  const observedMs = Date.parse(observedAt);
+  const expiresMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const integrityFlags: string[] = [];
+  if (authorizationState.toLowerCase() === "revoked") integrityFlags.push("grant_revoked");
+  if (!Number.isNaN(expiresMs) && !Number.isNaN(observedMs) && expiresMs <= observedMs) {
+    integrityFlags.push("grant_expired");
+  }
+  if (
+    authorizedQuantity !== null &&
+    sent !== null &&
+    reserved !== null &&
+    sent + reserved > authorizedQuantity
+  ) {
+    integrityFlags.push("authorized_quantity_exceeded");
+  }
+  if (maxDailyVolume !== null && maxDailyVolume !== EXPECTED_FIRST_REAL_COHORT_CAP) {
+    integrityFlags.push("daily_cap_unexpected");
+  }
+  return {
+    availability: reportTrusted ? "OBSERVED" : "UNKNOWN",
+    report_month: reportTrusted && typeof report.month === "string" ? report.month : null,
+    last_update_at: observedAt,
+    current: grant
+      ? {
+          authorization_id: typeof grant.authorization_id === "string" ? grant.authorization_id : null,
+          cohort_id: cohortID,
+          cohort_hash: typeof grant.cohort_hash === "string" ? grant.cohort_hash : null,
+          policy_version: policyVersion,
+          allowed_route_classes: asArray(grant.allowed_route_classes).filter(
+            (value): value is string => typeof value === "string",
+          ),
+          route_class_distribution: asRecord(grant.route_class_distribution),
+          authorized_quantity: authorizedQuantity,
+          sent,
+          reserved,
+          max_daily_volume: maxDailyVolume,
+          authorized_at: typeof grant.authorized_at === "string" ? grant.authorized_at : null,
+          expires_at: expiresAt,
+          authorization_state: authorizationState,
+          integrity_flags: integrityFlags,
+          go_review_verdict:
+            typeof grant.go_review_verdict === "string" ? grant.go_review_verdict : "UNKNOWN",
+          go_review_at: typeof grant.go_review_at === "string" ? grant.go_review_at : null,
+          dispatch,
+          outcomes: totals,
+        }
+      : null,
+    rows: cohortRows,
+  };
+}
+
 function firstText(row: Record<string, unknown>, keys: readonly string[]): string | null {
   for (const key of keys) {
     const value = row[key];
@@ -313,7 +432,13 @@ function operationsFromWarmbly(
   const exceptionsTotal = Math.max(intelExceptionsTotal, mergedExceptions.length);
   const exceptions = capList(mergedExceptions);
 
-  const status = asRecord(payload.confenge_status) ?? asRecord(asRecord(payload.health)?.confenge_status) ?? {};
+  // The production mapper owns this block under `operations`; older direct
+  // projector callers used the top-level field, so retain it only as fallback.
+  const status =
+    asRecord(nested.confenge_status) ??
+    asRecord(payload.confenge_status) ??
+    asRecord(asRecord(payload.health)?.confenge_status) ??
+    {};
   const autoSend =
     status.auto_send_enabled === true
       ? { enabled: true, source: "warmbly.confenge.status", note: "observed enabled; Control Center must not enable sending" }
@@ -321,6 +446,7 @@ function operationsFromWarmbly(
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
+  const report = nested.intel_report ?? payload.intel_report ?? payload.confenge_intel_report;
   const organic =
     nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
   const intelExceptionsPresent = intelExceptions.length > 0 || intelExceptionsSourcePresent(nested, payload);
@@ -333,6 +459,11 @@ function operationsFromWarmbly(
     scoreboard,
     executive,
   });
+  const dispatch = asRecord(nested.dispatch) ?? {
+    state: "UNKNOWN",
+    observed: false,
+    why: "the collector produced no dispatch reading; the kill-switch state is not known",
+  };
 
   const operations = {
     schema_version: "control-center.commercial-operations.v1",
@@ -341,11 +472,7 @@ function operationsFromWarmbly(
     // rebuilds most of `operations` from the raw payload, so a block that only
     // the connector computes has to be forwarded explicitly or it silently
     // disappears between the mapper and the surface that renders it.
-    dispatch: asRecord(nested.dispatch) ?? {
-      state: "UNKNOWN",
-      observed: false,
-      why: "the collector produced no dispatch reading; the kill-switch state is not known",
-    },
+    dispatch,
     authority: {
       catalog_authority: "governance",
       commercial_runtime: "warmbly",
@@ -362,6 +489,12 @@ function operationsFromWarmbly(
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
     },
     cohorts,
+    controlled_email: controlledEmailOperation(
+      report,
+      status,
+      dispatch,
+      observedAt,
+    ),
     activity,
     pipeline,
     exceptions,

@@ -267,6 +267,13 @@ export function collectFromWarmblyPayload(
     "GET",
   );
   mark(
+    "confenge_intel_report",
+    payload.confenge_intel_report !== undefined,
+    fail("GET", "/v1/confenge/intel/report"),
+    "/v1/confenge/intel/report",
+    "GET",
+  );
+  mark(
     "confenge_intel_exceptions",
     payload.confenge_intel_exceptions !== undefined,
     fail("GET", "/v1/confenge/intel/exceptions"),
@@ -513,6 +520,7 @@ export function collectFromWarmblyPayload(
     inbound: fullOperations.inbound.slice(0, OPERATIONS_CAP),
     intel_scoreboard: payload.confenge_intel_scoreboard ?? null,
     intel_executive: payload.confenge_intel_executive ?? null,
+    intel_report: payload.confenge_intel_report ?? null,
     intel_exceptions: intelExceptions.slice(0, OPERATIONS_CAP),
     intel_exceptions_total: intelExceptions.length,
     intel_organic_scoreboard: payload.confenge_intel_organic_scoreboard ?? null,

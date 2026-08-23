@@ -142,7 +142,31 @@ export type WarmblyConfengeStatus = {
   sending_allowed?: boolean;
   feed_configured?: boolean;
   ops_health?: { status?: string };
-  readiness?: { status?: string };
+  readiness?: {
+    status?: string;
+    pilot_cohort_state?: string;
+    pilot_cohort_prepared?: number;
+    pilot_cohort_needs_review?: number;
+    pilot_cohort_approved?: number;
+    pilot_cohort_sent?: number;
+    latest_bounded_cohort?: {
+      authorization_id?: string;
+      cohort_id?: string;
+      cohort_hash?: string;
+      policy_version?: string;
+      allowed_route_classes?: string[];
+      route_class_distribution?: Record<string, number>;
+      authorized_quantity?: number;
+      max_daily_volume?: number;
+      authorized_at?: string;
+      expires_at?: string;
+      state?: string;
+      go_review_verdict?: string;
+      go_review_at?: string;
+      sent?: number;
+      reserved?: number;
+    };
+  };
 };
 
 export type WarmblyOpsHealth = {
@@ -259,6 +283,7 @@ export type WarmblyPayload = {
   confenge_dispatch_status?: WarmblyDispatchStatus | { data: WarmblyDispatchStatus };
   confenge_intel_scoreboard?: Record<string, unknown>;
   confenge_intel_executive?: Record<string, unknown>;
+  confenge_intel_report?: Record<string, unknown>;
   confenge_intel_exceptions?: unknown;
   confenge_intel_organic_scoreboard?: Record<string, unknown>;
   unavailable?: EndpointFailure[];

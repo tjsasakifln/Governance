@@ -20,6 +20,14 @@ const EXECUTIVE = {
   inbound_qualified_pipeline: 1,
 };
 
+const REPORT = {
+  schema_version: "confenge.observability_report.v1",
+  month: "2026-08",
+  include_synthetic: false,
+  real_empty: false,
+  controlled_email: [],
+};
+
 const EXCEPTIONS = [
   { id: "ex-intel-1", code: "orphan_chain", reason: "lead without deal", next_action: "review", status: "open" },
 ];
@@ -69,7 +77,7 @@ function clientFor(bodies: Record<string, { status: number; json: unknown }>): W
 }
 
 describe("normalizeIntelEnvelope (shipped rule)", () => {
-  it("unwraps scoreboard/executive/exceptions/organic wrapped in data", () => {
+  it("unwraps scoreboard/executive/report/exceptions/organic wrapped in data", () => {
     assert.deepEqual(normalizeIntelEnvelope({ data: SCOREBOARD }, "intel_scoreboard"), {
       ok: true,
       value: SCOREBOARD,
@@ -77,6 +85,10 @@ describe("normalizeIntelEnvelope (shipped rule)", () => {
     assert.deepEqual(normalizeIntelEnvelope({ data: EXECUTIVE }, "intel_executive"), {
       ok: true,
       value: EXECUTIVE,
+    });
+    assert.deepEqual(normalizeIntelEnvelope({ data: REPORT }, "intel_report"), {
+      ok: true,
+      value: REPORT,
     });
     assert.deepEqual(normalizeIntelEnvelope({ data: EXCEPTIONS }, "intel_exceptions"), {
       ok: true,
@@ -102,6 +114,24 @@ describe("normalizeIntelEnvelope (shipped rule)", () => {
     assert.equal(unrelated.ok, false);
     if (!unrelated.ok) assert.equal(unrelated.code, "CONTRACT_DRIFT");
   });
+
+  it("rejects synthetic or unproven intel reports instead of publishing them as real", () => {
+    for (const includeSynthetic of [true, undefined]) {
+      const candidate = { ...REPORT, include_synthetic: includeSynthetic };
+      const result = normalizeIntelEnvelope({ data: candidate }, "intel_report");
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.code, "CONTRACT_DRIFT");
+        assert.match(result.reason, /include_synthetic=false/);
+      }
+    }
+    const contradictory = normalizeIntelEnvelope(
+      { ...REPORT, real_empty: true, controlled_email: [{ cohort_id: "not-empty" }] },
+      "intel_report",
+    );
+    assert.equal(contradictory.ok, false);
+    if (!contradictory.ok) assert.match(contradictory.reason, /real_empty/);
+  });
 });
 
 describe("fetchWarmblyPayload assignment path", () => {
@@ -111,12 +141,14 @@ describe("fetchWarmblyPayload assignment path", () => {
         "/health": { status: 200, json: { status: "ok" } },
         "/v1/confenge/intel/scoreboard": { status: 200, json: { data: SCOREBOARD } },
         "/v1/confenge/intel/executive": { status: 200, json: { data: EXECUTIVE } },
+        "/v1/confenge/intel/report": { status: 200, json: { data: REPORT } },
         "/v1/confenge/intel/exceptions": { status: 200, json: { data: EXCEPTIONS } },
         "/v1/confenge/intel/organic-scoreboard": { status: 200, json: { data: ORGANIC } },
       }),
     );
     assert.deepEqual(payload.confenge_intel_scoreboard, SCOREBOARD);
     assert.deepEqual(payload.confenge_intel_executive, EXECUTIVE);
+    assert.deepEqual(payload.confenge_intel_report, REPORT);
     assert.deepEqual(payload.confenge_intel_exceptions, EXCEPTIONS);
     assert.deepEqual(payload.confenge_intel_organic_scoreboard, ORGANIC);
     assert.equal(

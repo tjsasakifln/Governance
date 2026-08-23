@@ -68,6 +68,12 @@ export const COLLECT_ROUTES: CollectRoute[] = [
     required: false,
   },
   {
+    key: "confenge_intel_report",
+    method: "GET",
+    path: "/v1/confenge/intel/report?include_synthetic=0",
+    required: false,
+  },
+  {
     key: "confenge_intel_exceptions",
     method: "GET",
     path: "/v1/confenge/intel/exceptions",
