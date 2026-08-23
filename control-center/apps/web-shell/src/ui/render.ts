@@ -31,6 +31,11 @@ import {
   infraCatalogBlock,
   memoriaGroups,
 } from "./domains";
+import { warmblyBlock } from "./warmbly";
+import {
+  pendingResumeConfirmation,
+  resumeObservationFingerprint,
+} from "../warmbly-confirmation";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -124,9 +129,30 @@ function hojeBody(page: DestinationPage): string {
   return renderHoje(view);
 }
 
-function pageBody(page: DestinationPage, destination: DestinationId, surface?: string | null, resource?: string | null): string {
+function pageBody(
+  page: DestinationPage,
+  destination: DestinationId,
+  surface?: string | null,
+  resource?: string | null,
+  operatorResult?: AdapterWriteResult,
+): string {
   if (destination === "hoje") {
     return hojeBody(page);
+  }
+  if (destination === "warmbly") {
+    const observationFingerprint = resumeObservationFingerprint(page.commercial);
+    const pending = pendingResumeConfirmation();
+    const confirmation =
+      pending?.observation_fingerprint === observationFingerprint ? pending : undefined;
+    return warmblyBlock(
+      {
+        snapshot: page.commercial,
+        operator: page.operator,
+        ...(confirmation ? { confirmation } : {}),
+        ...(operatorResult ? { operatorResult } : {}),
+      },
+      surface,
+    );
   }
   if (destination === "memoria") {
     return page.directives && page.directives.length > 0 ? memoriaGroups(page.directives) : "";
@@ -218,7 +244,7 @@ export function renderShell(model: ShellModel): string {
 
   const body =
     page && (model.view.kind === "ready" || model.view.kind === "stale")
-      ? pageBody(page, model.destination, model.surface, model.resource)
+      ? pageBody(page, model.destination, model.surface, model.resource, model.operatorResult)
       : "";
 
   return `
@@ -248,7 +274,7 @@ export function renderShell(model: ShellModel): string {
         </header>
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}
-        ${operatorBanner(model.operatorResult)}
+        ${model.destination === "warmbly" ? "" : operatorBanner(model.operatorResult)}
         ${body}
       </main>
     </div>

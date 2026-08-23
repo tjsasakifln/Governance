@@ -1531,4 +1531,75 @@ describe("confirmation challenges are individually identifiable and reason-bound
       await h.close();
     }
   });
+
+  it("revokes an older challenge when the same operator requests a fresh one", async () => {
+    const h = await harness();
+    try {
+      const first = await h.channel.requestResumeConfirmation({
+        request: founderRequest(),
+        reason: "incidente resolvido",
+      });
+      const second = await h.channel.requestResumeConfirmation({
+        request: founderRequest(),
+        reason: "incidente resolvido",
+      });
+      if (!first.ok || first.outcome !== "challenged") throw new Error("expected first challenge");
+      if (!second.ok || second.outcome !== "challenged") throw new Error("expected second challenge");
+
+      const obsolete = await h.channel.resumeDispatch({
+        request: founderRequest(),
+        reason: "incidente resolvido",
+        confirmation_token: first.challenge.token,
+      });
+      assert.equal(obsolete.ok, false);
+      if (!obsolete.ok) assert.equal(obsolete.code, "confirmation_invalid");
+
+      const current = await h.channel.resumeDispatch({
+        request: founderRequest(),
+        reason: "incidente resolvido",
+        confirmation_token: second.challenge.token,
+      });
+      assert.equal(current.ok, true);
+      assert.equal(h.stub.operatorCalls.length, 1);
+    } finally {
+      await h.close();
+    }
+  });
+
+  for (const intervention of ["pause", "acknowledge"] as const) {
+    it(`revokes a pending resume after ${intervention}`, async () => {
+      const h = await harness();
+      try {
+        const challenge = await h.channel.requestResumeConfirmation({
+          request: founderRequest(),
+          reason: "incidente resolvido",
+        });
+        if (!challenge.ok || challenge.outcome !== "challenged") {
+          throw new Error("expected challenge");
+        }
+
+        const intervened =
+          intervention === "pause"
+            ? await h.channel.pauseDispatch({
+                request: founderRequest(),
+                reason: "nova anomalia",
+              })
+            : await h.channel.acknowledgeInboundAlert({
+                request: founderRequest(),
+                target_id: "lead-2f7c",
+              });
+        assert.equal(intervened.ok, true);
+
+        const obsolete = await h.channel.resumeDispatch({
+          request: founderRequest(),
+          reason: "incidente resolvido",
+          confirmation_token: challenge.challenge.token,
+        });
+        assert.equal(obsolete.ok, false);
+        if (!obsolete.ok) assert.equal(obsolete.code, "confirmation_invalid");
+      } finally {
+        await h.close();
+      }
+    });
+  }
 });
