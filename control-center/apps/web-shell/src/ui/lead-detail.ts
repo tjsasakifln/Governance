@@ -179,6 +179,19 @@ function text(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Warmbly's acknowledge route owns inbound alerts, not every commercial
+ * exception. Require both the projector's explicit attention origin and a
+ * structured inbound kind/code; prose such as `why` is presentation, not an
+ * authorization signal.
+ */
+function isInboundAlertException(row: Record<string, unknown>): boolean {
+  if (text(row.source) !== "warmbly.attention") return false;
+  const evidence = asRecord(row.evidence);
+  const discriminator = text(row.kind) ?? (evidence ? text(evidence.code) : null);
+  return discriminator !== null && /(?:^|[_-])inbound(?:$|[_-])/i.test(discriminator);
+}
+
 const IDENTITY_KEYS = ["source_id", "id", "canonical_id", "lead_id", "target_id", "deal_id"] as const;
 
 function identitiesOf(row: Record<string, unknown>): string[] {
@@ -532,9 +545,7 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   // The one lead-scoped Warmbly write is `acknowledge_inbound_alert`, and its
   // target kind is an alert — not a deal. Two gates, both real: the item has to
   // be an alert, and its id has to be something the channel would accept.
-  const isAlert =
-    exceptions.length > 0 ||
-    activity.some((row) => /inbound|alert/i.test(text(row.event) ?? ""));
+  const isAlert = exceptions.some(isInboundAlertException);
   const warmblyTargetId =
     found && isAlert && WARMBLY_TARGET_ID_PATTERN.test(resource) ? resource : null;
   const warmblyActions: LeadAction[] = warmblyTargetId

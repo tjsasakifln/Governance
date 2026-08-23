@@ -276,6 +276,19 @@ test("a deal that is not an inbound alert is offered no Warmbly write at all", (
   assert.match(html, /data-operator-form="CONFIRM_NEXT_ACTION"/, "local records still apply");
 });
 
+test("a common commercial exception with a valid target id cannot authorize an inbound acknowledge", () => {
+  const ops = representativeOperations();
+  const exceptions = ops.exceptions as Record<string, unknown>[];
+  ops.exceptions = exceptions
+    .filter((row) => row.source !== "warmbly.attention")
+    .map((row) => ({ ...row, source_id: DEAL_ID }));
+  const model = leadDetailView({ snapshot: snapshotWith(ops), resource: DEAL_ID });
+  assert.equal(model.warmblyTargetId, null);
+  assert.equal(model.warmblyRefusalReason, "not-an-alert");
+  const html = leadDetailBlock({ snapshot: snapshotWith(ops), resource: DEAL_ID });
+  assert.equal(/data-warmbly-dispatch=/.test(html), false);
+});
+
 test("confirmation is proportional to risk and enforced by the form, not by copy", () => {
   const html = leadDetailBlock({ snapshot: snapshotWith(representativeOperations()), resource: DEAL_ID });
   const formFor = (attr: string, value: string): string => {
@@ -307,10 +320,14 @@ test("confirmation is proportional to risk and enforced by the form, not by copy
 
 test("an id the operator channel would reject is never offered as a Warmbly write", () => {
   assert.equal(WARMBLY_TARGET_ID_PATTERN.test(OPAQUE), false);
-  const html = leadDetailBlock({ snapshot: snapshotWith(representativeOperations()), resource: OPAQUE });
+  const ops = representativeOperations();
+  ops.exceptions = (ops.exceptions as Record<string, unknown>[]).map((row) =>
+    row.source === "warmbly.attention" ? { ...row, id: `alert_${OPAQUE}`, source_id: OPAQUE } : row,
+  );
+  const html = leadDetailBlock({ snapshot: snapshotWith(ops), resource: OPAQUE });
   assert.equal(/data-warmbly-dispatch=/.test(html), false);
   assert.match(html, /data-warmbly-refusal="target-id"/);
-  assert.equal(leadDetailView({ snapshot: snapshotWith(representativeOperations()), resource: OPAQUE }).warmblyRefusalReason, "target-id");
+  assert.equal(leadDetailView({ snapshot: snapshotWith(ops), resource: OPAQUE }).warmblyRefusalReason, "target-id");
   assert.match(html, /não é um alvo válido do canal de operador/);
   // The local audit record is still available: refusing upstream is not
   // refusing the operator a way to record what they saw.
