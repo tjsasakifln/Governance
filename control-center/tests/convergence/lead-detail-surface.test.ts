@@ -22,8 +22,13 @@ import { fileURLToPath } from "node:url";
 
 import { createHttpAdapter } from "../../apps/web-shell/src/adapters/http.ts";
 import { paintShell } from "../../apps/web-shell/src/app.ts";
-import { WARMBLY_TARGET_ID_PATTERN } from "../../apps/web-shell/src/ui/lead-detail.ts";
+import {
+  leadDetailView,
+  queueFocusToken,
+  WARMBLY_TARGET_ID_PATTERN,
+} from "../../apps/web-shell/src/ui/lead-detail.ts";
 import { TARGET_ID_PATTERN } from "../../connectors/warmbly/src/operator/actions.ts";
+import { collectFromWarmblyPayload } from "../../connectors/warmbly/src/mapper/normalize.ts";
 import { projectCommercial } from "../../connectors/runner/src/projectors/commercial.ts";
 import { validateOperationalEnvelope } from "../../contracts/src/operational-envelope.ts";
 import { frozenClock } from "../../services/context/src/clock.ts";
@@ -78,6 +83,7 @@ function warmblyPayload(): Record<string, unknown> {
         status: "open",
         why: "inbound sem leitura há 2 dias",
         next_action: "ler e responder no Warmbly",
+        entity_ref: { type: "inbound_lead", id: DEAL_UUID },
         at: "2026-08-20T11:00:00.000Z",
       },
     ],
@@ -156,6 +162,59 @@ test("the web shell's Warmbly target pattern is the connector's, not a lookalike
   assert.equal(WARMBLY_TARGET_ID_PATTERN.flags, TARGET_ID_PATTERN.flags);
 });
 
+test("the real normalizer/projector preserves a proven inbound lead id for acknowledge", () => {
+  const leadId = "lead_from_real_normalizer_42";
+  const normalized = collectFromWarmblyPayload(
+    {
+      confenge_inbound: [{
+        lead_id: leadId,
+        company: "Conta Normalizada",
+        status: "new",
+        why_now: "inbound aguarda leitura",
+        recommended_action: "revisar inbound",
+      }],
+    },
+    { now: new Date(OBSERVED_AT) },
+  );
+  const projected = projectCommercial({
+    collector: "warmbly-commercial",
+    freshness_status: "FRESH",
+    observed_at: OBSERVED_AT,
+    source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+    confidence: 0.84,
+    payload: normalized as unknown as Record<string, unknown>,
+  });
+  const operations = projected.payload.operations as Record<string, unknown>;
+  const exception = (operations.exceptions as Record<string, unknown>[]).find(
+    (row) => row.source === "warmbly.attention" && row.kind === "inbound_lead",
+  );
+  assert.ok(exception);
+  const evidence = exception.evidence as Record<string, unknown>;
+  assert.deepEqual(evidence.entity_ref, { type: "inbound_lead", id: leadId });
+  const model = leadDetailView({
+    snapshot: {
+      schema_version: "control-center.commercial-snapshot.v1",
+      id: "cc:commercial-snapshot:normalized-inbound",
+      scope: "commercial",
+      generated_at: OBSERVED_AT,
+      provenance: {
+        source: projected.source,
+        observed_at: projected.observed_at,
+        freshness_status: projected.freshness_status,
+        confidence: projected.confidence,
+      },
+      authority: {
+        catalog_authority: "governance",
+        commercial_runtime: "warmbly",
+        this_document: "read_model",
+      },
+      operations,
+    } as never,
+    resource: String(exception.id),
+  });
+  assert.equal(model.warmblyTargetId, leadId);
+});
+
 test("the projector really does headline an opaque handle — this is the defect being fixed", () => {
   const payload = projectedRow().payload;
   const operations = payload.operations as Record<string, unknown>;
@@ -178,7 +237,7 @@ test("a lead detail served end-to-end shows context and keeps handles out of the
     const live = validateOperationalEnvelope(await envelope.json());
     assert.equal(live.ok, true, live.errors.map((e) => e.message).join("; "));
 
-    const html = await paint(base, `#/comercial/atividade?q=andrade&page=2&resource=${DEAL_UUID}`);
+    const html = await paint(base, `#/comercial/atividade?q=andrade&page=2&resource=${DEAL_UUID}&pos=2&of=3`);
     assert.match(html, /data-lead-detail="found"/);
     assert.match(html, /Metalúrgica Andrade/);
     assert.match(html, /Proposta/);
@@ -199,7 +258,7 @@ test("a lead detail served end-to-end shows context and keeps handles out of the
     assert.equal(backParams.get("q"), "andrade", "the queue filter survives the round trip");
     assert.equal(backParams.get("page"), "2");
     assert.equal(backParams.get("resource"), null);
-    assert.equal(backParams.get("focus"), DEAL_UUID);
+    assert.equal(backParams.get("focus"), queueFocusToken(DEAL_UUID, { index: 2, total: 3 }));
   });
 });
 
@@ -245,7 +304,7 @@ test("the two write mechanisms stay separate on a real payload", async () => {
   });
 });
 
-test("an alert whose id the channel would refuse gets a refusal, not a broken button", async () => {
+test("a composite alert id never replaces its distinct proven lead target", async () => {
   await withServer(async (base) => {
     const html = await paint(
       base,
@@ -255,8 +314,9 @@ test("an alert whose id the channel would refuse gets a refusal, not a broken bu
     assert.match(html, /data-lead-named="false"/);
     assert.match(html, /Organização não identificada pela origem/);
     assert.equal(WARMBLY_TARGET_ID_PATTERN.test(OPAQUE_ALERT_ID), false);
-    assert.match(html, /data-warmbly-refusal="target-id"/);
-    assert.equal(/data-warmbly-dispatch=/.test(html), false);
+    assert.match(html, /data-warmbly-dispatch="acknowledge"/);
+    assert.match(html, new RegExp(`name="target_id" value="${DEAL_UUID}"`));
+    assert.equal(html.includes(`name="target_id" value="${OPAQUE_ALERT_ID}"`), false);
     // Local recording is still available; refusing upstream is not refusing
     // the operator a way to write down what they saw.
     assert.match(html, /data-operator-form="ACKNOWLEDGE_EXCEPTION"/);

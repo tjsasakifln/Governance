@@ -13,7 +13,13 @@ import type {
   InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
-import { leadDetailBlock, leadDetailHash, leadTitleOf, queueFocusDomId } from "./lead-detail";
+import {
+  leadDetailBlock,
+  leadDetailHash,
+  leadTitleOf,
+  queueFocusDomId,
+  queueFocusToken,
+} from "./lead-detail";
 import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 
@@ -327,8 +333,9 @@ function activityOpsCard(
   const heading = rowId
     ? `<a href="${escapeHtml(leadDetailHash("atividade", query, rowId, position))}" data-lead-detail-link="${escapeHtml(rowId)}">${title}</a>`
     : title;
+  const focusToken = queueFocusToken(rowId, position);
   const focusAttributes = rowId
-    ? ` id="${queueFocusDomId(rowId)}" data-queue-focus="true" tabindex="-1"`
+    ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
   return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}">
     <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${escapeHtml(String(row.event ?? ""))}</p>

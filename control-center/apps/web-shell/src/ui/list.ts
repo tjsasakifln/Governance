@@ -196,7 +196,7 @@ export function renderFilteredList(input: ListChromeInput): string {
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(heading)}</h2>
       ${input.intro ?? ""}
       ${filters}
-      <p class="count" role="status" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
+      <p class="count" role="status" tabindex="-1" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
       ${coverageWarning}
       ${unavailableNote}
       ${reference}

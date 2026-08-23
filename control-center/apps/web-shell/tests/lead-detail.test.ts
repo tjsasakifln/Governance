@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createMemoryRuntime, mount, paintShell } from "../src/app";
+import { createHttpAdapter } from "../src/adapters/http";
+import { consumeQueueFocus, createMemoryRuntime, mount, paintShell } from "../src/app";
 import type { AdapterReadResult, DestinationPage } from "../src/adapters/contract";
 import type { CommercialSnapshot } from "../src/types";
 import {
@@ -11,11 +12,14 @@ import {
   leadDetailView,
   leadTitleOf,
   queueFocusDomId,
+  queueFocusToken,
   queueBackHash,
 } from "../src/ui/lead-detail";
+import { recordingFetch } from "./helpers";
 
 const OPAQUE = "warmbly:action:6f2c1f7a-6b4e-4a1e-9c3d-2f7b8a5e1c44:next_action";
 const DEAL_ID = "deal_7cGh-42";
+const INBOUND_LEAD_ID = "lead_7cGh-42";
 
 function snapshotWith(operations: Record<string, unknown>): CommercialSnapshot {
   return {
@@ -105,7 +109,11 @@ function representativeOperations(): Record<string, unknown> {
         status: "open",
         source: "warmbly.attention",
         observed_at: "2026-08-20T16:00:00Z",
-        evidence: { code: "inbound_unread" },
+        evidence: {
+          code: "inbound_unread",
+          entity_ref: { type: "inbound_lead", id: INBOUND_LEAD_ID },
+          lead_id: INBOUND_LEAD_ID,
+        },
       },
     ],
   };
@@ -152,7 +160,11 @@ test("the detail link carries queue state forward and the back link gives it bac
   assert.equal(backParams.get("resource"), null, "the subject must not survive the back link");
   assert.equal(backParams.get("pos"), null);
   assert.equal(backParams.get("of"), null);
-  assert.equal(backParams.get("focus"), DEAL_ID, "the queue needs the row to restore");
+  assert.equal(
+    backParams.get("focus"),
+    queueFocusToken(DEAL_ID, { index: 4, total: 12 }),
+    "the queue needs the exact row occurrence, not only its possibly duplicated resource",
+  );
 
   // A caller that owns its own route passes a full hash path and keeps it.
   assert.match(
@@ -290,6 +302,66 @@ test("a common commercial exception with a valid target id cannot authorize an i
   assert.equal(/data-warmbly-dispatch=/.test(html), false);
 });
 
+test("Warmbly acknowledge targets the proven inbound lead, never the exception, source or opened resource", () => {
+  const openedResource = "opened_alias_42";
+  const exceptionId = "exception_record_42";
+  const sourceId = "attention_source_42";
+  const leadId = "lead_proven_42";
+  const ops = representativeOperations();
+  ops.activity = [{
+    source_id: openedResource,
+    lead_or_account: "Conta comprovada",
+    event: "inbound_unread",
+    state: "open",
+  }];
+  ops.pipeline = [];
+  ops.exceptions = [{
+    id: exceptionId,
+    source_id: sourceId,
+    target_id: openedResource,
+    canonical_id: "cc:attention-item:exception-record-42",
+    kind: "inbound_unread",
+    source: "warmbly.attention",
+    status: "open",
+    why: "inbound aguarda leitura",
+    evidence: {
+      entity_ref: { type: "inbound_lead", id: leadId },
+      lead_id: "lead_lower_priority_ignored",
+    },
+  }];
+
+  const model = leadDetailView({ snapshot: snapshotWith(ops), resource: openedResource });
+  assert.notEqual(exceptionId, sourceId);
+  assert.notEqual(sourceId, openedResource);
+  assert.equal(model.warmblyTargetId, leadId);
+  const html = leadDetailBlock({ snapshot: snapshotWith(ops), resource: openedResource });
+  assert.match(html, new RegExp(`name="target_id" value="${leadId}"`));
+  assert.equal(html.includes(`name="target_id" value="${exceptionId}"`), false);
+  assert.equal(html.includes(`name="target_id" value="${sourceId}"`), false);
+  assert.equal(html.includes(`name="target_id" value="${openedResource}"`), false);
+});
+
+test("an inbound exception without proven lead identity fails closed even when source_id looks valid", () => {
+  const ops = representativeOperations();
+  ops.activity = [{ source_id: "opened_record", event: "inbound_unread", state: "open" }];
+  ops.pipeline = [];
+  ops.exceptions = [{
+    id: "exception_42",
+    source_id: "plausible_lead_42",
+    target_id: "opened_record",
+    kind: "inbound_unread",
+    source: "warmbly.attention",
+    status: "open",
+    evidence: { code: "inbound_unread" },
+  }];
+  const model = leadDetailView({ snapshot: snapshotWith(ops), resource: "opened_record" });
+  assert.equal(model.warmblyTargetId, null);
+  assert.equal(model.warmblyRefusalReason, "lead-id-unproven");
+  const html = leadDetailBlock({ snapshot: snapshotWith(ops), resource: "opened_record" });
+  assert.equal(/data-warmbly-dispatch=/.test(html), false);
+  assert.match(html, /data-warmbly-refusal="lead-id-unproven"/);
+});
+
 test("confirmation is proportional to risk and enforced by the form, not by copy", () => {
   const html = leadDetailBlock({ snapshot: snapshotWith(representativeOperations()), resource: DEAL_ID });
   const formFor = (attr: string, value: string): string => {
@@ -322,9 +394,16 @@ test("confirmation is proportional to risk and enforced by the form, not by copy
 test("an id the operator channel would reject is never offered as a Warmbly write", () => {
   assert.equal(WARMBLY_TARGET_ID_PATTERN.test(OPAQUE), false);
   const ops = representativeOperations();
-  ops.exceptions = (ops.exceptions as Record<string, unknown>[]).map((row) =>
-    row.source === "warmbly.attention" ? { ...row, id: `alert_${OPAQUE}`, source_id: OPAQUE } : row,
-  );
+  ops.exceptions = (ops.exceptions as Record<string, unknown>[]).map((row) => {
+    if (row.source !== "warmbly.attention") return row;
+    const evidence = row.evidence as Record<string, unknown>;
+    return {
+      ...row,
+      id: `alert_${OPAQUE}`,
+      source_id: OPAQUE,
+      evidence: { ...evidence, entity_ref: { type: "inbound_lead", id: OPAQUE }, lead_id: OPAQUE },
+    };
+  });
   const html = leadDetailBlock({ snapshot: snapshotWith(ops), resource: OPAQUE });
   assert.equal(/data-warmbly-dispatch=/.test(html), false);
   assert.match(html, /data-warmbly-refusal="target-id"/);
@@ -420,8 +499,81 @@ test("a queue row the origin gave no id is listed but not offered as a dead link
   assert.equal(/data-lead-detail-link=/.test(root.innerHTML), false);
 });
 
+test("detail resolves an item beyond the preview cap from the current list page", async () => {
+  const targetId = "lead_0051";
+  const target = {
+    at: "2026-08-20T16:00:00Z",
+    lead_or_account: "Conta da página três",
+    source_id: targetId,
+    event: "reply",
+    state: "open",
+    evidence: "retornada somente pela list view corrente",
+  };
+  const preview = Array.from({ length: 50 }, (_, index) => ({
+    ...target,
+    source_id: `lead_${String(index).padStart(4, "0")}`,
+    lead_or_account: `Conta preview ${index}`,
+  }));
+  const nestedOps = {
+    activity: preview,
+    overview: { activity: 75, activity_shown: 50 },
+    list_views: { atividade: { view: { items: [target] } } },
+  };
+  const nestedModel = leadDetailView({ snapshot: snapshotWith(nestedOps), resource: targetId });
+  assert.equal(nestedModel.found, true, "the internal list-view shape must participate in detail lookup");
+  assert.equal(nestedModel.title, "Conta da página três");
+
+  const snapshot = snapshotWith({ activity: preview, overview: { activity: 75, activity_shown: 50 } });
+  const { fetchImpl, calls } = recordingFetch((url) => {
+    const path = url.split("?")[0];
+    if (path?.endsWith("/v1/domains/commercial")) return snapshot;
+    if (path?.endsWith("/v1/domains/commercial/lists/activity")) {
+      return {
+        schema_version: "control-center.commercial-list.v1",
+        list: "activity",
+        generated_at: snapshot.generated_at,
+        loaded_total: 75,
+        declared_total: 75,
+        complete: true,
+        matched: 75,
+        items: [target],
+        page: 3,
+        page_count: 3,
+        page_size: 25,
+        range_start: 51,
+        range_end: 51,
+        filtered: false,
+        facet_values: { estado: ["open"], tipo: ["reply"], origem: [], responsavel: [], prioridade: [] },
+        unavailable_facets: ["origem", "responsavel", "prioridade"],
+        query: {
+          q: "",
+          facets: { estado: "all", tipo: "all", origem: "all", responsavel: "all", prioridade: "all" },
+          periodo: "all",
+          ordem: "urgencia",
+          pagina: 3,
+          porPagina: 25,
+        },
+      };
+    }
+    return undefined;
+  });
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+    kind: "human",
+    id: "founder-local",
+  });
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, `#/comercial/atividade?pagina=3&resource=${targetId}&pos=51&of=75`);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.match(root.innerHTML, /data-lead-detail="found"/);
+  assert.match(root.innerHTML, /Conta da página três/);
+  assert.match(root.innerHTML, /item 51 de 75/);
+  assert.match(root.innerHTML, /Próximo passo<\/dt><dd>ausente — nenhum próximo passo informado pela origem/, "missing pipeline context stays explicit");
+  assert.ok(calls.some((url) => /commercial\/lists\/activity\?.*pagina=3/.test(url)));
+});
+
 test("a paginated filtered queue consumes focus only after ready paint and never puts it in selectors or links", async () => {
   const resource = `lead:unsafe[id]\"><script>`;
+  const focusToken = queueFocusToken(resource, { index: 51, total: 61 });
   const row = {
     at: "2026-08-20T17:30:00Z",
     lead_or_account: "Conta retornada",
@@ -484,7 +636,9 @@ test("a paginated filtered queue consumes focus only after ready paint and never
   const target = {
     addEventListener(): void {},
     getAttribute(name: string): string | null {
-      return name === "id" ? queueFocusDomId(resource) : null;
+      if (name === "id") return queueFocusDomId(focusToken);
+      if (name === "data-queue-focus") return focusToken;
+      return null;
     },
     querySelector(): { value: string } | null {
       return null;
@@ -507,12 +661,12 @@ test("a paginated filtered queue consumes focus only after ready paint and never
     },
     querySelectorAll(selector: string): typeof target[] {
       selectors.push(selector);
-      return selector === "[data-queue-focus]" && html.includes(queueFocusDomId(resource))
+      return selector === "[data-queue-focus]" && html.includes(queueFocusDomId(focusToken))
         ? [target]
         : [];
     },
   };
-  const initial = `#/comercial/atividade?q=Conta&estado=open&ordem=recentes&pagina=3&por_pagina=25&focus=${encodeURIComponent(resource)}`;
+  const initial = `#/comercial/atividade?q=Conta&estado=open&ordem=recentes&pagina=3&por_pagina=25&focus=${focusToken}`;
   const runtime = createMemoryRuntime(initial);
   const handle = mount(root, adapter, runtime);
   try {
@@ -524,7 +678,7 @@ test("a paginated filtered queue consumes focus only after ready paint and never
     assert.equal(scrollCalls, 1);
     assert.ok(selectors.includes("[data-queue-focus]"));
     assert.equal(selectors.some((selector) => selector.includes(resource)), false);
-    assert.match(html, new RegExp(`id="${queueFocusDomId(resource)}" data-queue-focus="true" tabindex="-1"`));
+    assert.match(html, new RegExp(`id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`));
     assert.match(html, /pos=51&amp;of=61/, "remote page position must reach beyond the preview cap");
     assert.equal(/href="[^"]*focus=/.test(html), false, "pagination/detail links are rendered from the cleaned hash");
 
@@ -542,4 +696,75 @@ test("a paginated filtered queue consumes focus only after ready paint and never
   } finally {
     handle.unmount();
   }
+});
+
+test("row focus tokens disambiguate duplicate source ids and stay bounded under hostile input", () => {
+  const repeated = "same_source_id";
+  const firstToken = queueFocusToken(repeated, { index: 1, total: 2 });
+  const secondToken = queueFocusToken(repeated, { index: 2, total: 2 });
+  assert.notEqual(firstToken, secondToken);
+
+  let firstFocused = 0;
+  let secondFocused = 0;
+  let fallbackFocused = 0;
+  const candidate = (token: string, onFocus: () => void) => ({
+    addEventListener(): void {},
+    getAttribute(name: string): string | null {
+      if (name === "id") return queueFocusDomId(token);
+      if (name === "data-queue-focus") return token;
+      return null;
+    },
+    querySelector(): { value: string } | null { return null; },
+    focus(): void { onFocus(); },
+    scrollIntoView(): void {},
+  });
+  const first = candidate(firstToken, () => { firstFocused += 1; });
+  const second = candidate(secondToken, () => { secondFocused += 1; });
+  const fallback = candidate("fallback", () => { fallbackFocused += 1; });
+  const selectors: string[] = [];
+  const root = {
+    innerHTML: "",
+    querySelectorAll(selector: string) {
+      selectors.push(selector);
+      if (selector === "[data-queue-focus]") return [first, second];
+      if (selector === "[data-list-count]") return [fallback];
+      return [];
+    },
+  };
+  let replaced = "";
+  const focused = consumeQueueFocus(
+    root,
+    `#/comercial/atividade?pagina=1&focus=${secondToken}`,
+    true,
+    (next) => { replaced = next; },
+  );
+  assert.equal(focused, true);
+  assert.equal(firstFocused, 0);
+  assert.equal(secondFocused, 1);
+  assert.equal(replaced, "#/comercial/atividade?pagina=1");
+
+  const hostile = "x".repeat(100_000);
+  const bounded = queueFocusToken(hostile, { index: 999_999_999, total: 999_999_999 });
+  assert.ok(bounded.length < 64);
+  assert.ok(queueFocusDomId(bounded).length < 64);
+  selectors.length = 0;
+  consumeQueueFocus(
+    root,
+    `#/comercial/atividade?q=mantido&focus=${hostile}`,
+    true,
+    (next) => { replaced = next; },
+  );
+  assert.equal(replaced, "#/comercial/atividade?q=mantido");
+  assert.equal(selectors.includes("[data-queue-focus]"), false, "invalid huge markers are not scanned against rows");
+  assert.equal(fallbackFocused, 1, "a missing/invalid target moves focus to list status");
+
+  const drifted = queueFocusToken("row_that_disappeared", { index: 3, total: 3 });
+  consumeQueueFocus(
+    root,
+    `#/comercial/atividade?pagina=2&focus=${drifted}`,
+    true,
+    (next) => { replaced = next; },
+  );
+  assert.equal(replaced, "#/comercial/atividade?pagina=2");
+  assert.equal(fallbackFocused, 2, "a valid marker whose row drifted away also focuses list status");
 });

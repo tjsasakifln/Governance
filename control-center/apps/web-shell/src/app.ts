@@ -14,7 +14,11 @@ import {
   resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
-import { QUEUE_FOCUS_PARAM, queueFocusDomId } from "./ui/lead-detail";
+import {
+  QUEUE_FOCUS_PARAM,
+  QUEUE_FOCUS_TOKEN_PATTERN,
+  queueFocusDomId,
+} from "./ui/lead-detail";
 import { renderShell } from "./ui/render";
 import {
   parseViewKind,
@@ -34,7 +38,7 @@ export interface ShellRuntime {
   getHash(): string;
   setHash(hash: string): void;
   /** Replace URL state without firing a navigation/repaint. */
-  replaceHash?(hash: string): void;
+  replaceHash(hash: string): void;
   onHashChange(handler: () => void): () => void;
 }
 
@@ -241,25 +245,39 @@ export function consumeQueueFocus(
 ): boolean {
   if (!painted || typeof root.querySelectorAll !== "function") return false;
   const params = new URLSearchParams(queryOf(hash));
-  const resource = params.get(QUEUE_FOCUS_PARAM);
-  if (!resource) {
+  const token = params.get(QUEUE_FOCUS_PARAM);
+  if (!token) {
     consumedQueueFocus.delete(root);
     return false;
   }
   if (consumedQueueFocus.get(root) === hash) return false;
+  consumedQueueFocus.set(root, hash);
+  replaceLocation(stripQueueFocus(hash));
 
-  const expectedId = queueFocusDomId(resource);
+  const focusFallback = (): void => {
+    const fallback = root.querySelectorAll?.("[data-list-count]")[0];
+    fallback?.focus?.({ preventScroll: true });
+    fallback?.scrollIntoView?.({ block: "center", inline: "nearest" });
+  };
+  if (!QUEUE_FOCUS_TOKEN_PATTERN.test(token)) {
+    focusFallback();
+    return false;
+  }
+
+  const expectedId = queueFocusDomId(token);
   const candidates = root.querySelectorAll("[data-queue-focus]");
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
-    if (!candidate || candidate.getAttribute("id") !== expectedId) continue;
+    if (
+      !candidate ||
+      candidate.getAttribute("id") !== expectedId ||
+      candidate.getAttribute("data-queue-focus") !== token
+    ) continue;
     candidate.focus?.({ preventScroll: true });
     candidate.scrollIntoView?.({ block: "center", inline: "nearest" });
-    consumedQueueFocus.set(root, hash);
-
-    replaceLocation(stripQueueFocus(hash));
     return true;
   }
+  focusFallback();
   return false;
 }
 
@@ -561,7 +579,7 @@ export function mount(
       current,
       (g) => g === generation,
       (next) => runtime.setHash(next),
-      (next) => runtime.replaceHash?.(next),
+      (next) => runtime.replaceHash(next),
     );
   };
   const stop = runtime.onHashChange(paint);

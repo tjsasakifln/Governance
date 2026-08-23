@@ -40,19 +40,41 @@ export const LEAD_DETAIL_POSITION_PARAM = "pos";
 export const LEAD_DETAIL_TOTAL_PARAM = "of";
 /** Written on the back link so the queue can restore highlight/scroll. */
 export const QUEUE_FOCUS_PARAM = "focus";
+export const QUEUE_FOCUS_TOKEN_PATTERN = /^qf-[1-9][0-9]{0,8}-[0-9]{1,9}-[0-9a-f]{16}$/;
+
+function boundedDigest(value: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    first ^= unit;
+    first = Math.imul(first, 0x01000193) >>> 0;
+    second ^= unit + index;
+    second = Math.imul(second, 0x85ebca6b) >>> 0;
+  }
+  return `${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
+}
+
+/** Bounded return marker for one exact occurrence in a filtered/paged queue. */
+export function queueFocusToken(
+  resource: string,
+  position: { index: number; total: number },
+): string {
+  const index = Number.isSafeInteger(position.index) && position.index > 0
+    ? Math.min(position.index, 999_999_999)
+    : 1;
+  const length = Math.min(resource.length, 999_999_999);
+  return `qf-${index}-${length}-${boundedDigest(resource)}`;
+}
 
 /**
- * Collision-free DOM id for an opaque queue resource.
+ * Short DOM id for a queue-row token.
  *
- * Encoding UTF-16 code units keeps the result inside [0-9a-f-], so callers
- * never need to interpolate an upstream identifier into a CSS selector.
+ * The position inside `queueFocusToken` disambiguates repeated source ids. The
+ * digest keeps this id bounded even when an upstream identifier is hostile.
  */
-export function queueFocusDomId(resource: string): string {
-  const units: string[] = [];
-  for (let index = 0; index < resource.length; index += 1) {
-    units.push(resource.charCodeAt(index).toString(16).padStart(4, "0"));
-  }
-  return `commercial-queue-row-${units.join("-") || "empty"}`;
+export function queueFocusDomId(token: string): string {
+  return `commercial-queue-row-${token}`;
 }
 /** Parameters this module owns. Everything else on the hash is queue state. */
 export const LEAD_DETAIL_PARAMS = [
@@ -162,11 +184,14 @@ export function queueBackHash(
   resource: string,
 ): string {
   const params = paramsOf(query);
+  const position = positionFrom(query);
   for (const key of LEAD_DETAIL_PARAMS) {
     params.delete(key);
   }
-  if (resource) {
-    params.set(QUEUE_FOCUS_PARAM, resource);
+  if (resource && position) {
+    params.set(QUEUE_FOCUS_PARAM, queueFocusToken(resource, position));
+  } else {
+    params.delete(QUEUE_FOCUS_PARAM);
   }
   return withQuery(routeOf(surface), params);
 }
@@ -219,6 +244,72 @@ function identitiesOf(row: Record<string, unknown>): string[] {
 
 function matchesResource(row: Record<string, unknown>, resource: string): boolean {
   return identitiesOf(row).includes(resource);
+}
+
+/** Items returned for the current server-side page, across wire/internal shapes. */
+function currentListItems(
+  operations: Record<string, unknown>,
+  list: "atividade" | "excecoes",
+): Record<string, unknown>[] {
+  const views = asRecord(operations.list_views);
+  const entry = views ? asRecord(views[list]) : null;
+  if (!entry) return [];
+  const view = asRecord(entry.view);
+  return [...rowsOf(entry.items), ...rowsOf(view?.items)];
+}
+
+/**
+ * Merge bounded preview rows with the current remote page without duplicating
+ * a structurally identical record present in both. Rows that merely share an
+ * id remain distinct: one lead can have several real activity events.
+ */
+function mergeObservedRows(
+  preview: readonly Record<string, unknown>[],
+  current: readonly Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const structurallyEqual = (left: unknown, right: unknown): boolean => {
+    if (Object.is(left, right)) return true;
+    if (Array.isArray(left) || Array.isArray(right)) {
+      if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+      return left.every((item, index) => structurallyEqual(item, right[index]));
+    }
+    const leftRecord = asRecord(left);
+    const rightRecord = asRecord(right);
+    if (!leftRecord || !rightRecord) return false;
+    const leftKeys = Object.keys(leftRecord).sort();
+    const rightKeys = Object.keys(rightRecord).sort();
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every(
+      (key, index) => key === rightKeys[index] && structurallyEqual(leftRecord[key], rightRecord[key]),
+    );
+  };
+  const merged = [...preview];
+  for (const row of current) {
+    if (!merged.some((candidate) => structurallyEqual(candidate, row))) merged.push(row);
+  }
+  return merged;
+}
+
+const LEAD_ENTITY_TYPES = new Set(["lead", "lead_id", "inbound_lead"]);
+
+/** A lead id explicitly carried by an inbound exception, never inferred from the opened record. */
+function provenInboundLeadId(row: Record<string, unknown>): string | null {
+  if (!isInboundAlertException(row)) return null;
+  const evidence = asRecord(row.evidence);
+  if (!evidence) return null;
+  const entityRef = asRecord(evidence.entity_ref);
+  const entityType = entityRef ? text(entityRef.type)?.toLowerCase() : null;
+  const entityId = entityRef ? text(entityRef.id) : null;
+  if (entityId && entityType && LEAD_ENTITY_TYPES.has(entityType)) return entityId;
+
+  const evidenceLeadId = text(evidence.lead_id);
+  if (evidenceLeadId) return evidenceLeadId;
+
+  // `source_id` is normally the exception record id. It becomes a lead id only
+  // under an explicit discriminator; a plausible-looking string is not proof.
+  const sourceKind = (text(evidence.source_id_kind) ?? text(row.source_id_kind))?.toLowerCase();
+  const sourceId = text(row.source_id);
+  return sourceId && sourceKind && LEAD_ENTITY_TYPES.has(sourceKind) ? sourceId : null;
 }
 
 /** Human title for a row, or `null` when the origin only gave a handle. */
@@ -280,7 +371,7 @@ export interface LeadDetailModel {
   /** Non-null only when the id is a legal target for the operator channel. */
   warmblyTargetId: string | null;
   warmblyRefusal: string | null;
-  warmblyRefusalReason: "not-an-alert" | "target-id" | null;
+  warmblyRefusalReason: "not-an-alert" | "lead-id-unproven" | "target-id" | null;
   backHash: string;
   queuePosition: { index: number; total: number } | null;
 }
@@ -424,9 +515,15 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   const surface = input.surface && input.surface.length > 0 ? input.surface : "atividade";
   const resource = input.resource;
   const ops = asRecord(input.snapshot.operations) ?? {};
-  const activity = rowsOf(ops.activity).filter((row) => matchesResource(row, resource));
+  const activity = mergeObservedRows(
+    rowsOf(ops.activity),
+    currentListItems(ops, "atividade"),
+  ).filter((row) => matchesResource(row, resource));
   const pipeline = rowsOf(ops.pipeline).filter((row) => matchesResource(row, resource));
-  const exceptions = rowsOf(ops.exceptions).filter((row) => matchesResource(row, resource));
+  const exceptions = mergeObservedRows(
+    rowsOf(ops.exceptions),
+    currentListItems(ops, "excecoes"),
+  ).filter((row) => matchesResource(row, resource));
   const deal = pipeline[0] ?? null;
   const firstActivity = activity[0] ?? null;
   const firstException = exceptions[0] ?? null;
@@ -556,12 +653,18 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
       })
     : [];
 
-  // The one lead-scoped Warmbly write is `acknowledge_inbound_alert`, and its
-  // target kind is an alert — not a deal. Two gates, both real: the item has to
-  // be an alert, and its id has to be something the channel would accept.
+  // The one lead-scoped Warmbly write is `acknowledge_inbound_alert`. Its URL
+  // takes a lead id, not the exception id, source row id, deal id or whatever
+  // opaque resource happened to open this detail.
   const isAlert = exceptions.some(isInboundAlertException);
+  const provenTargets = [...new Set(exceptions.map(provenInboundLeadId).filter(
+    (value): value is string => value !== null,
+  ))];
+  const provenTarget = provenTargets.length === 1 ? provenTargets[0] ?? null : null;
   const warmblyTargetId =
-    found && isAlert && WARMBLY_TARGET_ID_PATTERN.test(resource) ? resource : null;
+    found && isAlert && provenTarget && WARMBLY_TARGET_ID_PATTERN.test(provenTarget)
+      ? provenTarget
+      : null;
   const warmblyActions: LeadAction[] = warmblyTargetId
     ? [
         {
@@ -581,10 +684,14 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     warmblyRefusalReason = "not-an-alert";
     warmblyRefusal =
       "Nenhuma escrita no Warmbly se aplica a este item: o canal de operador só reconhece alertas de inbound, e este item não é um. Pausar e retomar o disparo são controles de toda a operação e ficam na superfície de disparo, não no detalhe de um lead.";
-  } else if (found && !warmblyTargetId) {
+  } else if (found && isAlert && !provenTarget) {
+    warmblyRefusalReason = "lead-id-unproven";
+    warmblyRefusal =
+      "A exceção é de inbound, mas não traz um identificador de lead comprovado e inequívoco. O id da exceção, o source_id e o registro aberto não são substitutos seguros; nenhuma escrita upstream é oferecida.";
+  } else if (found && provenTarget && !warmblyTargetId) {
     warmblyRefusalReason = "target-id";
     warmblyRefusal =
-      "Este identificador não é um alvo válido do canal de operador do Warmbly (o canal só aceita [A-Za-z0-9_~-], até 128 caracteres). Nenhuma escrita upstream é oferecida aqui.";
+      "O identificador de lead comprovado não é um alvo válido do canal de operador do Warmbly (o canal só aceita [A-Za-z0-9_~-], até 128 caracteres). Nenhuma escrita upstream é oferecida aqui.";
   }
 
   const canonicalId =
