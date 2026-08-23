@@ -1,3 +1,4 @@
+import { attentionAlert, priorityAlert, type AlertPresentation } from "./alerts";
 import { isOperationalClient } from "./client-identity";
 import { formatLocal } from "./datetime";
 import { combinedTone, freshnessTone, type FreshnessTone } from "./freshness-tone";
@@ -60,6 +61,11 @@ export interface HojeRow {
   severity?: string;
   money?: { amount_cents: number; currency: string };
   health?: string;
+  /**
+   * Actionable presentation for the alert bands (top 3 and incidents).
+   * Absent on rows that are a domain roll-up rather than an alert.
+   */
+  alert?: AlertPresentation;
 }
 
 export interface HojeShortcut {
@@ -118,6 +124,7 @@ function rowFrom(
     severity?: string;
     money?: HojeRow["money"];
     health?: string;
+    alert?: AlertPresentation;
   },
   provenance: Provenance,
 ): HojeRow {
@@ -139,6 +146,7 @@ function rowFrom(
   if (base.severity) row.severity = base.severity;
   if (base.money) row.money = base.money;
   if (base.health) row.health = base.health;
+  if (base.alert) row.alert = base.alert;
   return row;
 }
 
@@ -161,17 +169,22 @@ function section(
 
 function composeTop3(input: HojeComposeInput): HojeSection {
   const priorities = selectHomepagePriorities(input.priorities);
-  const rows = priorities.map((item) =>
-    rowFrom(
+  const rows = priorities.map((item) => {
+    // `rationale` is the attention engine's `reason`: it carries the scoring
+    // arithmetic. It belongs behind "Como foi priorizado", never in the body.
+    const alert = priorityAlert(item, input.generated_at);
+    return rowFrom(
       {
         id: item.id,
         title: item.title,
-        summary: item.rationale,
+        summary: alert.description.length > 0 ? alert.description : alert.impact,
         kind: `rank-${item.rank}`,
+        severity: alert.severity,
+        alert,
       },
       item.provenance,
-    ),
-  );
+    );
+  });
   const compressed = rows.length === 0;
   return section(
     0,
@@ -183,18 +196,20 @@ function composeTop3(input: HojeComposeInput): HojeSection {
 
 function composeIncidents(input: HojeComposeInput): HojeSection {
   const items = selectHomepageAttention(input.incidents);
-  const rows = items.map((item) =>
-    rowFrom(
+  const rows = items.map((item) => {
+    const alert = attentionAlert(item, input.generated_at);
+    return rowFrom(
       {
         id: item.id,
         title: item.title,
-        summary: item.summary,
+        summary: alert.description.length > 0 ? alert.description : alert.impact,
         kind: "incident",
         severity: item.severity,
+        alert,
       },
       item.provenance,
-    ),
-  );
+    );
+  });
   const compressed = rows.length === 0;
   return section(
     1,

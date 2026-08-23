@@ -100,6 +100,24 @@ Horizons: `now` | `today` | `this_week`. Homepage limit: `HOMEPAGE_PRIORITY_LIMI
 
 `asPriorityRecommendations(output, horizon)` maps engine rows onto the contracts `PriorityRecommendation` shape (`rationale` = `reason`) without importing cc-01.
 
+### `reason` is two things in one string
+
+`reason` mixes an operator-readable note with the scoring arithmetic and the
+evidence locators. A cockpit needs them apart — `peso_categoria`, `eixo`,
+`freshness_bp`, `confidence_bp` and the `KILL-RULE` banner are engine vocabulary
+and belong behind a disclosure, never on the front of a card.
+
+`explain.ts` therefore has one producer and one published inverse:
+
+- `buildReasonParts(item, horizon)` → `{ plain, formula, evidence }`
+- `joinReasonParts(parts)` → the exact wire string (`buildReason` is these two composed)
+- `splitReason(reason)` → `{ plain, technical }`, where `technical` starts at the
+  arithmetic sentence and carries the evidence locators with it
+- `SCORE_SENTENCE_RE` — the anchor, published so a consumer does not guess it
+
+The wire bytes are unchanged: `buildReason` still emits exactly what it emitted
+before, and `attention_entry.reason` in `operational-envelope.v1` is untouched.
+
 ## Non-goals
 
 Homepage UI, MCP server, PostgreSQL schema, live collectors, LLM ranking, writes under `commercial/` or other Control Center workstreams, provider mutations (charge, checkout, refund, cancel, Asaas changes, commercial send).

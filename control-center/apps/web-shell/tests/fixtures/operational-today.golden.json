@@ -1,0 +1,966 @@
+{
+  "today": {
+    "audit": [
+      {
+        "action": "founder_override",
+        "actor": {
+          "id": "founder-local",
+          "kind": "human"
+        },
+        "at": "2026-08-20T12:00:00.000Z",
+        "detail": {
+          "override_action": "pin",
+          "previous_ranking": {
+            "now": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk"
+            ]
+          },
+          "resulting_ranking": {
+            "now": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down"
+            ]
+          },
+          "target_ids": [
+            "cc:attention-item:overdue-receivable"
+          ]
+        },
+        "id": "cc:audit-event:founder-override-2026-08-20T120000.000Z",
+        "outcome": "success",
+        "resource_id": null,
+        "resource_type": "PriorityRecommendation",
+        "schema_version": "control-center.audit-event.v1",
+        "scope": null
+      }
+    ],
+    "confidence": 0.7,
+    "freshness_status": "FRESH",
+    "generated_at": "2026-08-20T12:00:00.000Z",
+    "schema_version": "control-center.operational-envelope.v1",
+    "scope": "company",
+    "today": [
+      {
+        "attention_item_ids": [
+          "cc:attention-item:overdue-receivable"
+        ],
+        "category": "receita",
+        "domain": "finance",
+        "evidence_refs": [
+          {
+            "note": "overdue_cents=1500000",
+            "source": {
+              "kind": "receivable-read",
+              "locator": "finance/receivables",
+              "system": "asaas"
+            }
+          }
+        ],
+        "forced_by_kill_rule": false,
+        "horizon": "today",
+        "id": "cc:attention-item:overdue-receivable",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.9,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:40:00.000Z",
+          "source": {
+            "kind": "receivable-read",
+            "locator": "finance/receivables",
+            "system": "asaas"
+          }
+        },
+        "rank": 1,
+        "reason": "Score 7299.000 = peso_categoria 100 (tier 2, receita) × eixo 811000 (impacto 88×7000/10000 + urgência 65×3000/10000) × freshness_bp 10000 × confidence_bp 9000 / 10000², horizonte today. Evidências: asaas:receivable-read:finance/receivables.",
+        "recommended_action": "Tratar o recebível vencido (somente leitura; sem mutação Asaas).",
+        "scope": "finance",
+        "score": 7299,
+        "score_breakdown": {
+          "axis": 811000,
+          "category": "receita",
+          "category_tier": 2,
+          "category_weight": 100,
+          "confidence": 0.9,
+          "confidence_bp": 9000,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 88,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": false,
+          "merge_count": 1,
+          "raw": 8110,
+          "score": 7299,
+          "score_milli": 7299000,
+          "source_freshness_status": "FRESH",
+          "urgency": 65,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 7299000,
+        "severity": "high",
+        "status": "open",
+        "title": "Recebível vencido"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:open-incident"
+        ],
+        "category": "blocker",
+        "domain": "engineering",
+        "evidence_refs": [
+          {
+            "note": "open_incident_count=1",
+            "source": {
+              "kind": "repo-read",
+              "locator": "engineering/company",
+              "system": "github"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "today",
+        "id": "cc:attention-item:open-incident",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.95,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:30:00.000Z",
+          "source": {
+            "kind": "repo-read",
+            "locator": "engineering/company",
+            "system": "github"
+          }
+        },
+        "rank": 2,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 8113.000 = peso_categoria 95 (tier 2, blocker) × eixo 899000 (impacto 92×7000/10000 + urgência 85×3000/10000) × freshness_bp 10000 × confidence_bp 9500 / 10000², horizonte today. Evidências: github:repo-read:engineering/company.",
+        "recommended_action": "Desbloquear o incidente de engenharia.",
+        "scope": "company",
+        "score": 8113,
+        "score_breakdown": {
+          "axis": 899000,
+          "category": "blocker",
+          "category_tier": 2,
+          "category_weight": 95,
+          "confidence": 0.95,
+          "confidence_bp": 9500,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 92,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 8540,
+          "score": 8113,
+          "score_milli": 8113000,
+          "source_freshness_status": "FRESH",
+          "urgency": 85,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 8113000,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de engenharia aberto"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:edge-down"
+        ],
+        "category": "risco_operacional",
+        "domain": "infrastructure",
+        "evidence_refs": [
+          {
+            "note": "status=down",
+            "source": {
+              "kind": "host-health",
+              "locator": "infrastructure/hosts",
+              "system": "collector"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "today",
+        "id": "cc:attention-item:edge-down",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.88,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:20:00.000Z",
+          "source": {
+            "kind": "host-health",
+            "locator": "infrastructure/hosts",
+            "system": "collector"
+          }
+        },
+        "rank": 3,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 6993.360 = peso_categoria 85 (tier 2, risco_operacional) × eixo 935000 (impacto 95×7000/10000 + urgência 90×3000/10000) × freshness_bp 10000 × confidence_bp 8800 / 10000², horizonte today. Evidências: collector:host-health:infrastructure/hosts.",
+        "recommended_action": "Investigar o incidente de infraestrutura agora.",
+        "scope": "infrastructure",
+        "score": 6993.36,
+        "score_breakdown": {
+          "axis": 935000,
+          "category": "risco_operacional",
+          "category_tier": 2,
+          "category_weight": 85,
+          "confidence": 0.88,
+          "confidence_bp": 8800,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 95,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 7947,
+          "score": 6993.36,
+          "score_milli": 6993360,
+          "source_freshness_status": "FRESH",
+          "urgency": 90,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 6993360,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de infraestrutura"
+      }
+    ]
+  },
+  "attention_now": {
+    "audit": [
+      {
+        "action": "founder_override",
+        "actor": {
+          "id": "founder-local",
+          "kind": "human"
+        },
+        "at": "2026-08-20T12:00:00.000Z",
+        "detail": {
+          "override_action": "pin",
+          "previous_ranking": {
+            "now": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk"
+            ]
+          },
+          "resulting_ranking": {
+            "now": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down"
+            ]
+          },
+          "target_ids": [
+            "cc:attention-item:overdue-receivable"
+          ]
+        },
+        "id": "cc:audit-event:founder-override-2026-08-20T120000.000Z",
+        "outcome": "success",
+        "resource_id": null,
+        "resource_type": "PriorityRecommendation",
+        "schema_version": "control-center.audit-event.v1",
+        "scope": null
+      }
+    ],
+    "confidence": 0.7,
+    "freshness_status": "FRESH",
+    "generated_at": "2026-08-20T12:00:00.000Z",
+    "horizon": "now",
+    "items": [
+      {
+        "attention_item_ids": [
+          "cc:attention-item:overdue-receivable"
+        ],
+        "category": "receita",
+        "domain": "finance",
+        "evidence_refs": [
+          {
+            "note": "overdue_cents=1500000",
+            "source": {
+              "kind": "receivable-read",
+              "locator": "finance/receivables",
+              "system": "asaas"
+            }
+          }
+        ],
+        "forced_by_kill_rule": false,
+        "horizon": "now",
+        "id": "cc:attention-item:overdue-receivable",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.9,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:40:00.000Z",
+          "source": {
+            "kind": "receivable-read",
+            "locator": "finance/receivables",
+            "system": "asaas"
+          }
+        },
+        "rank": 1,
+        "reason": "Score 7299.000 = peso_categoria 100 (tier 2, receita) × eixo 811000 (impacto 88×7000/10000 + urgência 65×3000/10000) × freshness_bp 10000 × confidence_bp 9000 / 10000², horizonte now. Evidências: asaas:receivable-read:finance/receivables.",
+        "recommended_action": "Tratar o recebível vencido (somente leitura; sem mutação Asaas).",
+        "scope": "finance",
+        "score": 7299,
+        "score_breakdown": {
+          "axis": 811000,
+          "category": "receita",
+          "category_tier": 2,
+          "category_weight": 100,
+          "confidence": 0.9,
+          "confidence_bp": 9000,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 88,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": false,
+          "merge_count": 1,
+          "raw": 8110,
+          "score": 7299,
+          "score_milli": 7299000,
+          "source_freshness_status": "FRESH",
+          "urgency": 65,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 7299000,
+        "severity": "high",
+        "status": "open",
+        "title": "Recebível vencido"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:open-incident"
+        ],
+        "category": "blocker",
+        "domain": "engineering",
+        "evidence_refs": [
+          {
+            "note": "open_incident_count=1",
+            "source": {
+              "kind": "repo-read",
+              "locator": "engineering/company",
+              "system": "github"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "now",
+        "id": "cc:attention-item:open-incident",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.95,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:30:00.000Z",
+          "source": {
+            "kind": "repo-read",
+            "locator": "engineering/company",
+            "system": "github"
+          }
+        },
+        "rank": 2,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 8113.000 = peso_categoria 95 (tier 2, blocker) × eixo 899000 (impacto 92×7000/10000 + urgência 85×3000/10000) × freshness_bp 10000 × confidence_bp 9500 / 10000², horizonte now. Evidências: github:repo-read:engineering/company.",
+        "recommended_action": "Desbloquear o incidente de engenharia.",
+        "scope": "company",
+        "score": 8113,
+        "score_breakdown": {
+          "axis": 899000,
+          "category": "blocker",
+          "category_tier": 2,
+          "category_weight": 95,
+          "confidence": 0.95,
+          "confidence_bp": 9500,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 92,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 8540,
+          "score": 8113,
+          "score_milli": 8113000,
+          "source_freshness_status": "FRESH",
+          "urgency": 85,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 8113000,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de engenharia aberto"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:edge-down"
+        ],
+        "category": "risco_operacional",
+        "domain": "infrastructure",
+        "evidence_refs": [
+          {
+            "note": "status=down",
+            "source": {
+              "kind": "host-health",
+              "locator": "infrastructure/hosts",
+              "system": "collector"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "now",
+        "id": "cc:attention-item:edge-down",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.88,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:20:00.000Z",
+          "source": {
+            "kind": "host-health",
+            "locator": "infrastructure/hosts",
+            "system": "collector"
+          }
+        },
+        "rank": 3,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 6993.360 = peso_categoria 85 (tier 2, risco_operacional) × eixo 935000 (impacto 95×7000/10000 + urgência 90×3000/10000) × freshness_bp 10000 × confidence_bp 8800 / 10000², horizonte now. Evidências: collector:host-health:infrastructure/hosts.",
+        "recommended_action": "Investigar o incidente de infraestrutura agora.",
+        "scope": "infrastructure",
+        "score": 6993.36,
+        "score_breakdown": {
+          "axis": 935000,
+          "category": "risco_operacional",
+          "category_tier": 2,
+          "category_weight": 85,
+          "confidence": 0.88,
+          "confidence_bp": 8800,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 95,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 7947,
+          "score": 6993.36,
+          "score_milli": 6993360,
+          "source_freshness_status": "FRESH",
+          "urgency": 90,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 6993360,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de infraestrutura"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:client-risk"
+        ],
+        "category": "blocker",
+        "domain": "clients",
+        "evidence_refs": [
+          {
+            "note": "at_risk=1;blockers=1",
+            "source": {
+              "kind": "client-ops",
+              "locator": "clients/roll-up",
+              "system": "warmbly"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "now",
+        "id": "cc:attention-item:client-risk",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.8,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:45:00.000Z",
+          "source": {
+            "kind": "client-ops",
+            "locator": "clients/roll-up",
+            "system": "warmbly"
+          }
+        },
+        "rank": 4,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 5396.000 = peso_categoria 95 (tier 2, blocker) × eixo 710000 (impacto 80×7000/10000 + urgência 50×3000/10000) × freshness_bp 10000 × confidence_bp 8000 / 10000², horizonte now. Evidências: warmbly:client-ops:clients/roll-up.",
+        "recommended_action": "Tratar o relacionamento e o blocker do cliente.",
+        "scope": "clients",
+        "score": 5396,
+        "score_breakdown": {
+          "axis": 710000,
+          "category": "blocker",
+          "category_tier": 2,
+          "category_weight": 95,
+          "confidence": 0.8,
+          "confidence_bp": 8000,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 80,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 6745,
+          "score": 5396,
+          "score_milli": 5396000,
+          "source_freshness_status": "FRESH",
+          "urgency": 50,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 5396000,
+        "severity": "critical",
+        "status": "open",
+        "title": "Cliente em risco operacional"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:stalled-pipeline"
+        ],
+        "category": "prazo",
+        "domain": "commercial",
+        "evidence_refs": [
+          {
+            "note": "stalled=1",
+            "source": {
+              "kind": "crm-read-model",
+              "locator": "commercial/pipeline",
+              "system": "warmbly"
+            }
+          }
+        ],
+        "forced_by_kill_rule": false,
+        "horizon": "now",
+        "id": "cc:attention-item:stalled-pipeline",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.84,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:50:00.000Z",
+          "source": {
+            "kind": "crm-read-model",
+            "locator": "commercial/pipeline",
+            "system": "warmbly"
+          }
+        },
+        "rank": 5,
+        "reason": "Score 3628.800 = peso_categoria 80 (tier 2, prazo) × eixo 540000 (impacto 60×7000/10000 + urgência 40×3000/10000) × freshness_bp 10000 × confidence_bp 8400 / 10000², horizonte now. Evidências: warmbly:crm-read-model:commercial/pipeline.",
+        "recommended_action": "Definir próxima ação nos deals parados.",
+        "scope": "commercial",
+        "score": 3628.8,
+        "score_breakdown": {
+          "axis": 540000,
+          "category": "prazo",
+          "category_tier": 2,
+          "category_weight": 80,
+          "confidence": 0.84,
+          "confidence_bp": 8400,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 60,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": false,
+          "merge_count": 1,
+          "raw": 4320,
+          "score": 3628.8,
+          "score_milli": 3628800,
+          "source_freshness_status": "FRESH",
+          "urgency": 40,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 3628800,
+        "severity": "medium",
+        "status": "open",
+        "title": "Pipeline comercial parado"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:cosmetic-copy"
+        ],
+        "category": "estetica",
+        "domain": "company",
+        "evidence_refs": [
+          {
+            "source": {
+              "kind": "operational-view",
+              "locator": "control_center.v_latest_operational_snapshots",
+              "system": "control-center"
+            }
+          }
+        ],
+        "forced_by_kill_rule": false,
+        "horizon": "now",
+        "id": "cc:attention-item:cosmetic-copy",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 1,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T12:00:00.000Z",
+          "source": {
+            "kind": "operational-view",
+            "locator": "control_center.v_latest_operational_snapshots",
+            "system": "control-center"
+          }
+        },
+        "rank": 6,
+        "reason": "Score 367.000 = peso_categoria 10 (tier 1, estetica) × eixo 367000 (impacto 10×7000/10000 + urgência 99×3000/10000) × freshness_bp 10000 × confidence_bp 10000 / 10000², horizonte now. Evidências: control-center:operational-view:control_center.v_latest_operational_snapshots.",
+        "recommended_action": "Não priorizar estética sobre incidente ou receita.",
+        "scope": "company",
+        "score": 367,
+        "score_breakdown": {
+          "axis": 367000,
+          "category": "estetica",
+          "category_tier": 1,
+          "category_weight": 10,
+          "confidence": 1,
+          "confidence_bp": 10000,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 10,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": false,
+          "merge_count": 1,
+          "raw": 367,
+          "score": 367,
+          "score_milli": 367000,
+          "source_freshness_status": "FRESH",
+          "urgency": 99,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 367000,
+        "severity": "low",
+        "status": "open",
+        "title": "Ajuste estético de copy"
+      }
+    ],
+    "schema_version": "control-center.operational-envelope.v1",
+    "scope": "company"
+  },
+  "attention_today": {
+    "audit": [
+      {
+        "action": "founder_override",
+        "actor": {
+          "id": "founder-local",
+          "kind": "human"
+        },
+        "at": "2026-08-20T12:00:00.000Z",
+        "detail": {
+          "override_action": "pin",
+          "previous_ranking": {
+            "now": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk"
+            ]
+          },
+          "resulting_ranking": {
+            "now": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down",
+              "cc:attention-item:client-risk",
+              "cc:attention-item:stalled-pipeline",
+              "cc:attention-item:cosmetic-copy"
+            ],
+            "today": [
+              "cc:attention-item:overdue-receivable",
+              "cc:attention-item:open-incident",
+              "cc:attention-item:edge-down"
+            ]
+          },
+          "target_ids": [
+            "cc:attention-item:overdue-receivable"
+          ]
+        },
+        "id": "cc:audit-event:founder-override-2026-08-20T120000.000Z",
+        "outcome": "success",
+        "resource_id": null,
+        "resource_type": "PriorityRecommendation",
+        "schema_version": "control-center.audit-event.v1",
+        "scope": null
+      }
+    ],
+    "confidence": 0.7,
+    "freshness_status": "FRESH",
+    "generated_at": "2026-08-20T12:00:00.000Z",
+    "horizon": "today",
+    "items": [
+      {
+        "attention_item_ids": [
+          "cc:attention-item:overdue-receivable"
+        ],
+        "category": "receita",
+        "domain": "finance",
+        "evidence_refs": [
+          {
+            "note": "overdue_cents=1500000",
+            "source": {
+              "kind": "receivable-read",
+              "locator": "finance/receivables",
+              "system": "asaas"
+            }
+          }
+        ],
+        "forced_by_kill_rule": false,
+        "horizon": "today",
+        "id": "cc:attention-item:overdue-receivable",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.9,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:40:00.000Z",
+          "source": {
+            "kind": "receivable-read",
+            "locator": "finance/receivables",
+            "system": "asaas"
+          }
+        },
+        "rank": 1,
+        "reason": "Score 7299.000 = peso_categoria 100 (tier 2, receita) × eixo 811000 (impacto 88×7000/10000 + urgência 65×3000/10000) × freshness_bp 10000 × confidence_bp 9000 / 10000², horizonte today. Evidências: asaas:receivable-read:finance/receivables.",
+        "recommended_action": "Tratar o recebível vencido (somente leitura; sem mutação Asaas).",
+        "scope": "finance",
+        "score": 7299,
+        "score_breakdown": {
+          "axis": 811000,
+          "category": "receita",
+          "category_tier": 2,
+          "category_weight": 100,
+          "confidence": 0.9,
+          "confidence_bp": 9000,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 88,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": false,
+          "merge_count": 1,
+          "raw": 8110,
+          "score": 7299,
+          "score_milli": 7299000,
+          "source_freshness_status": "FRESH",
+          "urgency": 65,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 7299000,
+        "severity": "high",
+        "status": "open",
+        "title": "Recebível vencido"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:open-incident"
+        ],
+        "category": "blocker",
+        "domain": "engineering",
+        "evidence_refs": [
+          {
+            "note": "open_incident_count=1",
+            "source": {
+              "kind": "repo-read",
+              "locator": "engineering/company",
+              "system": "github"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "today",
+        "id": "cc:attention-item:open-incident",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.95,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:30:00.000Z",
+          "source": {
+            "kind": "repo-read",
+            "locator": "engineering/company",
+            "system": "github"
+          }
+        },
+        "rank": 2,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 8113.000 = peso_categoria 95 (tier 2, blocker) × eixo 899000 (impacto 92×7000/10000 + urgência 85×3000/10000) × freshness_bp 10000 × confidence_bp 9500 / 10000², horizonte today. Evidências: github:repo-read:engineering/company.",
+        "recommended_action": "Desbloquear o incidente de engenharia.",
+        "scope": "company",
+        "score": 8113,
+        "score_breakdown": {
+          "axis": 899000,
+          "category": "blocker",
+          "category_tier": 2,
+          "category_weight": 95,
+          "confidence": 0.95,
+          "confidence_bp": 9500,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 92,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 8540,
+          "score": 8113,
+          "score_milli": 8113000,
+          "source_freshness_status": "FRESH",
+          "urgency": 85,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 8113000,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de engenharia aberto"
+      },
+      {
+        "attention_item_ids": [
+          "cc:attention-item:edge-down"
+        ],
+        "category": "risco_operacional",
+        "domain": "infrastructure",
+        "evidence_refs": [
+          {
+            "note": "status=down",
+            "source": {
+              "kind": "host-health",
+              "locator": "infrastructure/hosts",
+              "system": "collector"
+            }
+          }
+        ],
+        "forced_by_kill_rule": true,
+        "horizon": "today",
+        "id": "cc:attention-item:edge-down",
+        "item_kind": "work",
+        "merge_count": 1,
+        "provenance": {
+          "confidence": 0.88,
+          "freshness_status": "FRESH",
+          "observed_at": "2026-08-20T11:20:00.000Z",
+          "source": {
+            "kind": "host-health",
+            "locator": "infrastructure/hosts",
+            "system": "collector"
+          }
+        },
+        "rank": 3,
+        "reason": "KILL-RULE: risco crítico forçado em ATENÇÃO AGORA. Score 6993.360 = peso_categoria 85 (tier 2, risco_operacional) × eixo 935000 (impacto 95×7000/10000 + urgência 90×3000/10000) × freshness_bp 10000 × confidence_bp 8800 / 10000², horizonte today. Evidências: collector:host-health:infrastructure/hosts.",
+        "recommended_action": "Investigar o incidente de infraestrutura agora.",
+        "scope": "infrastructure",
+        "score": 6993.36,
+        "score_breakdown": {
+          "axis": 935000,
+          "category": "risco_operacional",
+          "category_tier": 2,
+          "category_weight": 85,
+          "confidence": 0.88,
+          "confidence_bp": 8800,
+          "freshness_bp": 10000,
+          "freshness_demoted": false,
+          "freshness_multiplier": 1,
+          "freshness_status": "FRESH",
+          "impact": 95,
+          "impact_weight": 0.7,
+          "impact_weight_bp": 7000,
+          "kill_rule_applied": true,
+          "merge_count": 1,
+          "raw": 7947,
+          "score": 6993.36,
+          "score_milli": 6993360,
+          "source_freshness_status": "FRESH",
+          "urgency": 90,
+          "urgency_weight": 0.3,
+          "urgency_weight_bp": 3000
+        },
+        "score_milli": 6993360,
+        "severity": "critical",
+        "status": "open",
+        "title": "Incidente de infraestrutura"
+      }
+    ],
+    "schema_version": "control-center.operational-envelope.v1",
+    "scope": "company"
+  }
+}

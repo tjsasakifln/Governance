@@ -9,6 +9,7 @@ import type {
   ActorRef,
   AgentActivity,
   AgentActivityPresentationStatus,
+  AlertRanking,
   AttentionItem,
   ClientIdentityException,
   ClientStatus,
@@ -103,6 +104,67 @@ export function moneyOf(value: unknown): Money | undefined {
   return { amount_cents: rec.amount_cents as number, currency: rec.currency };
 }
 
+const ALERT_SEVERITIES = new Set(["critical", "high", "medium", "low"]);
+
+function alertSeverityOf(value: unknown): AttentionItem["severity"] | undefined {
+  return typeof value === "string" && ALERT_SEVERITIES.has(value)
+    ? (value as AttentionItem["severity"])
+    : undefined;
+}
+
+/**
+ * Attention-engine annotation carried by `GET /v1/attention` and `GET /v1/today`.
+ *
+ * Those routes serve `RankedItem`, which is wider than `attention-item.v1`:
+ * it carries `reason` (the scoring arithmetic in prose), `category`, `domain`
+ * and the evidence locators. Dropping them used to leave the cockpit with the
+ * formula as the only body text it had. Absent on a payload that is a plain
+ * contract body — the caller must treat every field as optional.
+ */
+export function rankingFrom(row: Record<string, unknown>): AlertRanking | undefined {
+  // `reason` only: a plain `priority-recommendation.v1` body carries
+  // `rationale`, which is operator prose, not engine output. Treating it as
+  // engine output would bury the one readable sentence the item has behind
+  // "Como foi priorizado".
+  const reason = str(row.reason);
+  const category = typeof row.category === "string" ? row.category : undefined;
+  const domain = typeof row.domain === "string" ? row.domain : undefined;
+  const severity = alertSeverityOf(row.severity);
+  const forced = typeof row.forced_by_kill_rule === "boolean" ? row.forced_by_kill_rule : undefined;
+  const merge = typeof row.merge_count === "number" ? row.merge_count : undefined;
+  const score = typeof row.score === "number" ? row.score : undefined;
+  const evidence = Array.isArray(row.evidence_refs)
+    ? row.evidence_refs
+        .map((entry) => asRecord(entry))
+        .map((entry) => asRecord(entry?.source))
+        .filter((source): source is Record<string, unknown> => source != null)
+        .map((source) => `${str(source.system)}:${str(source.kind)}:${str(source.locator)}`)
+        .filter((locator) => locator !== "::")
+    : [];
+  if (
+    reason === "" &&
+    category === undefined &&
+    domain === undefined &&
+    severity === undefined &&
+    forced === undefined &&
+    merge === undefined &&
+    score === undefined &&
+    evidence.length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    reason,
+    ...(category !== undefined ? { category } : {}),
+    ...(domain !== undefined ? { domain } : {}),
+    ...(severity !== undefined ? { severity } : {}),
+    ...(forced !== undefined ? { forced_by_kill_rule: forced } : {}),
+    ...(merge !== undefined ? { merge_count: merge } : {}),
+    ...(score !== undefined ? { score } : {}),
+    evidence,
+  };
+}
+
 export function attentionFrom(row: Record<string, unknown>, fallback: Provenance): AttentionItem {
   const prov = provenanceOf(row, fallback);
   const item: AttentionItem = {
@@ -119,6 +181,8 @@ export function attentionFrom(row: Record<string, unknown>, fallback: Provenance
   };
   if (typeof row.recommended_action === "string") item.recommended_action = row.recommended_action;
   if (Array.isArray(row.related_ids)) item.related_ids = row.related_ids.map(String);
+  const ranking = rankingFrom(row);
+  if (ranking) item.ranking = ranking;
   return item;
 }
 
@@ -141,6 +205,9 @@ export function priorityFrom(
   };
   if (Array.isArray(row.attention_item_ids)) item.attention_item_ids = row.attention_item_ids.map(String);
   if (Array.isArray(row.directive_ids)) item.directive_ids = row.directive_ids.map(String);
+  if (typeof row.recommended_action === "string") item.recommended_action = row.recommended_action;
+  const ranking = rankingFrom(row);
+  if (ranking) item.ranking = ranking;
   return item;
 }
 
