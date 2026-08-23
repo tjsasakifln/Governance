@@ -40,3 +40,24 @@ test("stale or errored zero keeps the transport evidence state", () => {
   assert.equal(operationalTruth({ ...base, value: 0, freshness_status: "STALE" }).state, "STALE");
   assert.equal(operationalTruth({ ...base, value: 0, freshness_status: "ERROR" }).state, "ERROR");
 });
+
+test("absence cannot hide stale, unknown, or errored transport evidence", () => {
+  assert.equal(
+    operationalTruth({ ...base, presence: "absent", freshness_status: "STALE" }).state,
+    "STALE",
+  );
+  assert.equal(
+    operationalTruth({ ...base, presence: "absent", freshness_status: "UNKNOWN", confidence: 0 }).state,
+    "UNKNOWN",
+  );
+  assert.equal(
+    operationalTruth({ ...base, presence: "absent", freshness_status: "ERROR", confidence: 0 }).state,
+    "ERROR",
+  );
+});
+
+test("ABSENT is reserved for a fresh, credible observation of source absence", () => {
+  const truth = operationalTruth({ ...base, presence: "absent", freshness_status: "FRESH", confidence: 0.9 });
+  assert.equal(truth.state, "ABSENT");
+  assert.equal(truth.reason, "source_absent");
+});

@@ -1222,6 +1222,39 @@ details.alert-why > summary {
   user-select: all;
 }
 
+.help-line {
+  margin: 0 0 0.55rem;
+}
+
+.term-help {
+  display: inline;
+  position: relative;
+}
+
+.term-help > summary {
+  display: inline;
+  list-style: none;
+}
+
+.term-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-help > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.term-help-text {
+  display: block;
+  margin: 0.35rem 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--accent);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+}
+
 .term[data-help] {
   border-bottom: 1px dotted currentColor;
   cursor: help;

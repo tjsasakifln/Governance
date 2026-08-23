@@ -2,6 +2,7 @@ import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
+import { ownMapValue } from "../own-map";
 import type {
   AgentActivity,
   ClientIdentityException,
@@ -29,6 +30,8 @@ import {
   authorityLabel,
   availabilityLabel,
   clientLifecycleLabel,
+  commercialEventLabel,
+  commercialStateLabel,
   directiveKindLabel,
   directiveStatusLabel,
   exceptionKindLabel,
@@ -37,6 +40,7 @@ import {
   helpTerm,
   hopStatusLabel,
   MEMORY_GROUP_TITLES,
+  pipelineStageLabel,
   providerMutationLabel,
   scopeLabel,
   statusPill,
@@ -237,15 +241,14 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
             const status = hopStatusFor(hop, row);
             const absent = !row;
             const detail = row && row.observation ? String(row.observation) : absent ? "etapa ausente nesta observação" : "";
-            const label =
-              hop in GROWTH_HOP_LABELS ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]] : hop;
+            const label = ownMapValue(GROWTH_HOP_LABELS, hop) ?? "Etapa não reconhecida";
             const shown =
               status === "BLOCKED"
                 ? helpTerm(hopStatusLabel(status), BLOCKED_HELP)
                 : escapeHtml(hopStatusLabel(status));
             return `<li class="card" data-growth-hop="${escapeHtml(hop)}" data-hop-status="${escapeHtml(status)}"${absent ? ` data-absent="true"` : ""}>
               <h3>${escapeHtml(label)}</h3>
-              <p>${shown}${detail ? ` · ${escapeHtml(detail)}` : ""}</p>
+              <div class="help-line">${shown}${detail ? ` · ${escapeHtml(detail)}` : ""}</div>
               ${technicalDetails(
                 [
                   { term: "hop", value: hop },
@@ -326,7 +329,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     ? current.integrity_flags.filter((flag): flag is string => typeof flag === "string")
     : [];
   const integrityWarning = integrityFlags.length > 0
-    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? flag).join("; "))}.</p>`
+    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => ownMapValue(integrityLabels, flag) ?? "verificação não reconhecida").join("; "))}.</p>`
     : "";
   const telemetryWarning = telemetryObserved
     ? ""
@@ -486,14 +489,13 @@ function activityOpsCard(
     ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
   const triage = String(row.triage_state ?? row.state ?? "new");
-  const triageLabels: Record<string, string> = { new: "nova", unread: "não lida", triaged: "triada", blocked: "bloqueada" };
   const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
   const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
   const sync = String(row.sync_status ?? "observed");
   const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
   const canonical = String(row.canonical_id ?? rowId);
   return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}" data-triage-state="${escapeHtml(triage)}">
-    <p class="kicker">${statusPill(triage, triageLabels[triage] ?? triage)} · ${escapeHtml(String(row.event ?? "evento"))}</p>
+    <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(String(row.event ?? "activity"), commercialEventLabel(String(row.event ?? "activity")))}</p>
     <h3>${heading}</h3>
     <p>${escapeHtml(String(row.evidence ?? "Sem descrição adicional da origem."))}</p>
     <dl class="facts">
@@ -502,7 +504,7 @@ function activityOpsCard(
       ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
       ${fact("Prioridade", escapeHtml(String(row.priority ?? "não informada")))}
       ${fact("Próximo passo", escapeHtml(String(row.next_action ?? "abrir o detalhe e definir a próxima ação")))}
-      ${fact("Sincronização", escapeHtml(syncLabels[sync] ?? sync))}
+      ${fact("Sincronização", escapeHtml(ownMapValue(syncLabels, sync) ?? "estado de sincronização não reconhecido"))}
     </dl>
     ${row.sync_detail ? `<p class="banner error" role="alert">Falha de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: confirme no Warmbly antes de repetir.</p>` : ""}
     ${technicalDetails([
@@ -534,7 +536,6 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
   const canonical = String(row.canonical_id ?? id);
   const sourceId = String(row.source_id ?? id);
   const workflow = String(row.workflow_state ?? "new");
-  const stateLabels: Record<string, string> = { new: "nova", acknowledged: "reconhecida", in_progress: "em tratamento", resolved: "resolvida", discarded: "descartada" };
   const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
   const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
   const count = typeof row.occurrence_count === "number" ? row.occurrence_count : 1;
@@ -549,7 +550,7 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
   }
   const open = workflow !== "resolved" && workflow !== "discarded";
   return `<article class="card" data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
-    <p class="kicker">${statusPill(workflow, stateLabels[workflow] ?? workflow)} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
+    <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
     <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
     <dl class="facts">
       ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
@@ -583,7 +584,7 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
         <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
         <button type="submit">Iniciar tratamento</button>
       </form>
-    </div>` : `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(stateLabels[workflow] ?? workflow)}.</p>`}
+    </div>` : `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>`}
   </article>`;
 }
 
@@ -678,8 +679,9 @@ function commercialOps(
         : pipeline
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}">
-                <p class="kicker">${escapeHtml(String(row.stage ?? row.status ?? ""))} ${row.stale === true ? "· dado defasado" : ""}</p>
+              const stage = String(row.stage ?? row.status ?? "unknown");
+              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}" data-stage="${escapeHtml(stage)}">
+                <p class="kicker">${statusPill(stage, pipelineStageLabel(stage))} ${row.stale === true ? "· dado defasado" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "negócio"))}</h3>
                 ${dealMoneyLine(row.value)}
                 <dl class="facts">
@@ -1097,7 +1099,7 @@ const CATALOG_REASON_LABELS: Record<string, string> = {
  */
 export function infraCatalogBlock(summary: InfraCatalogSummary): string {
   const reason = summary.unavailability_reason ?? summary.availability;
-  const reasonLabel = reason ? (CATALOG_REASON_LABELS[reason] ?? reason) : undefined;
+  const reasonLabel = reason ? (ownMapValue(CATALOG_REASON_LABELS, reason) ?? "motivo não reconhecido") : undefined;
   const confidence = summary.confidence.toFixed(2).replace(".", ",");
   return `
     <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
@@ -1210,7 +1212,7 @@ export function memoriaGroups(directives: Directive[]): string {
     .map((kind) => {
       const rows = directives.filter((item) => item.kind === kind);
       if (rows.length === 0) return "";
-      return `<section aria-labelledby="memoria-${kind}" data-memory-kind="${kind}"><h2 id="memoria-${kind}">${labels[kind]}</h2><div class="stack">${rows.map(directiveCard).join("")}</div></section>`;
+      return `<section aria-labelledby="memoria-${kind}" data-memory-kind="${kind}"><h2 id="memoria-${kind}">${ownMapValue(labels, kind) ?? "Registros"}</h2><div class="stack">${rows.map(directiveCard).join("")}</div></section>`;
     })
     .join("");
 }

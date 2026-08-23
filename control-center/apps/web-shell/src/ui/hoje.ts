@@ -54,17 +54,17 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   return `
     <article class="card ${sectionId === "incidents" ? "attention" : "hoje-row"}" data-id="${escapeHtml(row.id)}" data-freshness="${escapeHtml(row.freshness_status)}" data-tone="${escapeHtml(tone)}"${row.severity ? ` data-severity="${escapeHtml(row.severity)}"` : ""}>
       <header>
-        <p class="kicker">${severity}${freshnessPill(row.freshness_status)} <span class="sr-only">${escapeHtml(freshnessLabel(row.freshness_status))}</span></p>
+        <div class="kicker">${severity}${freshnessPill(row.freshness_status)} <span class="sr-only">${escapeHtml(freshnessLabel(row.freshness_status))}</span></div>
         <h3>${escapeHtml(row.title)}</h3>
       </header>
       <p>${escapeHtml(row.summary)}</p>
       ${money}
-      <p class="prov-inline">
+      <div class="prov-inline">
         <span>Origem: ${escapeHtml(row.source.system)}</span>
         · Observado <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
         <span class="sr-only">UTC ${escapeHtml(row.observed_at)}</span>
         · ${helpTerm("confiança", CONFIDENCE_HELP)} ${escapeHtml(confidence)}
-      </p>
+      </div>
       ${technicalDetails(
         [
           { term: "id", value: row.id },
@@ -137,10 +137,10 @@ function domainCard(card: HojeDomainCard): string {
   return `
     <article class="card domain-card" data-domain-card="${escapeHtml(card.id)}" data-domain-state="${escapeHtml(card.state)}" data-freshness="${escapeHtml(card.freshness_status)}" data-tone="${escapeHtml(tone)}" data-presence="${escapeHtml(card.presence)}" data-action-count="${escapeHtml(String(card.action_count))}">
       <header>
-        <p class="kicker">
+        <div class="kicker">
           <span class="pill pill-state-${escapeHtml(card.state)}">${escapeHtml(card.state_label)}</span>
           ${freshnessPill(card.freshness_status)}${absence}
-        </p>
+        </div>
         <h3>${escapeHtml(card.label)}</h3>
       </header>
       <p class="domain-reason">${escapeHtml(card.state_reason)}</p>
@@ -170,7 +170,7 @@ function integrationRow(row: HojeIntegration): string {
   return `<li data-integration="${escapeHtml(row.system)}" data-domain-state="${escapeHtml(row.state)}" data-freshness="${escapeHtml(row.freshness_status)}">
     <span class="pill pill-state-${escapeHtml(row.state)}">${escapeHtml(row.state_label)}</span>
     <strong>${escapeHtml(row.system)}</strong> — ${escapeHtml(row.detail)}
-    <span class="prov-inline">${freshnessPill(row.freshness_status)} · última leitura ${escapeHtml(row.observed_at_local)}</span>
+    <div class="prov-inline">${freshnessPill(row.freshness_status)} · última leitura ${escapeHtml(row.observed_at_local)}</div>
     ${technicalDetails([{ term: "error_code", value: row.error_code ?? "" }], "integration-error")}
   </li>`;
 }

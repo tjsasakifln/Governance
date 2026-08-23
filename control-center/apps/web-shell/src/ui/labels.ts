@@ -13,15 +13,16 @@
  * 2. **Nada é apagado.** Todo identificador, nome de schema, locator e enum
  *    cru que sai da superfície principal reaparece em `technicalDetails()`,
  *    recolhido e selecionável para cópia.
- * 3. **Código desconhecido aparece como veio.** Um `code` de texto livre que
- *    o upstream inventou não é traduzido por adivinhação: cai no fallback e
- *    segue visível, porque inventar rótulo esconde dado.
+ * 3. **Código desconhecido não vira texto de interface.** Um valor novo recebe
+ *    um rótulo autoral honesto; o token original continua disponível somente
+ *    nos dados e no detalhe técnico.
  *
  * O mapa de atualização é semeado por `freshnessLabel` de `../provenance`
  * (`FRESH→fresco`, `STALE→defasado`, `UNKNOWN→desconhecido`,
  * `ERROR→erro de coleta`); ele não é duplicado aqui.
  */
 import { escapeHtml } from "../escape";
+import { ownMapValue } from "../own-map";
 import { freshnessLabel } from "../provenance";
 import type {
   AgentActivityPresentationStatus,
@@ -215,7 +216,7 @@ export const SCOPE_LABELS: Record<string, string> = {
 };
 
 export function scopeLabel(scope: string): string {
-  const known = SCOPE_LABELS[scope];
+  const known = ownMapValue(SCOPE_LABELS, scope);
   if (known !== undefined) return known;
   const separator = scope.indexOf(":");
   if (separator > 0) {
@@ -224,7 +225,7 @@ export function scopeLabel(scope: string): string {
     if (prefix === "repo") return `repositório ${id}`;
     if (prefix === "client") return `cliente ${id}`;
   }
-  return scope;
+  return "escopo não reconhecido";
 }
 
 /**
@@ -271,76 +272,181 @@ export const OPERATOR_OUTCOME_LABELS: Record<string, string> = {
   duplicate: "duplicada",
 };
 
+export const COMMERCIAL_EVENT_LABELS: Record<string, string> = {
+  activity: "atividade",
+  overdue_task: "tarefa atrasada",
+  next_action: "próxima ação",
+  stalled_deal: "negócio parado",
+  exception_state: "estado excepcional",
+  inbox_signal: "sinal da caixa de entrada",
+  campaign_signal: "sinal de campanha",
+  inbound_lead: "lead recebido",
+  confenge_attention: "atenção da CONFENGE",
+  open: "abertura",
+  pending: "tarefa pendente",
+  in_progress: "tarefa em andamento",
+  completed: "tarefa concluída",
+  cancelled: "tarefa cancelada",
+  new: "novo contato",
+  unread: "mensagem não lida",
+  awaiting_reply: "aguardando resposta",
+  awaiting_agent_draft: "aguardando revisão do rascunho",
+  replied: "resposta recebida",
+  dnc: "contato proibido",
+  do_not_contact: "contato proibido",
+  needs_attention: "exige atenção",
+  scheduled_pending: "agendamento pendente",
+  snoozed: "adiado",
+  ready: "pronto",
+  active: "atividade ativa",
+  paused: "atividade pausada",
+  handled: "atividade tratada",
+  done: "atividade concluída",
+  closed: "encerramento",
+  won: "negócio ganho",
+  lost: "negócio perdido",
+  failed: "falha",
+  error: "erro",
+  unknown: "atividade desconhecida",
+};
+
+export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
+  open: "aberto",
+  pending: "pendente",
+  in_progress: "em andamento",
+  completed: "concluído",
+  cancelled: "cancelado",
+  new: "novo",
+  unread: "não lido",
+  awaiting_reply: "aguardando resposta",
+  awaiting_agent_draft: "aguardando revisão do rascunho",
+  replied: "respondido",
+  dnc: "não contatar",
+  do_not_contact: "não contatar",
+  needs_attention: "exige atenção",
+  scheduled_pending: "agendamento pendente",
+  snoozed: "adiado",
+  ready: "pronto",
+  active: "ativo",
+  paused: "pausado",
+  handled: "tratado",
+  done: "concluído",
+  closed: "encerrado",
+  won: "ganho",
+  lost: "perdido",
+  failed: "falhou",
+  error: "falhou",
+  blocked: "bloqueado",
+  triaged: "triado",
+  acknowledged: "reconhecido",
+  resolved: "resolvido",
+  discarded: "descartado",
+  unknown: "desconhecido",
+};
+
+export const PIPELINE_STAGE_LABELS: Record<string, string> = {
+  ...COMMERCIAL_STATE_LABELS,
+  Proposta: "Proposta",
+  proposta: "proposta",
+  qualified: "qualificado",
+  qualification: "qualificação",
+  discovery: "descoberta",
+  proposal: "proposta",
+  negotiation: "negociação",
+  closed_won: "encerrado como ganho",
+  closed_lost: "encerrado como perdido",
+};
+
+export const UNRECOGNIZED_COMMERCIAL_STATE_LABEL = "estado não reconhecido";
+
 /* ------------------------------------------------------------------ */
 /* Consultas tolerantes: valor desconhecido volta como veio.           */
 /* ------------------------------------------------------------------ */
 
-function lookup(table: Record<string, string>, value: string): string {
-  return table[value] ?? value;
+function lookup(table: Record<string, string>, value: string, fallback: string): string {
+  return ownMapValue(table, value) ?? fallback;
 }
 
 export function agentStatusLabel(status: string): string {
-  return lookup(AGENT_STATUS_LABELS as Record<string, string>, status);
+  return lookup(AGENT_STATUS_LABELS as Record<string, string>, status, "estado do agente não reconhecido");
 }
 
 export function agentSessionStatusLabel(status: string): string {
-  return lookup(AGENT_SESSION_STATUS_LABELS as Record<string, string>, status);
+  return lookup(AGENT_SESSION_STATUS_LABELS as Record<string, string>, status, "estado da sessão não reconhecido");
 }
 
 export function healthLabel(status: string): string {
-  return lookup(HEALTH_LABELS as Record<string, string>, status);
+  return lookup(HEALTH_LABELS as Record<string, string>, status, "estado de saúde não reconhecido");
 }
 
 export function clientLifecycleLabel(lifecycle: string): string {
-  return lookup(CLIENT_LIFECYCLE_LABELS as Record<string, string>, lifecycle);
+  return lookup(CLIENT_LIFECYCLE_LABELS as Record<string, string>, lifecycle, "ciclo do cliente não reconhecido");
 }
 
 export function severityLabel(severity: string): string {
-  return lookup(SEVERITY_LABELS as Record<string, string>, severity);
+  return lookup(SEVERITY_LABELS as Record<string, string>, severity, "gravidade não reconhecida");
 }
 
 export function attentionStatusLabel(status: string): string {
-  return lookup(ATTENTION_STATUS_LABELS as Record<string, string>, status);
+  return lookup(ATTENTION_STATUS_LABELS as Record<string, string>, status, "estado de atenção não reconhecido");
 }
 
 export function priorityHorizonLabel(horizon: string): string {
-  return lookup(PRIORITY_HORIZON_LABELS as Record<string, string>, horizon);
+  return lookup(PRIORITY_HORIZON_LABELS as Record<string, string>, horizon, "horizonte não reconhecido");
 }
 
 export function directiveKindLabel(kind: string): string {
-  return lookup(DIRECTIVE_KIND_LABELS as Record<string, string>, kind);
+  return lookup(DIRECTIVE_KIND_LABELS as Record<string, string>, kind, "tipo de diretiva não reconhecido");
 }
 
 export function directiveStatusLabel(status: string): string {
-  return lookup(DIRECTIVE_STATUS_LABELS as Record<string, string>, status);
+  return lookup(DIRECTIVE_STATUS_LABELS as Record<string, string>, status, "estado da diretiva não reconhecido");
 }
 
 export function availabilityLabel(value: string): string {
-  return lookup(AVAILABILITY_LABELS, value);
+  return lookup(AVAILABILITY_LABELS, value, "disponibilidade não reconhecida");
 }
 
 export function authorityLabel(value: string): string {
-  return lookup(AUTHORITY_LABELS, value);
+  return lookup(AUTHORITY_LABELS, value, "autoridade não reconhecida");
 }
 
 export function providerMutationLabel(value: string): string {
-  return lookup(PROVIDER_MUTATION_LABELS, value);
+  return lookup(PROVIDER_MUTATION_LABELS, value, "regra de mutação não reconhecida");
 }
 
 export function exceptionKindLabel(kind: string): string {
-  return lookup(EXCEPTION_KIND_LABELS, kind);
+  return lookup(EXCEPTION_KIND_LABELS, kind, "tipo não reconhecido");
 }
 
 export function viewKindLabel(kind: string): string {
-  return lookup(VIEW_KIND_LABELS, kind);
+  return lookup(VIEW_KIND_LABELS, kind, "estado da vista não reconhecido");
 }
 
 export function operatorActionLabel(action: string): string {
-  return lookup(OPERATOR_ACTION_LABELS, action);
+  return lookup(OPERATOR_ACTION_LABELS, action, "ação não reconhecida");
 }
 
 export function operatorOutcomeLabel(outcome: string): string {
-  return lookup(OPERATOR_OUTCOME_LABELS, outcome);
+  return lookup(OPERATOR_OUTCOME_LABELS, outcome, "resultado não reconhecido");
+}
+
+export function commercialEventLabel(event: string): string {
+  return ownMapValue(COMMERCIAL_EVENT_LABELS, event)
+    ?? ownMapValue(COMMERCIAL_EVENT_LABELS, event.toLowerCase())
+    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+}
+
+export function commercialStateLabel(state: string): string {
+  return ownMapValue(COMMERCIAL_STATE_LABELS, state)
+    ?? ownMapValue(COMMERCIAL_STATE_LABELS, state.toLowerCase())
+    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+}
+
+export function pipelineStageLabel(stage: string): string {
+  return ownMapValue(PIPELINE_STAGE_LABELS, stage)
+    ?? ownMapValue(PIPELINE_STAGE_LABELS, stage.toLowerCase())
+    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
 }
 
 /**
@@ -348,7 +454,7 @@ export function operatorOutcomeLabel(outcome: string): string {
  * `BLOCKED`/`UNKNOWN`, que é o que `hopStatusFor` produz.
  */
 export function hopStatusLabel(status: string): string {
-  return lookup(AVAILABILITY_LABELS, status);
+  return lookup(AVAILABILITY_LABELS, status, "estado não reconhecido");
 }
 
 /* ------------------------------------------------------------------ */
@@ -361,7 +467,7 @@ export function hopStatusLabel(status: string): string {
  * existe sem depender de hover.
  */
 export function helpTerm(term: string, help: string): string {
-  return `<span class="term" data-help="${escapeHtml(help)}" title="${escapeHtml(help)}">${escapeHtml(term)}</span>`;
+  return `<details class="term-help"><summary class="term" data-help="${escapeHtml(help)}" title="${escapeHtml(help)}">${escapeHtml(term)}<span class="sr-only"> — abrir ajuda contextual</span></summary><span class="term-help-text" role="note">${escapeHtml(help)}</span></details>`;
 }
 
 /**
@@ -379,7 +485,7 @@ export function statusPill(raw: string, label: string, extraClass = ""): string 
  * superfície onde aparece, e ela aparece em quase todas.
  */
 export function freshnessPill(status: FreshnessStatus): string {
-  return `<span class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}" data-help="${escapeHtml(FRESHNESS_HELP)}" title="${escapeHtml(FRESHNESS_HELP)}">${escapeHtml(freshnessLabel(status))}</span>`;
+  return `<details class="term-help freshness-help"><summary class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}" data-help="${escapeHtml(FRESHNESS_HELP)}" title="${escapeHtml(FRESHNESS_HELP)}">${escapeHtml(freshnessLabel(status))}<span class="sr-only"> — abrir ajuda sobre atualização</span></summary><span class="term-help-text" role="note">${escapeHtml(FRESHNESS_HELP)}</span></details>`;
 }
 
 /* ------------------------------------------------------------------ */

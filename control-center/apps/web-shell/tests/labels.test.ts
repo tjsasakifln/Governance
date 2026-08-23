@@ -27,10 +27,27 @@ import {
   PRIORITY_HORIZON_LABELS,
   SEVERITY_LABELS,
   availabilityLabel,
+  agentSessionStatusLabel,
+  agentStatusLabel,
+  attentionStatusLabel,
+  authorityLabel,
+  clientLifecycleLabel,
+  commercialEventLabel,
+  commercialStateLabel,
   confidenceWord,
+  directiveKindLabel,
+  directiveStatusLabel,
   exceptionKindLabel,
   freshnessLabel,
+  healthLabel,
   helpTerm,
+  hopStatusLabel,
+  operatorActionLabel,
+  operatorOutcomeLabel,
+  pipelineStageLabel,
+  priorityHorizonLabel,
+  providerMutationLabel,
+  severityLabel,
   scopeLabel,
   statusPill,
   technicalDetails,
@@ -101,11 +118,40 @@ test("every taxonomy value has a Portuguese label and no label is left blank", (
   }
 });
 
-test("a code the backend never enumerated survives untranslated instead of being invented", () => {
+test("unknown backend codes stay technical and receive an honest authored fallback", () => {
   assert.equal(exceptionKindLabel("missing_version"), "versão de oferta ausente");
-  assert.equal(exceptionKindLabel("some_code_warmbly_just_invented"), "some_code_warmbly_just_invented");
+  assert.equal(exceptionKindLabel("some_code_warmbly_just_invented"), "tipo não reconhecido");
   assert.equal(availabilityLabel("BLOCKED_BY_SECRET"), "bloqueado por credencial ausente");
-  assert.equal(availabilityLabel("A_BRAND_NEW_CODE"), "A_BRAND_NEW_CODE");
+  assert.equal(availabilityLabel("A_BRAND_NEW_CODE"), "disponibilidade não reconhecida");
+});
+
+test("label catalogues fail closed for future and Object.prototype tokens", () => {
+  const cases: Array<[(value: string) => string, string]> = [
+    [agentStatusLabel, "estado do agente não reconhecido"],
+    [agentSessionStatusLabel, "estado da sessão não reconhecido"],
+    [healthLabel, "estado de saúde não reconhecido"],
+    [clientLifecycleLabel, "ciclo do cliente não reconhecido"],
+    [severityLabel, "gravidade não reconhecida"],
+    [attentionStatusLabel, "estado de atenção não reconhecido"],
+    [priorityHorizonLabel, "horizonte não reconhecido"],
+    [directiveKindLabel, "tipo de diretiva não reconhecido"],
+    [directiveStatusLabel, "estado da diretiva não reconhecido"],
+    [availabilityLabel, "disponibilidade não reconhecida"],
+    [authorityLabel, "autoridade não reconhecida"],
+    [providerMutationLabel, "regra de mutação não reconhecida"],
+    [exceptionKindLabel, "tipo não reconhecido"],
+    [operatorActionLabel, "ação não reconhecida"],
+    [operatorOutcomeLabel, "resultado não reconhecido"],
+    [commercialEventLabel, "estado não reconhecido"],
+    [commercialStateLabel, "estado não reconhecido"],
+    [pipelineStageLabel, "estado não reconhecido"],
+    [hopStatusLabel, "estado não reconhecido"],
+    [scopeLabel, "escopo não reconhecido"],
+  ];
+  for (const poisoned of ["FUTURE_TOKEN", "constructor", "toString", "__proto__"]) {
+    assert.equal(freshnessLabel(poisoned as never), "atualização não reconhecida");
+    for (const [label, fallback] of cases) assert.equal(label(poisoned), fallback);
+  }
 });
 
 test("scope keeps its identifier and gains a Portuguese word", () => {
@@ -113,7 +159,7 @@ test("scope keeps its identifier and gains a Portuguese word", () => {
   assert.equal(scopeLabel("infrastructure"), "infraestrutura");
   assert.equal(scopeLabel("client:acme-industria"), "cliente acme-industria");
   assert.equal(scopeLabel("repo:tjsasakifln/Governance"), "repositório tjsasakifln/Governance");
-  assert.equal(scopeLabel("weird:thing"), "weird:thing");
+  assert.equal(scopeLabel("weird:thing"), "escopo não reconhecido");
 });
 
 test("confidence is spoken as a word, without hiding the number", () => {
@@ -147,6 +193,9 @@ test("helpTerm carries the explanation in title and data-help, escaped", () => {
   assert.match(html, /data-help="1 &lt; 2 &amp; &quot;aspas&quot;"/);
   assert.match(html, /title="1 &lt; 2 &amp; &quot;aspas&quot;"/);
   assert.match(html, />confiança</);
+  assert.match(html, /^<details class="term-help">/);
+  assert.match(html, /<summary[^>]*class="term"/);
+  assert.match(html, /role="note"/);
 });
 
 test("statusPill shows the Portuguese label and keeps the raw token in data-raw", () => {

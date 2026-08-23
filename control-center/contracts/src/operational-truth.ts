@@ -49,22 +49,22 @@ export interface OperationalTruthInput {
   complete?: boolean;
 }
 
-/** Fail-closed precedence. ERROR/STALE are never hidden by an empty value. */
+/** Fail-closed precedence. Transport uncertainty is never hidden by absence or a scalar value. */
 export function operationalTruth(input: OperationalTruthInput): OperationalTruth {
   let state: OperationalTruthState;
   let reason: OperationalTruthReason;
   if (input.freshness_status === "ERROR") {
     state = "ERROR";
     reason = "collection_error";
-  } else if (input.presence === "absent") {
-    state = "ABSENT";
-    reason = "source_absent";
-  } else if (input.freshness_status === "UNKNOWN" || input.confidence <= 0) {
-    state = "UNKNOWN";
-    reason = "recency_unknown";
   } else if (input.freshness_status === "STALE") {
     state = "STALE";
     reason = "observation_stale";
+  } else if (input.freshness_status === "UNKNOWN" || input.confidence <= 0) {
+    state = "UNKNOWN";
+    reason = "recency_unknown";
+  } else if (input.presence === "absent") {
+    state = "ABSENT";
+    reason = "source_absent";
   } else if (input.complete === false) {
     state = "UNKNOWN";
     reason = "partial_payload";

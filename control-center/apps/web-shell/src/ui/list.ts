@@ -1,5 +1,12 @@
 import { queryParamsOf } from "../destinations";
 import { escapeHtml } from "../escape";
+import { ownMapValue } from "../own-map";
+import {
+  commercialEventLabel,
+  commercialStateLabel,
+  exceptionKindLabel,
+  severityLabel,
+} from "./labels";
 import {
   PAGE_SIZES,
   PERIODS,
@@ -52,6 +59,16 @@ const FACET_VALUE_LABELS: Readonly<Record<string, string>> = {
   blocked: "bloqueado",
 };
 
+function facetValueLabel(spec: ListSpec, facet: FacetSpec, value: string): string {
+  if (facet.id === "condicao") return ownMapValue(FACET_VALUE_LABELS, value) ?? "condição não reconhecida";
+  if (spec.id === "atividade" && facet.id === "estado") return commercialStateLabel(value);
+  if (spec.id === "atividade" && facet.id === "tipo") return commercialEventLabel(value);
+  if (spec.id === "excecoes" && facet.id === "estado") return commercialStateLabel(value);
+  if (spec.id === "excecoes" && facet.id === "tipo") return exceptionKindLabel(value);
+  if (facet.id === "prioridade") return severityLabel(value);
+  return "valor não reconhecido";
+}
+
 function facetField(
   spec: ListSpec,
   facet: FacetSpec,
@@ -64,7 +81,7 @@ function facetField(
       <label for="${escapeHtml(id)}">${escapeHtml(facet.label)}</label>
       <select id="${escapeHtml(id)}" name="${escapeHtml(facet.id)}">
         ${option("all", `Todos · ${facet.label}`, current === "all")}
-        ${values.map((value) => option(value, FACET_VALUE_LABELS[value] ?? value, current === value)).join("")}
+        ${values.map((value) => option(value, facetValueLabel(spec, facet, value), current === value)).join("")}
       </select>
     </div>`;
 }

@@ -3,7 +3,14 @@ import { test } from "node:test";
 import { FINANCE_SNAPSHOT, FRESHNESS_SAMPLES } from "../src/fixtures/catalog";
 import { PRESENTATION_TIME_ZONE } from "../src/datetime";
 import { formatMoney } from "../src/money";
-import { mapProvenance, provenanceFromPresentation } from "../src/provenance";
+import {
+  freshnessLabel,
+  mapProvenance,
+  provenanceFromPresentation,
+  sourceKindLabel,
+  sourcePresentationLabel,
+  sourceSystemLabel,
+} from "../src/provenance";
 import { FRESHNESS_STATUSES } from "../src/types";
 
 test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation model", () => {
@@ -31,6 +38,18 @@ test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation 
   assert.equal(FRESHNESS_SAMPLES.FRESH?.freshness_status, "FRESH");
   assert.equal(FRESHNESS_SAMPLES.ERROR?.freshness_status, "ERROR");
   assert.equal(FRESHNESS_SAMPLES.UNKNOWN?.freshness_status, "UNKNOWN");
+});
+
+test("provenance catalogues reject inherited property names", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    assert.equal(sourceSystemLabel(poisoned), "Sistema de origem");
+    assert.equal(sourceKindLabel(poisoned), "leitura operacional");
+    assert.equal(freshnessLabel(poisoned as never), "atualização não reconhecida");
+    assert.equal(
+      sourcePresentationLabel({ system: poisoned, kind: poisoned, locator: `locator:${poisoned}` }),
+      "Sistema de origem · leitura operacional",
+    );
+  }
 });
 
 test("finance money formats integer cents plus currency", () => {
