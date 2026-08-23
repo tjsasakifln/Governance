@@ -506,6 +506,13 @@ export function createWarmblyOperatorChannel(
         auditReason: reason,
       });
     }
+    // A fresh decision supersedes every older pending decision by this actor.
+    // The ledger keeps all challenges, but only the newest token remains live.
+    confirmations.invalidate({
+      action: action.name,
+      target_id: target.id,
+      actor_id: actor.id,
+    });
     const challenge = confirmations.issue({
       action: action.name,
       target_id: target.id,
@@ -540,6 +547,23 @@ export function createWarmblyOperatorChannel(
       return prepared;
     }
     const { action, actor, target, path, reason } = prepared;
+
+    if (action.name === "pause_dispatch") {
+      // Dispatch is a singleton: even a refused pause attempt is a new safety
+      // intervention, so no operator may later release it with an older token.
+      confirmations.invalidate({
+        action: "resume_dispatch",
+        target_id: DISPATCH_TARGET_ID,
+      });
+    } else if (action.name === "acknowledge_inbound_alert") {
+      // Acknowledge does not change dispatch globally, but it interrupts this
+      // operator's decision flow and invalidates their pending resume.
+      confirmations.invalidate({
+        action: "resume_dispatch",
+        target_id: DISPATCH_TARGET_ID,
+        actor_id: actor.id,
+      });
+    }
 
     let confirmation: OperatorLedgerConfirmation = NO_CONFIRMATION;
     if (action.confirmation === "two_step") {

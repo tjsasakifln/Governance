@@ -302,6 +302,63 @@ export const COMMERCIAL_SNAPSHOT: CommercialSnapshot = {
   },
   offer_version_drift: { count: 1, detail: "proposta com versão de catálogo defasada" },
   attention_item_ids: ["cc:attention-item:01K3CC-INBOUND-UNREAD"],
+  /**
+   * Shaped exactly like `operations` of `control-center.commercial-operations.v1`
+   * as the runner projects it, so the mock surface exercises the same reader the
+   * HTTP adapter feeds. `dispatch` is the block the connector forwards verbatim;
+   * `operator_ledger*` is what the Control Center's own ledger read-back adds.
+   */
+  operations: {
+    dispatch: {
+      state: "PAUSED",
+      observed: true,
+      pause_reason: "pico de bounce acima do limite em 2026-08-20",
+      window_start: "09:00",
+      window_end: "18:00",
+      timezone: "America/Sao_Paulo",
+      in_send_window: true,
+      next_slot_at: "2026-08-21T09:00:00Z",
+      sent_last_hour: 12,
+      cap: 60,
+      queued_approved: 34,
+    },
+    operator_ledger_status: "read",
+    operator_ledger: [
+      {
+        action: "pause_dispatch",
+        outcome: "executed",
+        actor_id: "founder",
+        target: "dispatch:confenge-outbound",
+        reason: "pico de bounce acima do limite",
+        refusal_code: null,
+        upstream_status: 200,
+        recorded_at: "2026-08-20T17:38:00Z",
+        correlation_id: "wop_01K3CC0000000000000001",
+      },
+      {
+        action: "resume_dispatch",
+        outcome: "refused",
+        actor_id: "founder",
+        target: "dispatch:confenge-outbound",
+        reason: "bounce normalizado",
+        refusal_code: "confirmation_required",
+        upstream_status: null,
+        recorded_at: "2026-08-20T17:36:00Z",
+        correlation_id: "wop_01K3CC0000000000000000",
+      },
+    ],
+    last_operator_action: {
+      action: "pause_dispatch",
+      outcome: "executed",
+      actor_id: "founder",
+      target: "dispatch:confenge-outbound",
+      reason: "pico de bounce acima do limite",
+      refusal_code: null,
+      upstream_status: 200,
+      recorded_at: "2026-08-20T17:38:00Z",
+      correlation_id: "wop_01K3CC0000000000000001",
+    },
+  },
 };
 
 export const FINANCE_SNAPSHOT: FinanceSnapshot = {
@@ -896,6 +953,13 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       priorities: [],
       commercial: COMMERCIAL_SNAPSHOT,
       health: HEALTH_FIXTURES,
+    }),
+    warmbly: pageFor("warmbly", {
+      headline:
+        "Estado do outbound, janela, fila, limites e trilha antes dos controles. Pausar, retomar e reconhecer — nada mais.",
+      attention: [],
+      priorities: [],
+      commercial: COMMERCIAL_SNAPSHOT,
     }),
     memoria: pageFor("memoria", {
       headline: "Diretivas humanas por kind, escopo, vigência e trilha de auditoria.",
