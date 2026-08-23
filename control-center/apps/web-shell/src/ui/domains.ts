@@ -1,5 +1,5 @@
 import { escapeHtml } from "../escape";
-import { formatLocal } from "../datetime";
+import { formatLocal, isUtcDateTime } from "../datetime";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import { ownMapValue } from "../own-map";
@@ -126,6 +126,261 @@ function dealMoneyLine(value: unknown): string {
   return money
     ? `<p class="money" data-currency="${escapeHtml(money.currency)}">${escapeHtml(formatMoney(money))}</p>`
     : "";
+}
+
+const WEEKLY_CHAIN_SCHEMA = "control-center.weekly-revenue-chain.v1";
+const WEEKLY_SOURCE_CONTRACT = "confenge.commercial_intel.v1";
+const WEEKLY_SOURCE_SURFACE = "GET /v1/confenge/intel/executive?include_synthetic=0";
+const OPAQUE_WEEKLY_ID = /^[A-Za-z0-9._:-]{1,160}$/;
+const MONTH = /^\d{4}-(?:0[1-9]|1[0-2])$/;
+
+const WEEKLY_DECISION_LABELS = new Map<string, string>([
+  ["GO", "prosseguir"],
+  ["NO-GO", "não prosseguir"],
+  ["WAIT", "aguardando decisão humana"],
+]);
+const WEEKLY_ROLE_LABELS = new Map<string, string>([
+  ["role_commercial_owner", "responsável comercial"],
+]);
+const WEEKLY_ACTION_LABELS = new Map<string, string>([
+  ["human_review_commercial_terms", "revisar os termos comerciais manualmente"],
+]);
+const WEEKLY_MONEY_STATUS_LABELS = new Map<string, string>([
+  ["pending", "pendente"],
+  ["confirmed", "confirmada"],
+  ["received", "recebido"],
+  ["overdue", "vencida"],
+  ["refunded", "estornada"],
+  ["cancelled", "cancelada"],
+]);
+
+function own(value: Record<string, unknown>, key: string): unknown {
+  return Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined;
+}
+
+function ownRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function ownString(value: Record<string, unknown>, key: string): string | null {
+  const candidate = own(value, key);
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
+}
+
+function observedWeeklyValue(value: unknown): string | null {
+  const row = ownRecord(value);
+  const candidate = row && own(row, "availability") === "OBSERVED" ? ownString(row, "value") : null;
+  return candidate && OPAQUE_WEEKLY_ID.test(candidate) ? candidate : null;
+}
+
+function translatedWeeklyToken(raw: string | null, labels: ReadonlyMap<string, string>): string {
+  if (!raw) return "sem dados";
+  return labels.get(raw) ?? "estado não reconhecido";
+}
+
+function validWeeklyInstant(value: string): boolean {
+  if (!isUtcDateTime(value)) return false;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return false;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return inputSecond === parsedSecond;
+}
+
+function weeklyMoney(value: unknown, expectedId: string | null, collectedAt: string): {
+  available: boolean;
+  id: string | null;
+  rawStatus: string | null;
+  observedAt: string | null;
+  label: string;
+  money?: { amount_cents: number; currency: string };
+} {
+  const row = ownRecord(value);
+  if (!row || own(row, "availability") !== "OBSERVED") {
+    return { available: false, id: null, rawStatus: null, observedAt: null, label: "sem dados" };
+  }
+  const hasObservedAt = Object.prototype.hasOwnProperty.call(row, "observed_at");
+  const observedAtCandidate = ownString(row, "observed_at");
+  const observedAtValid = !hasObservedAt || (observedAtCandidate !== null &&
+    validWeeklyInstant(collectedAt) &&
+    validWeeklyInstant(observedAtCandidate) &&
+    Date.parse(observedAtCandidate) <= Date.parse(collectedAt)
+  );
+  if (!observedAtValid) {
+    return { available: false, id: null, rawStatus: null, observedAt: null, label: "sem dados" };
+  }
+  const idCandidate = ownString(row, "id");
+  const id = idCandidate && OPAQUE_WEEKLY_ID.test(idCandidate) ? idCandidate : null;
+  const statusCandidate = ownString(row, "status");
+  const rawStatus = statusCandidate && OPAQUE_WEEKLY_ID.test(statusCandidate) ? statusCandidate : null;
+  const observedAt = observedAtCandidate;
+  const amount = own(row, "amount_cents");
+  const currency = own(row, "currency");
+  const linked = id !== null && OPAQUE_WEEKLY_ID.test(id) && expectedId !== null && expectedId !== "UNKNOWN" && id === expectedId;
+  const money = linked && Number.isSafeInteger(amount) && Number(amount) >= 0 && typeof currency === "string" && ISO_4217.test(currency)
+    ? { amount_cents: Number(amount), currency }
+    : undefined;
+  const state = translatedWeeklyToken(rawStatus?.toLowerCase() ?? null, WEEKLY_MONEY_STATUS_LABELS);
+  return {
+    available: linked,
+    id,
+    rawStatus,
+    observedAt,
+    label: !linked ? "sem dados" : money ? `${state} · ${formatMoney(money)}` : `${state} · valor sem dados`,
+    ...(money ? { money } : {}),
+  };
+}
+
+type WeeklyRevenueRow = {
+  row: Record<string, unknown>;
+  identity: Record<string, unknown>;
+  source: Record<string, unknown>;
+  authority: Record<string, unknown>;
+  correlation: string;
+};
+
+function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected: number } {
+  const input = Array.isArray(value) ? value : [];
+  const byCorrelation = new Map<string, WeeklyRevenueRow>();
+  const duplicates = new Set<string>();
+  for (const item of input) {
+    const row = ownRecord(item);
+    const identity = ownRecord(row ? own(row, "canonical_identity") : null);
+    const source = ownRecord(row ? own(row, "source") : null);
+    const authority = ownRecord(row ? own(row, "authority") : null);
+    const correlation = identity ? ownString(identity, "correlation_id") : null;
+    const identityIdsValid = identity !== null && [
+      "correlation_id",
+      "account_id",
+      "opportunity_id",
+      "offer_id",
+      "proposal_id",
+      "charge_id",
+      "payment_id",
+    ].every((key) => {
+      const id = ownString(identity, key);
+      return id !== null && (id === "UNKNOWN" || OPAQUE_WEEKLY_ID.test(id));
+    });
+    const valid =
+      row !== null &&
+      identity !== null &&
+      source !== null &&
+      authority !== null &&
+      own(row, "schema_version") === WEEKLY_CHAIN_SCHEMA &&
+      typeof own(row, "held") === "boolean" &&
+      own(row, "synthetic") === false &&
+      correlation !== null &&
+      correlation !== "UNKNOWN" &&
+      OPAQUE_WEEKLY_ID.test(correlation) &&
+      identityIdsValid &&
+      own(source, "system") === "warmbly" &&
+      own(source, "surface") === WEEKLY_SOURCE_SURFACE &&
+      own(source, "contract") === WEEKLY_SOURCE_CONTRACT &&
+      typeof own(source, "month") === "string" &&
+      MONTH.test(String(own(source, "month"))) &&
+      typeof own(source, "observed_at") === "string" &&
+      validWeeklyInstant(String(own(source, "observed_at"))) &&
+      own(source, "include_synthetic") === false &&
+      own(authority, "operation_and_visualization") === "governance-control-center" &&
+      own(authority, "action_and_outcome") === "warmbly" &&
+      own(authority, "financial_facts") === "asaas";
+    if (!valid || !correlation) continue;
+    if (byCorrelation.has(correlation) || duplicates.has(correlation)) {
+      byCorrelation.delete(correlation);
+      duplicates.add(correlation);
+      continue;
+    }
+    byCorrelation.set(correlation, { row, identity, source, authority, correlation });
+  }
+  const rows = [...byCorrelation.values()]
+    .sort((a, b) => a.correlation.localeCompare(b.correlation))
+    .slice(0, 50);
+  return { rows, rejected: Math.max(0, input.length - rows.length) };
+}
+
+function technicalWeeklyFacts(item: WeeklyRevenueRow): string {
+  const { row, identity, source, correlation } = item;
+  const collectedAt = ownString(source, "observed_at") as string;
+  const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"), collectedAt);
+  const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"), collectedAt);
+  const rawFacts = [
+    ["Correlação", correlation],
+    ["Conta", ownString(identity, "account_id") ?? "UNKNOWN"],
+    ["Oportunidade", ownString(identity, "opportunity_id") ?? "UNKNOWN"],
+    ["Oferta", ownString(identity, "offer_id") ?? "UNKNOWN"],
+    ["Proposta", ownString(identity, "proposal_id") ?? "UNKNOWN"],
+    ["Cobrança", ownString(identity, "charge_id") ?? "UNKNOWN"],
+    ["Pagamento", ownString(identity, "payment_id") ?? "UNKNOWN"],
+    ["Entregável", observedWeeklyValue(own(row, "latest_deliverable")) ?? "UNKNOWN"],
+    ["Evidência", observedWeeklyValue(own(row, "latest_evidence")) ?? "UNKNOWN"],
+    ["Decisão bruta", observedWeeklyValue(own(row, "decision")) ?? "UNKNOWN"],
+    ["Responsável bruto", observedWeeklyValue(own(row, "responsible")) ?? "UNKNOWN"],
+    ["Próxima ação bruta", observedWeeklyValue(own(row, "next_action")) ?? "UNKNOWN"],
+    ["Estado bruto da cobrança", charge.rawStatus ?? "UNKNOWN"],
+    ["ID financeiro da cobrança", charge.id ?? "UNKNOWN"],
+    ["Cobrança observada em", charge.observedAt ?? "UNKNOWN"],
+    ["Estado bruto do recebimento", receipt.rawStatus ?? "UNKNOWN"],
+    ["ID financeiro do recebimento", receipt.id ?? "UNKNOWN"],
+    ["Recebimento observado em", receipt.observedAt ?? "UNKNOWN"],
+    ["Contrato de origem", ownString(source, "contract") ?? "UNKNOWN"],
+    ["Rota de origem", ownString(source, "surface") ?? "UNKNOWN"],
+  ] as const;
+  return `<details class="lead-technical" data-technical-detail="weekly-revenue">
+    <summary>Identificadores e proveniência técnica</summary>
+    <dl class="facts">${rawFacts.map(([label, value]) => fact(label, `<span class="wrap-any">${escapeHtml(value)}</span>`)).join("")}</dl>
+  </details>`;
+}
+
+function weeklyRevenueBlock(operations: Record<string, unknown>): string {
+  const result = weeklyRevenueRows(own(operations, "weekly_revenue_chains"));
+  return `<section class="stack" aria-labelledby="weekly-revenue-title" data-weekly-revenue-chain-count="${result.rows.length}" data-weekly-revenue-rejected="${result.rejected}">
+    <h2 id="weekly-revenue-title">Cadeia semanal até receita observável</h2>
+    <p class="constraint">O Control Center opera e apresenta os dados. O Warmbly responde pelas ações e pelos resultados comerciais. O Asaas é a autoridade dos fatos financeiros. Esta tela é somente leitura.</p>
+    ${result.rejected > 0 ? `<p class="banner" role="status">${result.rejected} registro(s) não foram exibidos por contrato inválido, correlação ambígua ou limite da tela.</p>` : ""}
+    <div class="cards">${result.rows.length === 0
+      ? `<p class="banner empty">Nenhuma cadeia real comprovada neste recorte. Ausência não é zero.</p>`
+      : result.rows.map((item, index) => {
+          const { row, identity, source, correlation } = item;
+          const decision = observedWeeklyValue(own(row, "decision"));
+          const decisionLabel = translatedWeeklyToken(decision, WEEKLY_DECISION_LABELS);
+          const responsible = observedWeeklyValue(own(row, "responsible"));
+          const nextAction = observedWeeklyValue(own(row, "next_action"));
+          const rawDeadline = observedWeeklyValue(own(row, "deadline"));
+          const deadline = rawDeadline && validWeeklyInstant(rawDeadline) ? rawDeadline : null;
+          const month = ownString(source, "month") as string;
+          const observedAt = ownString(source, "observed_at") as string;
+          const charge = weeklyMoney(own(row, "charge"), ownString(identity, "charge_id"), observedAt);
+          const receipt = weeklyMoney(own(row, "receipt"), ownString(identity, "payment_id"), observedAt);
+          const deliverableObserved = observedWeeklyValue(own(row, "latest_deliverable")) !== null;
+          const evidenceObserved = observedWeeklyValue(own(row, "latest_evidence")) !== null;
+          const proposalId = ownString(identity, "proposal_id");
+          const proposalObserved = proposalId !== null && proposalId !== "UNKNOWN" && observedWeeklyValue(own(row, "proposal")) === proposalId;
+          return `<article class="card" data-correlation-id="${escapeHtml(correlation)}" data-commercial-decision="${escapeHtml(decision ?? "UNKNOWN")}" data-synthetic="false">
+            <p class="kicker">Cadeia comercial ${index + 1}</p>
+            <h3>${escapeHtml(decisionLabel)}</h3>
+            ${decision === "WAIT" ? `<p class="banner" data-human-gate="WAIT">Aguardando decisão humana. Nenhuma conclusão comercial foi inferida.</p>` : ""}
+            <dl class="facts">
+              ${fact("Decisão comercial", escapeHtml(decisionLabel), decision ? "" : ` data-absent="true"`)}
+              ${fact("Responsável", escapeHtml(translatedWeeklyToken(responsible, WEEKLY_ROLE_LABELS)), responsible ? "" : ` data-absent="true"`)}
+              ${fact("Prazo", deadline ? escapeHtml(formatLocal(deadline)) : "sem dados", deadline ? "" : ` data-absent="true"`)}
+              ${fact("Próxima ação", escapeHtml(translatedWeeklyToken(nextAction, WEEKLY_ACTION_LABELS)), nextAction ? "" : ` data-absent="true"`)}
+              ${fact("Entregável mais recente", deliverableObserved ? "observado" : "sem dados", deliverableObserved ? "" : ` data-absent="true"`)}
+              ${fact("Evidência mais recente", evidenceObserved ? "observada" : "sem dados", evidenceObserved ? "" : ` data-absent="true"`)}
+              ${fact("Proposta", proposalObserved ? "observada" : "sem dados", proposalObserved ? "" : ` data-absent="true"`)}
+              ${fact("Retenção", own(row, "held") === true ? "retida para revisão" : "sem retenção observada")}
+              ${fact("Cobrança", escapeHtml(charge.label), charge.available ? "" : ` data-absent="true"`)}
+              ${fact("Recebimento", escapeHtml(receipt.label), receipt.available ? "" : ` data-absent="true"`)}
+              ${fact("Período da origem", escapeHtml(`${month.slice(5, 7)}/${month.slice(0, 4)}`))}
+              ${fact("Coletado em", escapeHtml(formatLocal(observedAt)))}
+              ${fact("Autoridade financeira", "Asaas")}
+            </dl>
+            ${technicalWeeklyFacts({ row, identity, source, authority: item.authority, correlation })}
+          </article>`;
+        }).join("")}
+    </div>
+  </section>`;
 }
 function listFact(label: string, items: string[] | undefined): string {
   if (!items || items.length === 0) return "";
@@ -805,7 +1060,8 @@ function commercialOps(
         ${fact("Oportunidades a agir", escapeHtml(String(overview.opportunities_requiring_action ?? "—")))}
       </dl>
       ${technicalDetails([{ term: "availability", value: String(availability) }], "commercial-availability")}
-    </section>`;
+    </section>
+    ${weeklyRevenueBlock(ops)}`;
   }
   return body;
 }
