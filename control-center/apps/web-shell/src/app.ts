@@ -3,10 +3,20 @@ import type {
   AdapterWriteResult,
   ControlCenterReadAdapter,
   DestinationPage,
+  GateReadback,
+  WarmblyGateAction,
 } from "./adapters/contract";
+import { isWarmblyGateAction } from "./adapters/contract";
 import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
+import {
+  beginGateFlight,
+  clearAdjustDraft,
+  endGateFlight,
+  markAdjustRouteMissing,
+  setAdjustDraft,
+} from "./human-gate-flight";
 import {
   humanGateIdempotencyKey,
   settleHumanGateIntent,
@@ -159,8 +169,9 @@ function applyPaint(
       result.ok && !result.loading ? result.page?.commercial : undefined,
     ),
   );
-  bindWarmblyHumanGate(root, adapter, repaint);
+  bindWarmblyHumanGate(root, adapter, repaint, navigate);
   bindWarmblyGateFilters(root, renderHash, navigate);
+  bindMessageToggle(root, renderHash, navigate);
   bindCopyControls(root);
   bindListFilters(root, renderHash, navigate);
   consumeQueueFocus(
@@ -494,10 +505,29 @@ function bindWarmblyDispatch(
   }
 }
 
+/**
+ * Binds every human-gate control.
+ *
+ * Four things this binder owes the operator, none of which the previous one
+ * gave them:
+ *
+ * 1. **One click is one write.** A gate POST is not idempotent by accident —
+ *    a second `create` mints a second cohort — so a form already waiting on the
+ *    channel refuses the next submit outright.
+ * 2. **A pending state.** The paint before the await is what makes the wait
+ *    visible; a control that looks idle while a write is in flight is a control
+ *    that invites the second click.
+ * 3. **A readback before claiming an effect.** A 2xx says the channel accepted
+ *    the call, not that the resource changed.
+ * 4. **Navigation to the resource the server named.** After create, reproduce or
+ *    adjust the operator is taken to the version the response carried — never to
+ *    a version this screen guessed.
+ */
 function bindWarmblyHumanGate(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
+  navigate: Navigate,
 ): void {
   if (!adapter.warmblyGate || typeof root.querySelectorAll !== "function") return;
   const forms = root.querySelectorAll("[data-human-gate]");
@@ -505,31 +535,251 @@ function bindWarmblyHumanGate(
     const form = forms[i];
     if (!form) continue;
     const raw = form.getAttribute("data-human-gate");
-    if (raw !== "create" && raw !== "reproduce" && raw !== "validate" && raw !== "review" && raw !== "decide") continue;
+    if (!isWarmblyGateAction(raw)) continue;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const decision = form.querySelector('[name="decision"]')?.value;
+      const versionId = form.getAttribute("data-version") ?? "";
+      const candidateId = form.getAttribute("data-candidate") ?? "";
+      const key = form.getAttribute("data-gate-key") ?? `${raw}:${versionId}:${candidateId}:`;
+      // The APPROVE form carries its decision on the element, because APPROVE
+      // and HOLD/REJECT are different forms with different requirements: one
+      // demands the acknowledgement, the other must never demand it.
+      const fixedDecision = form.getAttribute("data-decision");
+      const decision = fixedDecision ?? form.querySelector('[name="decision"]')?.value;
       const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
       const acknowledgement = form.querySelector('[name="ack"]')?.checked === true;
       const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
+      const reason = form.querySelector('[name="reason"]')?.value ?? "";
+
+      if (raw === "adjust") {
+        const subject = form.querySelector('[name="subject"]')?.value ?? "";
+        const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
+        if (form.getAttribute("data-adjust-step") !== "confirm") {
+          // Step one is local and writes nothing: it parks the draft so the
+          // next paint can show the operator the diff they are about to commit.
+          setAdjustDraft({
+            cohort_id: versionId,
+            candidate_id: candidateId,
+            subject,
+            body_text: bodyText,
+            reason,
+            // The frozen originals ride on the form, not on the inputs: the
+            // moment the operator types, the input no longer knows what was
+            // frozen, and a diff against the edited text is no diff at all.
+            before_subject: form.getAttribute("data-before-subject") ?? "",
+            before_body_text: form.getAttribute("data-before-body") ?? "",
+            version: form.getAttribute("data-cohort-version") ?? "",
+            frozen_hash: form.getAttribute("data-frozen-hash") ?? "",
+          });
+          onDone();
+          return;
+        }
+      }
+
+      if (!beginGateFlight(key)) return;
       const intent: HumanGateIntent = {
         action: raw,
-        ...(form.getAttribute("data-version") ? { version_id: form.getAttribute("data-version")! } : {}),
-        ...(form.getAttribute("data-candidate") ? { candidate_id: form.getAttribute("data-candidate")! } : {}),
+        ...(versionId ? { version_id: versionId } : {}),
+        ...(candidateId ? { candidate_id: candidateId } : {}),
         ...(limit > 0 ? { limit } : {}),
         ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
-        ...(form.querySelector('[name="reason"]')?.value ? { reason: form.querySelector('[name="reason"]')!.value } : {}),
+        ...(reason ? { reason } : {}),
         ...(decision === "APPROVE" ? { acknowledged: acknowledgement } : {}),
-        ...(raw === "decide" && confirmation ? { confirmation } : {}),
+        ...((raw === "decide" || raw === "adjust") && confirmation ? { confirmation } : {}),
+        ...(raw === "adjust"
+          ? {
+              subject: form.querySelector('[name="subject"]')?.value ?? "",
+              body_text: form.querySelector('[name="body_text"]')?.value ?? "",
+              expected_frozen_hash: form.getAttribute("data-frozen-hash") ?? "",
+            }
+          : {}),
       };
-      void Promise.resolve(adapter.warmblyGate?.({
-        ...intent,
-        idempotency_key: humanGateIdempotencyKey(intent),
-      })).then((result) => {
+      // Paint the pending state before the await. The key is computed first so
+      // this paint already renders the form as busy.
+      onDone();
+      void (async () => {
+        let result: AdapterWriteResult | undefined;
+        try {
+          result = await Promise.resolve(
+            adapter.warmblyGate?.({
+              ...intent,
+              idempotency_key: humanGateIdempotencyKey(intent),
+            }),
+          );
+        } catch {
+          // The adapter threw instead of answering, so this client cannot know
+          // whether the POST reached the gate. `unknown` is the only honest
+          // verdict — and it is the one that keeps the idempotency key.
+          result = {
+            ok: false,
+            path: "",
+            kind: "nota",
+            message: "O canal falhou sem responder.",
+            outcome: "unknown",
+            code: "browser_transport",
+            gateAction: raw,
+            ...(versionId || candidateId
+              ? {
+                  gateTarget: {
+                    ...(versionId ? { cohort_id: versionId } : {}),
+                    ...(candidateId ? { candidate_id: candidateId } : {}),
+                  },
+                }
+              : {}),
+          };
+        } finally {
+          endGateFlight(key);
+        }
+        // Only a definitive outcome advances the key. An `unknown` keeps it, so
+        // the retry of an uncertain intent is the same intent to the server.
         settleHumanGateIntent(intent, result?.outcome);
-        if (result) adapter.lastOperatorResult = result;
+        if (result) {
+          if (result.code === "adjust_route_unavailable") markAdjustRouteMissing();
+          const readback = await gateReadback(adapter, intent, result);
+          adapter.lastOperatorResult = { ...result, readback };
+          if (raw === "adjust" && result.ok) clearAdjustDraft(candidateId);
+        }
+        const next = gateNavigation(raw, result);
+        if (next) {
+          navigate(next);
+          return;
+        }
         onDone();
-      });
+      })();
+    });
+  }
+}
+
+/** Where the operator is taken after a write, according to the server's answer. */
+function gateNavigation(
+  action: WarmblyGateAction,
+  result: AdapterWriteResult | undefined,
+): string | null {
+  if (!result?.ok) return null;
+  if (action !== "create" && action !== "reproduce" && action !== "adjust") return null;
+  const cohortId = result.gateResource?.cohort_id;
+  // No id in the response is not a reason to guess one: a version this screen
+  // invented is a version that may not exist.
+  return cohortId ? `#/warmbly/revisao?resource=${encodeURIComponent(cohortId)}` : null;
+}
+
+function gateRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Re-reads the resource a definitive write claimed to change.
+ *
+ * "O canal aceitou" and "o recurso mudou" are different statements and only the
+ * second one is what an operator needs. Everything reported here is what the
+ * fresh GET returned; nothing is inferred from the write's own status.
+ */
+async function gateReadback(
+  adapter: ControlCenterReadAdapter,
+  intent: HumanGateIntent,
+  result: AdapterWriteResult,
+): Promise<GateReadback> {
+  if (result.outcome !== "executed" || !result.ok) {
+    return {
+      status: "skipped",
+      detail: "Nenhuma releitura é devida: o canal não relatou uma escrita aplicada.",
+    };
+  }
+  const cohortId = result.gateResource?.cohort_id ?? intent.version_id;
+  if (!cohortId) {
+    return { status: "unavailable", detail: "A resposta não nomeou nenhum recurso para reler." };
+  }
+  let read: import("./adapters/contract").AdapterReadResult;
+  try {
+    read = await Promise.resolve(
+      adapter.readDestination("warmbly", `#/warmbly/revisao?resource=${encodeURIComponent(cohortId)}`),
+    );
+  } catch {
+    return { status: "unavailable", detail: "A releitura não completou." };
+  }
+  if (!read.ok || read.loading || !read.page) {
+    return { status: "unavailable", detail: "A releitura não completou." };
+  }
+  const gate = gateRecord(read.page.warmbly_gate);
+  const cohort = gateRecord(gateRecord(gate.selected).data);
+  if (!cohort.id) {
+    return { status: "unavailable", detail: "O servidor não devolveu esta versão na releitura." };
+  }
+  const candidates = Array.isArray(cohort.candidates) ? cohort.candidates.map(gateRecord) : [];
+  const candidate = intent.candidate_id
+    ? candidates.find((row) => row.candidate_id === intent.candidate_id)
+    : undefined;
+  switch (intent.action) {
+    case "create":
+    case "reproduce":
+    case "adjust": {
+      const version = cohort.version;
+      const expected = result.gateResource?.version;
+      const matches = expected === undefined || version === expected;
+      return matches
+        ? { status: "confirmed", detail: `O servidor devolve a versão v${String(version)}.` }
+        : {
+            status: "not_confirmed",
+            detail: `O servidor devolve a versão v${String(version)}, não a v${String(expected)} anunciada na resposta.`,
+          };
+    }
+    case "review": {
+      if (!candidate) {
+        return { status: "not_confirmed", detail: "O candidato não aparece nesta versão na releitura." };
+      }
+      const recorded = gateRecord(candidate.review).decision;
+      return recorded === intent.decision
+        ? { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` }
+        : {
+            status: "not_confirmed",
+            detail: `O servidor ainda registra "${String(recorded ?? "nada")}" neste candidato.`,
+          };
+    }
+    case "decide": {
+      const recorded = gateRecord(cohort.decision).decision;
+      return recorded === intent.decision
+        ? { status: "confirmed", detail: `O servidor registra a decisão final ${String(recorded)}.` }
+        : {
+            status: "not_confirmed",
+            detail: `O servidor ainda registra "${String(recorded ?? "nada")}" como decisão final.`,
+          };
+    }
+    case "validate": {
+      if (!candidate) {
+        return { status: "not_confirmed", detail: "O candidato não aparece nesta versão na releitura." };
+      }
+      // Validation is asynchronous at Warmbly, so the honest readback is the
+      // state the server reports now — not a verdict about whether it "worked".
+      return {
+        status: "confirmed",
+        detail: `O servidor reporta validação "${String(gateRecord(candidate.validation).status ?? "sem estado")}" agora.`,
+      };
+    }
+  }
+}
+
+/**
+ * The "expand/collapse all messages" control.
+ *
+ * It is URL state like every other recorte on this shell, so it survives the
+ * repaint that reading a candidate causes.
+ */
+function bindMessageToggle(root: MountableRoot, hash: string, navigate: Navigate): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const buttons = root.querySelectorAll("[data-toggle-messages]");
+  for (let i = 0; i < buttons.length; i += 1) {
+    const button = buttons[i];
+    if (!button || !button.getAttribute("data-toggle-messages")) continue;
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const [path = "#/warmbly/revisao", query = ""] = hash.split("?");
+      const params = new URLSearchParams(query);
+      if (params.get("mensagens") === "recolhidas") params.delete("mensagens");
+      else params.set("mensagens", "recolhidas");
+      const rendered = params.toString();
+      navigate(`${path}${rendered ? `?${rendered}` : ""}`);
     });
   }
 }

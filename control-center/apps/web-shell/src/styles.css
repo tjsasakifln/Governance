@@ -1263,3 +1263,101 @@ details.alert-why > summary {
   border-bottom: 1px dotted currentColor;
   cursor: help;
 }
+
+/* ------------------------------------------------------------------ *
+ * Gate humano do Warmbly.
+ *
+ * A mensagem exata é o objeto da revisão, então ela é o que ocupa espaço.
+ * O resto do bloco existe para tornar visível o que antes era invisível:
+ * em que passo o piloto está, o que está bloqueado e por quê, e o que uma
+ * chamada em curso está fazendo agora.
+ * ------------------------------------------------------------------ */
+
+[data-pilot-stepper] {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+@media (min-width: 900px) {
+  [data-pilot-stepper] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+[data-step-state="current"] {
+  border-color: var(--focus);
+}
+
+[data-step-state="unknown"] {
+  border-style: dashed;
+}
+
+[data-write-pending] {
+  border-left: 4px solid var(--focus);
+}
+
+/* A disabled control must read as deliberate, not as broken. Its reason is
+   always rendered next to it, so the greying is the cue, not the message. */
+.operator-form button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+[data-approve-blocked],
+[data-blocked-reason],
+[data-go-authority="absent"] {
+  border-left: 3px solid var(--high);
+  padding-left: 0.6rem;
+}
+
+[data-adjust-diff] del {
+  color: var(--crit);
+  text-decoration: line-through;
+}
+
+[data-adjust-diff] ins,
+[data-server-diff] ins {
+  color: var(--ok);
+  text-decoration: none;
+}
+
+[data-server-diff] del {
+  color: var(--crit);
+}
+
+[data-message-preview] > summary {
+  font-weight: 600;
+}
+
+[data-exact-body] {
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+[data-readback="not_confirmed"],
+[data-readback="unavailable"] {
+  border-left: 3px solid var(--crit);
+  padding-left: 0.6rem;
+}
+
+[data-cohort-selector] {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+a.button,
+button[data-toggle-messages] {
+  display: inline-block;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.4rem;
+  background: var(--bg-elev);
+  color: var(--fg);
+  font: inherit;
+  text-decoration: none;
+}

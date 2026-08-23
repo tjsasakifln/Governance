@@ -19,6 +19,36 @@ Chrome navigation exposes exactly these ten areas:
 
 “Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one.
 
+### Rotas do gate humano de cohorts
+
+O gate humano vive **inteiramente** sob “Operação Warmbly”, em três sub-rotas:
+
+| Rota | O que é |
+| --- | --- |
+| `#/warmbly` (`operacao`) | Resumo do piloto — Fonte → Cohort → Validação → Revisão → GO → Handoff — mais a versão mais recente, o botão “Abrir revisão” e os três controles de disparo. |
+| `#/warmbly/cohorts` | Lista de cohorts versionadas, com os denominadores do preview e a criação de uma cohort pequena (1–10). |
+| `#/warmbly/revisao?resource=<id>` | Revisão candidato a candidato da versão escolhida, e o registro de GO/NO-GO. |
+
+O `resource` viaja na subnav: abrir “Revisão” a partir de “Cohorts” **não** perde a
+versão selecionada, e uma Revisão sem `resource` oferece a lista de versões em vez
+de uma página vazia.
+
+`#/comercial/cohorts` (“Comercial → Coortes”) é **outra coisa**: são coortes de
+aquisição e métricas por período. Nenhum runbook do gate humano deve apontar para
+lá — o caminho correto é **Operação Warmbly → Cohorts**. Pausar, retomar e
+reconhecer também já não vivem em Comercial; a aba de lá só carrega o ponteiro
+para `#/warmbly`.
+
+Autoridade: `operators` cria, reproduz, pede verificação, ajusta e registra
+APPROVE/HOLD/REJECT. `admins` é exigido para GO/NO-GO — sem esse grupo o controle
+aparece desabilitado com o motivo, e nunca escondido em silêncio. A identidade é
+resolvida pelo Authelia na borda; esta tela não envia cabeçalho de ator em
+nenhuma escrita do gate.
+
+Ajustar assunto/corpo cria uma **nova versão** (`POST …/candidates/{id}/adjust`).
+Enquanto essa rota não estiver implantada, a UI trata o 404 como estado esperado,
+diz isso e desabilita o editor em vez de oferecer um controle que não escreve.
+
 Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. Financial and commercial-send mutations (cobrança, checkout, refund, cancelamento, Asaas write, commercial send) are not offered.
 
 ## Cards de alerta

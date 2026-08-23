@@ -85,6 +85,149 @@ function validReceiptInstant(value: string, now = Date.now()): boolean {
   return inputSecond === parsedSecond;
 }
 
+/* ------------------------------------------------------------------ *
+ * Human-gate response reading.
+ *
+ * The channel answers every gate write with the same envelope shape, so the
+ * only way to tell a created cohort from a recorded HOLD is to read the action
+ * back out and to keep the resource the server named. Collapsing all of them
+ * into one "Decisão registrada" — and dropping the returned resource — is what
+ * left the operator with no way to reach the version they had just created.
+ * ------------------------------------------------------------------ */
+
+function gateText(body: Record<string, unknown>, key: string): string | undefined {
+  const value = body[key];
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return undefined;
+}
+
+function gateNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** The cohort payload, whether the server nests it or answers it at the root. */
+function gateCohortOf(body: Record<string, unknown>): Record<string, unknown> | undefined {
+  const nested = asRecord(body.cohort);
+  if (nested && typeof nested.id === "string") return nested;
+  return typeof body.id === "string" ? body : undefined;
+}
+
+function gateDiffOf(
+  adjustment: Record<string, unknown> | null | undefined,
+): AdapterWriteResult["diff"] {
+  if (!adjustment || !Array.isArray(adjustment.diff)) return undefined;
+  const rows = adjustment.diff
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => entry !== null)
+    .map((entry) => ({
+      field: String(entry.field ?? ""),
+      ...(typeof entry.before === "string" ? { before: entry.before } : {}),
+      ...(typeof entry.after === "string" ? { after: entry.after } : {}),
+    }))
+    .filter((entry) => entry.field !== "");
+  return rows.length > 0 ? rows : undefined;
+}
+
+/**
+ * The prose an operator reads when the server sent none.
+ *
+ * The channel's own success bodies carry a receipt and nothing else, so the
+ * sentence has to come from the action that was actually performed.
+ */
+function gateFallbackMessage(input: WarmblyGateInput, version: number | undefined): string {
+  const v = version === undefined ? "" : ` v${version}`;
+  switch (input.action) {
+    case "create":
+      return `Cohort congelada criada${v}.`;
+    case "reproduce":
+      return `Reprodução da versão imutável concluída${v}.`;
+    case "validate":
+      return "Verificação do destinatário solicitada ao Warmbly.";
+    case "review":
+      return input.decision === "APPROVE"
+        ? "Aprovação registrada para este candidato."
+        : input.decision === "HOLD"
+          ? "HOLD registrado para este candidato."
+          : "Rejeição registrada para este candidato.";
+    case "decide":
+      return input.decision === "GO"
+        ? "GO registrado. Nenhum e-mail foi enfileirado nem enviado."
+        : "NO-GO registrado.";
+    case "adjust":
+      return `Ajuste aceito. O servidor criou a nova versão${v}.`;
+  }
+}
+
+export function gateResult(
+  input: WarmblyGateInput,
+  path: string,
+  status: number,
+  ok: boolean,
+  body: Record<string, unknown>,
+): AdapterWriteResult {
+  const adjustment = asRecord(body.adjustment);
+  const cohort = gateCohortOf(body);
+  const version =
+    gateNumber(adjustment?.to_version) ?? gateNumber(cohort?.version) ?? gateNumber(body.version);
+  const cohortId =
+    (cohort && typeof cohort.id === "string" ? cohort.id : undefined) ?? input.version_id;
+  const rawServerMessage =
+    gateText(body, "message")
+    ?? (Array.isArray(body.reason)
+      ? body.reason.filter((row) => typeof row === "string").join(", ") || undefined
+      : gateText(body, "reason"));
+  // The edge stamps `reason: ["ok"]` / `["upstream_refused"]` when the upstream
+  // sent no prose at all. Those are envelope filler, not a sentence, and
+  // showing them would be the same "HTTP 200" non-answer in Portuguese.
+  const serverMessage =
+    rawServerMessage === "ok" || rawServerMessage === "upstream_refused"
+      ? undefined
+      : rawServerMessage;
+  const rawCode = gateText(body, "code");
+  // A 404 on adjust is the expected state of an install whose backend route has
+  // not landed yet, not an operator mistake. It gets its own code so the UI can
+  // say so and stop offering the control.
+  const code =
+    input.action === "adjust" && status === 404 && rawCode !== "candidate_not_found"
+      ? "adjust_route_unavailable"
+      : rawCode;
+  const diff = gateDiffOf(adjustment);
+  const receipt = gateText(body, "receipt") ?? gateText(adjustment ?? {}, "receipt");
+  const correlation =
+    gateText(adjustment ?? {}, "correlation_id")
+    ?? gateText(body, "correlation_id")
+    ?? gateText(body, "edge_correlation_id");
+  return {
+    ok,
+    path,
+    kind: "nota",
+    status,
+    outcome: ok ? "executed" : status === 503 ? "unknown" : "refused",
+    message: serverMessage ?? gateFallbackMessage(input, version),
+    gateAction: input.action,
+    ...(code ? { code } : {}),
+    ...(input.version_id || input.candidate_id
+      ? {
+          gateTarget: {
+            ...(input.version_id ? { cohort_id: input.version_id } : {}),
+            ...(input.candidate_id ? { candidate_id: input.candidate_id } : {}),
+          },
+        }
+      : {}),
+    ...(ok && (cohortId || version !== undefined)
+      ? {
+          gateResource: {
+            ...(cohortId ? { cohort_id: cohortId } : {}),
+            ...(version !== undefined ? { version } : {}),
+          },
+        }
+      : {}),
+    ...(receipt ? { receiptId: receipt } : {}),
+    ...(correlation ? { correlationId: correlation } : {}),
+    ...(diff ? { diff } : {}),
+  };
+}
+
 async function operatorIdempotencyKey(input: {
   action_type: string;
   target_canonical_id: string;
@@ -261,39 +404,66 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       : input.action === "reproduce" ? `${base}/${version}/reproduce`
       : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
       : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
+      : input.action === "adjust" ? `${base}/${version}/candidates/${candidate}/adjust`
       : `${base}/${version}/decision`;
+    // Every refusal below happens before the wire, so "nada foi aplicado" is a
+    // fact this adapter can prove rather than a hope.
+    const target = {
+      ...(version ? { cohort_id: version } : {}),
+      ...(candidate ? { candidate_id: candidate } : {}),
+    };
+    const refuse = (message: string, code: string): AdapterWriteResult => {
+      const refusal: AdapterWriteResult = {
+        ok: false,
+        path,
+        kind: "nota",
+        message,
+        outcome: "refused",
+        code,
+        gateAction: input.action,
+        ...(Object.keys(target).length > 0 ? { gateTarget: target } : {}),
+      };
+      this.lastOperatorResult = refusal;
+      return refusal;
+    };
     if (
       (input.action !== "create" && !version)
-      || (["validate", "review"].includes(input.action) && !candidate)
+      || (["validate", "review", "adjust"].includes(input.action) && !candidate)
     ) {
-      return {
-        ok: false,
-        path,
-        kind: "nota",
-        message: "alvo do gate incompleto",
-        outcome: "refused",
-        code: "client_precondition",
-      };
+      return refuse("alvo do gate incompleto", "gate_precondition");
     }
     if (input.action === "review" && input.decision === "APPROVE" && input.acknowledged !== true) {
-      return {
-        ok: false,
-        path,
-        kind: "nota",
-        message: "APPROVE exige ciência explícita do destinatário, mensagem, policy e evidência",
-        outcome: "refused",
-        code: "approval_acknowledgement_required",
-      };
+      return refuse(
+        "APPROVE exige ciência explícita do destinatário, mensagem, policy e evidência",
+        "approval_acknowledgement_required",
+      );
     }
     if (input.action === "decide" && !input.confirmation?.trim()) {
-      return {
-        ok: false,
-        path,
-        kind: "nota",
-        message: "GO/NO-GO exige a confirmação digitada da versão imutável",
-        outcome: "refused",
-        code: "cohort_version_confirmation_required",
-      };
+      return refuse(
+        "GO/NO-GO exige a confirmação digitada da versão imutável",
+        "cohort_version_confirmation_required",
+      );
+    }
+    if (input.action === "adjust") {
+      // The three editable fields plus the two anti-clobber tokens. An adjust
+      // that cannot name the frozen hash it was written against is an edit
+      // against an unknown baseline, and the server is right to reject it —
+      // this refuses it one hop earlier, without spending an attempt.
+      if (!input.subject?.trim() || !input.body_text?.trim() || !input.reason?.trim()) {
+        return refuse(
+          "ajuste exige assunto, corpo e motivo preenchidos",
+          "gate_precondition",
+        );
+      }
+      if (!input.confirmation?.trim()) {
+        return refuse("ajuste exige a confirmação digitada da versão", "confirmation_mismatch");
+      }
+      if (!input.expected_frozen_hash?.trim()) {
+        return refuse(
+          "ajuste exige o frozen hash da versão revisada",
+          "gate_precondition",
+        );
+      }
     }
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -307,20 +477,17 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
           ...(input.reason ? { reason: input.reason } : {}),
           ...(input.acknowledged === true ? { acknowledged: true } : {}),
           ...(input.confirmation ? { confirmation: input.confirmation.trim().toLowerCase() } : {}),
+          ...(input.action === "adjust"
+            ? {
+                subject: input.subject,
+                body_text: input.body_text,
+                expected_frozen_hash: input.expected_frozen_hash,
+              }
+            : {}),
         }),
       });
       const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-      const result: AdapterWriteResult = {
-        ok: response.ok,
-        path,
-        kind: "nota",
-        status: response.status,
-        outcome: response.ok ? "executed" : response.status === 503 ? "unknown" : "refused",
-        message: response.ok
-          ? `Decisão registrada. Receipt: ${String(body.receipt ?? "—")}`
-          : String(body.message ?? (Array.isArray(body.reason) ? body.reason.join(", ") : body.reason) ?? `HTTP ${response.status}`),
-        ...(typeof body.code === "string" ? { code: body.code } : {}),
-      };
+      const result = gateResult(input, path, response.status, response.ok, body);
       this.lastOperatorResult = result;
       return result;
     } catch {
@@ -331,6 +498,8 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         outcome: "unknown",
         code: "browser_transport",
         message: "Sem resposta; releia o recurso antes de repetir.",
+        gateAction: input.action,
+        ...(Object.keys(target).length > 0 ? { gateTarget: target } : {}),
       };
       this.lastOperatorResult = result;
       return result;
@@ -672,13 +841,27 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     // they moved to their own route.
     if (id === "warmbly" && page.commercial) {
       const parsed = parseHash(location ?? "#/warmbly");
-      if (parsed.surface === "cohorts" || parsed.surface === "revisao") {
-        const list = asRecord(await this.getJson("/v1/warmbly/operator/cohorts?limit=50")) ?? {};
-        const selected = parsed.resource
-          ? asRecord(await this.getJson(`/v1/warmbly/operator/cohorts/${encodeURIComponent(parsed.resource)}`))
-          : undefined;
-        page.warmbly_gate = { list, ...(selected ? { selected } : {}) };
-      } else {
+      // Every Warmbly surface now reads the gate, because the operation cockpit
+      // opens on a stepper that has to say where the pilot actually stands. A
+      // gate the channel cannot serve must not take the whole destination down
+      // with it, so these reads are soft and report their own status.
+      const list = await this.readGate("/v1/warmbly/operator/cohorts?limit=50");
+      const selected = parsed.resource
+        ? await this.readGate(`/v1/warmbly/operator/cohorts/${encodeURIComponent(parsed.resource)}`)
+        : undefined;
+      page.warmbly_gate = {
+        list: list.data ?? {},
+        list_status: list.status,
+        ...(list.detail ? { list_detail: list.detail } : {}),
+        ...(selected
+          ? {
+              selected: selected.data ?? {},
+              selected_status: selected.status,
+              ...(selected.detail ? { selected_detail: selected.detail } : {}),
+            }
+          : {}),
+      };
+      if (parsed.surface !== "cohorts" && parsed.surface !== "revisao") {
         await this.attachOperatorLedger(page.commercial);
       }
     }
@@ -765,6 +948,50 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       // Same reason as above: unreadable is not empty.
       ops.operator_ledger_status = "unreadable";
       ops.operator_ledger_detail = err instanceof Error ? err.name : "erro de transporte";
+    }
+  }
+
+  /**
+   * Reads one human-gate resource without ever taking the page down with it.
+   *
+   * Two differences from `getJson`, both deliberate:
+   *
+   * - No `x-actor-id`/`x-actor-kind`. These routes authenticate at the edge with
+   *   Authelia; a browser-set actor has no business travelling next to them.
+   * - A failure returns a status instead of throwing. "Não consegui ler" is a
+   *   thing this surface must be able to say out loud; an exception here would
+   *   render the whole destination as a generic error, which reads to an
+   *   operator exactly like "there are no cohorts".
+   */
+  private async readGate(path: string): Promise<{
+    status: "read" | "not_mounted" | "forbidden" | "unreadable";
+    data?: Record<string, unknown>;
+    detail?: string;
+  }> {
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        headers: { accept: "application/json" },
+        credentials: "include",
+      });
+      if (!response.ok) {
+        return {
+          status:
+            response.status === 404
+              ? "not_mounted"
+              : response.status === 401 || response.status === 403
+                ? "forbidden"
+                : "unreadable",
+          detail: `HTTP ${response.status}`,
+        };
+      }
+      const parsed = asRecord(await response.json().catch(() => undefined));
+      if (!parsed) return { status: "unreadable", detail: "resposta não é um objeto JSON" };
+      return { status: "read", data: parsed };
+    } catch (err) {
+      return {
+        status: "unreadable",
+        detail: err instanceof Error ? err.name : "erro de transporte",
+      };
     }
   }
 

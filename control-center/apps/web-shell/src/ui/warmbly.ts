@@ -24,6 +24,13 @@ import {
   type WarmblySurface,
 } from "../destinations";
 import type { AdapterWriteResult } from "../adapters/contract";
+import {
+  adjustDraft,
+  adjustRouteMissing,
+  gateInFlight,
+  type AdjustDraft,
+} from "../human-gate-flight";
+import { AUTH_HOST, PRODUCTIVE_HOST } from "../topology";
 import type { ActorRef, CommercialSnapshot } from "../types";
 import type { PendingResumeConfirmation } from "../warmbly-confirmation";
 import {
@@ -45,6 +52,8 @@ export interface WarmblySurfaceInput {
   confirmation?: PendingResumeConfirmation;
   gate?: Record<string, unknown>;
   query?: string;
+  /** Selected cohort id, carried by the route so the subnav cannot drop it. */
+  resource?: string | null;
 }
 
 export type WarmblySurfaceRenderer = (input: WarmblySurfaceInput) => string;
@@ -197,6 +206,108 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery:
       "O canal chegou ao Warmbly e o Warmbly respondeu com erro. Confira o estado do disparo acima; se o outbound precisa parar, use o fallback fora de banda.",
   },
+
+  /* ---------------------------------------------------------------- *
+   * Gate humano de cohorts. Mesmo dicionário, códigos próprios: um
+   * "recusado" genérico não diz ao operador o que corrigir, e cada um
+   * destes exige um movimento diferente.
+   * ---------------------------------------------------------------- */
+  gate_precondition: {
+    kind: "refused",
+    title: "Recusada aqui mesmo: faltam campos obrigatórios",
+    recovery:
+      "Nada saiu do navegador e nada foi gravado no Warmbly. Complete os campos indicados no formulário e envie de novo.",
+  },
+  approval_acknowledgement_required: {
+    kind: "refused",
+    title: "Recusada: APPROVE exige a ciência marcada",
+    recovery:
+      "Aprovar é assumir que você leu destinatário, mensagem exata, policy e evidência desta versão. Marque a ciência e aprove de novo. HOLD e REJECT não pedem essa marcação.",
+  },
+  cohort_version_confirmation_required: {
+    kind: "refused",
+    title: "Recusada: falta a confirmação digitada da versão",
+    recovery:
+      "GO/NO-GO exige digitar a versão imutável (por exemplo v1). Nada foi decidido.",
+  },
+  insufficient_human_gate_role: {
+    kind: "refused",
+    title: "Recusada: sua sessão não tem a autoridade necessária",
+    recovery:
+      "Revisar exige o grupo operators; registrar GO/NO-GO exige admins. Nada foi aplicado. Peça a inclusão no grupo no Authelia e reautentique antes de repetir.",
+  },
+  idempotency_key_required: {
+    kind: "refused",
+    title: "Recusada: escrita sem chave de idempotência",
+    recovery:
+      "Toda escrita do gate viaja com uma chave que impede duplicar a intenção. Nada foi aplicado; isto é defeito desta tela, não do operador.",
+  },
+  human_gate_route_not_allowed: {
+    kind: "refused",
+    title: "Recusada: rota fora do allowlist fixo do gate",
+    recovery:
+      "O proxy do gate só encaminha um conjunto fixo de rotas e esta não está nele. Nada foi aplicado; isto é configuração do canal, não do operador.",
+  },
+  human_gate_transport_unknown: {
+    kind: "unknown",
+    title: "Sem resposta: a escrita pode ter sido aplicada",
+    recovery:
+      "A requisição saiu e a resposta não voltou. Não repita às cegas: recarregue esta versão e compare receipt e correlation id. Se repetir, repita a MESMA intenção — a chave de idempotência é preservada.",
+  },
+  human_gate_read_unavailable: {
+    kind: "refused",
+    title: "Leitura do gate não concluída: nenhuma escrita foi tentada",
+    recovery: "Recarregue a página. Nada foi gravado.",
+  },
+  /* Ajuste (nova versão de conteúdo). */
+  frozen_hash_mismatch: {
+    kind: "refused",
+    title: "Recusada: o conteúdo congelado mudou desde a sua leitura",
+    recovery:
+      "Você editou sobre uma versão que já não é a atual, então o ajuste não foi aplicado. Recarregue esta revisão, releia a mensagem congelada e refaça a edição sobre o texto novo.",
+  },
+  confirmation_mismatch: {
+    kind: "refused",
+    title: "Recusada: a confirmação não corresponde à versão",
+    recovery:
+      "Digite exatamente a versão exibida nesta revisão (por exemplo v1) e confirme de novo. Nada foi alterado.",
+  },
+  version_superseded: {
+    kind: "refused",
+    title: "Recusada: esta versão já foi substituída por outra mais nova",
+    recovery:
+      "Alguém criou uma versão posterior enquanto você editava. Abra a versão mais recente na lista de Cohorts e refaça o ajuste lá. Nada foi alterado aqui.",
+  },
+  authority_active: {
+    kind: "refused",
+    title: "Recusada: há autoridade bounded ativa para esta cohort",
+    recovery:
+      "Uma cohort com GO ativo não pode ter conteúdo ajustado. Registre NO-GO para revogar a autoridade e só então ajuste. Nada foi alterado.",
+  },
+  immutable_field: {
+    kind: "refused",
+    title: "Recusada: o pedido tocou um campo imutável",
+    recovery:
+      "Só assunto e corpo podem ser ajustados; destinatário, evidência, origem, policy e classe de rota são congelados. Nada foi alterado; isto é defeito desta tela, não do operador.",
+  },
+  copy_qa_failed: {
+    kind: "refused",
+    title: "Recusada: o texto proposto reprovou no QA de copy",
+    recovery:
+      "O Warmbly aplica as mesmas regras de copy da composição original. Leia os motivos no detalhe técnico, corrija o assunto ou o corpo e proponha de novo. Nada foi alterado.",
+  },
+  candidate_not_found: {
+    kind: "refused",
+    title: "Recusada: candidato não encontrado nesta versão",
+    recovery:
+      "O candidato não existe mais nesta versão da cohort. Recarregue a revisão antes de agir de novo.",
+  },
+  adjust_route_unavailable: {
+    kind: "refused",
+    title: "Ajuste ainda não disponível nesta instalação",
+    recovery:
+      "A rota de ajuste do Warmbly ainda não foi implantada neste ambiente, então nada foi alterado. Enquanto isso, registre HOLD ou REJECT com o motivo e refaça a cohort quando a rota entrar no ar.",
+  },
 };
 
 /** Fallback when the channel answers a status this build does not have a code for. */
@@ -320,7 +431,33 @@ export function classifyDispatchOutcome(result: AdapterWriteResult): DispatchOut
   };
 }
 
-function outcomeBlock(result: AdapterWriteResult | undefined): string {
+const GATE_ACTION_LABELS: Record<string, string> = {
+  create: "criar cohort congelada",
+  reproduce: "reproduzir versão imutável",
+  validate: "verificar destinatário",
+  review: "registrar decisão de revisão",
+  decide: "registrar GO/NO-GO",
+  adjust: "ajustar assunto e corpo",
+};
+
+const READBACK_LABELS: Record<string, string> = {
+  confirmed: "Releitura do servidor confirmou o novo estado.",
+  not_confirmed:
+    "A releitura do servidor ainda NÃO mostra este efeito. O canal aceitou a chamada, mas o recurso lido não confirma a mudança: recarregue antes de concluir que foi aplicada.",
+  unavailable:
+    "Não foi possível reler o recurso para confirmar. Aceite do canal não é prova de efeito: recarregue e confira antes de repetir.",
+  skipped: "Releitura não aplicável a esta resposta.",
+};
+
+/**
+ * The one banner every write outcome goes through.
+ *
+ * Operation, Cohorts and Revisão share it deliberately. Three copies of this
+ * block would drift, and the surfaces that never had one — Cohorts and Revisão —
+ * are exactly where an operator was left with no success, no refusal, no code
+ * and no next move after every create, review and GO.
+ */
+export function writeResultBlock(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const view = classifyDispatchOutcome(result);
   const tone = ownMapValue(OUTCOME_TONE, view.kind) ?? "stale";
@@ -332,18 +469,54 @@ function outcomeBlock(result: AdapterWriteResult | undefined): string {
     failed: "A tentativa falhou; confirme o estado observado antes de tentar novamente.",
     unknown: "Não foi possível comprovar se a ação chegou a ser aplicada.",
   };
+  const actionLabel = result.gateAction
+    ? ownMapValue(GATE_ACTION_LABELS, result.gateAction) ?? "ação do gate não catalogada"
+    : "";
+  const readback = result.readback;
+  const diffRows = (result.diff ?? [])
+    .map(
+      (entry) =>
+        `<div data-diff-field="${escapeHtml(entry.field)}"><dt>${escapeHtml(entry.field)}</dt><dd><del>${escapeHtml(
+          entry.before ?? "—",
+        )}</del> <ins>${escapeHtml(entry.after ?? "—")}</ins></dd></div>`,
+    )
+    .join("");
   return `
     <article
       class="card banner ${tone}"
       role="${role}"
       data-dispatch-outcome="${escapeHtml(view.kind)}"
+      data-write-result="${escapeHtml(view.kind)}"
       data-outcome-code="${escapeHtml(view.code ?? "")}"
       data-outcome-status="${view.status ?? ""}"
+      data-gate-action="${escapeHtml(result.gateAction ?? "")}"
     >
-      <p class="kicker"><span class="pill">${escapeHtml(ownMapValue(OUTCOME_LABELS, view.kind) ?? "DESFECHO NÃO RECONHECIDO")}</span></p>
+      <p class="kicker"><span class="pill">${escapeHtml(ownMapValue(OUTCOME_LABELS, view.kind) ?? "DESFECHO NÃO RECONHECIDO")}</span>${
+        actionLabel ? ` <span class="scope">${escapeHtml(actionLabel)}</span>` : ""
+      }</p>
       <h3>${escapeHtml(view.title)}</h3>
       <p data-outcome-detail="true">${escapeHtml(ownMapValue(summary, view.kind) ?? "O canal retornou um desfecho não reconhecido.")}</p>
       <p class="constraint" data-outcome-recovery="true">O que fazer agora: ${escapeHtml(view.recovery)}</p>
+      ${
+        readback
+          ? `<p class="constraint" data-readback="${escapeHtml(readback.status)}">Releitura: ${escapeHtml(
+              ownMapValue(READBACK_LABELS, readback.status) ?? "estado de releitura não reconhecido",
+            )}${readback.detail ? ` ${escapeHtml(readback.detail)}` : ""}</p>`
+          : ""
+      }
+      <dl class="facts" data-write-evidence="true">
+        ${fact("Código do canal", view.code ?? "nenhum código devolvido")}
+        ${fact("Receipt", result.receiptId ?? result.receipt?.id ?? "não devolvido nesta resposta")}
+        ${fact(
+          "Correlation id",
+          result.correlationId ?? result.receipt?.correlation_id ?? "não devolvido nesta resposta",
+        )}
+      </dl>
+      ${
+        diffRows
+          ? `<dl class="facts" data-server-diff="true">${diffRows}</dl>`
+          : ""
+      }
       ${technicalDetails(
         [
           { term: "path", value: result.path },
@@ -351,10 +524,61 @@ function outcomeBlock(result: AdapterWriteResult | undefined): string {
           { term: "code", value: view.code ?? "" },
           { term: "status", value: view.status === null ? "" : String(view.status) },
           { term: "outcome", value: result.outcome ?? "" },
+          { term: "gate_action", value: result.gateAction ?? "" },
+          { term: "receipt", value: result.receiptId ?? result.receipt?.id ?? "" },
+          { term: "correlation_id", value: result.correlationId ?? result.receipt?.correlation_id ?? "" },
+          { term: "readback", value: readback?.status ?? "" },
         ],
         "warmbly-operator-result",
       )}
     </article>`;
+}
+
+/** The "enviando…" state. A control with no pending state invites a second click. */
+function pendingBlock(label: string): string {
+  return `
+    <article class="card banner stale" role="status" data-write-pending="true">
+      <p class="kicker"><span class="pill">ENVIANDO</span></p>
+      <h3>${escapeHtml(label)}</h3>
+      <p>A chamada saiu e a resposta ainda não voltou. Não repita: este formulário está bloqueado até o canal responder.</p>
+    </article>`;
+}
+
+/**
+ * Routes one write outcome to exactly one place on the page.
+ *
+ * "On the affected card" is the requirement, and "rendered once" is the other
+ * half of it: a banner repeated at the top and on the card reads as two events.
+ * The first claimant wins; whatever is left over lands at the top of the
+ * surface so a result can never be swallowed.
+ */
+export interface FeedbackRouter {
+  forCandidate(candidateId: string): string;
+  forCohort(cohortId: string): string;
+  remainder(): string;
+}
+
+export function feedbackRouter(result: AdapterWriteResult | undefined): FeedbackRouter {
+  let claimed = false;
+  const claim = (): string => {
+    claimed = true;
+    return writeResultBlock(result);
+  };
+  return {
+    forCandidate(candidateId: string): string {
+      if (claimed || !result || !candidateId) return "";
+      return result.gateTarget?.candidate_id === candidateId ? claim() : "";
+    },
+    forCohort(cohortId: string): string {
+      if (claimed || !result || !cohortId) return "";
+      if (result.gateTarget?.candidate_id) return "";
+      return result.gateTarget?.cohort_id === cohortId ? claim() : "";
+    },
+    remainder(): string {
+      if (claimed || !result) return "";
+      return claim();
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -592,6 +816,345 @@ function controlsBlock(
     </section>`;
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Gate humano: leitura do payload.
+ *
+ * Nada aqui recalcula elegibilidade, denominador ou validade. Quando um número
+ * não veio no payload, a tela diz que não veio — derivar seria inventar uma
+ * verdade que o servidor não afirmou.
+ * ------------------------------------------------------------------ */
+
+function array(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(record) : [];
+}
+
+/** Marker for a field the server did not send. Never a zero, never a guess. */
+const NOT_IN_PAYLOAD = "não informado pelo servidor";
+
+function fromPayload(value: unknown): string {
+  return value === undefined || value === null || value === "" ? NOT_IN_PAYLOAD : String(value);
+}
+
+interface GateSection {
+  status: string;
+  data: Record<string, unknown>;
+  detail: string;
+}
+
+function gateSection(input: WarmblySurfaceInput, key: "list" | "selected"): GateSection {
+  const gate = record(input.gate);
+  const raw = record(gate[key]);
+  const status = typeof gate[`${key}_status`] === "string" ? String(gate[`${key}_status`]) : "";
+  const detail = typeof gate[`${key}_detail`] === "string" ? String(gate[`${key}_detail`]) : "";
+  return {
+    // An older payload carried no status at all. A section that has data is a
+    // section that was read; anything else stays honestly unknown.
+    status: status || (Object.keys(raw).length > 0 ? "read" : "absent"),
+    data: raw,
+    detail,
+  };
+}
+
+function cohortRows(input: WarmblySurfaceInput): Record<string, unknown>[] {
+  return array(gateSection(input, "list").data.data);
+}
+
+function selectedCohort(input: WarmblySurfaceInput): Record<string, unknown> {
+  return record(gateSection(input, "selected").data.data);
+}
+
+/** The most recent version the server listed. Order is the server's, not ours. */
+function latestCohort(input: WarmblySurfaceInput): Record<string, unknown> | undefined {
+  const rows = cohortRows(input);
+  return rows[0];
+}
+
+function gateUnreadableBanner(section: GateSection, what: string): string {
+  if (section.status === "read" || section.status === "") return "";
+  const message =
+    section.status === "not_mounted"
+      ? `O canal do gate não está montado neste Control Center (${section.detail || "HTTP 404"}), então ${what} não pôde ser lido. Ausência aqui não é ausência de cohorts.`
+      : section.status === "forbidden"
+        ? `Sua sessão não tem autorização para ler ${what} (${section.detail || "HTTP 403"}). Isto não significa que não existam cohorts.`
+        : section.status === "absent"
+          ? `Não houve leitura de ${what} neste carregamento.`
+          : `Não foi possível ler ${what} (${section.detail || "erro"}). Ilegível não é vazio.`;
+  // "Not consulted" is a different claim from "could not be read", and only the
+  // second one is an alert. Both still have to be said out loud: a surface that
+  // renders nothing where cohorts would go reads as "there are no cohorts".
+  const tone = section.status === "absent" ? "empty" : "error";
+  const role = section.status === "absent" ? "status" : "alert";
+  return `<p class="banner ${tone}" role="${role}" data-gate-read="${escapeHtml(section.status)}">${escapeHtml(message)}</p>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * RBAC e ambiente.
+ * ------------------------------------------------------------------ */
+
+const CAPABILITY_LABELS: Record<string, string> = {
+  operators: "revisar candidatos, criar e reproduzir cohorts, pedir verificação",
+  admins: "registrar GO/NO-GO (autoridade bounded)",
+};
+
+export interface OperatorAuthority {
+  /** Whether the channel actually told us the effective groups. */
+  known: boolean;
+  groups: readonly string[];
+  canReview: boolean;
+  canDecide: boolean;
+}
+
+/**
+ * Effective authority, as reported by the edge — never as claimed by the browser.
+ *
+ * Authelia resolves the identity at the edge and the gate proxy echoes the
+ * groups it enforced with. This surface reads that echo; it does not send an
+ * actor, and it must not pretend to know an authority the channel never stated.
+ */
+export function operatorAuthority(input: WarmblySurfaceInput): OperatorAuthority {
+  const gate = record(input.gate);
+  const actor =
+    record(record(gate.list).edge_actor).groups !== undefined
+      ? record(record(gate.list).edge_actor)
+      : record(record(gate.selected).edge_actor);
+  const groups = Array.isArray(actor.groups)
+    ? actor.groups.filter((group): group is string => typeof group === "string")
+    : [];
+  const known = Array.isArray(actor.groups);
+  return {
+    known,
+    groups,
+    canReview: groups.includes("operators"),
+    canDecide: groups.includes("admins"),
+  };
+}
+
+/**
+ * Friendly identity plus effective capabilities (issue #59).
+ *
+ * The raw auditable identifier stays in the collapsed technical block: it is
+ * needed to match an audit row, and it is not what an operator should have to
+ * read to know who they are and what they may do.
+ */
+function identityBlock(input: WarmblySurfaceInput): string {
+  const authority = operatorAuthority(input);
+  const name = input.operator.display_name ?? "Sessão autenticada no Authelia";
+  const capabilities = authority.known
+    ? authority.groups.length > 0
+      ? authority.groups
+          .map((group) => `${group}: ${ownMapValue(CAPABILITY_LABELS, group) ?? "capacidade não catalogada nesta tela"}`)
+          .join(" · ")
+      : "nenhum grupo efetivo — esta sessão não pode escrever no gate"
+    : NOT_IN_PAYLOAD;
+  return `
+    <article class="card" data-operator-identity="true" data-can-review="${authority.canReview ? "true" : "false"}" data-can-decide="${authority.canDecide ? "true" : "false"}">
+      <p class="kicker"><span class="pill">${escapeHtml(authority.canDecide ? "admins" : authority.canReview ? "operators" : "sem autoridade de escrita")}</span></p>
+      <h3>Quem você é nesta tela</h3>
+      <dl class="facts">
+        ${fact("Operador", name)}
+        ${fact("Ambiente", PRODUCTIVE_HOST)}
+        ${fact("Autenticação", `Authelia em ${AUTH_HOST}`)}
+        ${fact("Capacidades efetivas", capabilities)}
+      </dl>
+      <p class="constraint">A identidade que a auditoria grava é a do Authelia resolvida na borda. Esta tela não envia cabeçalho de ator em nenhuma escrita.${
+        authority.known ? "" : " O canal não devolveu os grupos efetivos neste carregamento, então as capacidades acima não puderam ser confirmadas."
+      }</p>
+      ${technicalDetails(
+        [
+          { term: "identificador_auditavel", value: input.operator.id },
+          { term: "grupos_efetivos", value: authority.groups.join(",") },
+        ],
+        "warmbly-operator-identity",
+      )}
+    </article>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Passo a passo do piloto.
+ * ------------------------------------------------------------------ */
+
+interface StepView {
+  id: string;
+  label: string;
+  state: "done" | "current" | "pending" | "unknown";
+  detail: string;
+}
+
+const STEP_STATE_LABELS: Record<string, string> = {
+  done: "concluído",
+  current: "é aqui que você está",
+  pending: "ainda não",
+  unknown: "não dá para saber com o que o servidor devolveu",
+};
+
+/**
+ * Where the pilot stands, read strictly off the payload.
+ *
+ * Every "done" below is something the server said, not something this screen
+ * counted. When the payload is silent the step is `unknown`, never `pending`:
+ * "não sei" and "ainda não" are different answers and only one of them is safe.
+ */
+export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
+  const list = gateSection(input, "list");
+  const rows = cohortRows(input);
+  const cohort = Object.keys(selectedCohort(input)).length > 0 ? selectedCohort(input) : latestCohort(input);
+  const readable = list.status === "read";
+  const candidates = array(cohort?.candidates);
+  const validations = candidates.map((candidate) => show(record(candidate.validation).status));
+  const reviews = candidates.map((candidate) => show(record(candidate.review).decision));
+  const decision = show(record(cohort?.decision).decision);
+  const unknownStep = (id: string, label: string, detail: string): StepView => ({
+    id,
+    label,
+    state: "unknown",
+    detail,
+  });
+  if (!readable && rows.length === 0) {
+    return [
+      unknownStep("fonte", "Fonte", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("cohort", "Cohort", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("validacao", "Validação", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("revisao", "Revisão", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("go", "GO", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("handoff", "Handoff", "O gate não pôde ser lido neste carregamento."),
+    ];
+  }
+  const hasCohort = cohort !== undefined && Object.keys(cohort).length > 0;
+  const source = hasCohort ? show(cohort.source) : "—";
+  const freshness = hasCohort ? show(cohort.freshness) : "—";
+  const decided = decision === "GO" || decision === "NO_GO";
+  const validationPending = validations.filter((status) => status !== "VALID").length;
+  const reviewPending = reviews.filter((decisionValue) => decisionValue !== "APPROVE").length;
+  return [
+    {
+      id: "fonte",
+      label: "Fonte",
+      state: hasCohort ? "done" : "pending",
+      detail: hasCohort
+        ? `Origem ${source}, freshness ${freshness}, as_of ${show(cohort.as_of)}.`
+        : "Nenhuma cohort listada pelo servidor.",
+    },
+    {
+      id: "cohort",
+      label: "Cohort",
+      state: hasCohort ? "done" : "current",
+      detail: hasCohort
+        ? `v${show(cohort.version)} congelada com ${candidates.length === 0 ? fromPayload(undefined) : String(candidates.length)} candidato(s) no payload.`
+        : "Crie uma cohort pequena (1–10) em Cohorts para começar.",
+    },
+    {
+      id: "validacao",
+      label: "Validação",
+      state: !hasCohort
+        ? "pending"
+        : candidates.length === 0
+          ? "unknown"
+          : validationPending === 0
+            ? "done"
+            : "current",
+      detail:
+        !hasCohort || candidates.length === 0
+          ? "O payload desta versão não trouxe candidatos."
+          : `${validations.filter((status) => status === "VALID").length} de ${candidates.length} com validação VALID segundo o servidor.`,
+    },
+    {
+      id: "revisao",
+      label: "Revisão",
+      state: !hasCohort
+        ? "pending"
+        : candidates.length === 0
+          ? "unknown"
+          : reviewPending === 0
+            ? "done"
+            : "current",
+      detail:
+        !hasCohort || candidates.length === 0
+          ? "O payload desta versão não trouxe candidatos."
+          : `${reviews.filter((value) => value === "APPROVE").length} de ${candidates.length} aprovados segundo o servidor.`,
+    },
+    {
+      id: "go",
+      label: "GO",
+      state: decided ? "done" : hasCohort ? "pending" : "pending",
+      detail: decided
+        ? `Decisão final registrada: ${decision}.`
+        : hasCohort
+          ? "Nenhuma decisão final registrada nesta versão."
+          : "Sem cohort não existe GO.",
+    },
+    {
+      id: "handoff",
+      label: "Handoff",
+      state: decision === "GO" ? "current" : "pending",
+      detail:
+        decision === "GO"
+          ? "GO cria a autoridade bounded. Ele não enfileira, não envia e não liga auto-send."
+          : "O handoff só existe depois de um GO registrado.",
+    },
+  ];
+}
+
+function stepperBlock(input: WarmblySurfaceInput): string {
+  const steps = pilotSteps(input);
+  const items = steps
+    .map(
+      (step) => `
+      <li class="card" data-step="${escapeHtml(step.id)}" data-step-state="${escapeHtml(step.state)}">
+        <p class="kicker"><span class="pill">${escapeHtml(ownMapValue(STEP_STATE_LABELS, step.state) ?? "estado não reconhecido")}</span></p>
+        <h3>${escapeHtml(step.label)}</h3>
+        <p>${escapeHtml(step.detail)}</p>
+      </li>`,
+    )
+    .join("");
+  return `<ol class="stack" data-pilot-stepper="true">${items}</ol>`;
+}
+
+/**
+ * The landing card of `#/warmbly`: what the pilot is, where it stands, and the
+ * one button that opens the version the operator actually has to review.
+ */
+function pilotSummary(input: WarmblySurfaceInput): string {
+  const list = gateSection(input, "list");
+  const latest = latestCohort(input);
+  const authority = operatorAuthority(input);
+  const open = latest
+    ? `<p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(latest.id))}">Abrir revisão da v${escapeHtml(show(latest.version))}</a></p>`
+    : `<p><a class="button" data-open-cohorts="true" href="#/warmbly/cohorts">Abrir Cohorts para criar a primeira versão</a></p>`;
+  return `
+    <section class="stack" aria-labelledby="warmbly-piloto" data-pilot-summary="true">
+      <h2 id="warmbly-piloto">Onde o piloto está</h2>
+      <p class="constraint">Fonte → Cohort → Validação → Revisão → GO → Handoff. Cada passo abaixo repete o que o servidor devolveu; nada é recontado nesta tela. GO não envia e-mail e auto-send permanece desligado.</p>
+      ${gateUnreadableBanner(list, "a lista de cohorts")}
+      ${identityBlock(input)}
+      ${stepperBlock(input)}
+      ${
+        latest
+          ? `<article class="card" data-latest-cohort="${escapeHtml(show(latest.id))}">
+              <p class="kicker"><span class="pill">${escapeHtml(show(latest.freshness))}</span> <span class="scope">${escapeHtml(show(latest.source))}</span></p>
+              <h3>Versão mais recente: v${escapeHtml(show(latest.version))}</h3>
+              <dl class="facts">
+                ${fact("Identificador da versão", show(latest.id))}
+                ${fact("as_of", show(latest.as_of))}
+                ${fact("Decisão final", fromPayload(record(latest.decision).decision))}
+                ${fact("Destinatários finais no preview", fromPayload(record(record(latest.manifest).preview).recipients_final))}
+              </dl>
+              ${open}
+            </article>`
+          : list.status === "read"
+            ? `<article class="card" data-latest-cohort="none"><h3>Nenhuma cohort listada</h3><p>O servidor respondeu e não listou nenhuma versão. Uma cohort vazia nunca pode receber GO.</p>${open}</article>`
+            : open
+      }
+      ${
+        authority.canDecide
+          ? ""
+          : `<p class="constraint" data-go-authority="absent">Registrar GO/NO-GO exige o grupo <code>admins</code> no Authelia. Sua sessão ${
+              authority.known ? "não tem esse grupo" : "não teve os grupos confirmados pelo canal"
+            }: revisar continua permitido, e o controle de GO aparece desabilitado com o motivo na Revisão.</p>`
+      }
+    </section>`;
+}
+
 /* ------------------------------------------------------------------ *
  * Surface registry.
  * ------------------------------------------------------------------ */
@@ -601,7 +1164,10 @@ function operationSurface(input: WarmblySurfaceInput): string {
   const reading = readDispatch(operations);
   const lastAction = record(operations.last_operator_action);
   const hasLast = Object.keys(lastAction).length > 0;
+  const feedback = feedbackRouter(input.operatorResult);
   return `
+    ${pilotSummary(input)}
+    ${feedback.remainder()}
     <section class="stack" aria-labelledby="warmbly-estado" data-dispatch-state="${escapeHtml(reading.state)}">
       <h2 id="warmbly-estado">Estado antes de agir</h2>
       ${stateBlock(reading, input.snapshot?.provenance)}
@@ -628,7 +1194,6 @@ function operationSurface(input: WarmblySurfaceInput): string {
         }
       </article>
     </section>
-    ${outcomeBlock(input.operatorResult)}
     ${controlsBlock(reading, input.confirmation)}
     ${auditBlock(operations, input.operator)}`;
 }
@@ -644,18 +1209,6 @@ const WARMBLY_SURFACE_RENDERERS: Record<WarmblySurface, WarmblySurfaceRenderer> 
   revisao: reviewSurface,
 };
 
-function array(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value) ? value.map(record) : [];
-}
-
-function gateData(input: WarmblySurfaceInput, key: "list" | "selected"): Record<string, unknown> {
-  return record(record(input.gate)[key]);
-}
-
-function cohortData(input: WarmblySurfaceInput): Record<string, unknown>[] {
-  return array(gateData(input, "list").data);
-}
-
 function validationPill(candidate: Record<string, unknown>): string {
   const validation = record(candidate.validation);
   const observed = show(validation.status).toUpperCase();
@@ -670,11 +1223,56 @@ function validationPill(candidate: Record<string, unknown>): string {
   return `<span class="pill ${tone}" data-validation-status="${escapeHtml(status)}">${escapeHtml(status)}</span>`;
 }
 
+/**
+ * Whether APPROVE is offered at all for this candidate.
+ *
+ * The server refuses APPROVE on anything but a current VALID validation. A UI
+ * that renders the control anyway teaches the operator that approving is a
+ * thing they may try, and then hands them a refusal with no explanation. The
+ * verdict comes from the server's own `validation.status` plus its own
+ * `blocked_by` — never from a date this screen compared itself.
+ */
+export function approvalGate(candidate: Record<string, unknown>): {
+  allowed: boolean;
+  reason: string;
+} {
+  const status = show(record(candidate.validation).status).toUpperCase();
+  const blockers = Array.isArray(candidate.blocked_by)
+    ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const validationBlocker = blockers.find((entry) => entry.startsWith("validation"));
+  if (validationBlocker) {
+    return {
+      allowed: false,
+      reason: `O servidor marcou este candidato com o bloqueio "${validationBlocker}". Peça uma nova verificação do destinatário antes de aprovar.`,
+    };
+  }
+  if (status === "VALID") return { allowed: true, reason: "" };
+  if (status === NOT_IN_PAYLOAD.toUpperCase() || status === "—") {
+    return {
+      allowed: false,
+      reason:
+        "O payload não trouxe o estado da validação deste candidato. Sem validação vigente o servidor recusa APPROVE.",
+    };
+  }
+  return {
+    allowed: false,
+    reason: `A validação deste destinatário está ${status}, não VALID. O servidor recusa APPROVE fora de uma validação vigente: peça a verificação e aprove só depois que ela voltar VALID.`,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Cohorts.
+ * ------------------------------------------------------------------ */
+
 function cohortSurface(input: WarmblySurfaceInput): string {
   const params = new URLSearchParams(input.query ?? "");
   const freshness = params.get("freshness") ?? "all";
   const decisionFilter = params.get("decision") ?? "all";
-  const cohorts = cohortData(input).filter((cohort) => {
+  const list = gateSection(input, "list");
+  const authority = operatorAuthority(input);
+  const feedback = feedbackRouter(input.operatorResult);
+  const cohorts = cohortRows(input).filter((cohort) => {
     const decision = show(record(cohort.decision).decision);
     return (freshness === "all" || show(cohort.freshness) === freshness)
       && (decisionFilter === "all" || decision === decisionFilter);
@@ -682,43 +1280,327 @@ function cohortSurface(input: WarmblySurfaceInput): string {
   const rows = cohorts.map((cohort) => {
     const preview = record(record(cohort.manifest).preview);
     const decision = record(cohort.decision);
-    return `<tr><td><a href="#/warmbly/revisao?resource=${escapeHtml(show(cohort.id))}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(show(preview.accounts_considered))}</td><td>${escapeHtml(show(preview.accounts_eligible))}</td><td>${escapeHtml(show(preview.accounts_excluded))}</td><td>${escapeHtml(show(preview.recipients_final))}</td><td>${escapeHtml(show(decision.decision))}</td></tr>`;
+    const id = show(cohort.id);
+    return `<tr data-cohort-row="${escapeHtml(id)}"><td><a href="#/warmbly/revisao?resource=${escapeHtml(id)}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(fromPayload(preview.accounts_considered))}</td><td>${escapeHtml(fromPayload(preview.accounts_eligible))}</td><td>${escapeHtml(fromPayload(preview.accounts_excluded))}</td><td>${escapeHtml(fromPayload(preview.recipients_final))}</td><td>${escapeHtml(fromPayload(decision.decision))}</td><td><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(id)}">Abrir revisão</a></td></tr>`;
   }).join("");
+  const createKey = "create::::";
+  const createPending = gateInFlight(createKey);
   return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. Auto-send permanece OFF.</p>
+  ${gateUnreadableBanner(list, "a lista de cohorts")}
+  ${feedback.remainder()}
+  ${identityBlock(input)}
   <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label><label>Decisão<select name="decision"><option value="all">Todas</option><option value="GO"${decisionFilter === "GO" ? " selected" : ""}>GO</option><option value="NO_GO"${decisionFilter === "NO_GO" ? " selected" : ""}>NO_GO</option></select></label></form>
-  <form class="operator-form" data-human-gate="create"><label>Tamanho pequeno (1–10)<input name="limit" type="number" min="1" max="10" value="5" required></label><button type="submit">Criar cohort congelada</button></form>
-  <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Decisão</th></tr></thead><tbody>${rows || `<tr><td colspan="7">Nenhuma cohort. Uma cohort vazia nunca pode receber GO.</td></tr>`}</tbody></table></div></section>`;
+  ${createPending ? pendingBlock("Criando a cohort congelada") : ""}
+  <form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(createKey)}"><label>Tamanho pequeno (1–10)<input name="limit" type="number" min="1" max="10" value="5" required></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar cohort congelada"}</button>${
+    authority.canReview
+      ? ""
+      : `<p class="constraint" data-blocked-reason="create">Criar cohort exige o grupo <code>operators</code> no Authelia.</p>`
+  }</form>
+  <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Decisão</th><th>Revisão</th></tr></thead><tbody>${rows || `<tr><td colspan="8">Nenhuma cohort ${list.status === "read" ? "listada pelo servidor" : "pôde ser lida"}. Uma cohort vazia nunca pode receber GO.</td></tr>`}</tbody></table></div></section>`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Revisão.
+ * ------------------------------------------------------------------ */
+
+/** Preview denominators, rendered verbatim with an explicit "não veio". */
+function previewBlock(preview: Record<string, unknown>): string {
+  const exclusions = record(preview.exclusions_by_reason);
+  const exclusionRows = Object.keys(exclusions)
+    .sort()
+    .map((reason) => fact(`Excluídos por ${reason}`, fromPayload(exclusions[reason])))
+    .join("");
+  return `
+    <article class="card" data-preview-denominators="true">
+      <h3>Denominadores do preview</h3>
+      <dl class="facts">
+        ${fact("Considerados", fromPayload(preview.accounts_considered))}
+        ${fact("Elegíveis", fromPayload(preview.accounts_eligible))}
+        ${fact("Excluídos", fromPayload(preview.accounts_excluded))}
+        ${fact("Destinatários finais", fromPayload(preview.recipients_final))}
+        ${fact("Excluídos por suppression", fromPayload(preview.suppressed))}
+        ${fact("Excluídos por opt-out", fromPayload(preview.opt_out))}
+        ${fact("Excluídos por risco (risky)", fromPayload(preview.risky_excluded))}
+        ${fact("Excluídos por duplicidade", fromPayload(preview.duplicates_excluded ?? preview.duplicate_excluded))}
+        ${fact("Excluídos por hard bounce", fromPayload(preview.hard_bounce_excluded ?? preview.hard_bounce))}
+        ${fact("Excluídos por falta de proveniência", fromPayload(preview.missing_provenance_excluded ?? preview.missing_provenance))}
+        ${fact("Excluídos por reprovação de copy QA", fromPayload(preview.copy_qa_failed_excluded ?? preview.copy_qa_failed))}
+        ${exclusionRows}
+      </dl>
+      <p class="constraint">Estes números são os do servidor. Onde está escrito &quot;${escapeHtml(NOT_IN_PAYLOAD)}&quot; o payload não trouxe o campo: a tela não soma, não subtrai e não infere o que falta.</p>
+    </article>`;
+}
+
+function listFacts(label: string, value: unknown): string {
+  if (Array.isArray(value)) {
+    const rows = value.filter((entry) => typeof entry === "string" || typeof entry === "number");
+    return fact(label, rows.length > 0 ? rows.map(String).join(", ") : "nenhum");
+  }
+  return fact(label, fromPayload(value));
+}
+
+/**
+ * One candidate, message first.
+ *
+ * Recipient, exact subject and exact body are visible by default. Hiding the
+ * only thing a reviewer is there to review behind a closed `<details>` labelled
+ * "Ver mensagem exata congelada" turns a review gate into a rubber stamp.
+ */
+function candidateCard(
+  cohort: Record<string, unknown>,
+  candidate: Record<string, unknown>,
+  authority: OperatorAuthority,
+  feedback: FeedbackRouter,
+  expandAll: boolean,
+): string {
+  const cohortId = show(cohort.id);
+  const candidateId = show(candidate.candidate_id);
+  const validation = record(candidate.validation);
+  const review = record(candidate.review);
+  const evidence = record(candidate.evidence ?? candidate.observed_fact);
+  const copyQa = record(candidate.copy_qa);
+  const blockers = Array.isArray(candidate.blocked_by)
+    ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const gate = approvalGate(candidate);
+  const frozenHash = show(candidate.frozen_hash ?? candidate.content_hash);
+  const version = show(cohort.version);
+  const draft = adjustDraft(candidateId);
+
+  const validateKey = `validate:${cohortId}:${candidateId}:`;
+  const approveKey = `review:${cohortId}:${candidateId}:APPROVE`;
+  const holdKey = `review:${cohortId}:${candidateId}:HOLD_REJECT`;
+  const adjustKey = `adjust:${cohortId}:${candidateId}:`;
+
+  const copyQaFailures = Array.isArray(copyQa.failures)
+    ? copyQa.failures.filter((entry): entry is string => typeof entry === "string")
+    : Array.isArray(candidate.copy_qa_failures)
+      ? candidate.copy_qa_failures.filter((entry): entry is string => typeof entry === "string")
+      : [];
+
+  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-approve-allowed="${gate.allowed ? "true" : "false"}">
+    <p class="kicker">${validationPill(candidate)} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p>
+    <h3>${escapeHtml(show(candidate.company))}</h3>
+    ${feedback.forCandidate(candidateId)}
+    <dl class="facts" data-candidate-identity="true">
+      ${fact("Destinatário exato", show(candidate.mailbox))}
+      ${fact("Purpose do destinatário", show(candidate.mailbox_purpose))}
+      ${fact("Classe de rota", show(candidate.route_class))}
+    </dl>
+    <details data-message-preview="true"${expandAll ? " open" : ""}>
+      <summary>Mensagem exata congelada (assunto e corpo)</summary>
+      <p data-exact-subject="true"><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p>
+      <pre class="message-preview" data-exact-body="true">${escapeHtml(show(candidate.body_text))}</pre>
+      <p data-cta="true"><strong>Chamada para ação (CTA):</strong> ${escapeHtml(fromPayload(candidate.cta ?? candidate.cta_text))}</p>
+    </details>
+    <dl class="facts" data-observed-fact="true">
+      ${fact("Fato observado", fromPayload(candidate.observed_fact_text ?? evidence.text ?? evidence.summary))}
+      ${fact("Proveniência do fato", fromPayload(candidate.evidence_source ?? evidence.source ?? evidence.locator))}
+      ${fact("Observado em", fromPayload(candidate.evidence_observed_at ?? evidence.observed_at))}
+      ${fact("Evidence hash", fromPayload(candidate.evidence_hash))}
+    </dl>
+    <dl class="facts" data-candidate-integrity="true">
+      ${fact("Content hash", fromPayload(candidate.content_hash))}
+      ${fact("Frozen hash", fromPayload(candidate.frozen_hash))}
+      ${fact("Policy version", fromPayload(cohort.policy_version))}
+      ${fact("Composer version", fromPayload(candidate.composer_version ?? cohort.composer_version))}
+      ${fact("Validação", fromPayload(validation.status))}
+      ${fact("Motivo da validação", fromPayload(validation.reason))}
+      ${fact("Validação vence em", validation.expires_at ? stamp(validation.expires_at) : NOT_IN_PAYLOAD)}
+      ${fact("Revisão registrada", fromPayload(review.decision))}
+      ${fact("Revisão efetiva", fromPayload(review.effective))}
+      ${listFacts("Bloqueios", candidate.blocked_by)}
+      ${listFacts("Reprovações de copy QA", copyQaFailures.length > 0 ? copyQaFailures : copyQa.failures)}
+      ${fact("Duplicidade apontada pelo servidor", fromPayload(candidate.duplicate_of ?? candidate.duplicate))}
+      ${fact("Proveniência ausente", fromPayload(candidate.missing_provenance))}
+      ${fact("Hard bounce registrado", fromPayload(candidate.hard_bounce))}
+      ${fact("Excluído do preview por", fromPayload(candidate.exclusion_reason ?? candidate.excluded_reason))}
+    </dl>
+    ${
+      blockers.length > 0
+        ? `<p class="banner error" role="alert" data-candidate-blockers="${escapeHtml(blockers.join(" "))}">O servidor registrou ${blockers.length} bloqueio(s) neste candidato: ${escapeHtml(blockers.join(", "))}.</p>`
+        : ""
+    }
+
+    ${gateInFlight(validateKey) ? pendingBlock("Pedindo a verificação do destinatário") : ""}
+    <form class="operator-form" data-human-gate="validate" data-gate-key="${escapeHtml(validateKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+      <p class="constraint">Pede ao Warmbly que verifique agora se este endereço aceita entrega. Não envia mensagem nenhuma.</p>
+      <button type="submit"${gateInFlight(validateKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(validateKey) ? "Enviando…" : "Verificar o destinatário agora"}</button>
+    </form>
+
+    ${gateInFlight(approveKey) ? pendingBlock("Registrando a aprovação") : ""}
+    <form class="operator-form" data-human-gate="review" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+      <h4>Aprovar este candidato</h4>
+      <label>Motivo<input name="reason" required minlength="3"></label>
+      <label><input type="checkbox" name="ack"${gate.allowed ? " required" : ""}${gate.allowed ? "" : " disabled"}> Revisei destinatário, mensagem exata, policy e evidência desta versão</label>
+      <button type="submit"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Registrar APPROVE"}</button>
+      ${
+        gate.allowed
+          ? ""
+          : `<p class="constraint" data-approve-blocked="true">APPROVE está desabilitado: ${escapeHtml(gate.reason)}</p>`
+      }
+      ${
+        authority.canReview
+          ? ""
+          : `<p class="constraint" data-blocked-reason="review">Revisar exige o grupo <code>operators</code> no Authelia.</p>`
+      }
+    </form>
+
+    ${gateInFlight(holdKey) ? pendingBlock("Registrando HOLD/REJECT") : ""}
+    <form class="operator-form" data-human-gate="review" data-gate-key="${escapeHtml(holdKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+      <h4>Segurar ou rejeitar</h4>
+      <label>Decisão<select name="decision"><option value="HOLD">HOLD</option><option value="REJECT">REJECT</option></select></label>
+      <label>Motivo<input name="reason" required minlength="3"></label>
+      <p class="constraint" data-no-ack-required="true">HOLD e REJECT não pedem a ciência de aprovação: segurar ou rejeitar nunca autoriza uma mensagem.</p>
+      <button type="submit"${authority.canReview && !gateInFlight(holdKey) ? "" : " disabled"}>${gateInFlight(holdKey) ? "Enviando…" : "Registrar HOLD/REJECT"}</button>
+    </form>
+
+    ${adjustBlock({ cohortId, candidateId, version, frozenHash, candidate, authority, adjustKey, draft })}
+    ${technicalDetails(
+      [
+        { term: "candidate_id", value: candidateId },
+        { term: "content_hash", value: show(candidate.content_hash) },
+        { term: "frozen_hash", value: frozenHash },
+        { term: "evidence_hash", value: show(candidate.evidence_hash) },
+        { term: "blocked_by", value: blockers.join(",") },
+      ],
+      "warmbly-candidate",
+    )}
+  </article>`;
+}
+
+/**
+ * The adjust editor: exactly three fields, and a preview before the write.
+ *
+ * The contract accepts subject, body_text and reason and nothing else, so there
+ * is nothing here that could offer to change mailbox, evidence, source, policy
+ * or route class — the fields that make the frozen cohort worth trusting.
+ */
+function adjustBlock(args: {
+  cohortId: string;
+  candidateId: string;
+  version: string;
+  frozenHash: string;
+  candidate: Record<string, unknown>;
+  authority: OperatorAuthority;
+  adjustKey: string;
+  draft: AdjustDraft | undefined;
+}): string {
+  const { cohortId, candidateId, version, frozenHash, candidate, authority, adjustKey, draft } = args;
+  const unavailable = adjustRouteMissing();
+  const pending = gateInFlight(adjustKey);
+  const subject = show(candidate.subject);
+  const body = show(candidate.body_text);
+  const diff = draft
+    ? `
+      <div class="banner stale" role="status" data-adjust-diff="true">
+        <h4>Confira a mudança antes de confirmar</h4>
+        <dl class="facts">
+          <div data-diff-field="subject"><dt>Assunto</dt><dd><del>${escapeHtml(draft.before_subject)}</del><br><ins>${escapeHtml(draft.subject)}</ins></dd></div>
+          <div data-diff-field="body_text"><dt>Corpo</dt><dd><del><pre class="message-preview">${escapeHtml(draft.before_body_text)}</pre></del><ins><pre class="message-preview">${escapeHtml(draft.body_text)}</pre></ins></dd></div>
+          <div data-diff-field="reason"><dt>Motivo</dt><dd>${escapeHtml(draft.reason)}</dd></div>
+        </dl>
+        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação, revisão e GO da nova versão começam pendentes.</p>
+      </div>`
+    : "";
+  return `
+    <details class="card" data-adjust-editor="${escapeHtml(candidateId)}"${draft ? " open" : ""}>
+      <summary>Ajustar assunto e corpo (cria uma NOVA versão)</summary>
+      <p class="constraint" data-adjust-warning="true">Ajustar não edita esta versão: o Warmbly congela uma versão nova a partir dela. Destinatário, evidência, origem, policy e classe de rota são imutáveis e não aparecem aqui porque não podem ser alterados.</p>
+      ${
+        unavailable
+          ? `<p class="banner error" role="alert" data-adjust-unavailable="true">A rota de ajuste ainda não está implantada neste Control Center, então este editor não pode gravar. Registre HOLD ou REJECT com o motivo enquanto isso.</p>`
+          : ""
+      }
+      ${pending ? pendingBlock("Enviando o ajuste") : ""}
+      ${diff}
+      <form class="operator-form" data-human-gate="adjust" data-gate-key="${escapeHtml(adjustKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}" data-cohort-version="${escapeHtml(version)}" data-frozen-hash="${escapeHtml(frozenHash)}" data-before-subject="${escapeHtml(subject)}" data-before-body="${escapeHtml(body)}" data-adjust-step="${draft ? "confirm" : "preview"}">
+        <label>Assunto<input name="subject" required minlength="3" maxlength="200" value="${escapeHtml(draft?.subject ?? subject)}"></label>
+        <label>Corpo<textarea name="body_text" required minlength="3" rows="8">${escapeHtml(draft?.body_text ?? body)}</textarea></label>
+        <label>Motivo do ajuste<input name="reason" required minlength="3" value="${escapeHtml(draft?.reason ?? "")}"></label>
+        <label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}" value="${escapeHtml(draft ? `v${version}` : "")}"></label>
+        <button type="submit"${pending || unavailable || !authority.canReview ? " disabled" : ""}>${
+          pending ? "Enviando…" : draft ? `Confirmar e criar a versão seguinte a partir da v${escapeHtml(version)}` : "Pré-visualizar a mudança"
+        }</button>
+        ${
+          authority.canReview
+            ? ""
+            : `<p class="constraint" data-blocked-reason="adjust">Ajustar exige o grupo <code>operators</code> no Authelia.</p>`
+        }
+      </form>
+    </details>`;
 }
 
 function reviewSurface(input: WarmblySurfaceInput): string {
-  const selected = gateData(input, "selected");
-  const cohort = record(selected.data);
+  const selected = gateSection(input, "selected");
+  const list = gateSection(input, "list");
+  const cohort = selectedCohort(input);
+  const authority = operatorAuthority(input);
+  const feedback = feedbackRouter(input.operatorResult);
   if (!cohort.id) {
-    return `<section class="stack"><h2>Revisão</h2><p class="banner empty">Selecione uma versão em <a href="#/warmbly/cohorts">Cohorts</a>. Nenhuma elegibilidade é inferida localmente.</p></section>`;
+    // Never a silently empty page. Either the operator picks from what the
+    // server listed, or they are told plainly that the list itself could not
+    // be read — those are different situations with different next moves.
+    const options = cohortRows(input)
+      .map(
+        (row) =>
+          `<li class="card" data-cohort-option="${escapeHtml(show(row.id))}"><h3>v${escapeHtml(show(row.version))} · ${escapeHtml(show(row.freshness))}</h3><dl class="facts">${fact("Origem", show(row.source))}${fact("as_of", show(row.as_of))}${fact("Decisão final", fromPayload(record(row.decision).decision))}</dl><p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(row.id))}">Abrir revisão</a></p></li>`,
+      )
+      .join("");
+    return `<section class="stack" data-review-empty="true"><h2>Revisão</h2>
+      ${feedback.remainder()}
+      ${input.resource ? gateUnreadableBanner(selected, "a versão selecionada") : ""}
+      ${gateUnreadableBanner(list, "a lista de cohorts")}
+      <p class="banner empty">Nenhuma versão selecionada. Escolha uma abaixo — nenhuma elegibilidade é inferida localmente.</p>
+      ${
+        options
+          ? `<ol class="stack" data-cohort-selector="true">${options}</ol>`
+          : `<p><a class="button" data-open-cohorts="true" href="#/warmbly/cohorts">Abrir Cohorts</a></p>`
+      }
+      </section>`;
   }
   const manifest = record(cohort.manifest);
   const preview = record(manifest.preview);
   const candidates = array(cohort.candidates);
-  const candidateCards = candidates.map((candidate) => {
-    const validation = record(candidate.validation);
-    const review = record(candidate.review);
-    const blocked = Array.isArray(candidate.blocked_by) ? candidate.blocked_by.join(", ") : "";
-    return `<article class="card" data-candidate-id="${escapeHtml(show(candidate.candidate_id))}"><p class="kicker">${validationPill(candidate)} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p><h3>${escapeHtml(show(candidate.company))}</h3>
-    <dl>${fact("Destinatário exato", show(candidate.mailbox))}${fact("Purpose", show(candidate.mailbox_purpose))}${fact("Validação", show(validation.reason))}${fact("Evidência vence", stamp(validation.expires_at))}${fact("Review", show(review.decision))}${fact("Efetiva", show(review.effective))}${fact("Bloqueios", blocked || "nenhum")}</dl>
-    <details><summary>Ver mensagem exata congelada</summary><p><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p><pre class="message-preview">${escapeHtml(show(candidate.body_text))}</pre><p class="constraint">content hash ${escapeHtml(show(candidate.content_hash))}; policy ${escapeHtml(show(cohort.policy_version))}; evidence ${escapeHtml(show(candidate.evidence_hash))}</p></details>
-    <form class="operator-form" data-human-gate="validate" data-version="${escapeHtml(show(cohort.id))}" data-candidate="${escapeHtml(show(candidate.candidate_id))}"><button type="submit">Solicitar validation</button></form>
-    <form class="operator-form" data-human-gate="review" data-version="${escapeHtml(show(cohort.id))}" data-candidate="${escapeHtml(show(candidate.candidate_id))}"><label>Decisão<select name="decision"><option>APPROVE</option><option>HOLD</option><option>REJECT</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label><input type="checkbox" name="ack" required> Revisei destinatário, mensagem e evidência desta versão</label><button type="submit">Registrar decisão</button></form></article>`;
-  }).join("");
-  return `<section class="stack" aria-labelledby="review-title"><h2 id="review-title">Revisão v${escapeHtml(show(cohort.version))}</h2><p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
-  <dl>${fact("Considerados", show(preview.accounts_considered))}${fact("Elegíveis", show(preview.accounts_eligible))}${fact("Excluídos", show(preview.accounts_excluded))}${fact("Destinatários finais", show(preview.recipients_final))}${fact("Suppression", show(preview.suppressed))}${fact("Opt-out", show(preview.opt_out))}${fact("Risky excluídos", show(preview.risky_excluded))}</dl>
-  <form class="operator-form" data-human-gate="reproduce" data-version="${escapeHtml(show(cohort.id))}"><button type="submit">Reproduzir versão imutável</button></form>${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
-  <form class="operator-form" data-human-gate="decide" data-version="${escapeHtml(show(cohort.id))}"><label>Decisão final<select name="decision"><option>NO_GO</option><option>GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(show(cohort.version))}</code><input name="confirmation" required pattern="v${escapeHtml(show(cohort.version))}"></label><button type="submit">Registrar GO/NO-GO</button></form><p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
+  const expandAll = new URLSearchParams(input.query ?? "").get("mensagens") !== "recolhidas";
+  const cohortId = show(cohort.id);
+  const version = show(cohort.version);
+  const reproduceKey = `reproduce:${cohortId}::`;
+  const decideKey = `decide:${cohortId}::`;
+  const candidateCards = candidates
+    .map((candidate) => candidateCard(cohort, candidate, authority, feedback, expandAll))
+    .join("");
+  const cohortFeedback = feedback.forCohort(cohortId);
+  const leftover = feedback.remainder();
+  const decisionValue = fromPayload(record(cohort.decision).decision);
+  return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>
+  ${leftover}${cohortFeedback}
+  ${gateUnreadableBanner(selected, "a versão selecionada")}
+  <p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
+  ${identityBlock(input)}
+  ${previewBlock(preview)}
+  <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
+  ${gateInFlight(reproduceKey) ? pendingBlock("Reproduzindo a versão imutável") : ""}
+  <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
+  ${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
+  ${gateInFlight(decideKey) ? pendingBlock("Registrando GO/NO-GO") : ""}
+  <form class="operator-form" data-human-gate="decide" data-gate-key="${escapeHtml(decideKey)}" data-version="${escapeHtml(cohortId)}"><label>Decisão final<select name="decision"><option value="NO_GO">NO_GO</option><option value="GO">GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label><button type="submit"${authority.canDecide && !gateInFlight(decideKey) ? "" : " disabled"}>${gateInFlight(decideKey) ? "Enviando…" : "Registrar GO/NO-GO"}</button>${
+    authority.canDecide
+      ? ""
+      : `<p class="constraint" data-go-authority="absent">GO/NO-GO está desabilitado nesta sessão: ele exige o grupo <code>admins</code> no Authelia. Peça a inclusão nesse grupo e reautentique; revisar candidatos continua permitido com <code>operators</code>.</p>`
+  }</form>
+  <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>
+  <p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
 }
 
-function warmblySubnav(current: WarmblySurface): string {
+function warmblySubnav(current: WarmblySurface, resource: string | null | undefined): string {
+  // The resource travels with the operator. A subnav that drops it lands the
+  // reviewer on an empty Revisão and makes the selection they just made look
+  // like it never happened.
+  const suffix = resource ? `?resource=${encodeURIComponent(resource)}` : "";
   return `<nav class="subnav" aria-label="Superfícies de operação Warmbly">${WARMBLY_SURFACES.map(
     (id) =>
-      `<a href="#/warmbly/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
+      `<a href="#/warmbly/${id}${suffix}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
         ownMapValue(WARMBLY_SURFACE_LABELS, id) ?? "Operação",
       )}</a>`,
   ).join("")}</nav>`;
@@ -731,5 +1613,5 @@ export function resolveWarmblySurface(surface: string | null | undefined): Warmb
 export function warmblyBlock(input: WarmblySurfaceInput, surface: string | null | undefined): string {
   const current = resolveWarmblySurface(surface);
   const render = ownMapValue(WARMBLY_SURFACE_RENDERERS, current) ?? operationSurface;
-  return `${warmblySubnav(current)}${render(input)}`;
+  return `${warmblySubnav(current, input.resource)}${render(input)}`;
 }

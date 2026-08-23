@@ -47,5 +47,37 @@ export {
  * exported from this connector stays read-only.
  */
 export * from "./operator/index.ts";
-export { HUMAN_GATE_CONTRACT, HUMAN_GATE_PREFIX, createHumanGateHttpHandler } from "./human-gate/http.ts";
+export {
+  HUMAN_GATE_CONTRACT,
+  HUMAN_GATE_PREFIX,
+  HUMAN_GATE_ROUTES,
+  createHumanGateHttpHandler,
+} from "./human-gate/http.ts";
 export type { HumanGateHttpOptions } from "./human-gate/http.ts";
+export {
+  ADJUSTMENT_FIELDS,
+  ADJUST_EDGE_ONLY_FIELDS,
+  ADJUST_ERROR_CODES,
+  ADJUST_REFUSED_FIELDS,
+  ADJUST_REQUEST_FIELDS,
+  ADJUST_RESPONSE_FIELDS,
+  FORBIDDEN_HUMAN_GATE_SEGMENTS,
+  HUMAN_GATE_OPERATIONS,
+  HUMAN_GATE_OUTCOMES,
+  HUMAN_GATE_WRITE_OPERATIONS,
+  UUID_PATTERN_SOURCE,
+  WARMBLY_COHORTS_PREFIX,
+  isCanonicalUuid,
+  validateAdjustRequest,
+} from "./human-gate/contract.ts";
+export type {
+  AdjustErrorCode,
+  AdjustRequest,
+  AdjustRequestField,
+  AdjustValidation,
+  CohortAdjustResponse,
+  CohortAdjustment,
+  CohortAdjustmentDiffEntry,
+  HumanGateOperation,
+  HumanGateOutcome,
+} from "./human-gate/contract.ts";
