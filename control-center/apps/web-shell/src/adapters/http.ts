@@ -136,9 +136,10 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     if (!path) {
       return fail("ação de dispatch desconhecida", "unknown_action");
     }
-    // The channel refuses a write with no audit reason, and with paused_by
-    // missing upstream this ledger is the only record of who did it.
-    if (input.reason.trim() === "") {
+    // Pause and resume require an audit reason. Acknowledge deliberately does
+    // not: the channel contract marks it `reason_required: false`, and the UI
+    // labels that field optional.
+    if (input.action !== "acknowledge" && input.reason.trim() === "") {
       return fail("motivo é obrigatório");
     }
     if (input.action === "resume" && !input.confirmation_token) {
@@ -155,7 +156,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         headers: { accept: "application/json", "content-type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          reason: input.reason,
+          ...(input.reason.trim() !== "" ? { reason: input.reason } : {}),
           ...(input.confirmation_token ? { confirmation_token: input.confirmation_token } : {}),
           ...(input.target_id ? { target_id: input.target_id } : {}),
         }),

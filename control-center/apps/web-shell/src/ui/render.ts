@@ -25,7 +25,10 @@ import {
 } from "./domains";
 import { provenanceBlock } from "./provenance";
 import { warmblyBlock } from "./warmbly";
-import { resumeConfirmationIsArmed } from "../warmbly-confirmation";
+import {
+  pendingResumeConfirmation,
+  resumeObservationFingerprint,
+} from "../warmbly-confirmation";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -131,11 +134,15 @@ function pageBody(
     return hojeBody(page);
   }
   if (destination === "warmbly") {
+    const observationFingerprint = resumeObservationFingerprint(page.commercial);
+    const pending = pendingResumeConfirmation();
+    const confirmation =
+      pending?.observation_fingerprint === observationFingerprint ? pending : undefined;
     return warmblyBlock(
       {
         snapshot: page.commercial,
         operator: page.operator,
-        confirmationArmed: resumeConfirmationIsArmed(),
+        ...(confirmation ? { confirmation } : {}),
         ...(operatorResult ? { operatorResult } : {}),
       },
       surface,

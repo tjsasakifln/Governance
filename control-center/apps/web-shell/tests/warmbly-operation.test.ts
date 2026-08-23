@@ -17,7 +17,11 @@ import {
   type DispatchOutcomeKind,
 } from "../src/ui/warmbly";
 import { hasMutationControls } from "../src/ui/render";
-import { clearPendingResumeConfirmation } from "../src/warmbly-confirmation";
+import {
+  armPendingResumeConfirmation,
+  clearPendingResumeConfirmation,
+  resumeObservationFingerprint,
+} from "../src/warmbly-confirmation";
 import { jsonResponse, operationalRouter } from "./helpers";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -315,13 +319,19 @@ test("an armed confirmation changes the resume control from a request into a con
     const first = await adapter.warmblyDispatch({ action: "resume_confirm", reason: "bounce normalizado" });
     assert.equal(first.ok, true);
     assert.ok(first.confirmationToken, "the recorded challenge carries a token");
-    const { armPendingResumeConfirmation } = await import("../src/warmbly-confirmation");
-    armPendingResumeConfirmation(first.confirmationToken!);
+    const latest = await adapter.readDestination("warmbly");
+    assert.ok(latest.ok && !latest.loading);
+    armPendingResumeConfirmation({
+      token: first.confirmationToken!,
+      reason: "bounce normalizado",
+      observation_fingerprint: resumeObservationFingerprint(latest.page.commercial),
+    });
     paintShell(root, adapter, "#/warmbly");
     await settle();
     assert.match(root.innerHTML, /data-resume-armed="true"/);
     assert.match(root.innerHTML, /data-confirmation-pending="true"/);
     assert.match(root.innerHTML, /CONFIRMAR RETOMADA \(passo 2 de 2\)/);
+    assert.match(root.innerHTML, /name="reason"[^>]*value="bounce normalizado" readonly/);
   } finally {
     handle.unmount();
     clearPendingResumeConfirmation();

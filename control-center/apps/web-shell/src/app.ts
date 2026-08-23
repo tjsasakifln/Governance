@@ -1,11 +1,16 @@
 import type { MockScenario } from "./adapters/mock";
-import type { ControlCenterReadAdapter, DestinationPage } from "./adapters/contract";
-import type { WriteShortcutKind } from "./adapters/paths";
+import type {
+  AdapterWriteResult,
+  ControlCenterReadAdapter,
+  DestinationPage,
+} from "./adapters/contract";
+import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
 import {
   armPendingResumeConfirmation,
   clearPendingResumeConfirmation as clearPendingResume,
   pendingResumeConfirmation as readPendingResume,
+  resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
 import { renderShell } from "./ui/render";
@@ -117,9 +122,16 @@ function applyPaint(
   bindOperatorActions(root, adapter, () => {
     paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
   });
-  bindWarmblyDispatch(root, adapter, () => {
-    paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
-  });
+  bindWarmblyDispatch(
+    root,
+    adapter,
+    () => {
+      paintShell(root, adapter, `#/${parsed.destination}${parsed.surface ? `/${parsed.surface}` : ""}`);
+    },
+    resumeObservationFingerprint(
+      result.ok && !result.loading ? result.page?.commercial : undefined,
+    ),
+  );
 }
 
 function bindOperatorActions(
@@ -173,6 +185,7 @@ function bindWarmblyDispatch(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
+  observationFingerprint: string,
 ): void {
   if (!adapter.warmblyDispatch || typeof root.querySelectorAll !== "function") return;
   const forms = root.querySelectorAll("[data-warmbly-dispatch]");
@@ -181,37 +194,97 @@ function bindWarmblyDispatch(
     if (!form) continue;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const requested = form.getAttribute("data-warmbly-dispatch");
-      if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
-      const reason = form.querySelector('[name="reason"]')?.value ?? "";
-      const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
-      // A resume with no token yet is the confirmation step, not the resume.
-      const carried = readPendingResume();
-      const action = requested === "resume" && !carried ? "resume_confirm" : requested;
-      // Spend it at most once: whatever happens next, this token is not reused.
-      if (requested === "resume") {
-        clearPendingResume();
-      }
-      void Promise.resolve(
-        adapter.warmblyDispatch?.({
-          action,
-          reason,
-          ...(action === "resume" && carried ? { confirmation_token: carried } : {}),
-          ...(requested === "acknowledge" ? { target_id: targetId } : {}),
-        }),
-      ).then((result) => {
+      void (async () => {
+        const requested = form.getAttribute("data-warmbly-dispatch");
+        if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
+        const reason = form.querySelector('[name="reason"]')?.value ?? "";
+        const normalizedReason = reason.trim();
+        const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
+
+        let action: "pause" | "resume_confirm" | "resume" | "acknowledge" = requested;
+        let confirmationToken: string | undefined;
+        const pending = readPendingResume();
+
+        if (requested === "resume") {
+          const matchesPending =
+            pending !== undefined &&
+            pending.reason === normalizedReason &&
+            pending.observation_fingerprint === observationFingerprint;
+          if (matchesPending) {
+            // Take the token before the asynchronous freshness check. It is
+            // single-use in this client even if the read or the write fails.
+            confirmationToken = pending.token;
+            clearPendingResume();
+            const latestObservation = await latestResumeObservation(adapter);
+            if (latestObservation !== observationFingerprint) {
+              adapter.lastOperatorResult = staleResumeConfirmation();
+              onDone();
+              return;
+            }
+            action = "resume";
+          } else {
+            // A changed reason or changed rendered observation cannot inherit
+            // the old challenge. This submit starts a fresh first step.
+            clearPendingResume();
+            action = "resume_confirm";
+          }
+        } else {
+          // Pause and acknowledge are interventions. Even a refused attempt
+          // invalidates a prior resume decision before it can be reused.
+          clearPendingResume();
+        }
+
+        const result = await Promise.resolve(
+          adapter.warmblyDispatch?.({
+            action,
+            reason,
+            ...(action === "resume" && confirmationToken
+              ? { confirmation_token: confirmationToken }
+              : {}),
+            ...(requested === "acknowledge" ? { target_id: targetId } : {}),
+          }),
+        );
         if (result) {
           adapter.lastOperatorResult = result;
           // Arm the following resume only when this call actually minted a
-          // challenge. A refusal arms nothing.
+          // challenge. A refusal arms nothing, and the challenge is bound to
+          // the same reason and observation the operator just reviewed.
           if (action === "resume_confirm" && result.ok && result.confirmationToken) {
-            armPendingResumeConfirmation(result.confirmationToken);
+            armPendingResumeConfirmation({
+              token: result.confirmationToken,
+              reason: normalizedReason,
+              observation_fingerprint: observationFingerprint,
+            });
           }
         }
         onDone();
-      });
+      })();
     });
   }
+}
+
+async function latestResumeObservation(
+  adapter: ControlCenterReadAdapter,
+): Promise<string | null> {
+  try {
+    const result = await Promise.resolve(adapter.readDestination("warmbly"));
+    if (!result.ok || result.loading) return null;
+    return resumeObservationFingerprint(result.page?.commercial);
+  } catch {
+    return null;
+  }
+}
+
+function staleResumeConfirmation(): AdapterWriteResult {
+  return {
+    ok: false,
+    path: WARMBLY_DISPATCH_PATHS.resume,
+    kind: "nota",
+    message:
+      "A leitura do outbound mudou ou não pôde ser confirmada desde o primeiro passo. A retomada não foi executada; releia o estado e peça uma nova confirmação.",
+    outcome: "refused",
+    code: "confirmation_stale",
+  };
 }
 
 function bindWriteShortcuts(

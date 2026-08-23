@@ -24,6 +24,7 @@ import {
 } from "../destinations";
 import type { AdapterWriteResult } from "../adapters/contract";
 import type { ActorRef, CommercialSnapshot } from "../types";
+import type { PendingResumeConfirmation } from "../warmbly-confirmation";
 import { provenanceBlock } from "./provenance";
 
 /** Named once: the out-of-band way to stop outbound when this channel cannot. */
@@ -34,8 +35,8 @@ export interface WarmblySurfaceInput {
   operator: ActorRef;
   /** Result of the operator's last dispatch call in this session, if any. */
   operatorResult?: AdapterWriteResult;
-  /** True when a resume confirmation is armed and the next resume submit executes. */
-  confirmationArmed: boolean;
+  /** Challenge bound to the exact reason and observation shown on this render. */
+  confirmation?: PendingResumeConfirmation;
 }
 
 export type WarmblySurfaceRenderer = (input: WarmblySurfaceInput) => string;
@@ -137,6 +138,12 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     title: "Recusada: confirmação inválida ou vencida",
     recovery:
       "O token já foi gasto ou expirou, e ele é de uso único e ligado a quem o pediu. Refaça os dois passos. O outbound continua como estava.",
+  },
+  confirmation_stale: {
+    kind: "refused",
+    title: "Confirmação descartada: a leitura mudou",
+    recovery:
+      "A retomada não foi executada. Releia o estado, a fila e o teto exibidos acima e peça uma nova confirmação.",
   },
   circuit_open: {
     kind: "refused",
@@ -492,7 +499,11 @@ function impactSummary(reading: DispatchReading): string {
     }`;
 }
 
-function controlsBlock(reading: DispatchReading, confirmationArmed: boolean): string {
+function controlsBlock(
+  reading: DispatchReading,
+  confirmation: PendingResumeConfirmation | undefined,
+): string {
+  const confirmationArmed = confirmation !== undefined;
   return `
     <section class="stack" aria-labelledby="warmbly-controles" data-resume-armed="${confirmationArmed ? "true" : "false"}">
       <h2 id="warmbly-controles">Controles</h2>
@@ -516,7 +527,7 @@ function controlsBlock(reading: DispatchReading, confirmationArmed: boolean): st
             : `<p class="constraint">Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>`
         }
         <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
+          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando"${confirmation ? ` value="${escapeHtml(confirmation.reason)}" readonly` : ""} /></label>
           <button type="submit">${confirmationArmed ? "CONFIRMAR RETOMADA (passo 2 de 2)" : "RETOMAR OUTBOUND (passo 1 de 2)"}</button>
         </form>
       </article>
@@ -562,7 +573,7 @@ function operationSurface(input: WarmblySurfaceInput): string {
       </article>
     </section>
     ${outcomeBlock(input.operatorResult)}
-    ${controlsBlock(reading, input.confirmationArmed)}
+    ${controlsBlock(reading, input.confirmation)}
     ${auditBlock(operations, input.operator)}`;
 }
 
