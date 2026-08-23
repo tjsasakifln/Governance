@@ -196,7 +196,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { policy_version: string | null; outcomes: Record<string, number | null> };
     rows: unknown[];
   };
@@ -239,7 +239,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
     });
     const commercial = projected.find((row) => row.snapshot_kind === "commercial");
     assert.ok(commercial);
-    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+    const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
       availability: string;
       current: { outcomes: Record<string, number | null> };
       rows: unknown[];
@@ -283,7 +283,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { integrity_flags: string[] };
   };
   assert.deepEqual(controlled.current.integrity_flags, [

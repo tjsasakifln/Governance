@@ -121,7 +121,7 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   if (!commercial) return;
   commercial.operations = {
     cohorts: { acquisition: [] },
-    controlled_email: {
+    controlled_outbound: {
       availability: "UNKNOWN",
       last_update_at: "2026-08-22T18:00:00.000Z",
       current: {
