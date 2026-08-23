@@ -22,6 +22,7 @@ import {
   CLIENT_IDENTITY_REQUIRED_ACTIONS,
 } from "@confenge/control-center-contracts/taxonomy";
 import type { ClientIdentityException, ClientStatus, Provenance } from "./types";
+import { ownMapValue } from "./own-map";
 
 export { CLIENT_IDENTITY_REQUIRED_ACTION };
 
@@ -73,9 +74,9 @@ export function clientIdentityGapFrom(
     id: typeof row.id === "string" && row.id.trim() !== "" ? row.id : `client-identity:${index}`,
     source_id: typeof row.source_id === "string" ? row.source_id : null,
     kind: "client_identity_missing",
-    why: reasons.map((code) => REASON_TEXT[code] ?? code).join("; "),
+    why: reasons.map((code) => ownMapValue(REASON_TEXT, code) ?? "verificação de identidade não reconhecida").join("; "),
     reason_codes: reasons,
-    recommended_next_action: CLIENT_IDENTITY_REQUIRED_ACTIONS[first] ?? CLIENT_IDENTITY_REQUIRED_ACTION,
+    recommended_next_action: ownMapValue(CLIENT_IDENTITY_REQUIRED_ACTIONS, first) ?? CLIENT_IDENTITY_REQUIRED_ACTION,
     status: "open",
     origin: declaredSource
       ? {

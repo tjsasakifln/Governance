@@ -2,7 +2,24 @@ import { escapeHtml } from "../escape";
 import { mapProvenance, type ProvenancePresentation } from "../provenance";
 import type { Provenance } from "../types";
 import { freshnessTone } from "../freshness-tone";
+import {
+  CONFIDENCE_HELP,
+  FRESHNESS_HELP,
+  confidenceWord,
+  freshnessPill,
+  helpTerm,
+  technicalDetails,
+} from "./labels";
 
+/**
+ * Provenance na superfície principal: quem observou, quando, quão atual e
+ * quanto merece crédito — tudo em português.
+ *
+ * O que é identificador (sistema, tipo de origem, locator, o enum cru de
+ * atualização, o carimbo UTC) desce para o bloco recolhido. Nada some:
+ * `data-freshness`, `data-tone` e `data-source` continuam com o valor cru,
+ * porque a sonda Playwright e os testes de tom leem esses atributos.
+ */
 export function provenanceBlock(provenance: Provenance): string {
   const p: ProvenancePresentation = mapProvenance(provenance);
   const tone = freshnessTone(p.freshnessStatus);
@@ -20,16 +37,27 @@ export function provenanceBlock(provenance: Provenance): string {
         </dd>
       </div>
       <div>
-        <dt>Freshness</dt>
+        <dt>${helpTerm("Atualização", FRESHNESS_HELP)}</dt>
         <dd>
-          <span class="pill pill-${escapeHtml(p.freshnessStatus.toLowerCase())}">${escapeHtml(p.freshnessStatus)} · ${escapeHtml(p.freshnessLabel)}</span>
-          <span class="sr-only">${escapeHtml(p.freshnessStatus)}</span>
+          ${freshnessPill(p.freshnessStatus)}
+          <span class="sr-only">${escapeHtml(p.freshnessLabel)}</span>
         </dd>
       </div>
       <div>
-        <dt>Confiança</dt>
-        <dd>${escapeHtml(p.confidenceLabel)}</dd>
+        <dt>${helpTerm("Confiança", CONFIDENCE_HELP)}</dt>
+        <dd>${escapeHtml(`${confidenceWord(p.confidence)} (${p.confidenceLabel.replace("confiança ", "")})`)}</dd>
       </div>
     </dl>
+    ${technicalDetails(
+      [
+        { term: "sistema", value: p.sourceSystem },
+        { term: "tipo_de_origem", value: p.sourceKind },
+        { term: "locator", value: p.sourceLocator },
+        { term: "freshness_status", value: p.freshnessStatus },
+        { term: "observed_at_utc", value: p.observedAtUtc },
+        { term: "confidence", value: p.confidence.toFixed(2) },
+      ],
+      "provenance",
+    )}
   `;
 }
