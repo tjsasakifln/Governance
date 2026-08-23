@@ -40,8 +40,24 @@ Evidência executada em 2026-08-23:
   produzem um único receipt, payload divergente conflita e todos os receipts
   sobrevivem ao restart do pool.
 - Migration PostgreSQL 16 up/down — PASS; rollback deixou zero tabelas residuais.
-- Smoke produção read-only: `/` respondeu 302 para Authelia e `/healthz`
-  respondeu 200; nenhum POST foi executado.
+- Rollout ordenado: Warmbly PR #135 (`c27259b`), Governance PR #92
+  (`f70938c`) e correção do owner do secret no Governance PR #93 (`7beffc1`).
+  Migration 116 aplicada; backend/consumer/worker e Control Center saudáveis.
+- Smoke de negócio em produção foi somente leitura: anônimo `/` respondeu 302
+  para Authelia e `/healthz` respondeu 200. Uma identidade temporária com os
+  grupos `operators,admins` concluiu first factor + TOTP (200/200), abriu o shell
+  (200) e leu `GET /v1/warmbly/operator/cohorts?limit=1` pelo proxy (200), com
+  `confenge.human-gate.v1`, `receipt`, `correlation_id` e zero cohorts. A
+  identidade e sua configuração TOTP foram removidas ao final. Nenhum endpoint
+  de cohort, validation, review, decision, queue ou envio recebeu POST em
+  produção.
+- A credencial ativa foi confirmada com máscara exata 196 e sem permissão de
+  envio. A credencial legada de máscara 128 foi revogada pelo endpoint auditado,
+  a sessão técnica foi encerrada e a variável stale foi retirada do `.env`;
+  o token file-backed ativo permaneceu separado do collector.
+- Guardrails de runtime confirmados no host: auto-send OFF, GREEN autorun OFF,
+  human approval obrigatório e kill switch engajado. Nenhum e-mail real foi
+  enviado.
 - Suíte ampla `internal/app/confenge`: PASS (Mailpit local/sandbox, nenhuma
   entrega externa). Handler/API compilado contra o contrato novo — PASS.
 
