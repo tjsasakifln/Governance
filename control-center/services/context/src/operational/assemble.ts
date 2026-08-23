@@ -3,6 +3,7 @@ import {
   rankAttention,
   type AttentionSignal,
 } from "@confenge/control-center-attention";
+import { operationalTruth } from "@confenge/control-center-contracts";
 import { toUtcIso, type Clock } from "../clock.ts";
 import type { RepoDomainMap } from "../scope.ts";
 import type { FreshnessStatus, Scope } from "../types.ts";
@@ -60,14 +61,18 @@ function compareId(a: { id: string }, b: { id: string }): number {
 function latestSnapshot(
   rows: readonly OperationalSnapshotRow[],
   domain: OperationalDomain,
+  generatedAt: string,
 ): OperationalSnapshotRow | undefined {
+  const generatedMs = Date.parse(generatedAt);
   // Auxiliary commercial list pages share the commercial scope/source but are
   // not the domain headline. Selecting one here would replace the entire
   // commercial snapshot with a 50-row storage page.
   const matches = rows.filter(
     (row) =>
       row.snapshot_kind !== "commercial-list-page" &&
-      snapshotKindToDomain(row.snapshot_kind) === domain,
+      snapshotKindToDomain(row.snapshot_kind) === domain &&
+      !Number.isNaN(Date.parse(row.observed_at)) &&
+      Date.parse(row.observed_at) <= generatedMs,
   );
   matches.sort((a, b) => {
     const time = b.observed_at.localeCompare(a.observed_at);
@@ -76,8 +81,13 @@ function latestSnapshot(
   return matches[0];
 }
 
-function latestCollector(rows: readonly CollectorRunRow[], domain: OperationalDomain): CollectorRunRow | undefined {
-  const matches = rows.filter((row) => collectorNameToDomain(row.collector_name) === domain);
+function latestCollector(rows: readonly CollectorRunRow[], domain: OperationalDomain, generatedAt: string): CollectorRunRow | undefined {
+  const generatedMs = Date.parse(generatedAt);
+  const matches = rows.filter((row) =>
+    collectorNameToDomain(row.collector_name) === domain &&
+    !Number.isNaN(Date.parse(row.observed_at)) &&
+    Date.parse(row.observed_at) <= generatedMs,
+  );
   matches.sort((a, b) => b.observed_at.localeCompare(a.observed_at) || b.id.localeCompare(a.id));
   return matches[0];
 }
@@ -407,11 +417,19 @@ function snapshotBody(domain: OperationalDomain, row: OperationalSnapshotRow): R
   return mapInfraLike(payload, seed, row.id, "control-center.pncp-snapshot.v1");
 }
 
-function presentSlot(domain: OperationalDomain, row: OperationalSnapshotRow): DomainSlot {
+function presentSlot(domain: OperationalDomain, row: OperationalSnapshotRow, generatedAt: string): DomainSlot {
   const body = snapshotBody(domain, row);
   const rawStatus = typeof body.status === "string" ? body.status : undefined;
   const unhealthy = rawStatus === "down" || rawStatus === "unhealthy" || rawStatus === "degraded" || rawStatus === "unknown";
-  const healthy = looksHealthy(row.freshness_status, "present") && !unhealthy;
+  const truth = operationalTruth({
+    as_of: row.observed_at,
+    evaluated_at: generatedAt,
+    source: row.source,
+    confidence: row.confidence,
+    freshness_status: row.freshness_status,
+    presence: "present",
+  });
+  const healthy = truth.state === "HEALTHY" && looksHealthy(row.freshness_status, "present") && !unhealthy;
   return {
     schema_version: OPERATIONAL_DOMAIN_SCHEMA_VERSION,
     domain,
@@ -422,6 +440,7 @@ function presentSlot(domain: OperationalDomain, row: OperationalSnapshotRow): Do
     confidence: row.confidence,
     presence: "present",
     healthy,
+    truth,
     snapshot: body,
   };
 }
@@ -450,6 +469,14 @@ function absentSlot(
     presence: "absent",
     absence_reason: reason,
     healthy: false,
+    truth: operationalTruth({
+      as_of: run?.observed_at ?? generatedAt,
+      evaluated_at: generatedAt,
+      source,
+      confidence: 0,
+      freshness_status: freshness,
+      presence: "absent",
+    }),
     snapshot: null,
   };
 }
@@ -536,12 +563,12 @@ function buildSlots(
       snapshots[domain] = null;
       continue;
     }
-    const row = latestSnapshot(bundle.operational_snapshots, domain);
+    const row = latestSnapshot(bundle.operational_snapshots, domain, generatedAt);
     if (row) {
-      snapshots[domain] = presentSlot(domain, row);
+      snapshots[domain] = presentSlot(domain, row, generatedAt);
       continue;
     }
-    const run = latestCollector(bundle.collector_runs, domain);
+    const run = latestCollector(bundle.collector_runs, domain, generatedAt);
     snapshots[domain] = absentSlot(domain, query, absenceFromCollector(run), run, generatedAt);
   }
   return snapshots;

@@ -23,6 +23,10 @@ export default defineConfig({
         replacement: path.resolve(here, "../../contracts/src/types.ts"),
       },
       {
+        find: /^@confenge\/control-center-contracts\/operational-truth$/,
+        replacement: path.resolve(here, "../../contracts/src/operational-truth.ts"),
+      },
+      {
         find: /^@confenge\/control-center-contracts$/,
         replacement: path.resolve(here, "../../contracts/src/index.ts"),
       },

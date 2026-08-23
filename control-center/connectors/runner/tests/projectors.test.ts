@@ -86,6 +86,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
         include_synthetic: false,
         causal_proof: false,
         real_empty: false,
+        families: [{ id: "family_real_001", contact: { email: "must-not-project@example.com", role: "owner" } }],
         weekly_revenue_chains: [
           {
             schema_version: "confenge.weekly_revenue_chain.v1",
@@ -136,6 +137,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
   assert.ok(commercial);
   const operations = commercial.payload.operations as {
     weekly_revenue_chains: Array<Record<string, unknown>>;
+    intel: { executive: Record<string, unknown> };
   };
   assert.equal(operations.weekly_revenue_chains.length, 1);
   const chain = operations.weekly_revenue_chains[0] as Record<string, unknown>;
@@ -158,6 +160,7 @@ test("Warmbly weekly revenue facts project under one opaque correlation and pres
     (chain.canonical_identity as Record<string, unknown>).correlation_id,
     "corr_extra_sbx_week_2026_34",
   );
+  assert.equal(JSON.stringify(operations.intel.executive).includes("must-not-project"), false);
 });
 
 test("weekly revenue projection fails closed on authority drift, collisions, and unbound money", () => {
@@ -261,6 +264,56 @@ test("weekly revenue projection fails closed on authority drift, collisions, and
     amount_cents: 0,
     currency: "BRL",
   });
+
+  const boundFinancialFacts = {
+    ...chain,
+    charge: {
+      availability: "OBSERVED",
+      id: identity.charge_id,
+      status: "CONFIRMED",
+      amount_cents: 800000,
+      currency: "BRL",
+    },
+    receipt: {
+      availability: "OBSERVED",
+      id: identity.payment_id,
+      status: "RECEIVED",
+      amount_cents: 0,
+      currency: "BRL",
+    },
+  };
+  const [withoutOptionalTimestamp] = project({ ...executive, weekly_revenue_chains: [boundFinancialFacts] });
+  assert.deepEqual(withoutOptionalTimestamp?.charge, {
+    availability: "OBSERVED",
+    id: identity.charge_id,
+    status: "CONFIRMED",
+    amount_cents: 800000,
+    currency: "BRL",
+  });
+  assert.deepEqual(withoutOptionalTimestamp?.receipt, {
+    availability: "OBSERVED",
+    id: identity.payment_id,
+    status: "RECEIVED",
+    amount_cents: 0,
+    currency: "BRL",
+  });
+
+  for (const observed_at of [
+    "2026-02-30T12:00:00Z",
+    "2050-01-01T00:00:00Z",
+    "2026-08-21T12:00:00+00:00",
+  ]) {
+    const [hostileTime] = project({
+      ...executive,
+      weekly_revenue_chains: [{
+        ...boundFinancialFacts,
+        charge: { ...boundFinancialFacts.charge, observed_at },
+        receipt: { ...boundFinancialFacts.receipt, observed_at },
+      }],
+    });
+    assert.deepEqual(hostileTime?.charge, { availability: "UNKNOWN" });
+    assert.deepEqual(hostileTime?.receipt, { availability: "UNKNOWN" });
+  }
 
   assert.deepEqual(project({ ...executive, weekly_revenue_chains: [chain, chain] }), []);
 });
@@ -746,6 +799,38 @@ test("intel exceptions feed Commercial Exceptions and organic scoreboard feeds C
   assert.equal(ops.growth.organic_scoreboard.configured, true);
   assert.equal(Array.isArray(ops.growth.organic_scoreboard.windows), true);
   assert.equal(ops.growth.scoreboard.configured, true);
+});
+
+test("equivalent exceptions group without losing occurrence evidence or workflow state", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: {
+      counts: { deals_open: 0, inbound_now: 0 },
+      attention: [
+        { id: "att-duplicate", group_key: "owner-gap:acme", kind: "missing_owner", why: "sem owner", status: "acknowledged", resolution_url: "https://attacker.example/phish" },
+      ],
+      operations: {
+        intel_exceptions: [
+          { id: "intel-original", group_key: "owner-gap:acme", code: "missing_owner", reason: "sem owner", status: "acknowledged" },
+        ],
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as {
+    exceptions: Array<Record<string, unknown>>;
+  };
+  assert.equal(ops.exceptions.length, 1);
+  assert.equal(ops.exceptions[0]?.occurrence_count, 2);
+  assert.deepEqual(ops.exceptions[0]?.occurrence_ids, ["intel-original", "att-duplicate"]);
+  assert.equal(ops.exceptions[0]?.workflow_state, "acknowledged");
+  assert.equal(ops.exceptions[0]?.resolution_kind, "unsupported");
+  assert.equal(ops.exceptions[0]?.resolution_href, undefined);
 });
 
 test("absent intel sources stay NO_DATA and a data wrapper is never configured", () => {

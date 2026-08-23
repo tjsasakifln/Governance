@@ -107,7 +107,7 @@ test("the fields the list filters read are the fields the Warmbly projector emit
   // Object-literal keys, shorthand (`at,`) or explicit (`status: ...`).
   const emits = (key: string): boolean => new RegExp(`\\n\\s+${key}[,:]`).test(source);
 
-  const ACTIVITY_KEYS = ["at", "lead_or_account", "source_id", "event", "state", "evidence"];
+  const ACTIVITY_KEYS = ["at", "lead_or_account", "source_id", "event", "state", "conditions", "evidence"];
   const EXCEPTION_KEYS = [
     "id",
     "canonical_id",
@@ -385,11 +385,69 @@ test("Exceções renders search, filters, sorting, a count and pagination over t
   assert.match(html, /data-list-pagination="excecoes"/);
   assert.match(html, /rel="next" href="#\/comercial\/excecoes\?pagina=2"/);
   assert.equal(/rel="prev"/.test(html), false, "page 1 must not offer a previous page link");
-  // The operator forms the queue is built around survive the new chrome.
-  assert.match(html, /data-operator-form="ACKNOWLEDGE_EXCEPTION"/);
+  // A legacy preview has no explicit truth receipt, so writes fail closed.
+  assert.doesNotMatch(html, /data-operator-form="ACKNOWLEDGE_EXCEPTION"/);
+  assert.match(html, /Ações bloqueadas/);
   assert.match(html, /data-operator-scope="control-center-only"/);
   const cards = html.match(/data-exception-id="/g) ?? [];
   assert.equal(cards.length, 25, "a page must render exactly one page of cards");
+});
+
+test("remote list actions require a current HEALTHY truth", async () => {
+  const reasons = {
+    HEALTHY: "fresh_observation",
+    STALE: "observation_stale",
+    ERROR: "collection_error",
+    UNKNOWN: "recency_unknown",
+  } as const;
+  for (const state of ["HEALTHY", "STALE", "ERROR", "UNKNOWN"] as const) {
+    const item = exceptionRows(1)[0];
+    assert.ok(item);
+    const snapshot = snapshotWith({ exceptions: [item], overview: { exceptions: 1 } });
+    const { fetchImpl } = recordingFetch((url) => {
+      const path = url.split("?")[0];
+      if (path?.endsWith("/v1/domains/commercial")) return snapshot;
+      if (path?.endsWith("/v1/domains/commercial/lists/exceptions")) {
+        return {
+          schema_version: "control-center.commercial-list.v1",
+          list: "exceptions",
+          generated_at: GENERATED_AT,
+          loaded_total: 1,
+          declared_total: 1,
+          complete: true,
+          truth: {
+            state,
+            as_of: GENERATED_AT,
+            source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/exceptions" },
+            confidence: state === "UNKNOWN" ? 0 : 0.9,
+            reason: reasons[state],
+          },
+          matched: 1,
+          items: [item],
+          page: 1,
+          page_count: 1,
+          page_size: 25,
+          range_start: 1,
+          range_end: 1,
+          filtered: false,
+          facet_values: {},
+          unavailable_facets: [],
+          query: { q: "", facets: {}, periodo: "all", ordem: "urgencia", pagina: 1, porPagina: 25 },
+        };
+      }
+      return undefined;
+    });
+    const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+      kind: "human",
+      id: "founder-local",
+    });
+    const root = { innerHTML: "" };
+    paintShell(root, adapter, "#/comercial/excecoes");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(/data-operator-form="ACKNOWLEDGE_EXCEPTION"/.test(root.innerHTML), state === "HEALTHY");
+    assert.match(root.innerHTML, new RegExp(`data-list-writes-allowed="${state === "HEALTHY"}"`));
+    if (state !== "HEALTHY") assert.match(root.innerHTML, /Ações bloqueadas/);
+  }
 });
 
 test("HTTP list response replaces the capped preview and preserves a page beyond row 50", async () => {

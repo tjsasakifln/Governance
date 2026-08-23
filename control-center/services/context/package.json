@@ -23,6 +23,7 @@
     "@confenge/control-center-attention": "*",
     "@confenge/control-center-contracts": "*",
     "@confenge/control-center-persistence": "*",
+    "@confenge/control-center-security": "*",
     "@confenge/control-center-warmbly-connector": "*"
   },
   "devDependencies": {

@@ -57,7 +57,7 @@ export const ATTENTION_FIXTURES: AttentionItem[] = [
     status: "open",
     title: "Coleta de saúde da infra falhou",
     summary:
-      "A última corrida do coletor de saúde retornou ERROR. Não há observação utilizável para o serviço de contexto.",
+      "A última corrida do coletor de saúde terminou com erro. Não há observação utilizável para o serviço de contexto.",
     provenance: provenance(
       "collector",
       "health-probe",
@@ -941,7 +941,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       engineering: ENGINEERING_SNAPSHOT,
     }),
     infra: pageFor("infra", {
-      headline: "Saúde observada. Freshness e confiança são eixos distintos.",
+      headline: "Saúde observada. Atualização e confiança são eixos distintos.",
       attention: attentionByScope((item) => item.scope === "infrastructure"),
       priorities: [],
       health: HEALTH_FIXTURES,

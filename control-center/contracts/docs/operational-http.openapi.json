@@ -113,6 +113,7 @@
             "schema": { "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope" }
           },
           { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "condicao", "in": "query", "schema": { "type": "string", "enum": ["unread", "overdue", "unassigned", "blocked"] } },
           { "name": "estado", "in": "query", "schema": { "type": "string" } },
           { "name": "tipo", "in": "query", "schema": { "type": "string" } },
           { "name": "origem", "in": "query", "schema": { "type": "string" } },
@@ -130,13 +131,14 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["schema_version", "list", "loaded_total", "declared_total", "complete", "matched", "items", "page", "page_count", "page_size", "facet_values", "unavailable_facets", "query"],
+                  "required": ["schema_version", "list", "loaded_total", "declared_total", "complete", "truth", "matched", "items", "page", "page_count", "page_size", "facet_values", "unavailable_facets", "query"],
                   "properties": {
                     "schema_version": { "const": "control-center.commercial-list.v1" },
                     "list": { "type": "string", "enum": ["activity", "exceptions"] },
                     "loaded_total": { "type": "integer", "minimum": 0 },
                     "declared_total": { "type": "integer", "minimum": 0 },
                     "complete": { "type": "boolean" },
+                    "truth": { "$ref": "../schemas/operational-envelope.v1.schema.json#/$defs/operational_truth" },
                     "matched": { "type": "integer", "minimum": 0 },
                     "items": { "type": "array", "maxItems": 100, "items": { "type": "object" } },
                     "page": { "type": "integer", "minimum": 1 },

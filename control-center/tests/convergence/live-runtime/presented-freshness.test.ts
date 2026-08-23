@@ -94,6 +94,19 @@ test("an UNKNOWN-freshness service reported 'ok' on a sub-check fails too", () =
   assert.deepEqual(verdict.evidence.offender_ids, ["ui:infra:health-http:cc:service-health:edge"]);
 });
 
+test("an ERROR observation painted healthy fails, and no sample is UNKNOWN rather than a pass", () => {
+  const errored = evaluate([
+    page({
+      id: "financeiro",
+      health: [serviceHealth("healthy", provenance("ERROR", "2026-08-20T14:50:00.000Z"))],
+    }),
+  ]);
+  assert.equal(errored.verdict.state, "fail");
+  const noSample = evaluateStaleDataShownAsHealthy({ as_of: AS_OF, records: [] });
+  assert.equal(noSample.state, "UNKNOWN");
+  assert.equal(noSample.evidence.sample_status, "absent");
+});
+
 test("a FRESH observation older than its window and painted healthy fails", () => {
   const stale: Provenance = {
     ...provenance("FRESH", "2026-08-20T10:00:00.000Z"),

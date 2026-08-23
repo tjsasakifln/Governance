@@ -1,5 +1,6 @@
 import type { FreshnessStatus, Scope } from "../types.ts";
 import type { RankedItem } from "@confenge/control-center-attention";
+import type { OperationalTruth } from "@confenge/control-center-contracts";
 
 export const OPERATIONAL_ENVELOPE_SCHEMA_VERSION =
   "control-center.operational-envelope.v1" as const;
@@ -109,6 +110,7 @@ export interface DomainSlot {
   presence: "present" | "absent";
   absence_reason?: AbsenceReason;
   healthy: boolean;
+  truth: OperationalTruth;
   snapshot: Record<string, unknown> | null;
 }
 

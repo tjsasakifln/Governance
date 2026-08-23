@@ -2,6 +2,7 @@ import type { Scope } from "../types.ts";
 import type { RepoDomainMap } from "../scope.ts";
 import { rowVisibleUnderQuery, snapshotKindToDomain } from "./scope.ts";
 import type { OperationalReadResult, OperationalSnapshotRow } from "./types.ts";
+import { operationalTruth, type OperationalTruth } from "@confenge/control-center-contracts";
 
 export const COMMERCIAL_LIST_IDS = ["activity", "exceptions"] as const;
 export type CommercialListId = (typeof COMMERCIAL_LIST_IDS)[number];
@@ -27,6 +28,7 @@ const SHARED_FACETS: readonly FacetSpec[] = [
 const SPECS: Record<CommercialListId, ListSpec> = {
   activity: {
     facets: [
+      { id: "condicao", fields: ["conditions"] },
       { id: "estado", fields: ["state", "status"] },
       { id: "tipo", fields: ["event", "kind"] },
       { id: "origem", fields: ["source", "provider", "channel"] },
@@ -82,16 +84,26 @@ function rowsOf(value: unknown): Record<string, unknown>[] {
 }
 
 function fieldText(row: Record<string, unknown>, fields: readonly string[]): string {
+  return fieldTexts(row, fields)[0] ?? "";
+}
+
+function fieldTexts(row: Record<string, unknown>, fields: readonly string[]): string[] {
   for (const field of fields) {
     const value = row[field];
-    if (typeof value === "string" && value.trim() !== "") return value.trim();
-    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) {
+      const texts = value
+        .map((item) => typeof item === "string" ? item.trim() : typeof item === "number" || typeof item === "boolean" ? String(item) : "")
+        .filter(Boolean);
+      if (texts.length > 0) return texts;
+    }
+    if (typeof value === "string" && value.trim() !== "") return [value.trim()];
+    if (typeof value === "number" || typeof value === "boolean") return [String(value)];
   }
-  return "";
+  return [];
 }
 
 function facetValues(rows: readonly Record<string, unknown>[], facet: FacetSpec): string[] {
-  return [...new Set(rows.map((row) => fieldText(row, facet.fields)).filter(Boolean))]
+  return [...new Set(rows.flatMap((row) => fieldTexts(row, facet.fields)).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
@@ -168,9 +180,18 @@ function positiveInt(raw: string | undefined): number | null {
   return value > 0 ? value : null;
 }
 
-function latestCommercial(rows: readonly OperationalSnapshotRow[]): OperationalSnapshotRow | undefined {
+function observedNoLaterThan(row: OperationalSnapshotRow, nowMs: number): boolean {
+  const observed = Date.parse(row.observed_at);
+  return !Number.isNaN(observed) && observed <= nowMs;
+}
+
+function latestCommercial(rows: readonly OperationalSnapshotRow[], nowMs: number): OperationalSnapshotRow | undefined {
   return rows
-    .filter((row) => row.snapshot_kind !== "commercial-list-page" && snapshotKindToDomain(row.snapshot_kind) === "commercial")
+    .filter((row) =>
+      row.snapshot_kind !== "commercial-list-page" &&
+      snapshotKindToDomain(row.snapshot_kind) === "commercial" &&
+      observedNoLaterThan(row, nowMs),
+    )
     .sort((a, b) => b.observed_at.localeCompare(a.observed_at) || b.id.localeCompare(a.id))[0];
 }
 
@@ -179,22 +200,42 @@ function listRows(
   scope: Scope,
   repoDomains: RepoDomainMap,
   list: CommercialListId,
-): { rows: Record<string, unknown>[]; declaredTotal: number; complete: boolean; generatedAt: string } {
+  now: Date,
+): { rows: Record<string, unknown>[]; declaredTotal: number; complete: boolean; generatedAt: string; truth: OperationalTruth } {
+  const nowMs = now.getTime();
+  const evaluatedAt = now.toISOString();
   const visible = bundle.operational_snapshots.filter((row) => rowVisibleUnderQuery(row.scope, scope, repoDomains));
-  const main = latestCommercial(visible);
+  const main = latestCommercial(visible, nowMs);
   const pages = visible
-    .filter((row) => row.snapshot_kind === "commercial-list-page" && (!main || row.observed_at === main.observed_at))
+    .filter((row) =>
+      row.snapshot_kind === "commercial-list-page" &&
+      observedNoLaterThan(row, nowMs) &&
+      (!main || row.observed_at === main.observed_at),
+    )
     .map((row) => ({ row, payload: asRecord(row.payload) }))
     .filter((entry) => entry.payload?.list === list)
     .sort((a, b) => Number(a.payload?.page_index ?? 0) - Number(b.payload?.page_index ?? 0));
   if (pages.length > 0) {
     const rows = pages.flatMap((entry) => rowsOf(entry.payload?.items));
     const declaredTotal = Math.max(rows.length, Number(pages[0]?.payload?.declared_total ?? rows.length));
+    const complete = pages.every((entry) => entry.payload?.complete === true) && rows.length === declaredTotal;
+    const evidence = main ?? pages[0]?.row;
+    const generatedAt = main?.generated_at ?? pages[0]?.row.generated_at ?? pages[0]?.row.observed_at ?? new Date(0).toISOString();
     return {
       rows,
       declaredTotal,
-      complete: pages.every((entry) => entry.payload?.complete === true) && rows.length === declaredTotal,
-      generatedAt: main?.generated_at ?? pages[0]?.row.generated_at ?? pages[0]?.row.observed_at ?? new Date(0).toISOString(),
+      complete,
+      generatedAt,
+      truth: operationalTruth({
+        as_of: evidence?.observed_at ?? generatedAt,
+        evaluated_at: evaluatedAt,
+        source: evidence?.source ?? { system: "control-center", kind: "operational-view", locator: `commercial/${list}` },
+        confidence: evidence?.confidence ?? 0,
+        freshness_status: evidence?.freshness_status ?? "UNKNOWN",
+        presence: evidence ? "present" : "absent",
+        value: rows.length,
+        complete,
+      }),
     };
   }
   const operations = asRecord(asRecord(main?.payload)?.operations) ?? {};
@@ -202,11 +243,23 @@ function listRows(
   const overview = asRecord(operations.overview) ?? {};
   const declared = list === "activity" ? overview.activity : overview.exceptions;
   const declaredTotal = typeof declared === "number" ? Math.max(rows.length, declared) : rows.length;
+  const complete = rows.length === declaredTotal;
+  const generatedAt = main?.generated_at ?? main?.observed_at ?? new Date(0).toISOString();
   return {
     rows,
     declaredTotal,
-    complete: rows.length === declaredTotal,
-    generatedAt: main?.generated_at ?? main?.observed_at ?? new Date(0).toISOString(),
+    complete,
+    generatedAt,
+    truth: operationalTruth({
+      as_of: main?.observed_at ?? generatedAt,
+      evaluated_at: evaluatedAt,
+      source: main?.source ?? { system: "control-center", kind: "operational-view", locator: `commercial/${list}` },
+      confidence: main?.confidence ?? 0,
+      freshness_status: main?.freshness_status ?? "UNKNOWN",
+      presence: main ? "present" : "absent",
+      value: rows.length,
+      complete,
+    }),
   };
 }
 
@@ -217,6 +270,7 @@ export interface CommercialListResponse {
   readonly loaded_total: number;
   readonly declared_total: number;
   readonly complete: boolean;
+  readonly truth: OperationalTruth;
   readonly matched: number;
   readonly items: readonly Record<string, unknown>[];
   readonly page: number;
@@ -243,8 +297,9 @@ export function buildCommercialListResponse(
   repoDomains: RepoDomainMap,
   list: CommercialListId,
   params: Readonly<Record<string, string>>,
+  now: Date = new Date(),
 ): CommercialListResponse {
-  const source = listRows(bundle, scope, repoDomains, list);
+  const source = listRows(bundle, scope, repoDomains, list, now);
   const spec = SPECS[list];
   const facet_values: Record<string, string[]> = {};
   const facets: Record<string, string> = {};
@@ -267,7 +322,7 @@ export function buildCommercialListResponse(
       if (!matchesText(row, q)) return false;
       for (const facet of spec.facets) {
         const wanted = facets[facet.id] ?? "all";
-        if (wanted !== "all" && fieldText(row, facet.fields) !== wanted) return false;
+        if (wanted !== "all" && !fieldTexts(row, facet.fields).includes(wanted)) return false;
       }
       if (hours === null || Number.isNaN(reference)) return true;
       const at = timeOf(row, spec);
@@ -289,6 +344,7 @@ export function buildCommercialListResponse(
     loaded_total: source.rows.length,
     declared_total: source.declaredTotal,
     complete: source.complete,
+    truth: source.truth,
     matched,
     items,
     page,

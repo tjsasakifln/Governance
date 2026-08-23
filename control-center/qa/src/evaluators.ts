@@ -49,6 +49,12 @@ export function evaluateStaleDataShownAsHealthy(payload: unknown): AttackVerdict
   if (!asOf || !records) {
     return unknownShape(id, "as_of and records[] required");
   }
+  if (records.length === 0) {
+    return verdict(id, "UNKNOWN", "no presentation sample was available to inspect", {
+      inspected: 0,
+      sample_status: "absent",
+    });
+  }
   const offenders: string[] = [];
   for (const item of records) {
     const row = asRecord(item);

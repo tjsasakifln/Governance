@@ -1226,6 +1226,10 @@ details.alert-why > summary {
   user-select: all;
 }
 
+.help-line {
+  margin: 0 0 0.55rem;
+}
+
 .term-help {
   display: inline;
   position: relative;

@@ -7,6 +7,7 @@ import {
 } from "../brand";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
+import { ownMapValue } from "../own-map";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
 import {
   DEFAULT_LOADING_LABEL,
@@ -32,6 +33,11 @@ import {
   infraCatalogBlock,
   memoriaGroups,
 } from "./domains";
+import { warmblyBlock } from "./warmbly";
+import {
+  pendingResumeConfirmation,
+  resumeObservationFingerprint,
+} from "../warmbly-confirmation";
 import {
   agentSessionStatusLabel,
   attentionStatusLabel,
@@ -42,11 +48,6 @@ import {
   technicalDetails,
   viewKindLabel,
 } from "./labels";
-import { warmblyBlock } from "./warmbly";
-import {
-  pendingResumeConfirmation,
-  resumeObservationFingerprint,
-} from "../warmbly-confirmation";
 
 export interface ShellModel {
   destination: DestinationId;
@@ -72,6 +73,16 @@ function attentionCard(item: AttentionItem, now: string): string {
         <h3>${escapeHtml(item.title)}</h3>
       </header>
       ${alertBody(alert, item.provenance)}
+      ${technicalDetails(
+        [
+          { term: "id", value: item.id },
+          { term: "severity", value: item.severity },
+          { term: "status", value: item.status },
+          { term: "scope", value: item.scope },
+          { term: "schema_version", value: item.schema_version },
+        ],
+        "attention-item",
+      )}
     </article>
   `;
 }
@@ -144,6 +155,22 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const cls = result.ok ? "ok" : "error";
   const role = result.ok ? "status" : "alert";
+  const receipt = result.receipt;
+  const outcomeLabels: Record<string, string> = {
+    accepted: "aceito",
+    duplicate: "duplicado; receipt original preservado",
+    executed: "executado",
+    challenged: "aguardando confirmação",
+    refused: "recusado",
+    unknown: "indeterminado",
+  };
+  const recovery = result.outcome === "unknown"
+    ? "Não repita agora: releia a origem e a auditoria para saber se a escrita ocorreu."
+    : !result.ok
+      ? "Revise sua sessão/permissão e tente novamente somente depois de confirmar que nada foi aplicado."
+      : receipt?.writes_to === "warmbly"
+        ? "Releia o estado do Warmbly para confirmar o efeito observado."
+        : "A mudança ficou apenas na auditoria local; execute a correção indicada na origem quando aplicável.";
   const message = !result.ok
     ? "A ação não foi concluída. Consulte o detalhe técnico antes de tentar novamente."
     : result.path === WARMBLY_DISPATCH_PATHS.pause
@@ -157,13 +184,27 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
             : result.path === "/v1/operator-actions"
               ? "Ação registrada no Control Center."
               : "Ação concluída.";
-  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}"><p>${escapeHtml(message)}</p>${technicalDetails(
-    [
-      { term: "caminho", value: result.path },
+  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}" data-operator-outcome="${escapeHtml(result.outcome ?? (result.ok ? "accepted" : "refused"))}">
+    <p>${escapeHtml(message)}</p>
+    <p><strong>Próxima ação:</strong> ${escapeHtml(recovery)}</p>
+    ${receipt ? `<dl class="facts" data-action-receipt="true">
+      <div data-receipt-id="${escapeHtml(receipt.id)}"><dt>Receipt</dt><dd>registro append-only confirmado</dd></div>
+      <div><dt>Ator</dt><dd>${escapeHtml(receipt.actor_id ?? (receipt.writes_to === "warmbly" ? "sessão autenticada na borda" : "não retornado"))}</dd></div>
+      <div data-correlation-id="${escapeHtml(receipt.correlation_id)}"><dt>Sessão/correlação</dt><dd>registrada para esta ação</dd></div>
+      <div><dt>Desfecho</dt><dd>${escapeHtml(ownMapValue(outcomeLabels, receipt.outcome) ?? "desfecho não catalogado")}</dd></div>
+      <div><dt>Fronteira de escrita</dt><dd>${receipt.writes_to === "warmbly" ? "Warmbly" : "somente Control Center"}</dd></div>
+    </dl>` : ""}
+    ${technicalDetails([
+      { term: "path", value: result.path },
       { term: "mensagem_original", value: result.message },
-    ],
-    "operator-result",
-  )}</div>`;
+      { term: "code", value: result.code ?? "" },
+      { term: "http_status", value: result.status === undefined ? "" : String(result.status) },
+      { term: "receipt_id", value: receipt?.id ?? "" },
+      { term: "correlation_id", value: receipt?.correlation_id ?? "" },
+      { term: "occurred_at", value: receipt?.occurred_at ?? "" },
+      { term: "target", value: receipt?.target ?? "" },
+    ], "operator-write-result")}
+  </div>`;
 }
 
 function hojeBody(page: DestinationPage): string {

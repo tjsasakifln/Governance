@@ -255,6 +255,9 @@ export const OPERATOR_ACTION_LABELS: Record<string, string> = {
   REJECT_NEXT_ACTION: "rejeitar próxima ação",
   RECORD_NOTE: "registrar nota",
   MARK_REVIEWED: "marcar como revisado",
+  ASSIGN_TRIAGE: "atribuir triagem",
+  MARK_TRIAGED: "marcar como triado",
+  START_EXCEPTION_WORK: "iniciar tratamento da exceção",
 };
 
 /** Desfecho de uma ação do operador (`operator/channel.ts`). */

@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { bootFromEnvAsync } from "./boot.ts";
 import { createRequestListener } from "./http.ts";
 import { createWarmblyOperatorHandlerFromEnv } from "./warmbly-operator/from-env.ts";
+import { createOperatorActorResolverFromEnv } from "./security/operator-identity.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { isServiceError } from "./errors.ts";
 
@@ -33,11 +34,13 @@ export async function startServer(
   // Off unless CC_WARMBLY_OPERATOR_ENABLED=true. When absent, every operator
   // route 404s rather than falling back to a weaker identity path.
   const warmblyOperator = await createWarmblyOperatorHandlerFromEnv(env, { logger });
+  const operatorActor = createOperatorActorResolverFromEnv(env);
   const listener = createRequestListener({
     service: boot.service,
     operational: boot.operational,
     operatorActions: boot.operatorActions,
     logger,
+    ...(operatorActor ? { operatorActor } : {}),
     ...(warmblyOperator ? { warmblyOperator } : {}),
   });
   const server = createServer(listener);

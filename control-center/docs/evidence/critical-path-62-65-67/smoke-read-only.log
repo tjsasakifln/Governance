@@ -1,0 +1,9 @@
+target=https://ops.confenge.com.br
+mode=anonymous read-only
+GET / status=302 destination=auth.ops.confenge.com.br
+GET /v1/today?scope=company status=302 destination=authentication
+GET /healthz status=200 content-type=application/json body={"status":"ok"} tls_verify=ok
+GET /ready status=404
+headers=hsts,csp,frame-ancestors-none,nosniff,deny,permissions-policy
+writes=0
+cookies_sent=0

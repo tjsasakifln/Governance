@@ -92,6 +92,8 @@ export interface HojeDomainCard {
   href_label: string;
   presence: "present" | "absent";
   absence_reason: AbsenceReason | null;
+  /** Canonical #62 evidential state, carried without reinterpretation. */
+  truth?: unknown;
 }
 
 export interface HojeIntegration {
@@ -208,6 +210,7 @@ interface DomainSlot {
   observed_at: string | null;
   source: SourceRef | null;
   snapshot: Record<string, unknown> | null;
+  truth?: unknown;
 }
 
 function slotOf(value: unknown): DomainSlot | null {
@@ -224,6 +227,7 @@ function slotOf(value: unknown): DomainSlot | null {
     observed_at: strOf(rec.observed_at),
     source: sourceOf(rec.source),
     snapshot: asRecord(rec.snapshot),
+    ...(rec.truth === undefined ? {} : { truth: rec.truth }),
   };
 }
 
@@ -491,6 +495,7 @@ function warmblyCard(
     href_label: seed.href_label,
     presence: commercial?.presence ?? "absent",
     absence_reason: commercial?.absence_reason ?? null,
+    ...(commercial?.truth === undefined ? {} : { truth: commercial.truth }),
   };
 }
 
@@ -603,6 +608,7 @@ function standardCard(seed: CardSeed, slot: DomainSlot | null, alerts: AlertCoun
     href_label: seed.href_label,
     presence: slot?.presence ?? "absent",
     absence_reason: slot?.absence_reason ?? null,
+    ...(slot?.truth === undefined ? {} : { truth: slot.truth }),
   };
 }
 

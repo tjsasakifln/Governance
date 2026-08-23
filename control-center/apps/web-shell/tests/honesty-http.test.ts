@@ -263,7 +263,7 @@ test("operatorAction confirmation and error paint on the shipped HTTP path", asy
   paintShell(root, adapter, "#/comercial/excecoes");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.match(root.innerHTML, /data-operator-result="ok"/);
-  assert.match(root.innerHTML, /reconhecido no Control Center; Warmbly não foi alterado/);
+  assert.match(root.innerHTML, /ação registrada no Control Center; Warmbly não foi alterado/);
   assert.equal(/resolvid[oa] no Warmbly|exception resolved in Warmbly/i.test(root.innerHTML), false);
 
   const denied = await adapter.operatorAction({
@@ -304,4 +304,170 @@ test("operatorAction HTTP 4xx still paints the error banner", async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.match(root.innerHTML, /data-operator-result="error"/);
   assert.match(root.innerHTML, /recusado \(403\)/);
+  assert.equal(result.outcome, "refused");
+  assert.equal(result.status, 403);
+});
+
+test("operator action receipt preserves actor, correlation and duplicate outcome", async () => {
+  const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    assert.equal(init?.method, "POST");
+    return jsonResponse({
+      id: "cc:operator-action:receipt-1",
+      action_type: "START_EXCEPTION_WORK",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      correlation_id: "corr-receipt-1",
+      resulting_status: "duplicate",
+    }, 201);
+  }) as typeof fetch;
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+    kind: "human",
+    id: "founder-local",
+  });
+  const result = await adapter.operatorAction({
+    action_type: "START_EXCEPTION_WORK",
+    target_canonical_id: "cc:attention-item:x",
+    target_source_id: "x",
+    note: "tratar",
+    idempotency_key: "corr-receipt-1",
+  });
+  assert.equal(result.outcome, "duplicate");
+  assert.deepEqual(result.receipt, {
+    id: "cc:operator-action:receipt-1",
+    correlation_id: "corr-receipt-1",
+    occurred_at: "2026-08-22T12:00:00.000Z",
+    outcome: "duplicate",
+    actor_id: "founder-local",
+    target: "cc:attention-item:x",
+    writes_to: "control-center",
+  });
+  assert.match(result.message, /requisição duplicada/);
+});
+
+test("operator action fails closed on a successful HTTP response without an exact receipt", async () => {
+  for (const body of [
+    {},
+    {
+      id: "cc:operator-action:x",
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:other",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      correlation_id: "corr-x",
+      resulting_status: "accepted",
+    },
+    {
+      id: "cc:operator-action:x",
+      action_type: "SEND_EMAIL",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      correlation_id: "corr-x",
+      resulting_status: "accepted",
+    },
+  ]) {
+    const adapter = createHttpAdapter(
+      "http://127.0.0.1:8787",
+      (async () => jsonResponse(body, 201)) as typeof fetch,
+      { kind: "human", id: "founder-local" },
+    );
+    const result = await adapter.operatorAction({
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      note: "triado",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.outcome, "unknown");
+    assert.equal(result.code, "invalid_operator_receipt");
+    assert.equal(result.receipt, undefined);
+  }
+});
+
+test("operator action refuses impossible and future receipt timestamps", async () => {
+  for (const occurredAt of ["2026-02-30T12:00:00Z", "2050-01-01T00:00:00Z", "2026-08-22T12:00:00+00:00"]) {
+    let request: Record<string, unknown> = {};
+    const adapter = createHttpAdapter(
+      "http://127.0.0.1:8787",
+      (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        request = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({
+          id: "cc:operator-action:hostile-time",
+          action_type: request.action_type,
+          target_canonical_id: request.target_canonical_id,
+          target_source_id: request.target_source_id,
+          actor: { kind: "human", id: "founder-local" },
+          correlation_id: request.correlation_id,
+          occurred_at: occurredAt,
+          resulting_status: "accepted",
+        }, 201);
+      }) as typeof fetch,
+      { kind: "human", id: "founder-local" },
+    );
+    const result = await adapter.operatorAction({
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      note: "triado",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.outcome, "unknown");
+    assert.equal(result.code, "invalid_operator_receipt");
+  }
+});
+
+test("generated idempotency keys are bounded and never expose the operator note", async () => {
+  let requestBody: Record<string, unknown> = {};
+  const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return jsonResponse({
+      id: "cc:operator-action:x",
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      correlation_id: String(requestBody.correlation_id),
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      resulting_status: "accepted",
+    }, 201);
+  }) as typeof fetch;
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, { kind: "human", id: "founder-local" });
+  const sensitiveNote = "Fixture com nome de cliente que não deve ir para a chave";
+  await adapter.operatorAction({
+    action_type: "MARK_TRIAGED",
+    target_canonical_id: "cc:attention-item:x",
+    target_source_id: "x",
+    note: sensitiveNote,
+  });
+  assert.equal(String(requestBody.note), sensitiveNote);
+  assert.doesNotMatch(String(requestBody.idempotency_key), /Fixture|cliente|chave/);
+  assert.match(String(requestBody.idempotency_key), /^cc-web:MARK_TRIAGED:/);
+  assert.ok(String(requestBody.idempotency_key).length < 80);
+});
+
+test("operator action timeout is UNKNOWN and tells the operator not to repeat blindly", async () => {
+  const fetchImpl = (async () => {
+    throw new DOMException("timeout", "TimeoutError");
+  }) as typeof fetch;
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+    kind: "human",
+    id: "founder-local",
+  });
+  const result = await adapter.operatorAction({
+    action_type: "ASSIGN_TRIAGE",
+    target_canonical_id: "cc:attention-item:x",
+    target_source_id: "x",
+    note: "assumir",
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.outcome, "unknown");
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/comercial/atividade");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.match(root.innerHTML, /Não repita agora/);
+  assert.match(root.innerHTML, /data-operator-outcome="unknown"/);
 });

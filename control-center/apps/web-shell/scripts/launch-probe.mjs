@@ -77,6 +77,7 @@ const extraHashes = [
   "warmbly/operacao",
   "clientes/acme",
 ];
+const minimalEvidence = process.env.CC_EVIDENCE_MINIMAL === "1";
 
 /**
  * `matrixShots: false` keeps the per-hash overflow/layout assertions but stops
@@ -389,6 +390,81 @@ try {
     console.log(`hash=${hash} filled_chars=${destFilled.filled}`);
   }
 
+  // Critical operator journey (#65/#67): daily triage → detail → exception →
+  // authorized sandbox action → receipt. Navigation into the detail is done
+  // with Enter so a mouse-only implementation cannot satisfy this proof.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`${baseUrl}#/comercial/atividade`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-activity-id="lead-fixture-aurora"]');
+  const truthState = await page.locator("[data-operational-truth]").first().getAttribute("data-operational-truth");
+  if (truthState !== "HEALTHY") {
+    throw new Error(`complete daily-triage evidence should be HEALTHY, got ${truthState}`);
+  }
+  const activityLink = page.locator('[data-lead-detail-link="lead-fixture-aurora"]');
+  await activityLink.focus();
+  await page.keyboard.press("Enter");
+  await page.waitForSelector('[data-lead-detail="found"]');
+  const detailText = await page.locator('[data-lead-detail="found"]').innerText();
+  if (!detailText.includes("Metalúrgica Aurora") || !detailText.includes("Próximo passo")) {
+    throw new Error("operator could not understand the lead from the detail surface");
+  }
+  console.log("critical_path=triage_to_detail keyboard=Enter result=found");
+
+  // First prove the negative boundary: even a complete-looking row must not
+  // expose a write when its truth receipt is absent. Intercept exactly one list
+  // read; the following navigation uses the untouched production fixture.
+  const exceptionsListPattern = "**/v1/domains/commercial/lists/exceptions**";
+  await page.route(exceptionsListPattern, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const { truth: _omitted, ...withoutTruth } = body;
+    await route.fulfill({ response, json: withoutTruth });
+  }, { times: 1 });
+  await page.goto(`${baseUrl}#/comercial/excecoes`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-exception-id="exception-fixture-owner"]');
+  if ((await page.locator("[data-operational-truth]").count()) !== 0) {
+    throw new Error("truth-less exception fixture unexpectedly rendered a truth receipt");
+  }
+  if ((await page.locator('[data-operator-form="START_EXCEPTION_WORK"]').count()) !== 0) {
+    throw new Error("truth-less exception fixture exposed START_EXCEPTION_WORK");
+  }
+  const writesAllowedWithoutTruth = await page.locator('[data-list="excecoes"]').getAttribute("data-list-writes-allowed");
+  if (writesAllowedWithoutTruth !== "false") {
+    throw new Error(`truth-less exception fixture should block writes, got ${writesAllowedWithoutTruth}`);
+  }
+  const blockedCopy = await page.locator('[data-list="excecoes"] .banner.stale').first().innerText();
+  if (!blockedCopy.includes("Ações bloqueadas")) {
+    throw new Error(`truth-less exception fixture lacks blocking guidance: ${blockedCopy}`);
+  }
+  console.log("critical_path=exception_without_truth writes=blocked");
+  await page.unroute(exceptionsListPattern);
+
+  // The browser is already on this exact URL, so `goto` would be a same-document
+  // no-op and would keep the intercepted truth-less DOM. Reload so the untouched
+  // production fixture is really fetched with the route removed.
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector('[data-exception-id="exception-fixture-owner"]');
+  const exceptionTruth = await page.locator("[data-operational-truth]").first().getAttribute("data-operational-truth");
+  if (exceptionTruth !== "HEALTHY") {
+    throw new Error(`complete grouped exception payload should be HEALTHY, got ${exceptionTruth}`);
+  }
+  const grouped = await page.locator('[data-exception-id="exception-fixture-owner"]').getAttribute("data-occurrence-count");
+  if (grouped !== "2") throw new Error(`grouped duplicate evidence lost: ${grouped}`);
+  const action = page.locator('[data-operator-form="START_EXCEPTION_WORK"]');
+  await action.locator('textarea[name="note"]').fill("Fixture e2e: atribuir responsável e validar a origem");
+  await action.locator('button[type="submit"]').click();
+  await page.waitForSelector('.operator-result');
+  if ((await page.locator('[data-action-receipt="true"]').count()) !== 1) {
+    throw new Error(`authorized fixture action returned no receipt: ${await page.locator('.operator-result').innerText()}`);
+  }
+  const receiptText = await page.locator('[data-action-receipt="true"]').innerText();
+  if (!receiptText.includes("founder-local") || !receiptText.includes("somente Control Center")) {
+    throw new Error(`receipt lacks actor/write boundary: ${receiptText}`);
+  }
+  const criticalShot = screenshotPath.replace(/(\.[a-z]+)$/i, "-critical-path$1");
+  await page.screenshot({ path: criticalShot, fullPage: true });
+  console.log(`critical_path=exception_to_receipt outcome=accepted screenshot=${criticalShot}`);
+
   async function overflowPx() {
     return page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
   }
@@ -413,8 +489,12 @@ try {
     const metrics = await layoutMetrics(page);
     assertSingleScrollContext(metrics, `viewport ${vp.name}`);
     assertContentColumn(metrics, `viewport ${vp.name}`);
-    const shot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}$1`);
-    await page.screenshot({ path: shot, fullPage: true });
+    const shotPath = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}$1`);
+    let shot = "skipped";
+    if (!minimalEvidence || vp.name === "390" || vp.name === "desktop") {
+      await page.screenshot({ path: shotPath, fullPage: true });
+      shot = shotPath;
+    }
     console.log(`viewport=${vp.name} screenshot=${shot} surface=${Math.round(vpFilled.box.width)}x${Math.round(vpFilled.box.height)} overflow=${overflow}`);
     console.log(
       `layout viewport=${vp.name} content_width=${metrics.contentWidth} gutters=${metrics.padLeft}/${metrics.padRight} dead_right=${metrics.deadRight} doc_scroll_range=${metrics.documentScrollRange} scroll_owners=${metrics.owners.map((o) => o.label).join("|") || "none"}`,
@@ -436,7 +516,7 @@ try {
       assertSingleScrollContext(hashMetrics, `viewport ${vp.name} hash ${hash}`);
       assertContentColumn(hashMetrics, `viewport ${vp.name} hash ${hash}`);
       let hashShot = "skipped";
-      if (vp.matrixShots) {
+      if (vp.matrixShots && !minimalEvidence) {
         hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${hash.replaceAll("/", "-")}$1`);
         await page.screenshot({ path: hashShot, fullPage: true });
       }

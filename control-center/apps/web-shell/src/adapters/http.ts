@@ -1,5 +1,6 @@
 import type { DestinationId } from "../destinations";
 import { getDestination, parseHash, queryParamsOf } from "../destinations";
+import { isUtcDateTime } from "../datetime";
 import { LIST_PARAM_IDS } from "../filter";
 import { ownMapValue } from "../own-map";
 import { clientIdentityGapFrom } from "../client-identity";
@@ -68,6 +69,44 @@ function dispatchMessage(body: Record<string, unknown>, status: number): string 
     return `Confirmação emitida para ${action}. Ela vence sozinha, vale uma vez só e é ligada a quem a pediu.`;
   }
   return `O canal respondeu HTTP ${status} sem explicação legível.`;
+}
+
+function stringValue(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function validReceiptInstant(value: string, now = Date.now()): boolean {
+  if (!isUtcDateTime(value)) return false;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed) || parsed > now) return false;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return inputSecond === parsedSecond;
+}
+
+async function operatorIdempotencyKey(input: {
+  action_type: string;
+  target_canonical_id: string;
+  target_source_id: string;
+  note: string;
+}): Promise<string> {
+  const material = new TextEncoder().encode(JSON.stringify([
+    input.action_type,
+    input.target_canonical_id,
+    input.target_source_id,
+    input.note,
+  ]));
+  if (globalThis.crypto?.subtle) {
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", material));
+    const token = [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 32);
+    return `cc-web:${input.action_type}:${token}`;
+  }
+  // Test/legacy fallback only. A collision is rejected by the server's
+  // conflicting-payload guard; no operator prose is copied into the key.
+  let hash = 0x811c9dc5;
+  for (const byte of material) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return `cc-web:${input.action_type}:fnv-${hash.toString(16).padStart(8, "0")}`;
 }
 
 export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
@@ -181,6 +220,17 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         ...(typeof body.code === "string" ? { code: body.code } : {}),
         ...(typeof body.confirmation_token === "string"
           ? { confirmationToken: body.confirmation_token }
+          : {}),
+        ...(stringValue(body, "correlation_id") && stringValue(body, "recorded_at")
+          ? {
+              receipt: {
+                id: stringValue(body, "ledger_id") ?? stringValue(body, "correlation_id")!,
+                correlation_id: stringValue(body, "correlation_id")!,
+                occurred_at: stringValue(body, "recorded_at")!,
+                outcome: stringValue(body, "outcome") ?? (response.ok ? "executed" : "refused"),
+                writes_to: "warmbly" as const,
+              },
+            }
           : {}),
       };
       this.lastOperatorResult = result;
@@ -314,15 +364,14 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       return denied;
     }
     try {
-      const idempotency = input.idempotency_key ?? `${input.action_type}:${input.target_canonical_id}:${input.note}`;
+      const idempotency = input.idempotency_key ?? await operatorIdempotencyKey(input);
       const response = await this.fetchImpl(`${this.baseUrl}/v1/operator-actions`, {
         method: "POST",
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          "x-actor-id": this.operator.id,
-          "x-actor-kind": this.operator.kind,
         },
+        credentials: "include",
         body: JSON.stringify({
           action_type: input.action_type,
           target_canonical_id: input.target_canonical_id,
@@ -333,21 +382,70 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
           scope: "commercial",
         }),
       });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       if (!response.ok) {
+        const error = body.error && typeof body.error === "object" && !Array.isArray(body.error)
+          ? (body.error as Record<string, unknown>)
+          : {};
+        const detail = stringValue(body, "message") ?? stringValue(body, "reason") ?? stringValue(error, "message");
         const denied: AdapterWriteResult = {
           ok: false,
           path: "/v1/operator-actions",
           kind: "nota",
-          message: `recusado (${response.status})`,
+          message: `recusado (${response.status})${detail ? `: ${detail}` : ""}`,
+          outcome: "refused",
+          code: `http_${response.status}`,
+          status: response.status,
         };
         this.lastOperatorResult = denied;
         return denied;
+      }
+      const actor = body.actor && typeof body.actor === "object" && !Array.isArray(body.actor)
+        ? (body.actor as Record<string, unknown>)
+        : {};
+      const resultingStatus = stringValue(body, "resulting_status");
+      const receiptId = stringValue(body, "id");
+      const correlationId = stringValue(body, "correlation_id");
+      const occurredAt = stringValue(body, "occurred_at");
+      const receiptIsValid =
+        (resultingStatus === "accepted" || resultingStatus === "duplicate") &&
+        Boolean(receiptId && correlationId && occurredAt && validReceiptInstant(occurredAt)) &&
+        correlationId === idempotency &&
+        stringValue(body, "action_type") === input.action_type &&
+        stringValue(body, "target_canonical_id") === input.target_canonical_id &&
+        stringValue(body, "target_source_id") === input.target_source_id &&
+        stringValue(actor, "kind") === "human" &&
+        stringValue(actor, "id") === this.operator.id;
+      if (!receiptIsValid) {
+        const unproven: AdapterWriteResult = {
+          ok: false,
+          path: "/v1/operator-actions",
+          kind: "nota",
+          message: "a resposta não trouxe um receipt íntegro; a gravação permanece indeterminada",
+          outcome: "unknown",
+          code: "invalid_operator_receipt",
+          status: response.status,
+        };
+        this.lastOperatorResult = unproven;
+        return unproven;
       }
       const accepted: AdapterWriteResult = {
         ok: true,
         path: "/v1/operator-actions",
         kind: "nota",
-        message: "reconhecido no Control Center; Warmbly não foi alterado",
+        message: resultingStatus === "duplicate"
+          ? "requisição duplicada: o receipt original foi preservado; Warmbly não foi alterado"
+          : "ação registrada no Control Center; Warmbly não foi alterado",
+        outcome: resultingStatus!,
+        receipt: {
+          id: receiptId!,
+          correlation_id: correlationId!,
+          occurred_at: occurredAt!,
+          outcome: resultingStatus!,
+          actor_id: stringValue(actor, "id")!,
+          target: input.target_canonical_id,
+          writes_to: "control-center" as const,
+        },
       };
       this.lastOperatorResult = accepted;
       return accepted;
@@ -357,6 +455,8 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         path: "/v1/operator-actions",
         kind: "nota",
         message: err instanceof Error ? err.message : "gravação indisponível",
+        outcome: "unknown",
+        code: "browser_transport",
       };
       this.lastOperatorResult = failed;
       return failed;

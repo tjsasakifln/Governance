@@ -113,6 +113,21 @@ test("same idempotency key with conflicting payload fails closed", async () => {
   assert.equal(counted.rows[0]?.n, 1);
 });
 
+test("same idempotency key with a changed note fails closed after persistence", async () => {
+  const service = createPostgresOperatorActionService(ctx.persistence, FOUNDER.id);
+  const payload = {
+    ...body,
+    idempotency_key: "conflict-note-pg",
+    correlation_id: "conflict-note-pg",
+    note: "primeira decisão",
+  };
+  await service.submit(FOUNDER, payload);
+  await assert.rejects(
+    () => service.submit(FOUNDER, { ...payload, note: "decisão alterada" }),
+    /conflicting payload/,
+  );
+});
+
 test("agent and unknown actors cannot impersonate the founder", async () => {
   const service = createPostgresOperatorActionService(ctx.persistence, FOUNDER.id);
   await assert.rejects(

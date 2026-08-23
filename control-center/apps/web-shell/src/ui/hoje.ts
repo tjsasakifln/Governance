@@ -22,6 +22,7 @@ import {
   type HojeDomainSummary,
   type HojeIntegration,
 } from "../hoje-domains";
+import { operationalTruthBlock, parseOperationalTruth } from "./operational-truth";
 
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const tone = row.freshness_tone || freshnessTone(row.freshness_status);
@@ -150,6 +151,7 @@ function domainCard(card: HojeDomainCard): string {
         <h3>${escapeHtml(card.label)}</h3>
       </header>
       <p class="domain-reason">${escapeHtml(card.state_reason)}</p>
+      ${card.truth === undefined ? "" : operationalTruthBlock(parseOperationalTruth(card.truth))}
       <p class="domain-indicator"><strong>Indicador:</strong> ${escapeHtml(card.indicator)}</p>
       ${pendingList(card)}
       <p class="prov-inline">
@@ -186,7 +188,7 @@ function integrationRow(row: HojeIntegration): string {
     <span class="pill pill-state-${escapeHtml(row.state)}">${escapeHtml(row.state_label)}</span>
     <strong>${escapeHtml(row.system_label)}</strong> — ${escapeHtml(row.detail)}
     ${freshnessPill(row.freshness_status)}
-    <span class="prov-inline">última leitura ${escapeHtml(row.observed_at_local)}</span>
+    <div class="prov-inline">última leitura ${escapeHtml(row.observed_at_local)}</div>
     ${technicalDetails(
       [
         { term: "sistema", value: row.system },

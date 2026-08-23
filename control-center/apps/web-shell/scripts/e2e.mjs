@@ -4,11 +4,25 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createServer } from "node:net";
 import { isOsLibLauncherFailure } from "../src/playwright-env.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const app = join(here, "..");
 const ccRoot = join(app, "../..");
+
+async function freePort() {
+  const probe = createServer();
+  await new Promise((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", resolve);
+  });
+  const address = probe.address();
+  if (!address || typeof address === "string") throw new Error("could not allocate local e2e port");
+  const port = address.port;
+  await new Promise((resolve, reject) => probe.close((err) => (err ? reject(err) : resolve())));
+  return port;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,12 +79,17 @@ if (built.status !== 0) {
 const distHtml = join(app, "dist/index.html");
 writeFileSync(distHtml, patchIdentity(readFileSync(distHtml, "utf8")));
 
+const contextPort = await freePort();
+const webPort = await freePort();
+const contextBase = `http://127.0.0.1:${contextPort}`;
+const webBase = `http://127.0.0.1:${webPort}`;
+
 const context = spawn("npx", ["tsx", "scripts/boot-production-context.ts"], {
   cwd: ccRoot,
   env: {
     ...process.env,
     HOST: "127.0.0.1",
-    PORT: "8799",
+    PORT: String(contextPort),
     NODE_ENV: "test",
     CONTROL_CENTER_FOUNDER_ACTOR_ID: "founder-local",
   },
@@ -81,8 +100,8 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
   env: {
     ...process.env,
     HOST: "127.0.0.1",
-    PORT: "4173",
-    CC_CONTEXT_UPSTREAM: "http://127.0.0.1:8799",
+    PORT: String(webPort),
+    CC_CONTEXT_UPSTREAM: contextBase,
     CC_ACTOR_ID: "founder-local",
     CC_ACTOR_KIND: "human",
   },
@@ -91,9 +110,9 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
 
 let exitCode = 1;
 try {
-  await waitHttp("http://127.0.0.1:8799/healthz", 45_000);
-  await waitHttp("http://127.0.0.1:4173/healthz", 15_000);
-  const proxied = await fetch("http://127.0.0.1:4173/v1/context?scope=company", {
+  await waitHttp(`${contextBase}/healthz`, 45_000);
+  await waitHttp(`${webBase}/healthz`, 15_000);
+  const proxied = await fetch(`${webBase}/v1/context?scope=company`, {
     headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },
   });
   const ctxBody = await proxied.json();
@@ -101,7 +120,7 @@ try {
     throw new Error(`production context proxy is not substantially filled: status=${proxied.status}`);
   }
   const attentionHeaders = { "x-actor-id": "founder-local", "x-actor-kind": "human" };
-  const attention = await fetch("http://127.0.0.1:4173/v1/attention?scope=company&horizon=now", {
+  const attention = await fetch(`${webBase}/v1/attention?scope=company&horizon=now`, {
     headers: attentionHeaders,
   });
   if (attention.status === 404) {
@@ -118,7 +137,7 @@ try {
     : mkdtempSync(join(tmpdir(), "cc-web-"));
   mkdirSync(shotDir, { recursive: true });
   const screenshot = join(shotDir, "web-shell.png");
-  const probe = await tryPlaywright("http://127.0.0.1:4173/", screenshot);
+  const probe = await tryPlaywright(`${webBase}/`, screenshot);
   if (probe.ok) {
     process.stdout.write(`screenshot=${screenshot}\n`);
     exitCode = 0;

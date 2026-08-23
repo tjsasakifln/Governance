@@ -144,7 +144,7 @@ export function createOperationalService(deps: OperationalServiceDeps): Operatio
       assertOperationalReader(actor, deps.founderActorId);
       const query = parseScope(scope);
       const bundle = await deps.port.readLatest();
-      return buildCommercialListResponse(bundle, query, deps.repoDomains, list, params);
+      return buildCommercialListResponse(bundle, query, deps.repoDomains, list, params, deps.clock.now());
     },
   };
 }

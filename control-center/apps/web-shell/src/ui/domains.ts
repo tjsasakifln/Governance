@@ -49,6 +49,7 @@ import {
   scopeLabel,
   routeClassLabel,
   goReviewVerdictLabel,
+  severityLabel,
   statusPill,
   technicalDetails,
 } from "./labels";
@@ -241,8 +242,9 @@ type WeeklyRevenueRow = {
   correlation: string;
 };
 
-function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected: number } {
+function weeklyRevenueRows(value: unknown, presentedAt: string): { rows: WeeklyRevenueRow[]; rejected: number } {
   const input = Array.isArray(value) ? value : [];
+  const presentationInstantValid = validWeeklyInstant(presentedAt) && Date.parse(presentedAt) <= Date.now();
   const byCorrelation = new Map<string, WeeklyRevenueRow>();
   const duplicates = new Set<string>();
   for (const item of input) {
@@ -282,6 +284,8 @@ function weeklyRevenueRows(value: unknown): { rows: WeeklyRevenueRow[]; rejected
       MONTH.test(String(own(source, "month"))) &&
       typeof own(source, "observed_at") === "string" &&
       validWeeklyInstant(String(own(source, "observed_at"))) &&
+      presentationInstantValid &&
+      Date.parse(String(own(source, "observed_at"))) <= Date.parse(presentedAt) &&
       own(source, "include_synthetic") === false &&
       own(authority, "operation_and_visualization") === "governance-control-center" &&
       own(authority, "action_and_outcome") === "warmbly" &&
@@ -333,8 +337,8 @@ function technicalWeeklyFacts(item: WeeklyRevenueRow): string {
   </details>`;
 }
 
-function weeklyRevenueBlock(operations: Record<string, unknown>): string {
-  const result = weeklyRevenueRows(own(operations, "weekly_revenue_chains"));
+function weeklyRevenueBlock(operations: Record<string, unknown>, presentedAt: string): string {
+  const result = weeklyRevenueRows(own(operations, "weekly_revenue_chains"), presentedAt);
   return `<section class="stack" aria-labelledby="weekly-revenue-title" data-weekly-revenue-chain-count="${result.rows.length}" data-weekly-revenue-rejected="${result.rejected}">
     <h2 id="weekly-revenue-title">Cadeia semanal até receita observável</h2>
     <p class="constraint">O Control Center opera e apresenta os dados. O Warmbly responde pelas ações e pelos resultados comerciais. O Asaas é a autoridade dos fatos financeiros. Esta tela é somente leitura.</p>
@@ -843,7 +847,7 @@ function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
 function activityOpsCard(
   row: Record<string, unknown>,
   query: string | null,
-  position: { index: number; total: number },
+  position: { index: number; total: number; writesAllowed: boolean },
 ): string {
   const rowId = String(row.source_id ?? row.id ?? "");
   const title = escapeHtml(leadTitleOf(row) ?? "Organização não identificada pela origem");
@@ -854,51 +858,104 @@ function activityOpsCard(
   const focusAttributes = rowId
     ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
+  const triage = String(row.triage_state ?? row.state ?? "new");
   const event = String(row.event ?? "activity");
   const state = String(row.state ?? "");
-  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}">
-    <p class="kicker">${escapeHtml(String(row.at ?? ""))} · ${statusPill(event, commercialEventLabel(event))}${state ? ` ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
+  const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
+  const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
+  const sync = String(row.sync_status ?? "observed");
+  const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
+  const canonical = String(row.canonical_id ?? rowId);
+  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}" data-triage-state="${escapeHtml(triage)}">
+    <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(event, commercialEventLabel(event))}${state && state !== triage ? ` · ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
     <h3>${heading}</h3>
-    <p>${escapeHtml(row.evidence === undefined ? commercialStateLabel(state) : String(row.evidence))}</p>
-    ${technicalDetails(
-      [
-        { term: "event", value: event },
-        { term: "state", value: state },
-        { term: "source_id", value: rowId },
-      ],
-      "commercial-activity",
-    )}
-    <form data-operator-form="REVIEW_ACTIVITY" class="operator-form">
-      <input type="hidden" name="target_canonical_id" value="${escapeHtml(rowId)}" />
+    <p>${escapeHtml(String(row.evidence ?? "Sem descrição adicional da origem."))}</p>
+    <dl class="facts">
+      ${fact("Idade", escapeHtml(age))}
+      ${fact("Origem", escapeHtml(sourceSystemLabel(String(row.source ?? "warmbly"))))}
+      ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
+      ${fact("Prioridade", row.priority ? escapeHtml(severityLabel(String(row.priority))) : "não informada")}
+      ${fact("Próximo passo", escapeHtml(String(row.next_action ?? "abrir o detalhe e definir a próxima ação")))}
+      ${fact("Sincronização", escapeHtml(ownMapValue(syncLabels, sync) ?? "estado de sincronização não reconhecido"))}
+    </dl>
+    ${row.sync_detail ? `<p class="banner error" role="alert">Falha de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: confirme no Warmbly antes de repetir.</p>` : ""}
+    ${technicalDetails([
+      { term: "source_id", value: rowId },
+      { term: "event", value: event },
+      { term: "state", value: state },
+      { term: "triage_state", value: triage },
+      { term: "sync_status", value: sync },
+    ], "daily-triage")}
+    ${position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
+    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-      <button type="submit">Validar atividade</button>
+      <label>Nota de atribuição <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <button type="submit">Atribuir a mim</button>
     </form>
+    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" class="operator-form">
+      <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+      <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
+      <label>Nota de triagem <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que isto registra a triagem no Control Center e não altera o Warmbly.</label>
+      <button type="submit">Marcar como triado</button>
+    </form>
+    </div>` : ""}
   </article>`;
 }
 
-function exceptionOpsCard(row: Record<string, unknown>): string {
-  const kind = String(row.kind ?? "exception");
-  const state = String(row.status ?? row.state ?? "");
-  return `<article class="card" data-exception-id="${escapeHtml(String(row.id ?? ""))}" data-exception-status="${escapeHtml(String(row.status ?? ""))}">
-    <p class="kicker">${statusPill(kind, exceptionKindLabel(kind))}${state ? ` ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
+function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean): string {
+  const id = String(row.id ?? "");
+  const canonical = String(row.canonical_id ?? id);
+  const sourceId = String(row.source_id ?? id);
+  const workflow = String(row.workflow_state ?? "new");
+  const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
+  const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
+  const count = typeof row.occurrence_count === "number" ? row.occurrence_count : 1;
+  const resolutionKind = String(row.resolution_kind ?? "unsupported");
+  let resolution: string;
+  if (resolutionKind === "warmbly_action") {
+    resolution = `<a class="alert-open" href="${escapeHtml(leadDetailHash("excecoes", null, id))}">Abrir detalhe e corrigir no Warmbly</a>`;
+  } else {
+    resolution = `<p class="constraint">Correção upstream não suportada pelo allowlist atual. Próxima ação: use a orientação abaixo e registre o desfecho; não marque como resolvida só por reconhecer.</p>`;
+  }
+  const open = workflow !== "resolved" && workflow !== "discarded";
+  return `<article class="card" data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
+    <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
     <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
-    <p>Recomendado: ${escapeHtml(String(row.recommended_next_action ?? "não determinado"))}</p>
-    ${technicalDetails(
-      [
-        { term: "kind", value: kind },
-        { term: "state", value: state },
-        { term: "canonical_id", value: String(row.canonical_id ?? "") },
-        { term: "source_id", value: String(row.source_id ?? row.id ?? "") },
-      ],
-      "commercial-exception",
-    )}
-    <form data-operator-form="ACKNOWLEDGE_EXCEPTION" class="operator-form">
-      <input type="hidden" name="target_canonical_id" value="${escapeHtml(String(row.canonical_id ?? row.id ?? ""))}" />
-      <input type="hidden" name="target_source_id" value="${escapeHtml(String(row.source_id ?? row.id ?? ""))}" />
-      <label>Nota <textarea name="note" required minlength="2"></textarea></label>
-      <button type="submit">Reconhecer no Control Center</button>
-    </form>
+    <dl class="facts">
+      ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
+      ${fact("Idade", escapeHtml(age))}
+      ${fact("Impacto", escapeHtml(String(row.impact ?? "impacto não informado pela origem")))}
+      ${fact("Ação recomendada", escapeHtml(String(row.recommended_next_action ?? "investigar a evidência e definir correção")))}
+      ${fact("Ocorrências agrupadas", String(count))}
+      ${fact("Sincronização", escapeHtml(String(row.sync_status ?? "observada na origem")))}
+    </dl>
+    ${row.sync_detail ? `<p class="banner error" role="alert">Erro de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: releia a origem antes de repetir.</p>` : ""}
+    ${resolution}
+    ${technicalDetails([
+      { term: "id", value: id },
+      { term: "canonical_id", value: canonical },
+      { term: "source_id", value: sourceId },
+      { term: "workflow_state", value: workflow },
+      { term: "group_key", value: String(row.group_key ?? "") },
+      { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
+    ], "resolvable-exception")}
+    ${open && writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
+      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form">
+        <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+        <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
+        <label>Nota <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que reconhecer não resolve nem remove a exceção.</label>
+        <button type="submit">Reconhecer sem resolver</button>
+      </form>
+      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" class="operator-form">
+        <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
+        <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
+        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <button type="submit">Iniciar tratamento</button>
+      </form>
+    </div>` : !open ? `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>` : ""}
   </article>`;
 }
 
@@ -1043,7 +1100,7 @@ function commercialOps(
       noun: "exceção(ões) observada(s)",
       emptyData: "Nenhuma exceção observada.",
       intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
-      card: exceptionOpsCard,
+      card: (row, position) => exceptionOpsCard(row, position.writesAllowed),
       remote: listViews.excecoes,
       declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
       complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
@@ -1061,7 +1118,7 @@ function commercialOps(
       </dl>
       ${technicalDetails([{ term: "availability", value: String(availability) }], "commercial-availability")}
     </section>
-    ${weeklyRevenueBlock(ops)}`;
+    ${weeklyRevenueBlock(ops, snapshot.generated_at)}`;
   }
   return body;
 }
@@ -1387,9 +1444,9 @@ export function healthCard(item: ServiceHealth): string {
           escapeHtml(item.last_error ?? "nenhum erro registrado nesta coleta"),
           item.last_error ? "" : ` data-absent="true"`,
         )}
-        ${checkLine("HTTP", item.http)}
-        ${checkLine("TLS", item.tls)}
-        ${checkLine("Docker", item.docker)}
+        ${checkLine("Resposta HTTP", item.http)}
+        ${checkLine("Certificado TLS", item.tls)}
+        ${checkLine("Contêiner Docker", item.docker)}
         ${checkLine("Backup", item.backup)}
         ${checkLine("Host", item.host_metrics)}
         ${item.disk ? fact("Disco", escapeHtml(item.disk.detail ?? `${item.disk.used_pct ?? "?"}%`)) : ""}
@@ -1448,7 +1505,7 @@ export function infraCatalogBlock(summary: InfraCatalogSummary): string {
       ${fact("Evidência da coleta", escapeHtml(`${freshnessLabel(summary.freshness_status)} · confiança ${confidence}`))}
       ${
         reasonLabel
-          ? fact("Motivo", escapeHtml(reasonLabel))
+          ? fact("Motivo", escapeHtml(reasonLabel), ` data-reason="${escapeHtml(reason ?? "")}"`)
           : fact("Motivo", escapeHtml("coleta íntegra"), ` data-absent="true"`)
       }
       ${
