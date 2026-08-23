@@ -156,6 +156,7 @@ function minutesBetween(fromIso: string, toIso: string): number | null {
 export function ageLabel(detectedAt: string, now: string): string {
   const minutes = minutesBetween(detectedAt, now);
   if (minutes === null) return "idade desconhecida";
+  if (minutes < 0) return "agora";
   return `há ${humanDuration(minutes)}`;
 }
 

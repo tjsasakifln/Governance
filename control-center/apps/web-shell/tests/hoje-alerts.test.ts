@@ -271,6 +271,7 @@ test("SLA, age, owner, class and impact are derived, not invented per card", () 
 
   assert.equal(ageLabel("2026-08-20T10:00:00Z", "2026-08-20T10:20:00Z"), "há 20 min");
   assert.equal(ageLabel("2026-08-18T10:00:00Z", "2026-08-20T10:00:00Z"), "há 2 d");
+  assert.equal(ageLabel("2026-08-20T10:20:00Z", "2026-08-20T10:00:00Z"), "agora");
 
   assert.equal(alertClassOf("critical"), "incidente");
   assert.equal(alertClassOf("medium"), "acao");
