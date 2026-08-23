@@ -23,6 +23,7 @@ const EXECUTIVE = {
 const REPORT = {
   schema_version: "confenge.observability_report.v1",
   month: "2026-08",
+  include_synthetic: false,
   real_empty: false,
   controlled_email: [],
 };
@@ -76,7 +77,7 @@ function clientFor(bodies: Record<string, { status: number; json: unknown }>): W
 }
 
 describe("normalizeIntelEnvelope (shipped rule)", () => {
-  it("unwraps scoreboard/executive/exceptions/organic wrapped in data", () => {
+  it("unwraps scoreboard/executive/report/exceptions/organic wrapped in data", () => {
     assert.deepEqual(normalizeIntelEnvelope({ data: SCOREBOARD }, "intel_scoreboard"), {
       ok: true,
       value: SCOREBOARD,
@@ -84,6 +85,10 @@ describe("normalizeIntelEnvelope (shipped rule)", () => {
     assert.deepEqual(normalizeIntelEnvelope({ data: EXECUTIVE }, "intel_executive"), {
       ok: true,
       value: EXECUTIVE,
+    });
+    assert.deepEqual(normalizeIntelEnvelope({ data: REPORT }, "intel_report"), {
+      ok: true,
+      value: REPORT,
     });
     assert.deepEqual(normalizeIntelEnvelope({ data: EXCEPTIONS }, "intel_exceptions"), {
       ok: true,
@@ -108,6 +113,24 @@ describe("normalizeIntelEnvelope (shipped rule)", () => {
     const unrelated = normalizeIntelEnvelope({ foo: 1, bar: "x" }, "intel_scoreboard");
     assert.equal(unrelated.ok, false);
     if (!unrelated.ok) assert.equal(unrelated.code, "CONTRACT_DRIFT");
+  });
+
+  it("rejects synthetic or unproven intel reports instead of publishing them as real", () => {
+    for (const includeSynthetic of [true, undefined]) {
+      const candidate = { ...REPORT, include_synthetic: includeSynthetic };
+      const result = normalizeIntelEnvelope({ data: candidate }, "intel_report");
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.code, "CONTRACT_DRIFT");
+        assert.match(result.reason, /include_synthetic=false/);
+      }
+    }
+    const contradictory = normalizeIntelEnvelope(
+      { ...REPORT, real_empty: true, controlled_email: [{ cohort_id: "not-empty" }] },
+      "intel_report",
+    );
+    assert.equal(contradictory.ok, false);
+    if (!contradictory.ok) assert.match(contradictory.reason, /real_empty/);
   });
 });
 

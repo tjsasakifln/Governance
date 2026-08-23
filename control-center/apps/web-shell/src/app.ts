@@ -14,6 +14,11 @@ import {
   resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
+import {
+  QUEUE_FOCUS_PARAM,
+  QUEUE_FOCUS_TOKEN_PATTERN,
+  queueFocusDomId,
+} from "./ui/lead-detail";
 import { renderShell } from "./ui/render";
 import {
   parseViewKind,
@@ -32,6 +37,8 @@ export function scenarioFromView(view: ViewKind | null): MockScenario {
 export interface ShellRuntime {
   getHash(): string;
   setHash(hash: string): void;
+  /** Replace URL state without firing a navigation/repaint. */
+  replaceHash(hash: string): void;
   onHashChange(handler: () => void): () => void;
 }
 
@@ -42,6 +49,9 @@ export function browserRuntime(): ShellRuntime {
     },
     setHash(hash: string): void {
       window.location.hash = hash;
+    },
+    replaceHash(hash: string): void {
+      window.history.replaceState(window.history.state, "", hash);
     },
     onHashChange(handler: () => void): () => void {
       window.addEventListener("hashchange", handler);
@@ -63,6 +73,9 @@ export function createMemoryRuntime(initialHash = "#/hoje"): ShellRuntime {
       hash = next;
       for (const listener of listeners) listener();
     },
+    replaceHash(next: string): void {
+      hash = next;
+    },
     onHashChange(handler: () => void): () => void {
       listeners.push(handler);
       return () => {
@@ -79,6 +92,8 @@ export interface MountableRoot {
     addEventListener(type: string, listener: (event: Event) => void): void;
     getAttribute(name: string): string | null;
     querySelector(selector: string): { value: string } | null;
+    focus?(options?: { preventScroll?: boolean }): void;
+    scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
   }>;
 }
 
@@ -97,6 +112,7 @@ function applyPaint(
   result: import("./adapters/contract").AdapterReadResult,
   hash: string,
   navigate: Navigate,
+  replaceLocation: ReplaceLocation,
 ): void {
   const input: ResolveViewInput<DestinationPage> = {
     loading: result.ok && result.loading,
@@ -109,6 +125,10 @@ function applyPaint(
     input.error = result.error;
   }
   const view = resolveViewState(input);
+  // `focus` is an ephemeral return marker, never durable list state. Render
+  // and bind against a cleaned location so pagination, filters and repaint
+  // closures cannot resurrect it after it has been consumed.
+  const renderHash = stripQueueFocus(hash);
   root.innerHTML = renderShell({
     destination: parsed.destination,
     viewKind: view.kind,
@@ -117,14 +137,12 @@ function applyPaint(
     adapterMode: adapter.mode,
     surface: parsed.surface,
     resource: parsed.resource,
-    hash,
+    query: queryOf(renderHash),
+    hash: renderHash,
     ...(adapter.lastOperatorResult ? { operatorResult: adapter.lastOperatorResult } : {}),
   });
-  // Repaint the location that is actually on screen. Rebuilding it from
-  // `parsed` alone drops the query string, so an operator action taken inside a
-  // filtered queue used to throw the operator back to the unfiltered page 1.
   const repaint = (): void => {
-    paintShell(root, adapter, hash, 0, () => true, navigate);
+    paintShell(root, adapter, renderHash, 0, () => true, navigate, replaceLocation);
   };
   bindWriteShortcuts(root, adapter, repaint);
   bindOperatorActions(root, adapter, repaint);
@@ -136,15 +154,131 @@ function applyPaint(
       result.ok && !result.loading ? result.page?.commercial : undefined,
     ),
   );
-  bindListFilters(root, hash, navigate);
+  bindCopyControls(root);
+  bindListFilters(root, renderHash, navigate);
+  consumeQueueFocus(
+    root,
+    hash,
+    view.kind === "ready" || view.kind === "stale",
+    replaceLocation,
+  );
+}
+
+/**
+ * Query string of a hash route, without the leading `?`.
+ *
+ * The shell repaints wholesale, so the only durable place for queue state —
+ * filters, sort, page, position — is the hash itself. Surfaces that offer a
+ * back link read it from here rather than from a closure that dies with the
+ * markup that created it.
+ */
+export function queryOf(hash: string): string {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const index = stripped.indexOf("?");
+  return index >= 0 ? stripped.slice(index + 1) : "";
+}
+
+export function stripQueueFocus(hash: string): string {
+  const query = queryOf(hash);
+  if (!query) return hash;
+  const params = new URLSearchParams(query);
+  if (!params.has(QUEUE_FOCUS_PARAM)) return hash;
+  params.delete(QUEUE_FOCUS_PARAM);
+  const rendered = params.toString();
+  const path = hash.split("?", 1)[0] || "#/comercial/atividade";
+  return rendered ? `${path}?${rendered}` : path;
+}
+
+/**
+ * Copy buttons for technical-detail blocks.
+ *
+ * Joins the repaint pass like every other binding, because a handler attached
+ * once would die on the first navigation. The block is a readonly textarea, so
+ * a browser with no clipboard permission still lets the operator select and
+ * copy by hand; this only removes the two keystrokes.
+ */
+function bindCopyControls(root: MountableRoot): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-copy-form]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    // Bind only what is really a copy form. A repaint re-runs every binder over
+    // the same tree, so a binder that attaches to whatever the query hands back
+    // would fight the operator-action binders for the same nodes.
+    if (!form.getAttribute("data-copy-form")) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const payload = form.querySelector('[name="copy_payload"]')?.value ?? "";
+      if (!payload) return;
+      const clipboard = globalThis.navigator?.clipboard;
+      if (clipboard && typeof clipboard.writeText === "function") {
+        void clipboard.writeText(payload).catch(() => undefined);
+      }
+    });
+  }
 }
 
 export type Navigate = (hash: string) => void;
+export type ReplaceLocation = (hash: string) => void;
 
 function defaultNavigate(hash: string): void {
   if (typeof window !== "undefined") {
     window.location.hash = hash;
   }
+}
+
+function defaultReplaceLocation(hash: string): void {
+  if (typeof window !== "undefined") {
+    window.history.replaceState(window.history.state, "", hash);
+  }
+}
+
+const consumedQueueFocus = new WeakMap<object, string>();
+
+/** Focus a returned queue row once the ready/stale paint contains it. */
+export function consumeQueueFocus(
+  root: MountableRoot,
+  hash: string,
+  painted: boolean,
+  replaceLocation: ReplaceLocation = defaultReplaceLocation,
+): boolean {
+  if (!painted || typeof root.querySelectorAll !== "function") return false;
+  const params = new URLSearchParams(queryOf(hash));
+  const token = params.get(QUEUE_FOCUS_PARAM);
+  if (!token) {
+    consumedQueueFocus.delete(root);
+    return false;
+  }
+  if (consumedQueueFocus.get(root) === hash) return false;
+  consumedQueueFocus.set(root, hash);
+  replaceLocation(stripQueueFocus(hash));
+
+  const focusFallback = (): void => {
+    const fallback = root.querySelectorAll?.("[data-list-count]")[0];
+    fallback?.focus?.({ preventScroll: true });
+    fallback?.scrollIntoView?.({ block: "center", inline: "nearest" });
+  };
+  if (!QUEUE_FOCUS_TOKEN_PATTERN.test(token)) {
+    focusFallback();
+    return false;
+  }
+
+  const expectedId = queueFocusDomId(token);
+  const candidates = root.querySelectorAll("[data-queue-focus]");
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (
+      !candidate ||
+      candidate.getAttribute("id") !== expectedId ||
+      candidate.getAttribute("data-queue-focus") !== token
+    ) continue;
+    candidate.focus?.({ preventScroll: true });
+    candidate.scrollIntoView?.({ block: "center", inline: "nearest" });
+    return true;
+  }
+  focusFallback();
+  return false;
 }
 
 /**
@@ -408,6 +542,7 @@ export function paintShell(
   generation = 0,
   isCurrent: (generation: number) => boolean = () => true,
   navigate: Navigate = defaultNavigate,
+  replaceLocation: ReplaceLocation = defaultReplaceLocation,
 ): void {
   const location = hash || "#/hoje";
   const parsed = parseHash(location);
@@ -415,14 +550,14 @@ export function paintShell(
   adapter.setScenario?.(scenarioFromView(override));
   const result = adapter.readDestination(parsed.destination, location);
   if (isPromise(result)) {
-    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null }, location, navigate);
+    applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null }, location, navigate, replaceLocation);
     void result.then((resolved) => {
       if (!isCurrent(generation)) return;
-      applyPaint(root, adapter, parsed, override, resolved, location, navigate);
+      applyPaint(root, adapter, parsed, override, resolved, location, navigate, replaceLocation);
     });
     return;
   }
-  applyPaint(root, adapter, parsed, override, result, location, navigate);
+  applyPaint(root, adapter, parsed, override, result, location, navigate, replaceLocation);
 }
 
 export function mount(
@@ -437,9 +572,15 @@ export function mount(
   const paint = (): void => {
     generation += 1;
     const current = generation;
-    paintShell(root, adapter, runtime.getHash(), current, (g) => g === generation, (next) => {
-      runtime.setHash(next);
-    });
+    paintShell(
+      root,
+      adapter,
+      runtime.getHash(),
+      current,
+      (g) => g === generation,
+      (next) => runtime.setHash(next),
+      (next) => runtime.replaceHash(next),
+    );
   };
   const stop = runtime.onHashChange(paint);
   if (!runtime.getHash()) {
