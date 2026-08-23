@@ -339,10 +339,11 @@ test("the rendered identity queue is the producer's, with its origin, reason cod
   assert.match(html, /data-queue="client-identity"/);
   assert.match(html, /data-operational-client="false"/);
   assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
-  // Origin is the producer, not the reader's base URL.
-  assert.match(html, /warmbly · deal-7/);
+  // Origin is authored on the front; locator and reason code stay technical.
+  assert.match(html, /<dt>Origem<\/dt><dd>Warmbly<\/dd>/);
   assert.doesNotMatch(html, /control-center · http/);
   assert.match(html, /não está vinculado a nenhuma conta\/empresa/);
+  assert.match(html, /locator=deal-7/);
   assert.match(html, /missing_client_key/);
   assert.match(html, /Vincular o registro a uma conta\/empresa/);
 });
@@ -371,8 +372,9 @@ test("a published row that fails the identity rule is queued, never rendered as 
   assert.match(html, /class="card client"/);
   assert.match(html, /Qualidade de dados — identidade de cliente \(1\)/);
   assert.doesNotMatch(html, /client:unknown/);
-  // The queue names the row's own declared source, not the HTTP reader.
-  assert.match(html, /warmbly · commercial\/pipeline/);
+  // The queue names the source safely; its locator remains available technically.
+  assert.match(html, /<dt>Origem<\/dt><dd>Warmbly<\/dd>/);
+  assert.match(html, /locator=commercial\/pipeline/);
 });
 
 test("drilling into one client does not show the whole identity queue", async () => {

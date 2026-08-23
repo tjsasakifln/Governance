@@ -283,7 +283,6 @@ test("doubt about the collector run is shown as a caveat, not written into the s
   const html = healthCard(item);
   assert.match(html, /data-snapshot-evidence="ERROR"/);
   assert.match(html, /Coleta que trouxe este serviço: erro de coleta/);
-  assert.match(html, /data-snapshot-evidence="ERROR"/);
   assert.doesNotMatch(html, /data-status="down"/);
 });
 

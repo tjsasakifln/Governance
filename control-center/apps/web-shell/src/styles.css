@@ -393,6 +393,10 @@ h2 {
   margin: 0 0 0.55rem;
 }
 
+.help-line {
+  margin: 0 0 0.55rem;
+}
+
 .kicker {
   display: flex;
   flex-wrap: wrap;

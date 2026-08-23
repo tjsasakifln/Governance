@@ -3,6 +3,7 @@ import { formatLocal } from "../datetime";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import { ownMapValue } from "../own-map";
+import { sourceSystemLabel } from "../provenance";
 import type {
   AgentActivity,
   ClientIdentityException,
@@ -27,6 +28,7 @@ import {
   ABSENT_HELP,
   BLOCKED_HELP,
   agentStatusLabel,
+  authorizationStateLabel,
   authorityLabel,
   availabilityLabel,
   clientLifecycleLabel,
@@ -34,6 +36,7 @@ import {
   commercialStateLabel,
   directiveKindLabel,
   directiveStatusLabel,
+  dispatchStateLabel,
   exceptionKindLabel,
   freshnessLabel,
   healthLabel,
@@ -41,8 +44,11 @@ import {
   hopStatusLabel,
   MEMORY_GROUP_TITLES,
   pipelineStageLabel,
+  providerLabel,
   providerMutationLabel,
   scopeLabel,
+  routeClassLabel,
+  goReviewVerdictLabel,
   statusPill,
   technicalDetails,
 } from "./labels";
@@ -177,26 +183,26 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
   }
   const attribution =
     growth.attribution && typeof growth.attribution === "object" ? (growth.attribution as Record<string, unknown>) : {};
-  const note = String(
-    attribution.note ??
-      "Etapa sem identificador durável fica como desconhecida ou bloqueada. Nenhum cruzamento entre sistemas é inventado. " +
-        "As etapas de busca e clique seguem bloqueadas enquanto não houver ingestão de dados de busca.",
-  );
+  const attributionNote = typeof attribution.note === "string" ? attribution.note : "";
+  const note = growthAttributionLabel(attributionNote);
   const organic =
     growth.organic_scoreboard && typeof growth.organic_scoreboard === "object"
       ? (growth.organic_scoreboard as Record<string, unknown>)
       : {};
+  const organicNote = typeof organic.note === "string" ? organic.note : "";
   const organicConfigured = organic.configured === true;
   const organicWindows = Array.isArray(organic.windows) ? organic.windows : [];
   const organicBlock = organicConfigured
-    ? `<article class="card" data-organic-scoreboard="true">
+      ? `<article class="card" data-organic-scoreboard="true">
         <h3>Placar de crescimento orgânico (Warmbly)</h3>
-        <p>${escapeHtml(String(organic.note ?? "Inteligência de crescimento orgânico mantida pelo Warmbly."))}</p>
+        <p>${escapeHtml(organicNoteLabel(organicNote))}</p>
         ${technicalDetails(
           [
             { term: "schema", value: String(organic.schema ?? "") },
             { term: "real_empty", value: organic.real_empty === undefined ? "" : String(organic.real_empty) },
             { term: "availability", value: String(organic.availability ?? "") },
+            { term: "note", value: organicNote },
+            { term: "attribution_note", value: attributionNote },
           ],
           "organic-scoreboard",
         )}
@@ -215,12 +221,23 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
                   const first = slices[0] && typeof slices[0] === "object" ? (slices[0] as Record<string, unknown>) : {};
                   const layers = Array.isArray(first.layers) ? first.layers : [];
                   return `<article class="card" data-organic-window="${escapeHtml(String(row.id ?? ""))}">
-                    <h4>Janela ${escapeHtml(String(row.id ?? "—"))}</h4>
+                    <h4>Janela ${escapeHtml(organicWindowLabel(String(row.id ?? "")))}</h4>
                     <ul>${layers
                       .map((layer) => {
                         const ly = layer && typeof layer === "object" ? (layer as Record<string, unknown>) : {};
                         const layerStatus = String(ly.status ?? "UNKNOWN");
-                        return `<li data-organic-layer="${escapeHtml(String(ly.id ?? ""))}" data-layer-status="${escapeHtml(layerStatus)}">${escapeHtml(String(ly.id ?? "camada"))}: ${escapeHtml(availabilityLabel(layerStatus))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})</li>`;
+                        const layerId = String(ly.id ?? "");
+                        const layerLabel = layerId === "LEAD_VALID" ? "Leads válidos" : "camada não reconhecida";
+                        const observation = typeof ly.observation === "string" ? ly.observation : "";
+                        return `<li data-organic-layer="${escapeHtml(layerId)}" data-layer-status="${escapeHtml(layerStatus)}">${escapeHtml(layerLabel)}: ${escapeHtml(availabilityLabel(layerStatus))} (${escapeHtml(String(ly.count ?? "—"))}/${escapeHtml(String(ly.denominator ?? "—"))})${observation ? ` · ${escapeHtml(organicObservationLabel(observation))}` : ""}${technicalDetails(
+                          [
+                            { term: "layer_id", value: layerId },
+                            { term: "layer_status", value: layerStatus },
+                            { term: "observation", value: observation },
+                            { term: "window_id", value: String(row.id ?? "") },
+                          ],
+                          "organic-layer",
+                        )}</li>`;
                       })
                       .join("")}</ul>
                   </article>`;
@@ -233,6 +250,7 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
     <section class="stack domain-crescimento" aria-labelledby="crescimento-funil" data-domain="growth">
       <h2 id="crescimento-funil">Funil de crescimento</h2>
       <p class="constraint">${escapeHtml(note)}</p>
+      ${technicalDetails([{ term: "attribution_note", value: attributionNote }], "growth-attribution")}
       ${organicBlock}
       <ol class="growth-hops">
         ${hops
@@ -286,6 +304,78 @@ function observedCount(value: unknown): string {
     : "desconhecido / dados ainda incompletos";
 }
 
+function growthAttributionLabel(value: string): string {
+  if (
+    value ===
+    "Hops without a durable ID stay UNKNOWN/BLOCKED. Scoreboard stages 1-2 stay BLOCKED without GSC/URL-index ingest. OrganicScoreboard is Warmbly-owned."
+  ) {
+    return "Etapas sem identificador durável permanecem desconhecidas ou bloqueadas. Busca e clique dependem de ingestão própria; o placar orgânico pertence ao Warmbly.";
+  }
+  return value === ""
+    ? "Etapa sem identificador durável fica como desconhecida ou bloqueada. Nenhum cruzamento entre sistemas é inventado."
+    : "Nota de atribuição não reconhecida; consulte o detalhe técnico.";
+}
+
+function organicNoteLabel(value: string): string {
+  if (value === "Warmbly-owned organic/growth intelligence. Control Center does not recompute it.") {
+    return "Inteligência de crescimento orgânico mantida pelo Warmbly; o Control Center não a recalcula.";
+  }
+  if (value === "Warmbly OrganicScoreboard was not present on this observation.") {
+    return "O placar orgânico do Warmbly não estava presente nesta observação.";
+  }
+  return value === ""
+    ? "Inteligência de crescimento orgânico mantida pelo Warmbly."
+    : "Nota do placar orgânico não reconhecida; consulte o detalhe técnico.";
+}
+
+function organicWindowLabel(value: string): string {
+  const days = /^(\d+)d$/.exec(value);
+  if (days) return `${days[1]} dias`;
+  if (value === "open") return "aberta";
+  return "não reconhecida";
+}
+
+function organicObservationLabel(value: string): string {
+  if (value === "no ingest") return "sem ingestão observada";
+  return "observação não reconhecida";
+}
+
+const COHORT_MIXING_LABELS: Record<string, string> = {
+  acquisition_cohorts_and_event_period_metrics_are_labeled_separately:
+    "Coortes de aquisição e métricas por período são apresentadas separadamente.",
+};
+
+const COHORT_KIND_LABELS: Record<string, string> = {
+  acquisition_cohort: "coorte de aquisição",
+  event_period_funnel: "funil por período do evento",
+};
+
+const COHORT_ANCHOR_LABELS: Record<string, string> = {
+  "Acquisition cohort: contact created_at. Not an event-period metric.":
+    "Coorte de aquisição ancorada na criação do contato; não é uma métrica por período do evento.",
+  "Warmbly inbound-truth scoreboard. Not an acquisition cohort.":
+    "Placar de mensagens recebidas do Warmbly; não é uma coorte de aquisição.",
+};
+
+function cohortMixingLabel(value: string): string {
+  return ownMapValue(COHORT_MIXING_LABELS, value) ?? "Regra de separação não reconhecida.";
+}
+
+function cohortKindLabel(value: string): string {
+  return ownMapValue(COHORT_KIND_LABELS, value) ?? "tipo de coorte não reconhecido";
+}
+
+function cohortWindowLabel(value: string): string {
+  const days = /^(\d+)d$/.exec(value);
+  if (days) return `${days[1]} dias`;
+  if (value === "open") return "aberta";
+  return "não reconhecida";
+}
+
+function cohortAnchorLabel(value: string): string {
+  return ownMapValue(COHORT_ANCHOR_LABELS, value) ?? "Referência da métrica não reconhecida.";
+}
+
 function controlledEmailCohort(ops: Record<string, unknown>): string {
   const root = ops.controlled_outbound && typeof ops.controlled_outbound === "object"
     ? (ops.controlled_outbound as Record<string, unknown>)
@@ -298,9 +388,9 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
   if (!current) {
     return `<article class="card" data-controlled-email="unknown">
       <h3>Cohort controlado de e-mail</h3>
-      <p class="constraint">Nenhum grant bounded foi observado. Ausência não é autorização.</p>
+      <p class="constraint">Nenhuma autorização limitada foi observada. Ausência não é autorização.</p>
       ${fact("Telemetria", escapeHtml(availabilityLabel(String(root.availability ?? "UNKNOWN"))))}
-      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "não informado")))}
+      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
     </article>`;
   }
   const dispatch = current.dispatch && typeof current.dispatch === "object"
@@ -314,14 +404,14 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     : {};
   const routeFacts = Object.entries(distribution)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([route, count]) => fact(`Rota ${route}`, observedCount(count)))
+    .map(([route, count]) => fact(`Rota ${routeClassLabel(route)}`, observedCount(count)))
     .join("");
   const window = dispatch.window_start && dispatch.window_end
     ? `${String(dispatch.window_start)}–${String(dispatch.window_end)} ${String(dispatch.timezone ?? "")}`.trim()
-    : "não informada";
+    : "desconhecida";
   const integrityLabels: Record<string, string> = {
-    grant_revoked: "grant observado como revogado",
-    grant_expired: "grant expirado no instante desta coleta",
+    grant_revoked: "autorização observada como revogada",
+    grant_expired: "autorização expirada no instante desta coleta",
     authorized_quantity_exceeded: "enviados + reservados excedem a quantidade autorizada",
     daily_cap_unexpected: "cap diário diverge do limite esperado de 10",
   };
@@ -333,14 +423,17 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     : "";
   const telemetryWarning = telemetryObserved
     ? ""
-    : `<p class="banner" data-controlled-email-telemetry="unproven">A autorização foi observada, mas o relatório não comprovou telemetria real sem dados sintéticos. Os desfechos permanecem desconhecidos.</p>`;
+    : `<p class="banner" data-controlled-email-telemetry="unproven">A autorização foi observada, mas o relatório não comprovou telemetria real sem dados sintéticos. Os resultados permanecem desconhecidos.</p>`;
   const outcomeRows = rows
     .filter((item) => item && typeof item === "object")
     .map((item) => item as Record<string, unknown>)
-    .map((row) => `<article class="card" data-controlled-email-route="${escapeHtml(String(row.route_class ?? "UNKNOWN"))}">
-      <h3>${escapeHtml(String(row.route_class ?? "rota não informada"))}</h3>
+    .map((row) => {
+      const route = String(row.route_class ?? "UNKNOWN");
+      const provider = String(row.provider ?? "UNKNOWN");
+      return `<article class="card" data-controlled-email-route="${escapeHtml(route)}">
+      <h3>${escapeHtml(routeClassLabel(route))}</h3>
       <dl class="facts">
-        ${fact("Provedor", escapeHtml(String(row.provider ?? "não informado")))}
+        ${fact("Provedor", escapeHtml(providerLabel(provider)))}
         ${fact("Tentativas", observedCount(row.attempted))}
         ${fact("Aceitos pelo SMTP", observedCount(row.provider_accepted))}
         ${fact("Entregues", observedCount(row.delivered))}
@@ -348,21 +441,29 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
         ${fact("Rejeições temporárias", observedCount(row.soft_bounce))}
         ${fact("Respostas", observedCount(row.reply))}
         ${fact("Respostas positivas", observedCount(row.positive_reply))}
-        ${fact("Descadastros", observedCount(row.opt_out))}
-        ${fact("Denúncias", observedCount(row.spam_complaint))}
+        ${fact("Pedidos de descadastro", observedCount(row.opt_out))}
+        ${fact("Denúncias de spam", observedCount(row.spam_complaint))}
       </dl>
-    </article>`)
+      ${technicalDetails(
+        [
+          { term: "route_class", value: route },
+          { term: "provider", value: provider },
+        ],
+        "controlled-email-row",
+      )}
+    </article>`;
+    })
     .join("");
   return `<section class="stack" aria-labelledby="controlled-email-title" data-controlled-email="${telemetryObserved ? "observed" : "unknown"}">
-    <h2 id="controlled-email-title">${telemetryObserved ? "Primeiro cohort real de e-mail" : "Cohort controlado — telemetria real não comprovada"}</h2>
+    <h2 id="controlled-email-title">${telemetryObserved ? "Primeira coorte real de e-mail" : "Coorte controlada — telemetria real não comprovada"}</h2>
     ${telemetryWarning}
     ${integrityWarning}
     <article class="card">
-      <h3>${escapeHtml(String(current.cohort_id ?? "coorte não informada"))}</h3>
+      <h3>${current.cohort_id ? "Coorte autorizada" : "Coorte não identificada"}</h3>
       <dl class="facts">
-        ${fact("Identificador técnico da coorte", escapeHtml(String(current.cohort_hash ?? "não informado")))}
-        ${fact("Versão da política", escapeHtml(String(current.policy_version ?? "não informada")))}
-        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "não informado")))}
+        ${fact("Hash da coorte", escapeHtml(String(current.cohort_hash ?? "desconhecido")))}
+        ${fact("Versão da política", escapeHtml(String(current.policy_version ?? "desconhecida")))}
+        ${fact("Mês do relatório", escapeHtml(String(root.report_month ?? "desconhecido")))}
         ${fact("Quantidade autorizada", observedCount(current.authorized_quantity))}
         ${fact("Enviados", observedCount(current.sent))}
         ${fact("Reservados", observedCount(current.reserved))}
@@ -371,20 +472,30 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
         ${fact("Rejeições temporárias", observedCount(outcomes.soft_bounce))}
         ${fact("Respostas", observedCount(outcomes.reply))}
         ${fact("Respostas positivas", observedCount(outcomes.positive_reply))}
-        ${fact("Descadastros", observedCount(outcomes.opt_out))}
-        ${fact("Estado da autorização", escapeHtml(availabilityLabel(String(current.authorization_state ?? "UNKNOWN"))))}
-        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "não informado")))}
-        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "não informado")))}
-        ${fact("Revisão de liberação", escapeHtml(availabilityLabel(String(current.go_review_verdict ?? "UNKNOWN"))))}
-        ${fact("Estado do disparo", escapeHtml(availabilityLabel(String(dispatch.state ?? "UNKNOWN"))))}
+        ${fact("Pedidos de descadastro", observedCount(outcomes.opt_out))}
+        ${fact("Estado da autorização", escapeHtml(authorizationStateLabel(String(current.authorization_state ?? "UNKNOWN"))))}
+        ${fact("Autorizado em", escapeHtml(String(current.authorized_at ?? "desconhecido")))}
+        ${fact("Expira em", escapeHtml(String(current.expires_at ?? "desconhecido")))}
+        ${fact("Revisão para prosseguir", escapeHtml(goReviewVerdictLabel(String(current.go_review_verdict ?? "UNKNOWN"))))}
+        ${fact("Estado do disparo", escapeHtml(dispatchStateLabel(String(dispatch.state ?? "UNKNOWN"))))}
         ${fact("Cap diário", observedCount(current.max_daily_volume))}
         ${fact("Janela", escapeHtml(window))}
-        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "não informado")))}
+        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
         ${routeFacts}
       </dl>
       <p class="constraint">Aceite pelo SMTP não comprova entrega. Métricas sem evento reconciliado permanecem desconhecidas.</p>
+      ${technicalDetails(
+        [
+          { term: "cohort_id", value: String(current.cohort_id ?? "") },
+          { term: "integrity_flags", value: integrityFlags.join(",") },
+          { term: "authorization_state", value: String(current.authorization_state ?? "") },
+          { term: "go_review_verdict", value: String(current.go_review_verdict ?? "") },
+          { term: "dispatch_state", value: String(dispatch.state ?? "") },
+        ],
+        "controlled-email-grant",
+      )}
     </article>
-    <div class="cards">${outcomeRows || `<p class="banner empty">Nenhum evento comercial real observado para esta cohort. Ausência não é zero.</p>`}</div>
+    <div class="cards">${outcomeRows || `<p class="banner empty">Nenhum evento comercial real observado para esta coorte. Ausência não é zero.</p>`}</div>
   </section>`;
 }
 
@@ -613,16 +724,20 @@ function commercialOps(
   if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];
     const inbound = cohorts.inbound_truth && typeof cohorts.inbound_truth === "object" ? (cohorts.inbound_truth as Record<string, unknown>) : {};
+    const mixingRule = String(cohorts.mixing_rule ?? "");
     body = `
       <section class="stack" aria-labelledby="cohorts-title">
         <h2 id="cohorts-title">Coortes</h2>
-        <p class="constraint">${escapeHtml(String(cohorts.mixing_rule ?? "Coortes de aquisição e métricas de período são rotuladas em separado."))}</p>
+        <p class="constraint">${mixingRule ? escapeHtml(cohortMixingLabel(mixingRule)) : "Coortes de aquisição e métricas por período são apresentadas separadamente."}</p>
+        ${technicalDetails([{ term: "mixing_rule", value: mixingRule }], "cohort-mixing-rule")}
         <div class="cards">${acquisition
           .map((item) => {
             const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}">
-              <h3>Janela ${escapeHtml(String(row.window))} · ${escapeHtml(String(row.kind))}</h3>
-              <p>${escapeHtml(String(row.anchor_label ?? row.anchor_event ?? ""))}</p>
+            const kind = String(row.kind ?? "");
+            const anchorLabel = String(row.anchor_label ?? "");
+            return `<article class="card" data-cohort-window="${escapeHtml(String(row.window ?? ""))}" data-cohort-kind="${escapeHtml(kind)}">
+              <h3>Janela ${escapeHtml(cohortWindowLabel(String(row.window ?? "")))} · ${escapeHtml(cohortKindLabel(kind))}</h3>
+              <p>${anchorLabel ? escapeHtml(cohortAnchorLabel(anchorLabel)) : "Referência da métrica não informada."}</p>
               <dl class="facts">
                 ${fact("População", String(row.population ?? "—"))}
                 ${fact("Contactados", String(row.contacted ?? "—"))}
@@ -631,17 +746,30 @@ function commercialOps(
                 ${fact("Conversão em oportunidade", metricRate(row.opportunity_conversion))}
                 ${fact("Conversão em fechamento", metricRate(row.win_conversion))}
               </dl>
+              ${technicalDetails(
+                [
+                  { term: "kind", value: kind },
+                  { term: "window", value: String(row.window ?? "") },
+                  { term: "anchor_event", value: String(row.anchor_event ?? "") },
+                  { term: "anchor_label", value: anchorLabel },
+                  { term: "source", value: String(row.source ?? "") },
+                ],
+                "acquisition-cohort",
+              )}
             </article>`;
           })
           .join("")}</div>
         <article class="card">
           <h3>Origem das mensagens recebidas (Warmbly)</h3>
-          <p>${escapeHtml(String(inbound.anchor_label ?? "Placar do Warmbly, quando presente. Não é coorte de aquisição."))}</p>
+          <p>${inbound.anchor_label ? escapeHtml(cohortAnchorLabel(String(inbound.anchor_label))) : "Placar do Warmbly, quando presente. Não é coorte de aquisição."}</p>
           <p>${inbound.configured === true ? "Configurado no Warmbly." : "Não configurado no Warmbly."}</p>
           ${technicalDetails(
             [
               { term: "configured", value: inbound.configured === undefined ? "" : String(inbound.configured) },
               { term: "schema", value: String(inbound.schema ?? "") },
+              { term: "kind", value: String(inbound.kind ?? "") },
+              { term: "anchor_event", value: String(inbound.anchor_event ?? "") },
+              { term: "anchor_label", value: String(inbound.anchor_label ?? "") },
             ],
             "inbound-truth",
           )}
@@ -680,7 +808,8 @@ function commercialOps(
             .map((item) => {
               const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
               const stage = String(row.stage ?? row.status ?? "unknown");
-              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}" data-stage="${escapeHtml(stage)}">
+              const status = String(row.status ?? "unknown");
+              return `<article class="card" data-stale="${row.stale === true ? "true" : "false"}" data-stage="${escapeHtml(stage)}" data-status="${escapeHtml(status)}">
                 <p class="kicker">${statusPill(stage, pipelineStageLabel(stage))} ${row.stale === true ? "· dado defasado" : ""}</p>
                 <h3>${escapeHtml(String(row.display_name ?? row.id ?? "negócio"))}</h3>
                 ${dealMoneyLine(row.value)}
@@ -895,8 +1024,7 @@ export function clientCard(item: ClientStatus): string {
  * offered none of the three.
  */
 export function clientIdentityQueueCard(entry: ClientIdentityException): string {
-  const origin = `${entry.origin.system} · ${entry.origin.locator}`;
-  const codes = entry.reason_codes.length > 0 ? entry.reason_codes.join(", ") : "não declarado";
+  const origin = sourceSystemLabel(entry.origin.system);
   return `
     <article class="card data-quality" data-queue="client-identity" data-id="${escapeHtml(entry.id)}" data-operational-client="false" data-status="${escapeHtml(entry.status)}">
       <header>
@@ -908,9 +1036,17 @@ export function clientIdentityQueueCard(entry: ClientIdentityException): string 
         ${fact("Origem", escapeHtml(origin))}
         ${entry.source_id ? fact("Registro na origem", escapeHtml(entry.source_id)) : ""}
         ${fact("Motivo", escapeHtml(entry.why))}
-        ${fact("Código do motivo", escapeHtml(codes))}
         ${fact("Ação necessária", escapeHtml(entry.recommended_next_action))}
       </dl>
+      ${technicalDetails(
+        [
+          { term: "sistema", value: entry.origin.system },
+          { term: "locator", value: entry.origin.locator },
+          { term: "reason_codes", value: entry.reason_codes.join(",") },
+          { term: "source_id", value: entry.source_id ?? "" },
+        ],
+        "client-identity-queue",
+      )}
       ${entry.provenance ? provenanceBlock(entry.provenance) : ""}
     </article>
   `;
@@ -997,9 +1133,7 @@ export function healthCard(item: ServiceHealth): string {
         )}. O estado abaixo vem da evidência do próprio serviço.</p>`
       : "";
   const catalogError = item.catalog_error
-    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
-        item.catalog_error,
-      )}. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
+    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
     : "";
   const duplicates =
     item.duplicate_count && item.duplicate_count > 1
@@ -1016,7 +1150,9 @@ export function healthCard(item: ServiceHealth): string {
   return `
     <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker">${statusPill(presented.status, healthLabel(presented.status))} <span class="sr-only">${escapeHtml(HEALTH_LABELS[presented.status])}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
+        <p class="kicker">${statusPill(presented.status, ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido")} <span class="sr-only">${escapeHtml(
+          ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido",
+        )}</span> <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
       ${catalogError}
@@ -1033,7 +1169,7 @@ export function healthCard(item: ServiceHealth): string {
           "Última verificação",
           `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
         )}
-        ${fact("Estado avaliado", escapeHtml(HEALTH_LABELS[presented.status]))}
+        ${fact("Estado avaliado", escapeHtml(ownMapValue(HEALTH_LABELS, presented.status) ?? "estado de saúde não reconhecido"))}
         ${fact(
           item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
           item.latency_ms !== undefined
@@ -1073,6 +1209,7 @@ export function healthCard(item: ServiceHealth): string {
           { term: "service_name", value: item.service_name },
           { term: "status", value: item.status },
           { term: "scope", value: item.scope },
+          { term: "catalog_error", value: item.catalog_error ?? "" },
           { term: "partial_outage", value: item.partial_outage === undefined ? "" : String(item.partial_outage) },
         ],
         "service-health",
@@ -1121,6 +1258,14 @@ export function infraCatalogBlock(summary: InfraCatalogSummary): string {
           : ""
       }
     </dl>
+    ${technicalDetails(
+      [
+        { term: "freshness_status", value: summary.freshness_status },
+        { term: "availability", value: summary.availability ?? "" },
+        { term: "unavailability_reason", value: summary.unavailability_reason ?? "" },
+      ],
+      "infra-catalog-summary",
+    )}
   `;
 }
 
@@ -1175,7 +1320,7 @@ export function activityCard(item: AgentActivity): string {
       ${staleRunning}
       <dl class="facts">
         <div><dt>Agente / provedor</dt><dd>${escapeHtml(item.agent_id)}${item.provider ? ` / ${escapeHtml(item.provider)}` : ""}</dd></div>
-        <div><dt>Repositório / escopo</dt><dd>${escapeHtml(item.repo ?? item.scope)}</dd></div>
+        <div><dt>Repositório / escopo</dt><dd>${escapeHtml(item.repo ?? scopeLabel(item.scope))}</dd></div>
         <div><dt>Objetivo / campanha</dt><dd>${escapeHtml(item.goal)}${item.campaign ? ` · ${escapeHtml(item.campaign)}` : ""}</dd></div>
         ${listFact("Evidência", item.evidence_refs)}
         ${listFact("Bloqueios", item.blockers)}

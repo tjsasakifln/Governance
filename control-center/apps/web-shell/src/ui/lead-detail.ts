@@ -29,7 +29,16 @@
 import { formatLocal } from "../datetime";
 import { escapeHtml } from "../escape";
 import { formatMoney, isMoney } from "../money";
+import { ownMapValue } from "../own-map";
+import { sourcePresentationLabel, sourceSystemLabel } from "../provenance";
 import type { CommercialSnapshot } from "../types";
+import {
+  commercialEventLabel,
+  commercialStateLabel,
+  exceptionKindLabel,
+  pipelineStageLabel,
+  technicalDetails,
+} from "./labels";
 import { provenanceBlock } from "./provenance";
 
 /** Query parameter that turns a queue surface into this detail. */
@@ -349,11 +358,15 @@ export interface DetailField {
 }
 
 export interface HistoryEntry {
+  kind: "activity" | "exception";
   at: string | null;
   event: string;
   state: string | null;
   detail: string | null;
+  /** Authored label for the reading surface. */
   origin: string;
+  /** Upstream token, retained only in attributes and the collapsed technical detail. */
+  source: string | null;
 }
 
 export interface EvidenceEntry {
@@ -443,6 +456,27 @@ function ownerFrom(rows: readonly Record<string, unknown>[]): string | null {
     }
   }
   return null;
+}
+
+const HISTORY_SOURCE_LABELS: Record<string, string> = {
+  "warmbly.attention": "Warmbly · fila de atenção",
+  "warmbly.intel.exceptions": "Warmbly · exceções comerciais",
+};
+
+/**
+ * A history row may carry a projector namespace rather than presentation copy.
+ * Only recognized namespaces influence the authored label; every raw value is
+ * retained separately for the technical disclosure.
+ */
+function historyOriginLabel(
+  rawSource: string | null,
+  fallbackSystem: string,
+  subject: "atividade comercial" | "exceção comercial",
+): string {
+  const known = rawSource ? ownMapValue(HISTORY_SOURCE_LABELS, rawSource) : undefined;
+  if (known) return known;
+  const namespace = rawSource?.split(".", 1)[0] ?? fallbackSystem;
+  return `${sourceSystemLabel(namespace)} · ${subject}`;
 }
 
 function localActionsFor(opts: {
@@ -558,9 +592,9 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     (deal ? text(deal.next_action) : null) ??
     (firstException ? text(firstException.recommended_next_action) : null);
   const owner = ownerFrom(related);
-  const originSystem = input.snapshot.provenance.source.system;
-  const originLocator = input.snapshot.provenance.source.locator;
-  const rowOrigin = firstException ? text(firstException.source) : null;
+  const originSource = input.snapshot.provenance.source;
+  const originSystem = originSource.system;
+  const originLocator = originSource.locator;
 
   const fields: DetailField[] = [
     {
@@ -570,12 +604,12 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     },
     {
       label: "Origem",
-      value: found ? `${originSystem} · ${originLocator}${rowOrigin ? ` · ${rowOrigin}` : ""}` : null,
+      value: found ? sourcePresentationLabel(originSource) : null,
       ...(found ? {} : { absence: "nenhum registro casou com este identificador" }),
     },
     {
       label: "Estágio",
-      value: stage ?? activityState,
+      value: stage ? pipelineStageLabel(stage) : activityState ? commercialStateLabel(activityState) : null,
       ...(stage ?? activityState
         ? {}
         : { absence: "não projetado para este item — só há registro de atividade, sem negócio no pipeline" }),
@@ -595,22 +629,30 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   ];
 
   const history: HistoryEntry[] = activity
-    .map((row) => ({
-      at: text(row.at),
-      event: text(row.event) ?? "atividade",
-      state: text(row.state),
-      detail: text(row.evidence),
-      origin: `${originSystem} · atividade`,
-    }))
+    .map((row) => {
+      const source = text(row.source) ?? originSystem;
+      return {
+        kind: "activity" as const,
+        at: text(row.at),
+        event: text(row.event) ?? "atividade",
+        state: text(row.state),
+        detail: text(row.evidence),
+        origin: historyOriginLabel(text(row.source), originSystem, "atividade comercial"),
+        source,
+      };
+    })
     .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
 
   for (const row of exceptions) {
+    const source = text(row.source) ?? originSystem;
     history.push({
+      kind: "exception",
       at: text(row.observed_at),
       event: text(row.kind) ?? "exceção",
       state: text(row.status),
       detail: text(row.why),
-      origin: text(row.source) ?? `${originSystem} · exceção`,
+      origin: historyOriginLabel(text(row.source), originSystem, "exceção comercial"),
+      source,
     });
   }
   history.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
@@ -627,11 +669,11 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
   }
   for (const row of exceptions) {
     const why = text(row.why);
-    if (why) evidence.push({ label: `Exceção · ${text(row.kind) ?? "sem tipo"}`, value: why });
+    if (why) evidence.push({ label: `Exceção · ${exceptionKindLabel(text(row.kind) ?? "unknown")}`, value: why });
   }
   for (const row of activity) {
     const detail = text(row.evidence);
-    if (detail) evidence.push({ label: `Atividade · ${text(row.event) ?? "evento"}`, value: detail });
+    if (detail) evidence.push({ label: `Atividade · ${commercialEventLabel(text(row.event) ?? "activity")}`, value: detail });
   }
 
   const technicalIds: EvidenceEntry[] = [];
@@ -649,12 +691,18 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
     pushId("Negócio · canonical_id", text(deal.canonical_id));
   }
   if (firstActivity) pushId("Atividade · source_id", text(firstActivity.source_id));
+  if (stage) pushId("Negócio · stage", stage);
+  if (activityState) pushId("Atividade · state", activityState);
   for (const row of exceptions) {
     pushId("Exceção · id", text(row.id));
     pushId("Exceção · canonical_id", text(row.canonical_id));
   }
   pushId("Snapshot comercial", input.snapshot.id);
+  pushId("Origem (sistema)", originSystem);
+  pushId("Origem (tipo)", originSource.kind);
   pushId("Origem (locator)", originLocator);
+  for (const row of activity) pushId("Histórico de atividade · source", text(row.source));
+  for (const row of exceptions) pushId("Histórico de exceção · source", text(row.source));
 
   const openException = exceptions.some((row) => (text(row.status) ?? "open") === "open");
   const closedException = exceptions.some((row) => {
@@ -766,9 +814,10 @@ function confirmationControls(action: LeadAction): string {
 }
 
 function localActionForm(action: LeadAction, resource: string, canonicalId: string): string {
+  const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   return `
     <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
-      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(RISK_LABEL[action.risk])}</span></h4>
+      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonicalId)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(resource)}" />
@@ -779,9 +828,10 @@ function localActionForm(action: LeadAction, resource: string, canonicalId: stri
 }
 
 function warmblyActionForm(action: LeadAction, targetId: string): string {
+  const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   return `
     <form data-warmbly-dispatch="acknowledge" data-writes-to="warmbly" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
-      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(RISK_LABEL[action.risk])}</span></h4>
+      <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_id" value="${escapeHtml(targetId)}" />
       <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está reconhecendo" /></label>
@@ -795,13 +845,25 @@ function historySection(model: LeadDetailModel): string {
     return `<p class="banner empty">Nenhum evento observado para este item. Ausência de histórico não é ausência de trabalho — é o que esta coleta enxergou.</p>`;
   }
   return `<ol class="stack lead-history">${model.history
-    .map(
-      (entry) => `<li class="card" data-history-event="${escapeHtml(entry.event)}">
+    .map((entry) => {
+      const eventLabel = entry.kind === "exception"
+        ? exceptionKindLabel(entry.event)
+        : commercialEventLabel(entry.event);
+      const stateLabel = entry.state ? commercialStateLabel(entry.state) : null;
+      return `<li class="card" data-history-event="${escapeHtml(entry.event)}" data-history-source="${escapeHtml(entry.source ?? "")}">
         <p class="kicker">${timeCell(entry.at)} · ${escapeHtml(entry.origin)}</p>
-        <h4>${escapeHtml(entry.event)}${entry.state ? ` · ${escapeHtml(entry.state)}` : ""}</h4>
+        <h4>${escapeHtml(eventLabel)}${stateLabel ? ` · ${escapeHtml(stateLabel)}` : ""}</h4>
         ${entry.detail ? `<p>${escapeHtml(entry.detail)}</p>` : ""}
-      </li>`,
-    )
+        ${technicalDetails(
+          [
+            { term: "event", value: entry.event },
+            { term: "state", value: entry.state ?? "" },
+            { term: "source", value: entry.source ?? "" },
+          ],
+          "lead-history-event",
+        )}
+      </li>`;
+    })
     .join("")}</ol>`;
 }
 

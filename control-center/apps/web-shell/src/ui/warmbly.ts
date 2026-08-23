@@ -16,6 +16,7 @@
 
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
+import { ownMapValue } from "../own-map";
 import {
   DEFAULT_WARMBLY_SURFACE,
   WARMBLY_SURFACES,
@@ -25,6 +26,11 @@ import {
 import type { AdapterWriteResult } from "../adapters/contract";
 import type { ActorRef, CommercialSnapshot } from "../types";
 import type { PendingResumeConfirmation } from "../warmbly-confirmation";
+import {
+  operatorActionLabel,
+  operatorOutcomeLabel,
+  technicalDetails,
+} from "./labels";
 import { provenanceBlock } from "./provenance";
 
 /** Named once: the out-of-band way to stop outbound when this channel cannot. */
@@ -287,9 +293,11 @@ export function classifyDispatchOutcome(result: AdapterWriteResult): DispatchOut
   const code = typeof result.code === "string" && result.code !== "" ? result.code : null;
   const status = typeof result.status === "number" ? result.status : null;
   const rule =
-    (code ? OUTCOME_BY_CODE[code] : undefined) ??
-    (result.outcome ? OUTCOME_BY_CHANNEL_OUTCOME[result.outcome] : undefined) ??
-    (status !== null ? OUTCOME_BY_STATUS[status] : undefined) ??
+    (code ? ownMapValue(OUTCOME_BY_CODE, code) : undefined) ??
+    (result.outcome ? ownMapValue(OUTCOME_BY_CHANNEL_OUTCOME, result.outcome) : undefined) ??
+    (status !== null
+      ? ownMapValue(OUTCOME_BY_STATUS as unknown as Record<string, OutcomeRule>, String(status))
+      : undefined) ??
     (result.ok
       ? OUTCOME_BY_CHANNEL_OUTCOME.executed!
       : {
@@ -311,8 +319,15 @@ export function classifyDispatchOutcome(result: AdapterWriteResult): DispatchOut
 function outcomeBlock(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const view = classifyDispatchOutcome(result);
-  const tone = OUTCOME_TONE[view.kind];
+  const tone = ownMapValue(OUTCOME_TONE, view.kind) ?? "stale";
   const role = view.kind === "executed" || view.kind === "challenged" ? "status" : "alert";
+  const summary: Record<DispatchOutcomeKind, string> = {
+    executed: "A ação foi aceita pelo canal de operação.",
+    challenged: "A ação ainda não foi executada; falta a confirmação final.",
+    refused: "A ação foi recusada e não deve ser repetida sem corrigir a causa.",
+    failed: "A tentativa falhou; confirme o estado observado antes de tentar novamente.",
+    unknown: "Não foi possível comprovar se a ação chegou a ser aplicada.",
+  };
   return `
     <article
       class="card banner ${tone}"
@@ -321,10 +336,20 @@ function outcomeBlock(result: AdapterWriteResult | undefined): string {
       data-outcome-code="${escapeHtml(view.code ?? "")}"
       data-outcome-status="${view.status ?? ""}"
     >
-      <p class="kicker"><span class="pill">${escapeHtml(OUTCOME_LABELS[view.kind])}</span></p>
+      <p class="kicker"><span class="pill">${escapeHtml(ownMapValue(OUTCOME_LABELS, view.kind) ?? "DESFECHO NÃO RECONHECIDO")}</span></p>
       <h3>${escapeHtml(view.title)}</h3>
-      <p data-outcome-detail="true">${escapeHtml(view.detail)}</p>
+      <p data-outcome-detail="true">${escapeHtml(ownMapValue(summary, view.kind) ?? "O canal retornou um desfecho não reconhecido.")}</p>
       <p class="constraint" data-outcome-recovery="true">O que fazer agora: ${escapeHtml(view.recovery)}</p>
+      ${technicalDetails(
+        [
+          { term: "path", value: result.path },
+          { term: "message", value: view.detail },
+          { term: "code", value: view.code ?? "" },
+          { term: "status", value: view.status === null ? "" : String(view.status) },
+          { term: "outcome", value: result.outcome ?? "" },
+        ],
+        "warmbly-operator-result",
+      )}
     </article>`;
 }
 
@@ -369,7 +394,7 @@ export function readDispatch(operations: Record<string, unknown>): DispatchReadi
   const state = typeof d.state === "string" && d.state !== "" ? d.state : "UNKNOWN";
   return {
     state,
-    stateLabel: state === "PAUSED" ? "PAUSADO" : state === "ACTIVE" ? "ATIVO" : "DESCONHECIDO",
+    stateLabel: state === "PAUSED" ? "pausado" : state === "ACTIVE" ? "ativo" : "desconhecido",
     observed: d.observed === true,
     pauseReason: show(d.pause_reason),
     window:
@@ -414,7 +439,7 @@ function stateBlock(reading: DispatchReading, provenance: CommercialSnapshot["pr
       ${
         reading.observed
           ? ""
-          : `<p class="constraint" data-dispatch-unobserved="true">Nenhuma leitura de disparo foi observada nesta coleta. DESCONHECIDO não é ATIVO nem PAUSADO: não conclua que o outbound está parado.</p>`
+          : `<p class="constraint" data-dispatch-unobserved="true">Nenhuma leitura de disparo foi observada nesta coleta. Estado desconhecido não significa ativo nem pausado: não conclua que o disparo está parado.</p>`
       }
       ${reading.why ? `<p class="constraint">${escapeHtml(reading.why)}</p>` : ""}
       ${provenance ? provenanceBlock(provenance) : ""}
@@ -427,18 +452,31 @@ function stateBlock(reading: DispatchReading, provenance: CommercialSnapshot["pr
 
 function ledgerRow(entry: Record<string, unknown>): string {
   const refusal = show(entry.refusal_code);
+  const action = show(entry.action);
+  const outcome = show(entry.outcome);
+  const refusalLabel = refusal === "—"
+    ? "sem recusa registrada"
+    : ownMapValue(OUTCOME_BY_CODE, refusal)?.title ?? "código de recusa não reconhecido";
   return `
     <article class="card" data-ledger-entry="${escapeHtml(show(entry.outcome))}">
-      <p class="kicker"><span class="pill">${escapeHtml(show(entry.outcome))}</span> <span class="scope">${escapeHtml(show(entry.action))}</span></p>
+      <p class="kicker"><span class="pill">${escapeHtml(operatorOutcomeLabel(outcome))}</span> <span class="scope">${escapeHtml(operatorActionLabel(action))}</span></p>
       <h3>${escapeHtml(stamp(entry.recorded_at))}</h3>
       <dl class="facts">
         ${fact("Operador registrado", show(entry.actor_id))}
         ${fact("Alvo", show(entry.target))}
         ${fact("Motivo registrado", show(entry.reason))}
-        ${fact("Código de recusa", refusal)}
-        ${fact("Status upstream", show(entry.upstream_status))}
-        ${fact("Correlação", show(entry.correlation_id))}
+        ${fact("Recusa", refusalLabel)}
       </dl>
+      ${technicalDetails(
+        [
+          { term: "action", value: action },
+          { term: "outcome", value: outcome },
+          { term: "refusal_code", value: refusal === "—" ? "" : refusal },
+          { term: "upstream_status", value: show(entry.upstream_status) },
+          { term: "correlation_id", value: show(entry.correlation_id) },
+        ],
+        "warmbly-ledger-entry",
+      )}
     </article>`;
 }
 
@@ -465,7 +503,14 @@ function auditBlock(operations: Record<string, unknown>, operator: ActorRef): st
   return `
     <section class="stack" aria-labelledby="warmbly-auditoria" data-ledger-status="${escapeHtml(status)}">
       <h2 id="warmbly-auditoria">Trilha recente de auditoria</h2>
-      <p class="constraint">Toda chamada entra na trilha, executada ou recusada, como <code>control-center.warmbly-operator-action.v1</code>, espelhada em <code>domains/agent-activity</code>.</p>
+      <p class="constraint">Toda chamada entra na trilha de auditoria, executada ou recusada.</p>
+      ${technicalDetails(
+        [
+          { term: "schema", value: "control-center.warmbly-operator-action.v1" },
+          { term: "espelho", value: "domains/agent-activity" },
+        ],
+        "warmbly-ledger-contract",
+      )}
       <article class="card" data-operator-identity="true">
         <h3>Identidade do operador</h3>
         <dl class="facts">
@@ -514,7 +559,7 @@ function controlsBlock(
         <p>Um passo. Interrompe o disparo; nada é enviado enquanto durar a pausa.</p>
         <form data-warmbly-dispatch="pause" class="operator-form">
           <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">PAUSAR OUTBOUND</button>
+          <button type="submit">Pausar disparos</button>
         </form>
       </article>
       <article class="card" data-two-step="true">
@@ -528,7 +573,7 @@ function controlsBlock(
         }
         <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
           <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando"${confirmation ? ` value="${escapeHtml(confirmation.reason)}" readonly` : ""} /></label>
-          <button type="submit">${confirmationArmed ? "CONFIRMAR RETOMADA (passo 2 de 2)" : "RETOMAR OUTBOUND (passo 1 de 2)"}</button>
+          <button type="submit">${confirmationArmed ? "Confirmar retomada (passo 2 de 2)" : "Retomar disparos (passo 1 de 2)"}</button>
         </form>
       </article>
       <article class="card">
@@ -537,7 +582,7 @@ function controlsBlock(
         <form data-warmbly-dispatch="acknowledge" class="operator-form">
           <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
           <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">RECONHECER ALERTA</button>
+          <button type="submit">Reconhecer alerta</button>
         </form>
       </article>
     </section>`;
@@ -561,13 +606,20 @@ function operationSurface(input: WarmblySurfaceInput): string {
         ${
           hasLast
             ? `<dl class="facts">
-                ${fact("Ação", show(lastAction.action))}
-                ${fact("Desfecho", show(lastAction.outcome))}
+                ${fact("Ação", operatorActionLabel(show(lastAction.action)))}
+                ${fact("Desfecho", operatorOutcomeLabel(show(lastAction.outcome)))}
                 ${fact("Operador registrado", show(lastAction.actor_id))}
                 ${fact("Quando", stamp(lastAction.recorded_at))}
                 ${fact("Motivo registrado", show(lastAction.reason))}
-                ${fact("Código de recusa", show(lastAction.refusal_code))}
-              </dl>`
+              </dl>
+              ${technicalDetails(
+                [
+                  { term: "action", value: show(lastAction.action) },
+                  { term: "outcome", value: show(lastAction.outcome) },
+                  { term: "refusal_code", value: show(lastAction.refusal_code) },
+                ],
+                "warmbly-last-action",
+              )}`
             : `<p class="banner empty">Nenhuma ação de operador conhecida nesta instância. Veja a trilha abaixo antes de concluir que ninguém agiu.</p>`
         }
       </article>
@@ -590,7 +642,7 @@ function warmblySubnav(current: WarmblySurface): string {
   return `<nav class="subnav" aria-label="Superfícies de operação Warmbly">${WARMBLY_SURFACES.map(
     (id) =>
       `<a href="#/warmbly/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
-        WARMBLY_SURFACE_LABELS[id],
+        ownMapValue(WARMBLY_SURFACE_LABELS, id) ?? "Operação",
       )}</a>`,
   ).join("")}</nav>`;
 }
@@ -601,5 +653,6 @@ export function resolveWarmblySurface(surface: string | null | undefined): Warmb
 
 export function warmblyBlock(input: WarmblySurfaceInput, surface: string | null | undefined): string {
   const current = resolveWarmblySurface(surface);
-  return `${warmblySubnav(current)}${WARMBLY_SURFACE_RENDERERS[current](input)}`;
+  const render = ownMapValue(WARMBLY_SURFACE_RENDERERS, current) ?? operationSurface;
+  return `${warmblySubnav(current)}${render(input)}`;
 }

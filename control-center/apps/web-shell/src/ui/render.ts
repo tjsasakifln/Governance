@@ -1,4 +1,5 @@
 import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
+import { WARMBLY_DISPATCH_PATHS } from "../adapters/paths";
 import {
   BRAND_LOGO_HEIGHT,
   BRAND_LOGO_SRC,
@@ -6,6 +7,7 @@ import {
 } from "../brand";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
+import { ownMapValue } from "../own-map";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
 import {
   DEFAULT_LOADING_LABEL,
@@ -97,17 +99,26 @@ function priorityCard(item: PriorityRecommendation, now: string): string {
 }
 
 function sessionCard(item: AgentSession): string {
+  const requested = item.requested_scopes.map(scopeLabel);
+  const granted = item.granted_scopes.map(scopeLabel);
   return `
-    <article class="card session" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}">
+    <article class="card session" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-requested-scopes="${escapeHtml(item.requested_scopes.join(" "))}" data-granted-scopes="${escapeHtml(item.granted_scopes.join(" "))}">
       <header>
         <p class="kicker">${statusPill(item.status, agentSessionStatusLabel(item.status))} <span class="scope">${escapeHtml(item.agent_id)}</span></p>
         <h3>${escapeHtml(item.agent_id)}</h3>
       </header>
       <p>${escapeHtml(item.purpose)}</p>
       <dl class="facts">
-        <div><dt>Escopos pedidos</dt><dd>${escapeHtml(item.requested_scopes.join(", ") || "—")}</dd></div>
-        <div><dt>Escopos concedidos</dt><dd>${escapeHtml(item.granted_scopes.join(", ") || "nenhum")}</dd></div>
+        <div><dt>Escopos pedidos</dt><dd>${escapeHtml(requested.join(", ") || "—")}</dd></div>
+        <div><dt>Escopos concedidos</dt><dd>${escapeHtml(granted.join(", ") || "nenhum")}</dd></div>
       </dl>
+      ${technicalDetails(
+        [
+          { term: "requested_scopes", value: item.requested_scopes.join(",") },
+          { term: "granted_scopes", value: item.granted_scopes.join(",") },
+        ],
+        "agent-session-scopes",
+      )}
     </article>
   `;
 }
@@ -117,7 +128,19 @@ function viewBanner(view: ViewState<DestinationPage>): string {
     return `<div class="banner loading" role="status">${escapeHtml(DEFAULT_LOADING_LABEL)}</div>`;
   }
   if (view.kind === "error") {
-    return `<div class="banner error" role="alert"><p>${escapeHtml(view.message)}</p>${technicalDetails([{ term: "codigo_do_erro", value: view.code }], "view-error")}</div>`;
+    const message =
+      view.code === "UNKNOWN_DESTINATION"
+        ? "Este destino não existe."
+        : view.code === "CONTEXT_UNAVAILABLE"
+          ? "Não foi possível carregar este recorte."
+          : "Não foi possível exibir este recorte.";
+    return `<div class="banner error" role="alert"><p>${escapeHtml(message)}</p>${technicalDetails(
+      [
+        { term: "codigo_do_erro", value: view.code },
+        { term: "mensagem_original", value: view.message },
+      ],
+      "view-error",
+    )}</div>`;
   }
   if (view.kind === "empty") {
     return `<div class="banner empty" role="status">${escapeHtml(view.message)}</div>`;
@@ -148,18 +171,32 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
       : receipt?.writes_to === "warmbly"
         ? "Releia o estado do Warmbly para confirmar o efeito observado."
         : "A mudança ficou apenas na auditoria local; execute a correção indicada na origem quando aplicável.";
+  const message = !result.ok
+    ? "A ação não foi concluída. Consulte o detalhe técnico antes de tentar novamente."
+    : result.path === WARMBLY_DISPATCH_PATHS.pause
+      ? "Disparos pausados."
+      : result.path === WARMBLY_DISPATCH_PATHS.resume_confirm
+        ? "Confirmação registrada. Envie novamente para retomar os disparos."
+        : result.path === WARMBLY_DISPATCH_PATHS.resume
+          ? "Disparos retomados."
+          : result.path === WARMBLY_DISPATCH_PATHS.acknowledge
+            ? "Alerta reconhecido."
+            : result.path === "/v1/operator-actions"
+              ? "Ação registrada no Control Center."
+              : "Ação concluída.";
   return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}" data-operator-outcome="${escapeHtml(result.outcome ?? (result.ok ? "accepted" : "refused"))}">
-    <p>${escapeHtml(result.message)}</p>
+    <p>${escapeHtml(message)}</p>
     <p><strong>Próxima ação:</strong> ${escapeHtml(recovery)}</p>
     ${receipt ? `<dl class="facts" data-action-receipt="true">
       <div data-receipt-id="${escapeHtml(receipt.id)}"><dt>Receipt</dt><dd>registro append-only confirmado</dd></div>
       <div><dt>Ator</dt><dd>${escapeHtml(receipt.actor_id ?? (receipt.writes_to === "warmbly" ? "sessão autenticada na borda" : "não retornado"))}</dd></div>
       <div data-correlation-id="${escapeHtml(receipt.correlation_id)}"><dt>Sessão/correlação</dt><dd>registrada para esta ação</dd></div>
-      <div><dt>Desfecho</dt><dd>${escapeHtml(outcomeLabels[receipt.outcome] ?? "desfecho não catalogado")}</dd></div>
+      <div><dt>Desfecho</dt><dd>${escapeHtml(ownMapValue(outcomeLabels, receipt.outcome) ?? "desfecho não catalogado")}</dd></div>
       <div><dt>Fronteira de escrita</dt><dd>${receipt.writes_to === "warmbly" ? "Warmbly" : "somente Control Center"}</dd></div>
     </dl>` : ""}
     ${technicalDetails([
       { term: "path", value: result.path },
+      { term: "mensagem_original", value: result.message },
       { term: "code", value: result.code ?? "" },
       { term: "http_status", value: result.status === undefined ? "" : String(result.status) },
       { term: "receipt_id", value: receipt?.id ?? "" },

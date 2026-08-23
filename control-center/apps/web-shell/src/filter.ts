@@ -1,6 +1,7 @@
 import { withQueryParams } from "./destinations";
 import type { OperationalTruth } from "@confenge/control-center-contracts";
 import { parseOperationalTruth } from "./ui/operational-truth";
+import { ownMapValue } from "./own-map";
 
 /**
  * Search, filter, sort and pagination for the long operational lists.
@@ -367,7 +368,7 @@ function stateRank(row: Record<string, unknown>, spec: ListSpec): number {
 
 function priorityRank(row: Record<string, unknown>, spec: ListSpec): number {
   const raw = fieldText(row, spec.priorityFields).toLowerCase();
-  return PRIORITY_RANK[raw] ?? 2;
+  return ownMapValue(PRIORITY_RANK, raw) ?? 2;
 }
 
 export function identityOf(row: Record<string, unknown>, spec: ListSpec): string {

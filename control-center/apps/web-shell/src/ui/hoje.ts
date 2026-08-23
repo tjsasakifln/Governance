@@ -1,15 +1,11 @@
 import { alertBody, alertDataAttributes } from "./alert-card";
 import { escapeHtml } from "../escape";
 import { formatMoney } from "../money";
+import { sourcePresentationLabel } from "../provenance";
+import { ownMapValue } from "../own-map";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
 import { WRITE_SHORTCUT_LABELS } from "../adapters/paths";
 import { freshnessTone } from "../freshness-tone";
-import {
-  domainStateTone,
-  type HojeDomainCard,
-  type HojeDomainSummary,
-  type HojeIntegration,
-} from "../hoje-domains";
 import {
   CONFIDENCE_HELP,
   confidenceWord,
@@ -20,6 +16,12 @@ import {
   statusPill,
   technicalDetails,
 } from "./labels";
+import {
+  domainStateTone,
+  type HojeDomainCard,
+  type HojeDomainSummary,
+  type HojeIntegration,
+} from "../hoje-domains";
 import { operationalTruthBlock, parseOperationalTruth } from "./operational-truth";
 
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
@@ -60,7 +62,7 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
       <p>${escapeHtml(row.summary)}</p>
       ${money}
       <div class="prov-inline">
-        <span>Origem: ${escapeHtml(row.source.system)}</span>
+        <span>Origem: ${escapeHtml(sourcePresentationLabel(row.source))}</span>
         · Observado <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
         <span class="sr-only">UTC ${escapeHtml(row.observed_at)}</span>
         · ${helpTerm("confiança", CONFIDENCE_HELP)} ${escapeHtml(confidence)}
@@ -85,7 +87,7 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
 function shortcutForm(section: HojeSection): string {
   return section.shortcuts
     .map((shortcut) => {
-      const label = WRITE_SHORTCUT_LABELS[shortcut.kind];
+      const label = ownMapValue(WRITE_SHORTCUT_LABELS, shortcut.kind) ?? "Atalho operacional";
       return `
         <form class="shortcut-form" data-shortcut-form="${escapeHtml(shortcut.kind)}" data-write-path="/v1/directives">
           <h3>${escapeHtml(label)}</h3>
@@ -129,10 +131,15 @@ function domainCard(card: HojeDomainCard): string {
   const confidence =
     card.confidence === null ? "sem leitura" : String(card.confidence).replace(".", ",");
   const source = card.source
-    ? `${card.source.system} · ${card.source.kind}`
+    ? sourcePresentationLabel(card.source)
     : "origem não informada";
+  const absenceLabels = {
+    no_data: "sem dados",
+    not_configured: "não configurado",
+    upstream_error: "erro na origem",
+  } as const;
   const absence = card.absence_reason
-    ? ` <span class="pill" data-absence-reason="${escapeHtml(card.absence_reason)}">${escapeHtml(card.absence_reason)}</span>`
+    ? ` ${statusPill(card.absence_reason, ownMapValue(absenceLabels, card.absence_reason) ?? "motivo não reconhecido")}`
     : "";
   return `
     <article class="card domain-card" data-domain-card="${escapeHtml(card.id)}" data-domain-state="${escapeHtml(card.state)}" data-freshness="${escapeHtml(card.freshness_status)}" data-tone="${escapeHtml(tone)}" data-presence="${escapeHtml(card.presence)}" data-action-count="${escapeHtml(String(card.action_count))}">
@@ -157,6 +164,16 @@ function domainCard(card: HojeDomainCard): string {
         · confiança ${escapeHtml(confidence)}
       </p>
       <p class="domain-link"><a href="${escapeHtml(card.href)}" data-domain-link="${escapeHtml(card.id)}">${escapeHtml(card.href_label)} (${escapeHtml(String(card.action_count))} sinal(is))</a></p>
+      ${technicalDetails(
+        card.source
+          ? [
+              { term: "sistema", value: card.source.system },
+              { term: "tipo_de_origem", value: card.source.kind },
+              { term: "locator", value: card.source.locator },
+            ]
+          : [],
+        "hoje-domain-source",
+      )}
     </article>
   `;
 }
@@ -167,11 +184,21 @@ function domainCard(card: HojeDomainCard): string {
  * and duplicating it here only creates a second place for the two to disagree.
  */
 function integrationRow(row: HojeIntegration): string {
-  return `<li data-integration="${escapeHtml(row.system)}" data-domain-state="${escapeHtml(row.state)}" data-freshness="${escapeHtml(row.freshness_status)}">
+  return `<li data-integration="${escapeHtml(row.system)}" data-domain-state="${escapeHtml(row.state)}" data-freshness="${escapeHtml(row.freshness_status)}" data-integration-error="${escapeHtml(row.error_code ?? "")}">
     <span class="pill pill-state-${escapeHtml(row.state)}">${escapeHtml(row.state_label)}</span>
-    <strong>${escapeHtml(row.system)}</strong> — ${escapeHtml(row.detail)}
-    <div class="prov-inline">${freshnessPill(row.freshness_status)} · última leitura ${escapeHtml(row.observed_at_local)}</div>
-    ${technicalDetails([{ term: "error_code", value: row.error_code ?? "" }], "integration-error")}
+    <strong>${escapeHtml(row.system_label)}</strong> — ${escapeHtml(row.detail)}
+    ${freshnessPill(row.freshness_status)}
+    <div class="prov-inline">última leitura ${escapeHtml(row.observed_at_local)}</div>
+    ${technicalDetails(
+      [
+        { term: "sistema", value: row.system },
+        { term: "tipo_de_origem", value: row.source_kind },
+        { term: "locator", value: row.source_locator },
+        { term: "error_code", value: row.error_code ?? "" },
+        { term: "error_message", value: row.error_message ?? "" },
+      ],
+      "hoje-integration",
+    )}
   </li>`;
 }
 

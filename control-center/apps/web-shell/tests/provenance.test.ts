@@ -4,9 +4,9 @@ import { FINANCE_SNAPSHOT, FRESHNESS_SAMPLES } from "../src/fixtures/catalog";
 import { PRESENTATION_TIME_ZONE } from "../src/datetime";
 import { formatMoney } from "../src/money";
 import {
-  freshnessLabel,
   mapProvenance,
   provenanceFromPresentation,
+  freshnessLabel,
   sourceKindLabel,
   sourcePresentationLabel,
   sourceSystemLabel,
@@ -40,7 +40,29 @@ test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation 
   assert.equal(FRESHNESS_SAMPLES.UNKNOWN?.freshness_status, "UNKNOWN");
 });
 
-test("provenance catalogues reject inherited property names", () => {
+test("source presentation translates known kinds and never exposes an unknown source token", () => {
+  const knownKinds: Record<string, string> = {
+    "crm-read-model": "leitura comercial",
+    "receivable-read": "leitura de recebíveis",
+    "repo-read": "leitura do repositório",
+    report: "relatório operacional",
+    snapshot: "instantâneo operacional",
+  };
+  for (const [kind, label] of Object.entries(knownKinds)) {
+    const shown = sourcePresentationLabel({ system: "asaas", kind, locator: "technical/locator" });
+    assert.match(shown, new RegExp(label));
+    assert.doesNotMatch(shown, new RegExp(kind));
+  }
+  const unknown = sourcePresentationLabel({
+    system: "FUTURE_SOURCE_SYSTEM",
+    kind: "FUTURE_SOURCE_KIND",
+    locator: "technical/locator",
+  });
+  assert.equal(unknown, "Sistema de origem · leitura operacional");
+  assert.doesNotMatch(unknown, /FUTURE_SOURCE/);
+});
+
+test("provenance catalogues ignore inherited Object.prototype properties", () => {
   for (const poisoned of ["constructor", "toString", "__proto__"]) {
     assert.equal(sourceSystemLabel(poisoned), "Sistema de origem");
     assert.equal(sourceKindLabel(poisoned), "leitura operacional");

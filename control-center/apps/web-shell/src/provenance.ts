@@ -51,17 +51,18 @@ const SOURCE_KIND_LABELS: Record<string, string> = {
   snapshot: "instantâneo operacional",
 };
 
+/** Rótulo visível seguro; sistema, tipo e locator crus ficam no detalhe técnico. */
+export function sourcePresentationLabel(source: Provenance["source"]): string {
+  if (source.label) return source.label;
+  return `${sourceSystemLabel(source.system)} · ${sourceKindLabel(source.kind)}`;
+}
+
 export function sourceSystemLabel(system: string): string {
   return ownMapValue(SOURCE_SYSTEM_LABELS, system) ?? "Sistema de origem";
 }
 
 export function sourceKindLabel(kind: string): string {
   return ownMapValue(SOURCE_KIND_LABELS, kind) ?? "leitura operacional";
-}
-
-export function sourcePresentationLabel(source: Provenance["source"]): string {
-  if (source.label) return source.label;
-  return `${sourceSystemLabel(source.system)} · ${sourceKindLabel(source.kind)}`;
 }
 
 export function freshnessLabel(status: FreshnessStatus): string {

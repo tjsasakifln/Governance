@@ -14,8 +14,8 @@
  *    cru que sai da superfície principal reaparece em `technicalDetails()`,
  *    recolhido e selecionável para cópia.
  * 3. **Código desconhecido não vira texto de interface.** Um valor novo recebe
- *    um rótulo autoral honesto; o token original continua disponível somente
- *    nos dados e no detalhe técnico.
+ *    um rótulo autoral honesto (“estado não reconhecido” e equivalentes); o
+ *    token original continua disponível somente nos dados e no detalhe técnico.
  *
  * O mapa de atualização é semeado por `freshnessLabel` de `../provenance`
  * (`FRESH→fresco`, `STALE→defasado`, `UNKNOWN→desconhecido`,
@@ -185,8 +185,7 @@ export const PROVIDER_MUTATION_LABELS: Record<string, string> = {
 
 /**
  * Códigos de exceção comercial. `missing_version` e `orphan` chegam como texto
- * livre do Warmbly — não há enum no backend — então o fallback devolve o
- * código cru em vez de inventar tradução.
+ * livre do Warmbly, mas valores novos ainda usam um fallback autoral seguro.
  */
 export const EXCEPTION_KIND_LABELS: Record<string, string> = {
   exception: "exceção",
@@ -256,9 +255,6 @@ export const OPERATOR_ACTION_LABELS: Record<string, string> = {
   REJECT_NEXT_ACTION: "rejeitar próxima ação",
   RECORD_NOTE: "registrar nota",
   MARK_REVIEWED: "marcar como revisado",
-  ASSIGN_TRIAGE: "atribuir triagem",
-  MARK_TRIAGED: "marcar como triado",
-  START_EXCEPTION_WORK: "iniciar tratamento da exceção",
 };
 
 /** Desfecho de uma ação do operador (`operator/channel.ts`). */
@@ -266,12 +262,18 @@ export const OPERATOR_OUTCOME_LABELS: Record<string, string> = {
   executed: "executada",
   challenged: "aguardando confirmação",
   refused: "recusada",
+  failed: "falhou",
   unknown: "sem resposta do Warmbly",
   accepted: "aceita",
   rejected: "rejeitada",
   duplicate: "duplicada",
 };
 
+/**
+ * Valores que o projetor comercial realmente publica em `operations.activity`.
+ * O token continua em `data-*` e no detalhe técnico; esta tabela cuida apenas
+ * da leitura humana.
+ */
 export const COMMERCIAL_EVENT_LABELS: Record<string, string> = {
   activity: "atividade",
   overdue_task: "tarefa atrasada",
@@ -310,6 +312,7 @@ export const COMMERCIAL_EVENT_LABELS: Record<string, string> = {
   unknown: "atividade desconhecida",
 };
 
+/** Estados de negócio, tarefa e caixa de entrada emitidos pelo Warmbly. */
 export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
   open: "aberto",
   pending: "pendente",
@@ -336,14 +339,13 @@ export const COMMERCIAL_STATE_LABELS: Record<string, string> = {
   lost: "perdido",
   failed: "falhou",
   error: "falhou",
-  blocked: "bloqueado",
-  triaged: "triado",
   acknowledged: "reconhecido",
   resolved: "resolvido",
-  discarded: "descartado",
+  dismissed: "descartado",
   unknown: "desconhecido",
 };
 
+/** Estágios conhecidos; qualquer valor novo segue o fallback seguro abaixo. */
 export const PIPELINE_STAGE_LABELS: Record<string, string> = {
   ...COMMERCIAL_STATE_LABELS,
   Proposta: "Proposta",
@@ -359,8 +361,50 @@ export const PIPELINE_STAGE_LABELS: Record<string, string> = {
 
 export const UNRECOGNIZED_COMMERCIAL_STATE_LABEL = "estado não reconhecido";
 
+export const ROUTE_CLASS_LABELS: Record<string, string> = {
+  DIRECT_PERSON: "pessoa identificada diretamente",
+  DIRECT_COMPANY: "empresa identificada diretamente",
+  INBOUND: "mensagem recebida",
+  UNKNOWN: "classe de rota desconhecida",
+};
+
+export const PROVIDER_LABELS: Record<string, string> = {
+  smtp: "SMTP",
+  warmbly: "Warmbly",
+  UNKNOWN: "provedor desconhecido",
+};
+
+export const AUTHORIZATION_STATE_LABELS: Record<string, string> = {
+  active: "ativa",
+  authorized: "autorizada",
+  revoked: "revogada",
+  expired: "expirada",
+  pending: "pendente",
+  UNKNOWN: "desconhecida",
+};
+
+export const GO_REVIEW_VERDICT_LABELS: Record<string, string> = {
+  GO: "aprovado para prosseguir",
+  NO_GO: "não aprovado",
+  approved: "aprovado para prosseguir",
+  rejected: "não aprovado",
+  pending: "pendente",
+  UNKNOWN: "desconhecido",
+};
+
+export const DISPATCH_STATE_LABELS: Record<string, string> = {
+  ACTIVE: "ativo",
+  PAUSED: "pausado",
+  UNKNOWN: "desconhecido",
+  active: "ativo",
+  paused: "pausado",
+  blocked_outside_window: "bloqueado fora da janela de envio",
+  blocked: "bloqueado",
+  ready: "pronto",
+};
+
 /* ------------------------------------------------------------------ */
-/* Consultas tolerantes: valor desconhecido volta como veio.           */
+/* Consultas tolerantes: cada catálogo define seu fallback seguro.     */
 /* ------------------------------------------------------------------ */
 
 function lookup(table: Record<string, string>, value: string, fallback: string): string {
@@ -432,21 +476,47 @@ export function operatorOutcomeLabel(outcome: string): string {
 }
 
 export function commercialEventLabel(event: string): string {
-  return ownMapValue(COMMERCIAL_EVENT_LABELS, event)
-    ?? ownMapValue(COMMERCIAL_EVENT_LABELS, event.toLowerCase())
-    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+  return (
+    ownMapValue(COMMERCIAL_EVENT_LABELS, event) ??
+    ownMapValue(COMMERCIAL_EVENT_LABELS, event.toLowerCase()) ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
 }
 
 export function commercialStateLabel(state: string): string {
-  return ownMapValue(COMMERCIAL_STATE_LABELS, state)
-    ?? ownMapValue(COMMERCIAL_STATE_LABELS, state.toLowerCase())
-    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+  return (
+    ownMapValue(COMMERCIAL_STATE_LABELS, state) ??
+    ownMapValue(COMMERCIAL_STATE_LABELS, state.toLowerCase()) ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
 }
 
 export function pipelineStageLabel(stage: string): string {
-  return ownMapValue(PIPELINE_STAGE_LABELS, stage)
-    ?? ownMapValue(PIPELINE_STAGE_LABELS, stage.toLowerCase())
-    ?? UNRECOGNIZED_COMMERCIAL_STATE_LABEL;
+  return (
+    ownMapValue(PIPELINE_STAGE_LABELS, stage) ??
+    ownMapValue(PIPELINE_STAGE_LABELS, stage.toLowerCase()) ??
+    UNRECOGNIZED_COMMERCIAL_STATE_LABEL
+  );
+}
+
+export function routeClassLabel(value: string): string {
+  return lookup(ROUTE_CLASS_LABELS, value, "classe de rota não reconhecida");
+}
+
+export function providerLabel(value: string): string {
+  return lookup(PROVIDER_LABELS, value, "provedor não reconhecido");
+}
+
+export function authorizationStateLabel(value: string): string {
+  return lookup(AUTHORIZATION_STATE_LABELS, value, UNRECOGNIZED_COMMERCIAL_STATE_LABEL);
+}
+
+export function goReviewVerdictLabel(value: string): string {
+  return lookup(GO_REVIEW_VERDICT_LABELS, value, "veredito não reconhecido");
+}
+
+export function dispatchStateLabel(value: string): string {
+  return lookup(DISPATCH_STATE_LABELS, value, UNRECOGNIZED_COMMERCIAL_STATE_LABEL);
 }
 
 /**
@@ -462,9 +532,8 @@ export function hopStatusLabel(status: string): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Termo com ajuda contextual. O texto de ajuda vai em `title` (dica do
- * navegador) e em `data-help` — assim um teste consegue afirmar que a ajuda
- * existe sem depender de hover.
+ * Termo com ajuda contextual. `details/summary` oferece o mesmo conteúdo a
+ * mouse, teclado e toque sem depender de JavaScript ou de hover.
  */
 export function helpTerm(term: string, help: string): string {
   return `<details class="term-help"><summary class="term" data-help="${escapeHtml(help)}" title="${escapeHtml(help)}">${escapeHtml(term)}<span class="sr-only"> — abrir ajuda contextual</span></summary><span class="term-help-text" role="note">${escapeHtml(help)}</span></details>`;
@@ -480,9 +549,8 @@ export function statusPill(raw: string, label: string, extraClass = ""): string 
 }
 
 /**
- * Pílula de atualização. Carrega a ajuda contextual em `title`/`data-help`
- * porque "atualização" é um dos conceitos que a issue exige explicar em toda
- * superfície onde aparece, e ela aparece em quase todas.
+ * Pílula de atualização com a mesma divulgação nativa acessível de
+ * `helpTerm()`. O enum cru permanece em `data-raw`.
  */
 export function freshnessPill(status: FreshnessStatus): string {
   return `<details class="term-help freshness-help"><summary class="pill pill-${escapeHtml(status.toLowerCase())}" data-raw="${escapeHtml(status)}" data-help="${escapeHtml(FRESHNESS_HELP)}" title="${escapeHtml(FRESHNESS_HELP)}">${escapeHtml(freshnessLabel(status))}<span class="sr-only"> — abrir ajuda sobre atualização</span></summary><span class="term-help-text" role="note">${escapeHtml(FRESHNESS_HELP)}</span></details>`;

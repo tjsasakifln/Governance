@@ -26,6 +26,13 @@ import { jsonResponse, operationalRouter } from "./helpers";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 /**
  * Responses recorded from the real `services/context` server with the real
  * operator channel mounted. `services/context/test/warmbly-operator-wire-shapes.test.ts`
@@ -153,6 +160,22 @@ test("every recorded channel response is classified as executed, refused, failed
     assert.match(view.recovery, want.recovery, `${item.name} recovery guidance`);
     assert.ok(view.detail.length > 0, `${item.name} has no detail line`);
     assert.doesNotMatch(view.detail, /^HTTP \d+$/, `${item.name} detail is a bare status`);
+  }
+});
+
+test("dispatch outcome catalogues ignore inherited property names", () => {
+  for (const poisoned of ["constructor", "toString", "__proto__"]) {
+    const view = classifyDispatchOutcome({
+      ok: false,
+      path: "/v1/warmbly/operator/actions",
+      kind: "nota",
+      message: poisoned,
+      code: poisoned,
+      outcome: poisoned,
+    });
+    assert.equal(view.kind, "unknown");
+    assert.equal(view.title, "Desfecho não classificado");
+    assert.equal(view.code, poisoned);
   }
 });
 
@@ -289,8 +312,8 @@ test("pause is one step and resume announces its two, with the impact of confirm
   const { root, unmount } = mountWarmbly();
   try {
     const html = root.innerHTML;
-    assert.match(html, /PAUSAR OUTBOUND/);
-    assert.match(html, /RETOMAR OUTBOUND \(passo 1 de 2\)/);
+    assert.match(html, /Pausar disparos/);
+    assert.match(html, /Retomar disparos \(passo 1 de 2\)/);
     assert.match(html, /data-resume-armed="false"/);
     assert.match(html, /data-resume-impact="true"/);
     assert.match(html, /e-mail frio para empresas reais/);
@@ -330,7 +353,7 @@ test("an armed confirmation changes the resume control from a request into a con
     await settle();
     assert.match(root.innerHTML, /data-resume-armed="true"/);
     assert.match(root.innerHTML, /data-confirmation-pending="true"/);
-    assert.match(root.innerHTML, /CONFIRMAR RETOMADA \(passo 2 de 2\)/);
+    assert.match(root.innerHTML, /Confirmar retomada \(passo 2 de 2\)/);
     assert.match(root.innerHTML, /name="reason"[^>]*value="bounce normalizado" readonly/);
   } finally {
     handle.unmount();
@@ -342,7 +365,7 @@ test("the last outcome is rendered on the cockpit with its recovery instruction"
   clearPendingResumeConfirmation();
   const { adapter } = adapterReplaying(recordedCase("circuit_open"));
   const root = { innerHTML: "" };
-  await adapter.warmblyDispatch({ action: "pause", reason: "pico de bounce" });
+  const result = await adapter.warmblyDispatch({ action: "pause", reason: "pico de bounce" });
   paintShell(root, adapter as ControlCenterReadAdapter, "#/warmbly");
   await settle();
   assert.match(root.innerHTML, /data-dispatch-outcome="refused"/);
@@ -351,6 +374,9 @@ test("the last outcome is rendered on the cockpit with its recovery instruction"
   assert.match(root.innerHTML, /data-outcome-recovery="true"/);
   assert.ok(root.innerHTML.includes(OUT_OF_BAND_PAUSE_FALLBACK));
   assert.match(root.innerHTML, /role="alert"/);
+  assert.doesNotMatch(visibleText(root.innerHTML), new RegExp(result.message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(root.innerHTML, /data-tech="warmbly-operator-result"/);
+  assert.match(root.innerHTML, /message=/);
 });
 
 /* ------------------------------------------------------------------ *
@@ -384,6 +410,77 @@ test("the audit trail renders the recent ledger with the operator recorded on ea
   assert.match(root.innerHTML, /Operador registrado/);
   assert.match(root.innerHTML, /data-operator-identity="true"/);
   assert.match(root.innerHTML, /control-center\.warmbly-operator-action\.v1/);
+  assert.match(root.innerHTML, /domains\/agent-activity/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /control-center\.warmbly-operator-action\.v1|domains\/agent-activity/);
+  assert.match(visibleText(root.innerHTML), /pausar disparo/);
+  assert.match(visibleText(root.innerHTML), /executada/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /pause_dispatch|\bexecuted\b/);
+  assert.match(root.innerHTML, /action=pause_dispatch/);
+  assert.match(root.innerHTML, /outcome=executed/);
+});
+
+test("future ledger action and outcome use safe visible fallbacks while preserving raw audit data", async () => {
+  clearPendingResumeConfirmation();
+  const entries = [
+    {
+      action: "FUTURE_ACTION",
+      outcome: "FUTURE_OUTCOME",
+      actor_id: "founder",
+      target: "dispatch:confenge-dispatch",
+      reason: "auditoria de compatibilidade",
+      recorded_at: "2026-08-20T17:38:00Z",
+    },
+  ];
+  const { adapter } = adapterReplaying(recordedCase("executed"), {
+    ledger: { status: 200, body: { ok: true, entries } },
+  });
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as ControlCenterReadAdapter, "#/warmbly");
+  await settle();
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /ação não reconhecida/);
+  assert.match(shown, /resultado não reconhecido/);
+  assert.doesNotMatch(shown, /FUTURE_ACTION|FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /action=FUTURE_ACTION/);
+  assert.match(root.innerHTML, /outcome=FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /data-ledger-entry="FUTURE_OUTCOME"/);
+});
+
+test("future tokens in the last operator action are visible only as safe labels", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("warmbly");
+  assert.ok(initial.ok && !initial.loading);
+  if (!initial.ok || initial.loading || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    ...(commercial.operations ?? {}),
+    last_operator_action: {
+      action: "FUTURE_ACTION",
+      outcome: "FUTURE_OUTCOME",
+      actor_id: "founder",
+      recorded_at: "2026-08-20T17:38:00Z",
+      reason: "auditoria de compatibilidade",
+    },
+  };
+  const adapter: ControlCenterReadAdapter = {
+    mode: "mock",
+    actions: base.actions,
+    readOperator: () => base.readOperator(),
+    readDestination: () => ({ ok: true, loading: false, page }),
+    readAttention: () => base.readAttention(),
+    readPriorities: () => base.readPriorities(),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/warmbly");
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /ação não reconhecida/);
+  assert.match(shown, /resultado não reconhecido/);
+  assert.doesNotMatch(shown, /FUTURE_ACTION|FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /data-tech="warmbly-last-action"/);
+  assert.match(root.innerHTML, /action=FUTURE_ACTION/);
+  assert.match(root.innerHTML, /outcome=FUTURE_OUTCOME/);
 });
 
 test("an unreadable trail is never rendered as an empty one", async () => {
@@ -481,7 +578,7 @@ test("an unobserved dispatch reading is UNKNOWN and says so, never ACTIVE by def
   // exactly the "collector produced no reading" case.
   assert.match(root.innerHTML, /data-dispatch-state="UNKNOWN"/);
   assert.match(root.innerHTML, /data-dispatch-observed="false"/);
-  assert.match(root.innerHTML, /DESCONHECIDO não é ATIVO nem PAUSADO/);
+  assert.match(root.innerHTML, /Estado desconhecido não significa ativo nem pausado/);
   assert.match(root.innerHTML, /data-impact-unquantified="true"/);
 });
 

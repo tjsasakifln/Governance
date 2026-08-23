@@ -19,6 +19,8 @@
  */
 import { formatLocal } from "./datetime";
 import { formatMoney } from "./money";
+import { sourceKindLabel, sourceSystemLabel } from "./provenance";
+import { ownMapValue } from "./own-map";
 import type { FreshnessStatus, Money, SourceRef } from "./types";
 
 export const DOMAIN_CARD_IDS = [
@@ -96,12 +98,16 @@ export interface HojeDomainCard {
 
 export interface HojeIntegration {
   system: string;
+  system_label: string;
+  source_kind: string;
+  source_locator: string;
   state: DomainState;
   state_label: string;
   detail: string;
   observed_at_local: string;
   freshness_status: FreshnessStatus;
-  error_code?: string;
+  error_code: string | null;
+  error_message: string | null;
 }
 
 export interface HojeOutbound {
@@ -132,11 +138,11 @@ export interface HojeDomainSummary {
 }
 
 export function domainStateLabel(state: DomainState): string {
-  return STATE_LABELS[state];
+  return ownMapValue(STATE_LABELS, state) ?? "estado não reconhecido";
 }
 
 export function domainStateTone(state: DomainState): "green" | "amber" | "red" | "slate" {
-  return STATE_TONES[state];
+  return ownMapValue(STATE_TONES, state) ?? "slate";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -446,7 +452,7 @@ function warmblyCard(
   } else if (commercial.presence === "absent") {
     const absence = commercial.absence_reason ?? "no_data";
     state = absence === "upstream_error" ? "erro_coleta" : "desconhecido";
-    reason = ABSENCE_SENTENCES[absence];
+    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? "Faltam dados por motivo não reconhecido.";
   } else if (commercial.freshness_status === "ERROR") {
     state = "erro_coleta";
     reason = "Erro de coleta na origem Warmbly: o estado exibido não é confiável.";
@@ -475,7 +481,7 @@ function warmblyCard(
     id: seed.id,
     label: seed.label,
     state,
-    state_label: STATE_LABELS[state],
+    state_label: domainStateLabel(state),
     state_reason: reason,
     indicator: `disparo ${outbound.label} — ${outbound.detail}`,
     pending,
@@ -558,7 +564,7 @@ function standardCard(seed: CardSeed, slot: DomainSlot | null, alerts: AlertCoun
   } else if (slot.presence === "absent") {
     const absence = slot.absence_reason ?? "no_data";
     state = absence === "upstream_error" ? "erro_coleta" : "desconhecido";
-    reason = ABSENCE_SENTENCES[absence];
+    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? "Faltam dados por motivo não reconhecido.";
   } else if (slot.freshness_status === "ERROR") {
     state = "erro_coleta";
     reason = "Erro de coleta: a última tentativa de leitura falhou. Os números abaixo não valem.";
@@ -588,7 +594,7 @@ function standardCard(seed: CardSeed, slot: DomainSlot | null, alerts: AlertCoun
     id: seed.id,
     label: seed.label,
     state,
-    state_label: STATE_LABELS[state],
+    state_label: domainStateLabel(state),
     state_reason: reason,
     indicator: slot?.presence === "present" ? indicatorFor(seed.id, slot.snapshot) : "sem indicador — leitura ausente",
     pending,
@@ -630,19 +636,23 @@ function integrationsFrom(envelope: Record<string, unknown>): HojeIntegration[] 
     else if (freshness === "STALE") state = "atencao";
     else state = "saudavel";
     const observedAt = strOf(row.observed_at);
-    const detail =
-      errorCode !== null
-        ? `erro na origem: ${(error ? strOf(error.message) : null) ?? "a origem respondeu com erro"}`
-        : `${source.kind} · ${source.locator}`;
+    const errorMessage = error ? strOf(error.message) : null;
+    const detail = errorCode !== null
+      ? "Erro na origem: a leitura falhou."
+      : `Leitura recebida: ${sourceKindLabel(source.kind)}.`;
     const previous = bySystem.get(source.system);
     const candidate: HojeIntegration = {
       system: source.system,
+      system_label: sourceSystemLabel(source.system),
+      source_kind: source.kind,
+      source_locator: source.locator,
       state,
-      state_label: STATE_LABELS[state],
+      state_label: domainStateLabel(state),
       detail,
       observed_at_local: observedAt ? formatLocal(observedAt) : "sem leitura registrada",
       freshness_status: freshness,
-      ...(errorCode === null ? {} : { error_code: errorCode }),
+      error_code: errorCode,
+      error_message: errorMessage,
     };
     // Worst reading per system wins: one healthy probe must not hide a broken one.
     if (
@@ -723,7 +733,7 @@ export function summarizeDomains(envelopeRaw: unknown): HojeDomainSummary {
   const unmapped: HojeUnmappedAlerts[] = [];
   for (const [domain, count] of alerts) {
     if (DOMAIN_TO_CARD.has(domain)) continue;
-    unmapped.push({ domain, count: count.open, href: UNMAPPED_HREFS[domain] ?? "#/hoje" });
+    unmapped.push({ domain, count: count.open, href: ownMapValue(UNMAPPED_HREFS, domain) ?? "#/hoje" });
   }
   unmapped.sort((a, b) => a.domain.localeCompare(b.domain));
   const cardTotal = cards.reduce((sum, card) => sum + card.action_count, 0);
@@ -758,7 +768,7 @@ export function absenceNoteFor(envelopeRaw: unknown, domain: string): string | n
     return "Faltam dados: este domínio não veio no envelope operacional.";
   }
   if (slot.presence === "absent") {
-    return ABSENCE_SENTENCES[slot.absence_reason ?? "no_data"];
+    return ownMapValue(ABSENCE_SENTENCES, slot.absence_reason ?? "no_data") ?? "Faltam dados por motivo não reconhecido.";
   }
   if (slot.freshness_status === "ERROR") {
     return "Erro de coleta: a última leitura deste domínio falhou.";

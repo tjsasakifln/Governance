@@ -1,7 +1,8 @@
 /**
- * Reads an external string key without consulting Object.prototype.
- * Contract values such as `constructor`, `toString`, and `__proto__` must be
- * treated exactly like any other unknown token.
+ * Reads a string-keyed catalogue without consulting Object.prototype.
+ *
+ * Contract values are external strings, so keys such as `constructor`,
+ * `toString` and `__proto__` must behave exactly like any other unknown token.
  */
 export function ownMapValue<T>(
   table: Readonly<Record<string, T>>,
