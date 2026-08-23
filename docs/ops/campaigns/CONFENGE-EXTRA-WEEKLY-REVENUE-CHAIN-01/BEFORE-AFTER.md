@@ -11,6 +11,6 @@
 | Partial failure | No adapter-owned retry/dead state | Bounded retry with actionable blocked/dead occurrence | Warmbly edge |
 | Restart | No versioned lease recovery | Expired processing lease returns to retry | Warmbly edge |
 | Restore | No adapter restore drill | Online SQLite backup plus schema/integrity restore verification | Warmbly edge |
-| Control Center | Executive payload existed but no complete weekly row was rendered | Deliverable, evidence, decision, owner, deadline, action, proposal, charge, and receipt are visible | Governance operates/visualizes |
+| Control Center | Executive payload existed but no complete weekly row was rendered | The operator sees localized state, deadline, action, charge, receipt, source period, collection instant, and authority; opaque IDs and raw tokens stay in a technical disclosure | Governance operates/visualizes |
 | Financial truth | Risk of treating object creation as cash | Charge remains distinct from received payment; Asaas is labeled authority | Asaas |
 | Commercial decision | Could be absent in the visual chain | `GO`, `NO-GO`, or `WAIT`; sandbox fixture remains `WAIT` | Human |
