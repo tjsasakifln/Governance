@@ -29,6 +29,7 @@ run("npx", [
   "tests/convergence/importer-apply-db.test.ts",
   "tests/convergence/mcp-context.test.ts",
   "tests/convergence/snapshots.test.ts",
+  "tests/convergence/hoje-domain-summary.test.ts",
   "tests/convergence/pncp-warmbly.test.ts",
   "tests/convergence/live-runtime-qa.test.ts",
   "tests/convergence/domain-gates.test.ts",
