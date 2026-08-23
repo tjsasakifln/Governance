@@ -37,6 +37,118 @@ const WINDOW_MS: Record<Exclude<CohortWindow, "open">, number> = {
  */
 const CATALOG_CURRENCY = "BRL";
 const ISO_4217 = /^[A-Z]{3}$/;
+const OPAQUE_COMMERCIAL_ID = /^[A-Za-z0-9._:-]{1,160}$/;
+const WEEKLY_REVENUE_CHAIN_CAP = 50;
+
+function opaqueCommercialId(value: unknown): string {
+  if (typeof value !== "string") return "UNKNOWN";
+  const id = value.trim();
+  return id !== "UNKNOWN" && OPAQUE_COMMERCIAL_ID.test(id) ? id : "UNKNOWN";
+}
+
+function observedInstant(value: unknown): string | undefined {
+  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) return undefined;
+  return value;
+}
+
+function observedOpaqueText(value: unknown): Record<string, unknown> {
+  const row = asRecord(value);
+  if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
+  const text = opaqueCommercialId(row.value);
+  if (text === "UNKNOWN") return { availability: "UNKNOWN" };
+  const observedAt = observedInstant(row.observed_at);
+  return {
+    availability: "OBSERVED",
+    value: text,
+    ...(observedAt ? { observed_at: observedAt } : {}),
+  };
+}
+
+function observedDecision(value: unknown): Record<string, unknown> {
+  const row = observedOpaqueText(value);
+  return row.availability === "OBSERVED" && ["GO", "NO-GO", "WAIT"].includes(String(row.value))
+    ? row
+    : { availability: "UNKNOWN" };
+}
+
+function observedDeadline(value: unknown): Record<string, unknown> {
+  const row = asRecord(value);
+  if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
+  const deadline = observedInstant(row.value);
+  if (!deadline) return { availability: "UNKNOWN" };
+  const observedAt = observedInstant(row.observed_at);
+  return {
+    availability: "OBSERVED",
+    value: deadline,
+    ...(observedAt ? { observed_at: observedAt } : {}),
+  };
+}
+
+function observedProviderMoney(value: unknown): Record<string, unknown> {
+  const row = asRecord(value);
+  if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
+  const id = opaqueCommercialId(row.id);
+  if (id === "UNKNOWN") return { availability: "UNKNOWN" };
+  const status = opaqueCommercialId(row.status);
+  const currency = typeof row.currency === "string" && ISO_4217.test(row.currency) ? row.currency : undefined;
+  const amount = Number.isSafeInteger(row.amount_cents) && Number(row.amount_cents) >= 0
+    ? Number(row.amount_cents)
+    : undefined;
+  const observedAt = observedInstant(row.observed_at);
+  return {
+    availability: "OBSERVED",
+    id,
+    status,
+    ...(amount === undefined ? {} : { amount_cents: amount }),
+    ...(currency ? { currency } : {}),
+    ...(observedAt ? { observed_at: observedAt } : {}),
+  };
+}
+
+function weeklyRevenueChainsFromExecutive(value: unknown): Record<string, unknown>[] {
+  const rows = asArray(asRecord(value)?.weekly_revenue_chains);
+  const byCorrelation = new Map<string, Record<string, unknown>>();
+  for (const item of rows) {
+    const row = asRecord(item);
+    const identity = asRecord(row?.canonical_identity);
+    const correlationId = opaqueCommercialId(identity?.correlation_id);
+    if (!row || !identity || correlationId === "UNKNOWN" || byCorrelation.has(correlationId)) continue;
+    byCorrelation.set(correlationId, {
+      schema_version: "control-center.weekly-revenue-chain.v1",
+      canonical_identity: {
+        correlation_id: correlationId,
+        account_id: opaqueCommercialId(identity.account_id),
+        opportunity_id: opaqueCommercialId(identity.opportunity_id),
+        offer_id: opaqueCommercialId(identity.offer_id),
+        proposal_id: opaqueCommercialId(identity.proposal_id),
+        charge_id: opaqueCommercialId(identity.charge_id),
+        payment_id: opaqueCommercialId(identity.payment_id),
+      },
+      latest_deliverable: observedOpaqueText(row.latest_deliverable),
+      latest_evidence: observedOpaqueText(row.latest_evidence),
+      decision: observedDecision(row.decision),
+      responsible: observedOpaqueText(row.responsible),
+      deadline: observedDeadline(row.deadline),
+      next_action: observedOpaqueText(row.next_action),
+      proposal: observedOpaqueText(row.proposal),
+      charge: observedProviderMoney(row.charge),
+      receipt: observedProviderMoney(row.receipt),
+      held: row.held === true,
+      synthetic: row.synthetic === true,
+      authority: {
+        operation_and_visualization: "governance-control-center",
+        action_and_outcome: "warmbly",
+        financial_facts: "asaas",
+      },
+    });
+    if (byCorrelation.size >= WEEKLY_REVENUE_CHAIN_CAP) break;
+  }
+  return [...byCorrelation.values()].sort((a, b) => {
+    const aId = String(asRecord(a.canonical_identity)?.correlation_id ?? "");
+    const bId = String(asRecord(b.canonical_identity)?.correlation_id ?? "");
+    return aId.localeCompare(bId);
+  });
+}
 
 /**
  * Absent currency resolves to the contractual catalog currency.
@@ -446,6 +558,7 @@ function operationsFromWarmbly(
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
+  const weeklyRevenueChains = weeklyRevenueChainsFromExecutive(executive);
   const report = nested.intel_report ?? payload.intel_report ?? payload.confenge_intel_report;
   const organic =
     nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
@@ -497,6 +610,7 @@ function operationsFromWarmbly(
     ),
     activity,
     pipeline,
+    weekly_revenue_chains: weeklyRevenueChains,
     exceptions,
     intel: {
       scoreboard: scoreboardPresent(scoreboard) ? scoreboard : null,

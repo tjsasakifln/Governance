@@ -127,6 +127,131 @@
       "items": {
         "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/resource_id"
       }
+    },
+    "operations": {
+      "type": "object",
+      "description": "Operational read model. Warmbly owns action/outcome and Asaas owns financial facts.",
+      "properties": {
+        "weekly_revenue_chains": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/weekly_revenue_chain" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "unknown_fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability"],
+      "properties": { "availability": { "const": "UNKNOWN" } }
+    },
+    "observed_opaque_fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability", "value"],
+      "properties": {
+        "availability": { "const": "OBSERVED" },
+        "value": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "observed_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }
+      }
+    },
+    "opaque_fact": {
+      "oneOf": [
+        { "$ref": "#/$defs/unknown_fact" },
+        { "$ref": "#/$defs/observed_opaque_fact" }
+      ]
+    },
+    "deadline_fact": {
+      "oneOf": [
+        { "$ref": "#/$defs/unknown_fact" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["availability", "value"],
+          "properties": {
+            "availability": { "const": "OBSERVED" },
+            "value": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" },
+            "observed_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }
+          }
+        }
+      ]
+    },
+    "provider_money_fact": {
+      "oneOf": [
+        { "$ref": "#/$defs/unknown_fact" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["availability", "id", "status"],
+          "properties": {
+            "availability": { "const": "OBSERVED" },
+            "id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "status": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "amount_cents": { "type": "integer", "minimum": 0 },
+            "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+            "observed_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }
+          }
+        }
+      ]
+    },
+    "weekly_revenue_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "canonical_identity", "latest_deliverable", "latest_evidence",
+        "decision", "responsible", "deadline", "next_action", "proposal", "charge", "receipt",
+        "held", "synthetic", "authority"
+      ],
+      "properties": {
+        "schema_version": { "const": "control-center.weekly-revenue-chain.v1" },
+        "canonical_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["correlation_id", "account_id", "opportunity_id", "offer_id", "proposal_id", "charge_id", "payment_id"],
+          "properties": {
+            "correlation_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$", "not": { "const": "UNKNOWN" } },
+            "account_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "opportunity_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "offer_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "proposal_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "charge_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
+            "payment_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" }
+          }
+        },
+        "latest_deliverable": { "$ref": "#/$defs/opaque_fact" },
+        "latest_evidence": { "$ref": "#/$defs/opaque_fact" },
+        "decision": {
+          "oneOf": [
+            { "$ref": "#/$defs/unknown_fact" },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/observed_opaque_fact" },
+                { "type": "object", "properties": { "value": { "enum": ["GO", "NO-GO", "WAIT"] } } }
+              ]
+            }
+          ]
+        },
+        "responsible": { "$ref": "#/$defs/opaque_fact" },
+        "deadline": { "$ref": "#/$defs/deadline_fact" },
+        "next_action": { "$ref": "#/$defs/opaque_fact" },
+        "proposal": { "$ref": "#/$defs/opaque_fact" },
+        "charge": { "$ref": "#/$defs/provider_money_fact" },
+        "receipt": { "$ref": "#/$defs/provider_money_fact" },
+        "held": { "type": "boolean" },
+        "synthetic": { "type": "boolean" },
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation_and_visualization", "action_and_outcome", "financial_facts"],
+          "properties": {
+            "operation_and_visualization": { "const": "governance-control-center" },
+            "action_and_outcome": { "const": "warmbly" },
+            "financial_facts": { "const": "asaas" }
+          }
+        }
+      }
     }
   }
 }
