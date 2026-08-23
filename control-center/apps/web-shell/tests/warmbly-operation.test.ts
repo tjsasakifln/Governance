@@ -394,11 +394,77 @@ test("the audit trail renders the recent ledger with the operator recorded on ea
   assert.match(root.innerHTML, /Operador registrado/);
   assert.match(root.innerHTML, /data-operator-identity="true"/);
   assert.match(root.innerHTML, /control-center\.warmbly-operator-action\.v1/);
+  assert.match(root.innerHTML, /domains\/agent-activity/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /control-center\.warmbly-operator-action\.v1|domains\/agent-activity/);
   assert.match(visibleText(root.innerHTML), /pausar disparo/);
   assert.match(visibleText(root.innerHTML), /executada/);
   assert.doesNotMatch(visibleText(root.innerHTML), /pause_dispatch|\bexecuted\b/);
   assert.match(root.innerHTML, /action=pause_dispatch/);
   assert.match(root.innerHTML, /outcome=executed/);
+});
+
+test("future ledger action and outcome use safe visible fallbacks while preserving raw audit data", async () => {
+  clearPendingResumeConfirmation();
+  const entries = [
+    {
+      action: "FUTURE_ACTION",
+      outcome: "FUTURE_OUTCOME",
+      actor_id: "founder",
+      target: "dispatch:confenge-dispatch",
+      reason: "auditoria de compatibilidade",
+      recorded_at: "2026-08-20T17:38:00Z",
+    },
+  ];
+  const { adapter } = adapterReplaying(recordedCase("executed"), {
+    ledger: { status: 200, body: { ok: true, entries } },
+  });
+  const root = { innerHTML: "" };
+  paintShell(root, adapter as ControlCenterReadAdapter, "#/warmbly");
+  await settle();
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /ação não reconhecida/);
+  assert.match(shown, /resultado não reconhecido/);
+  assert.doesNotMatch(shown, /FUTURE_ACTION|FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /action=FUTURE_ACTION/);
+  assert.match(root.innerHTML, /outcome=FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /data-ledger-entry="FUTURE_OUTCOME"/);
+});
+
+test("future tokens in the last operator action are visible only as safe labels", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("warmbly");
+  assert.ok(initial.ok && !initial.loading);
+  if (!initial.ok || initial.loading || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    ...(commercial.operations ?? {}),
+    last_operator_action: {
+      action: "FUTURE_ACTION",
+      outcome: "FUTURE_OUTCOME",
+      actor_id: "founder",
+      recorded_at: "2026-08-20T17:38:00Z",
+      reason: "auditoria de compatibilidade",
+    },
+  };
+  const adapter: ControlCenterReadAdapter = {
+    mode: "mock",
+    actions: base.actions,
+    readOperator: () => base.readOperator(),
+    readDestination: () => ({ ok: true, loading: false, page }),
+    readAttention: () => base.readAttention(),
+    readPriorities: () => base.readPriorities(),
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/warmbly");
+  const shown = visibleText(root.innerHTML);
+  assert.match(shown, /ação não reconhecida/);
+  assert.match(shown, /resultado não reconhecido/);
+  assert.doesNotMatch(shown, /FUTURE_ACTION|FUTURE_OUTCOME/);
+  assert.match(root.innerHTML, /data-tech="warmbly-last-action"/);
+  assert.match(root.innerHTML, /action=FUTURE_ACTION/);
+  assert.match(root.innerHTML, /outcome=FUTURE_OUTCOME/);
 });
 
 test("an unreadable trail is never rendered as an empty one", async () => {

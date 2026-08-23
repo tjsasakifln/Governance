@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { FINANCE_SNAPSHOT, FRESHNESS_SAMPLES } from "../src/fixtures/catalog";
 import { PRESENTATION_TIME_ZONE } from "../src/datetime";
 import { formatMoney } from "../src/money";
-import { mapProvenance, provenanceFromPresentation } from "../src/provenance";
+import { mapProvenance, provenanceFromPresentation, sourcePresentationLabel } from "../src/provenance";
 import { FRESHNESS_STATUSES } from "../src/types";
 
 test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation model", () => {
@@ -31,6 +31,28 @@ test("FRESH, STALE, ERROR and UNKNOWN fixtures round-trip into the presentation 
   assert.equal(FRESHNESS_SAMPLES.FRESH?.freshness_status, "FRESH");
   assert.equal(FRESHNESS_SAMPLES.ERROR?.freshness_status, "ERROR");
   assert.equal(FRESHNESS_SAMPLES.UNKNOWN?.freshness_status, "UNKNOWN");
+});
+
+test("source presentation translates known kinds and never exposes an unknown source token", () => {
+  const knownKinds: Record<string, string> = {
+    "crm-read-model": "leitura comercial",
+    "receivable-read": "leitura de recebíveis",
+    "repo-read": "leitura do repositório",
+    report: "relatório operacional",
+    snapshot: "instantâneo operacional",
+  };
+  for (const [kind, label] of Object.entries(knownKinds)) {
+    const shown = sourcePresentationLabel({ system: "asaas", kind, locator: "technical/locator" });
+    assert.match(shown, new RegExp(label));
+    assert.doesNotMatch(shown, new RegExp(kind));
+  }
+  const unknown = sourcePresentationLabel({
+    system: "FUTURE_SOURCE_SYSTEM",
+    kind: "FUTURE_SOURCE_KIND",
+    locator: "technical/locator",
+  });
+  assert.equal(unknown, "Sistema de origem · leitura operacional");
+  assert.doesNotMatch(unknown, /FUTURE_SOURCE/);
 });
 
 test("finance money formats integer cents plus currency", () => {

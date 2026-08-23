@@ -1,6 +1,6 @@
 import type { AlertPresentation } from "../alerts";
 import { escapeHtml } from "../escape";
-import { freshnessLabel } from "../provenance";
+import { freshnessLabel, sourcePresentationLabel } from "../provenance";
 import type { FreshnessStatus, Provenance } from "../types";
 import { provenanceBlock } from "./provenance";
 
@@ -55,7 +55,7 @@ export function alertFront(alert: AlertPresentation, provenance: Provenance): st
       <p class="alert-impact"><strong>Impacto:</strong> ${escapeHtml(alert.impact)}</p>
       ${description}
       <dl class="facts alert-facts">
-        ${fact("Origem", `${escapeHtml(alert.origin)} <span class="locator">${escapeHtml(alert.origin_locator)}</span>`)}
+        ${fact("Origem", `${escapeHtml(sourcePresentationLabel(provenance.source))} <span class="locator">${escapeHtml(alert.origin_locator)}</span>`)}
         ${fact(
           "Responsável",
           `<a href="${escapeHtml(alert.owner.href)}" data-owner-destination="${escapeHtml(alert.owner.destination)}">${escapeHtml(alert.owner.label)}</a>`,

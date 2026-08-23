@@ -1,6 +1,7 @@
 import { alertBody, alertDataAttributes } from "./alert-card";
 import { escapeHtml } from "../escape";
 import { formatMoney } from "../money";
+import { sourcePresentationLabel } from "../provenance";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
 import { WRITE_SHORTCUT_LABELS } from "../adapters/paths";
 import { freshnessTone } from "../freshness-tone";
@@ -59,7 +60,7 @@ function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
       <p>${escapeHtml(row.summary)}</p>
       ${money}
       <div class="prov-inline">
-        <span>Origem: ${escapeHtml(row.source.system)}</span>
+        <span>Origem: ${escapeHtml(sourcePresentationLabel(row.source))}</span>
         · Observado <time datetime="${escapeHtml(row.observed_at)}">${escapeHtml(row.observed_at_local)}</time>
         <span class="sr-only">UTC ${escapeHtml(row.observed_at)}</span>
         · ${helpTerm("confiança", CONFIDENCE_HELP)} ${escapeHtml(confidence)}
@@ -128,7 +129,7 @@ function domainCard(card: HojeDomainCard): string {
   const confidence =
     card.confidence === null ? "sem leitura" : String(card.confidence).replace(".", ",");
   const source = card.source
-    ? `${card.source.system} · ${card.source.kind}`
+    ? sourcePresentationLabel(card.source)
     : "origem não informada";
   const absenceLabels = {
     no_data: "sem dados",
@@ -160,6 +161,16 @@ function domainCard(card: HojeDomainCard): string {
         · confiança ${escapeHtml(confidence)}
       </p>
       <p class="domain-link"><a href="${escapeHtml(card.href)}" data-domain-link="${escapeHtml(card.id)}">${escapeHtml(card.href_label)} (${escapeHtml(String(card.action_count))} sinal(is))</a></p>
+      ${technicalDetails(
+        card.source
+          ? [
+              { term: "sistema", value: card.source.system },
+              { term: "tipo_de_origem", value: card.source.kind },
+              { term: "locator", value: card.source.locator },
+            ]
+          : [],
+        "hoje-domain-source",
+      )}
     </article>
   `;
 }

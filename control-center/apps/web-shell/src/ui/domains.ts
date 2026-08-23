@@ -246,7 +246,9 @@ export function growthFunnelBlock(snapshot: CommercialSnapshot | undefined): str
             const absent = !row;
             const detail = row && row.observation ? String(row.observation) : absent ? "etapa ausente nesta observação" : "";
             const label =
-              hop in GROWTH_HOP_LABELS ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]] : hop;
+              hop in GROWTH_HOP_LABELS
+                ? GROWTH_HOP_LABELS[hop as (typeof GROWTH_FUNNEL_HOPS)[number]]
+                : "Etapa não reconhecida";
             const shown =
               status === "BLOCKED"
                 ? helpTerm(hopStatusLabel(status), BLOCKED_HELP)
@@ -334,7 +336,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     ? current.integrity_flags.filter((flag): flag is string => typeof flag === "string")
     : [];
   const integrityWarning = integrityFlags.length > 0
-    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? flag).join("; "))}.</p>`
+    ? `<p class="banner" data-controlled-email-integrity="${escapeHtml(integrityFlags.join(" "))}">Sinais de integridade observados: ${escapeHtml(integrityFlags.map((flag) => integrityLabels[flag] ?? "verificação não reconhecida").join("; "))}.</p>`
     : "";
   const telemetryWarning = telemetryObserved
     ? ""
@@ -374,7 +376,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     ${telemetryWarning}
     ${integrityWarning}
     <article class="card">
-      <h3>${escapeHtml(String(current.cohort_id ?? "UNKNOWN"))}</h3>
+      <h3>${current.cohort_id ? "Coorte autorizada" : "Coorte não identificada"}</h3>
       <dl class="facts">
         ${fact("Hash da coorte", escapeHtml(String(current.cohort_hash ?? "desconhecido")))}
         ${fact("Versão da política", escapeHtml(String(current.policy_version ?? "desconhecida")))}
@@ -401,6 +403,8 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
       <p class="constraint">Aceite pelo SMTP não comprova entrega. Métricas sem evento reconciliado permanecem desconhecidas.</p>
       ${technicalDetails(
         [
+          { term: "cohort_id", value: String(current.cohort_id ?? "") },
+          { term: "integrity_flags", value: integrityFlags.join(",") },
           { term: "authorization_state", value: String(current.authorization_state ?? "") },
           { term: "go_review_verdict", value: String(current.go_review_verdict ?? "") },
           { term: "dispatch_state", value: String(dispatch.state ?? "") },

@@ -4,7 +4,7 @@ import { createMemoryRuntime, mount } from "../src/app";
 import { createMockAdapter } from "../src/adapters/index";
 import { DESTINATIONS } from "../src/destinations";
 import type { CommercialSnapshot } from "../src/types";
-import { commercialBlock } from "../src/ui/domains";
+import { commercialBlock, growthFunnelBlock } from "../src/ui/domains";
 import { renderShell } from "../src/ui/render";
 import {
   AGENT_ACTIVITY_PRESENTATION_STATUSES,
@@ -29,14 +29,29 @@ import {
   MEMORY_GROUP_TITLES,
   PRIORITY_HORIZON_LABELS,
   SEVERITY_LABELS,
+  agentSessionStatusLabel,
+  agentStatusLabel,
+  attentionStatusLabel,
+  authorityLabel,
   availabilityLabel,
+  clientLifecycleLabel,
   confidenceWord,
+  directiveKindLabel,
+  directiveStatusLabel,
   exceptionKindLabel,
   freshnessLabel,
+  healthLabel,
   helpTerm,
+  hopStatusLabel,
+  operatorActionLabel,
+  operatorOutcomeLabel,
+  priorityHorizonLabel,
+  providerMutationLabel,
+  severityLabel,
   scopeLabel,
   statusPill,
   technicalDetails,
+  viewKindLabel,
 } from "../src/ui/labels";
 
 /**
@@ -132,7 +147,60 @@ test("a new commercial exception code is hidden behind an honest fallback", () =
   assert.equal(exceptionKindLabel("missing_version"), "versão de oferta ausente");
   assert.equal(exceptionKindLabel("some_code_warmbly_just_invented"), "tipo não reconhecido");
   assert.equal(availabilityLabel("BLOCKED_BY_SECRET"), "bloqueado por credencial ausente");
-  assert.equal(availabilityLabel("A_BRAND_NEW_CODE"), "A_BRAND_NEW_CODE");
+  assert.equal(availabilityLabel("A_BRAND_NEW_CODE"), "disponibilidade não reconhecida");
+});
+
+test("every enum label helper hides future tokens behind an authored fallback", () => {
+  assert.equal(freshnessLabel("FUTURE_FRESHNESS" as never), "atualização não reconhecida");
+  const cases: Array<[string, (value: string) => string, string]> = [
+    ["FUTURE_AGENT", agentStatusLabel, "estado do agente não reconhecido"],
+    ["FUTURE_SESSION", agentSessionStatusLabel, "estado da sessão não reconhecido"],
+    ["FUTURE_HEALTH", healthLabel, "estado de saúde não reconhecido"],
+    ["FUTURE_LIFECYCLE", clientLifecycleLabel, "ciclo do cliente não reconhecido"],
+    ["FUTURE_SEVERITY", severityLabel, "gravidade não reconhecida"],
+    ["FUTURE_ATTENTION", attentionStatusLabel, "estado de atenção não reconhecido"],
+    ["FUTURE_HORIZON", priorityHorizonLabel, "horizonte não reconhecido"],
+    ["FUTURE_DIRECTIVE_KIND", directiveKindLabel, "tipo de diretiva não reconhecido"],
+    ["FUTURE_DIRECTIVE_STATUS", directiveStatusLabel, "estado da diretiva não reconhecido"],
+    ["FUTURE_AVAIL", availabilityLabel, "disponibilidade não reconhecida"],
+    ["FUTURE_AUTHORITY", authorityLabel, "autoridade não reconhecida"],
+    ["FUTURE_MUTATION", providerMutationLabel, "regra de mutação não reconhecida"],
+    ["FUTURE_VIEW", viewKindLabel, "estado da vista não reconhecido"],
+    ["FUTURE_ACTION", operatorActionLabel, "ação não reconhecida"],
+    ["FUTURE_OUTCOME", operatorOutcomeLabel, "resultado não reconhecido"],
+    ["FUTURE_HOP", hopStatusLabel, "estado não reconhecido"],
+  ];
+  for (const [raw, label, expected] of cases) {
+    assert.equal(label(raw), expected, `${raw} perdeu o fallback autoral`);
+    assert.doesNotMatch(label(raw), new RegExp(raw));
+  }
+});
+
+test("future availability and funnel status stay raw only in attributes and technical details", () => {
+  const snapshot = {
+    operations: {
+      growth: {
+        funnel_contract: ["lead", "FUTURE_HOP_ID"],
+        scoreboard: {
+          stages: [
+            { id: "lead", status: "FUTURE_HOP" },
+            { id: "FUTURE_HOP_ID", status: "PRESENT" },
+          ],
+        },
+        organic_scoreboard: { configured: false, availability: "FUTURE_AVAIL" },
+      },
+    },
+  } as unknown as CommercialSnapshot;
+  const html = growthFunnelBlock(snapshot);
+  const shown = visibleText(html);
+  assert.match(shown, /disponibilidade não reconhecida/);
+  assert.match(shown, /estado não reconhecido/);
+  assert.match(shown, /Etapa não reconhecida/);
+  assert.doesNotMatch(shown, /FUTURE_AVAIL|FUTURE_HOP/);
+  assert.match(html, /data-availability="FUTURE_AVAIL"/);
+  assert.match(html, /data-hop-status="FUTURE_HOP"/);
+  assert.match(html, /data-growth-hop="FUTURE_HOP_ID"/);
+  assert.match(html, /status=FUTURE_HOP/);
 });
 
 test("scope keeps its identifier and gains a Portuguese word", () => {

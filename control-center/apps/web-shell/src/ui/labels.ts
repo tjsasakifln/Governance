@@ -13,9 +13,9 @@
  * 2. **Nada é apagado.** Todo identificador, nome de schema, locator e enum
  *    cru que sai da superfície principal reaparece em `technicalDetails()`,
  *    recolhido e selecionável para cópia.
- * 3. **Código livre desconhecido aparece como veio.** Enums comerciais são a
- *    exceção: um valor novo recebe o rótulo honesto “estado não reconhecido” e
- *    o token continua disponível somente nos dados e no detalhe técnico.
+ * 3. **Código desconhecido não vira texto de interface.** Um valor novo recebe
+ *    um rótulo autoral honesto (“estado não reconhecido” e equivalentes); o
+ *    token original continua disponível somente nos dados e no detalhe técnico.
  *
  * O mapa de atualização é semeado por `freshnessLabel` de `../provenance`
  * (`FRESH→fresco`, `STALE→defasado`, `UNKNOWN→desconhecido`,
@@ -184,8 +184,7 @@ export const PROVIDER_MUTATION_LABELS: Record<string, string> = {
 
 /**
  * Códigos de exceção comercial. `missing_version` e `orphan` chegam como texto
- * livre do Warmbly — não há enum no backend — então o fallback devolve o
- * código cru em vez de inventar tradução.
+ * livre do Warmbly, mas valores novos ainda usam um fallback autoral seguro.
  */
 export const EXCEPTION_KIND_LABELS: Record<string, string> = {
   exception: "exceção",
@@ -407,56 +406,56 @@ export const DISPATCH_STATE_LABELS: Record<string, string> = {
 /* Consultas tolerantes: cada catálogo define seu fallback seguro.     */
 /* ------------------------------------------------------------------ */
 
-function lookup(table: Record<string, string>, value: string): string {
-  return table[value] ?? value;
+function lookup(table: Record<string, string>, value: string, fallback: string): string {
+  return table[value] ?? fallback;
 }
 
 export function agentStatusLabel(status: string): string {
-  return lookup(AGENT_STATUS_LABELS as Record<string, string>, status);
+  return lookup(AGENT_STATUS_LABELS as Record<string, string>, status, "estado do agente não reconhecido");
 }
 
 export function agentSessionStatusLabel(status: string): string {
-  return lookup(AGENT_SESSION_STATUS_LABELS as Record<string, string>, status);
+  return lookup(AGENT_SESSION_STATUS_LABELS as Record<string, string>, status, "estado da sessão não reconhecido");
 }
 
 export function healthLabel(status: string): string {
-  return lookup(HEALTH_LABELS as Record<string, string>, status);
+  return lookup(HEALTH_LABELS as Record<string, string>, status, "estado de saúde não reconhecido");
 }
 
 export function clientLifecycleLabel(lifecycle: string): string {
-  return lookup(CLIENT_LIFECYCLE_LABELS as Record<string, string>, lifecycle);
+  return lookup(CLIENT_LIFECYCLE_LABELS as Record<string, string>, lifecycle, "ciclo do cliente não reconhecido");
 }
 
 export function severityLabel(severity: string): string {
-  return lookup(SEVERITY_LABELS as Record<string, string>, severity);
+  return lookup(SEVERITY_LABELS as Record<string, string>, severity, "gravidade não reconhecida");
 }
 
 export function attentionStatusLabel(status: string): string {
-  return lookup(ATTENTION_STATUS_LABELS as Record<string, string>, status);
+  return lookup(ATTENTION_STATUS_LABELS as Record<string, string>, status, "estado de atenção não reconhecido");
 }
 
 export function priorityHorizonLabel(horizon: string): string {
-  return lookup(PRIORITY_HORIZON_LABELS as Record<string, string>, horizon);
+  return lookup(PRIORITY_HORIZON_LABELS as Record<string, string>, horizon, "horizonte não reconhecido");
 }
 
 export function directiveKindLabel(kind: string): string {
-  return lookup(DIRECTIVE_KIND_LABELS as Record<string, string>, kind);
+  return lookup(DIRECTIVE_KIND_LABELS as Record<string, string>, kind, "tipo de diretiva não reconhecido");
 }
 
 export function directiveStatusLabel(status: string): string {
-  return lookup(DIRECTIVE_STATUS_LABELS as Record<string, string>, status);
+  return lookup(DIRECTIVE_STATUS_LABELS as Record<string, string>, status, "estado da diretiva não reconhecido");
 }
 
 export function availabilityLabel(value: string): string {
-  return lookup(AVAILABILITY_LABELS, value);
+  return lookup(AVAILABILITY_LABELS, value, "disponibilidade não reconhecida");
 }
 
 export function authorityLabel(value: string): string {
-  return lookup(AUTHORITY_LABELS, value);
+  return lookup(AUTHORITY_LABELS, value, "autoridade não reconhecida");
 }
 
 export function providerMutationLabel(value: string): string {
-  return lookup(PROVIDER_MUTATION_LABELS, value);
+  return lookup(PROVIDER_MUTATION_LABELS, value, "regra de mutação não reconhecida");
 }
 
 export function exceptionKindLabel(kind: string): string {
@@ -464,15 +463,15 @@ export function exceptionKindLabel(kind: string): string {
 }
 
 export function viewKindLabel(kind: string): string {
-  return lookup(VIEW_KIND_LABELS, kind);
+  return lookup(VIEW_KIND_LABELS, kind, "estado da vista não reconhecido");
 }
 
 export function operatorActionLabel(action: string): string {
-  return lookup(OPERATOR_ACTION_LABELS, action);
+  return lookup(OPERATOR_ACTION_LABELS, action, "ação não reconhecida");
 }
 
 export function operatorOutcomeLabel(outcome: string): string {
-  return lookup(OPERATOR_OUTCOME_LABELS, outcome);
+  return lookup(OPERATOR_OUTCOME_LABELS, outcome, "resultado não reconhecido");
 }
 
 export function commercialEventLabel(event: string): string {
@@ -524,7 +523,7 @@ export function dispatchStateLabel(value: string): string {
  * `BLOCKED`/`UNKNOWN`, que é o que `hopStatusFor` produz.
  */
 export function hopStatusLabel(status: string): string {
-  return lookup(AVAILABILITY_LABELS, status);
+  return lookup(AVAILABILITY_LABELS, status, "estado não reconhecido");
 }
 
 /* ------------------------------------------------------------------ */

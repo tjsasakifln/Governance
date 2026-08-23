@@ -500,7 +500,14 @@ function auditBlock(operations: Record<string, unknown>, operator: ActorRef): st
   return `
     <section class="stack" aria-labelledby="warmbly-auditoria" data-ledger-status="${escapeHtml(status)}">
       <h2 id="warmbly-auditoria">Trilha recente de auditoria</h2>
-      <p class="constraint">Toda chamada entra na trilha, executada ou recusada, como <code>control-center.warmbly-operator-action.v1</code>, espelhada em <code>domains/agent-activity</code>.</p>
+      <p class="constraint">Toda chamada entra na trilha de auditoria, executada ou recusada.</p>
+      ${technicalDetails(
+        [
+          { term: "schema", value: "control-center.warmbly-operator-action.v1" },
+          { term: "espelho", value: "domains/agent-activity" },
+        ],
+        "warmbly-ledger-contract",
+      )}
       <article class="card" data-operator-identity="true">
         <h3>Identidade do operador</h3>
         <dl class="facts">

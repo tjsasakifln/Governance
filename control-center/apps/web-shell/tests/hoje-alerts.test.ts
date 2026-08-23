@@ -91,7 +91,7 @@ test("live ranked items paint severity, impact, origin, owner, age and deadline 
   const card = cardFor(html, "cc:attention-item:overdue-receivable");
   assert.match(card, /data-severity-pill="high">Alto</);
   assert.match(card, /<strong>Impacto:<\/strong> Afeta receita/);
-  assert.match(card, /<dt>Origem<\/dt><dd>asaas · receivable-read/);
+  assert.match(card, /<dt>Origem<\/dt><dd>Asaas · leitura de recebíveis/);
   assert.match(card, /finance\/receivables/);
   assert.match(card, /<dt>Responsável<\/dt>[\s\S]*?data-owner-destination="financeiro">Financeiro</);
   assert.match(card, /<dt>Idade<\/dt><dd>há \d+ (min|h|d)/);
@@ -99,6 +99,7 @@ test("live ranked items paint severity, impact, origin, owner, age and deadline 
   assert.match(card, /O que fazer agora/);
   assert.match(card, /Tratar o recebível vencido/);
   assert.match(card, /class="alert-open" href="#\/financeiro">Abrir Financeiro</);
+  assert.doesNotMatch(withoutDisclosures(card), /receivable-read|crm-read-model|repo-read/);
 });
 
 test("the scoring formula appears only inside the collapsed 'Como foi priorizado'", async () => {

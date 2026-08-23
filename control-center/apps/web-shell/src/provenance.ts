@@ -25,8 +25,41 @@ const FRESHNESS_LABELS: Record<FreshnessStatus, string> = {
   ERROR: "erro de coleta",
 };
 
+const SOURCE_SYSTEM_LABELS: Record<string, string> = {
+  asaas: "Asaas",
+  collector: "Coletor operacional",
+  "control-center": "Control Center",
+  context: "Serviço de contexto",
+  github: "GitHub",
+  governance: "Governance",
+  infrastructure: "Infraestrutura",
+  warmbly: "Warmbly",
+};
+
+const SOURCE_KIND_LABELS: Record<string, string> = {
+  collector: "coleta",
+  commercial: "operação comercial",
+  "crm-read-model": "leitura comercial",
+  "directive-store": "registro de diretivas",
+  "health-probe": "sonda de saúde",
+  http: "leitura HTTP",
+  "inbound-queue": "fila de mensagens recebidas",
+  "receivable-read": "leitura de recebíveis",
+  report: "relatório operacional",
+  "repo-read": "leitura do repositório",
+  snapshot: "instantâneo operacional",
+};
+
+/** Rótulo visível seguro; sistema, tipo e locator crus ficam no detalhe técnico. */
+export function sourcePresentationLabel(source: Provenance["source"]): string {
+  if (source.label) return source.label;
+  const system = SOURCE_SYSTEM_LABELS[source.system] ?? "Sistema de origem";
+  const kind = SOURCE_KIND_LABELS[source.kind] ?? "leitura operacional";
+  return `${system} · ${kind}`;
+}
+
 export function freshnessLabel(status: FreshnessStatus): string {
-  return FRESHNESS_LABELS[status] ?? status;
+  return FRESHNESS_LABELS[status] ?? "atualização não reconhecida";
 }
 
 export function isFreshnessStatus(value: string): value is FreshnessStatus {
@@ -47,8 +80,7 @@ export function mapProvenance(provenance: Provenance): ProvenancePresentation {
   if (provenance.confidence < 0 || provenance.confidence > 1) {
     throw new Error("confidence must be in [0, 1]");
   }
-  const sourceLabel =
-    provenance.source.label ?? `${provenance.source.system} · ${provenance.source.kind}`;
+  const sourceLabel = sourcePresentationLabel(provenance.source);
   return {
     sourceSystem: provenance.source.system,
     sourceKind: provenance.source.kind,

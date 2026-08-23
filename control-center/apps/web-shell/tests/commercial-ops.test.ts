@@ -4,6 +4,13 @@ import { paintShell, createMemoryRuntime } from "../src/app";
 import { createMockAdapter } from "../src/adapters/index";
 import { parseHash } from "../src/destinations";
 
+function visibleText(html: string): string {
+  return html
+    .replace(/<details class="tech"[\s\S]*?<\/details>/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
 test("commercial surfaces render cohort, pipeline, activity and exception operator forms", () => {
   const adapter = createMockAdapter();
   const root = { innerHTML: "" };
@@ -130,10 +137,9 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
       availability: "UNKNOWN",
       last_update_at: "2026-08-22T18:00:00.000Z",
       current: {
-        cohort_id: "cohort-unproven",
         policy_version: "controlled-email.v1",
         outcomes: { provider_accepted: 99 },
-        integrity_flags: ["grant_revoked"],
+        integrity_flags: ["grant_revoked", "FUTURE_FLAG"],
       },
       rows: [{ route_class: "SHOULD_NOT_RENDER", provider_accepted: 99 }],
     },
@@ -147,6 +153,10 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   assert.match(root.innerHTML, /data-controlled-email="unknown"/);
   assert.match(root.innerHTML, /telemetria real não comprovada/);
   assert.match(root.innerHTML, /autorização observada como revogada/);
+  assert.match(visibleText(root.innerHTML), /verificação não reconhecida/);
+  assert.match(visibleText(root.innerHTML), /Coorte não identificada/);
+  assert.doesNotMatch(visibleText(root.innerHTML), /FUTURE_FLAG|UNKNOWN/);
+  assert.match(root.innerHTML, /integrity_flags=grant_revoked,FUTURE_FLAG/);
   assert.match(root.innerHTML, /Aceitos pelo SMTP<\/dt><dd>desconhecido \/ dados ainda incompletos<\/dd>/);
   assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
   assert.doesNotMatch(root.innerHTML, /Primeira coorte real de e-mail/);
