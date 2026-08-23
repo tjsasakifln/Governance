@@ -1363,7 +1363,12 @@ function candidateCard(
     ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
     : [];
   const gate = approvalGate(candidate);
-  const frozenHash = show(candidate.frozen_hash ?? candidate.content_hash);
+  // expected_frozen_hash guards the VERSION the operator was looking at, so it
+  // is the cohort's frozen_hash. A candidate carries content_hash and
+  // evidence_hash and no frozen_hash of its own, so reading it from the
+  // candidate sent the content hash and the server refused every adjust with
+  // frozen_hash_mismatch. The candidate value is kept only as a last resort.
+  const frozenHash = show(cohort.frozen_hash ?? candidate.frozen_hash ?? candidate.content_hash);
   const version = show(cohort.version);
   const draft = adjustDraft(candidateId);
 
