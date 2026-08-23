@@ -138,7 +138,7 @@ export type CommercialSurface = (typeof COMMERCIAL_SURFACES)[number];
  * plus one entry in the renderer registry of `ui/warmbly.ts`; nothing else in
  * the shell has to change.
  */
-export const WARMBLY_SURFACES = ["operacao"] as const;
+export const WARMBLY_SURFACES = ["operacao", "cohorts", "revisao"] as const;
 export type WarmblySurface = (typeof WARMBLY_SURFACES)[number];
 
 export const DEFAULT_WARMBLY_SURFACE: WarmblySurface = "operacao";

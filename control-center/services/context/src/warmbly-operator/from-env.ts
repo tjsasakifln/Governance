@@ -7,6 +7,8 @@
  * a default.
  */
 
+import { readFileSync } from "node:fs";
+
 import type { Logger } from "../log.ts";
 import type { WarmblyOperatorHttpRequest, WarmblyOperatorHttpResponse } from "../http.ts";
 
@@ -54,6 +56,29 @@ function required(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return typeof raw === "string" && raw.trim() !== "" ? raw.trim() : undefined;
 }
 
+function operatorCredential(env: NodeJS.ProcessEnv, logger: Logger): string | undefined {
+  const file = required(env, "CC_WARMBLY_OPERATOR_TOKEN_FILE");
+  if (file) {
+    try {
+      const value = readFileSync(file, "utf8").trim();
+      if (value !== "") return value;
+      logger.error("warmbly.operator.credential_file_empty", {
+        msg: "the configured Warmbly operator credential file is empty",
+      });
+      return undefined;
+    } catch (err) {
+      logger.error("warmbly.operator.credential_file_unreadable", {
+        msg: "the configured Warmbly operator credential file cannot be read",
+        error: err instanceof Error ? err.name : "unknown",
+      });
+      return undefined;
+    }
+  }
+  // Backward compatibility for existing non-production deployments. Production
+  // uses *_FILE so the credential is not copied into container environment.
+  return required(env, "CC_WARMBLY_OPERATOR_TOKEN");
+}
+
 /**
  * Loaded lazily and only when enabled. A static import would make an opt-in
  * feature able to crash boot on any image that does not ship the connector,
@@ -71,7 +96,7 @@ export async function createWarmblyOperatorHandlerFromEnv(
     return undefined;
   }
   const baseUrl = required(env, "CC_WARMBLY_BASE_URL");
-  const token = required(env, "CC_WARMBLY_OPERATOR_TOKEN");
+  const token = operatorCredential(env, deps.logger);
   // The hop that may speak for Authelia must be named explicitly. The library
   // default is DEFAULT_TRUSTED_HOPS, which contains the whole cc_edge /24 — and
   // that network holds web, mcp, collector and context alongside caddy. Trusting
@@ -92,7 +117,7 @@ export async function createWarmblyOperatorHandlerFromEnv(
     // Enabled but not configured is a misconfiguration, not a reason to run
     // half-wired: say so and stay off.
     deps.logger.error("warmbly.operator.not_configured", {
-      msg: "CC_WARMBLY_OPERATOR_ENABLED=true requires CC_WARMBLY_BASE_URL and CC_WARMBLY_OPERATOR_TOKEN",
+      msg: "CC_WARMBLY_OPERATOR_ENABLED=true requires CC_WARMBLY_BASE_URL and a readable operator credential",
       has_base_url: Boolean(baseUrl),
       // The service logger refuses any field NAME matching /token/i and throws,
       // so `has_token` — and `token_present` — turn a misconfiguration into a
@@ -117,6 +142,7 @@ export async function createWarmblyOperatorHandlerFromEnv(
     createAgentActivityLedgerSink,
     createFanOutOperatorActionLedger,
     createMemoryOperatorActionLedger,
+    createHumanGateHttpHandler,
     createOperatorHttpHandler,
     createWarmblyOperatorChannel,
     defaultOperatorSinkErrorHandler,
@@ -147,5 +173,18 @@ export async function createWarmblyOperatorHandlerFromEnv(
     logger: log,
     identityPolicy: connector.defaultOperatorIdentityPolicy(trustedHops),
   });
-  return createOperatorHttpHandler(channel) as WarmblyOperatorHandler;
+  const operator = createOperatorHttpHandler(channel);
+  const humanGate = createHumanGateHttpHandler({
+    baseUrl,
+    token,
+    logger: log,
+    identityPolicy: connector.defaultOperatorIdentityPolicy(trustedHops),
+    ...(required(env, "CC_WARMBLY_OPERATOR_TIMEOUT_MS")
+      ? { timeoutMs: Number(required(env, "CC_WARMBLY_OPERATOR_TIMEOUT_MS")) }
+      : {}),
+  });
+  return ((req) =>
+    (req.url ?? "").split("?")[0]?.startsWith("/v1/warmbly/operator/cohorts")
+      ? humanGate(req as never)
+      : operator(req as never)) as WarmblyOperatorHandler;
 }

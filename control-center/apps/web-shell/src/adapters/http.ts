@@ -17,6 +17,7 @@ import {
   type AdapterReadResult,
   type AdapterWriteResult,
   type WarmblyDispatchInput,
+  type WarmblyGateInput,
   type ControlCenterReadAdapter,
   type DestinationPage,
 } from "./contract";
@@ -199,6 +200,90 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       };
       this.lastOperatorResult = unresolved;
       return unresolved;
+    }
+  }
+
+  async warmblyGate(input: WarmblyGateInput): Promise<AdapterWriteResult> {
+    const base = "/v1/warmbly/operator/cohorts";
+    const version = input.version_id ?? "";
+    const candidate = input.candidate_id ?? "";
+    const path = input.action === "create" ? base
+      : input.action === "reproduce" ? `${base}/${version}/reproduce`
+      : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
+      : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
+      : `${base}/${version}/decision`;
+    if (
+      (input.action !== "create" && !version)
+      || (["validate", "review"].includes(input.action) && !candidate)
+    ) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "alvo do gate incompleto",
+        outcome: "refused",
+        code: "client_precondition",
+      };
+    }
+    if (input.action === "review" && input.decision === "APPROVE" && input.acknowledged !== true) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "APPROVE exige ciência explícita do destinatário, mensagem, policy e evidência",
+        outcome: "refused",
+        code: "approval_acknowledgement_required",
+      };
+    }
+    if (input.action === "decide" && !input.confirmation?.trim()) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "GO/NO-GO exige a confirmação digitada da versão imutável",
+        outcome: "refused",
+        code: "cohort_version_confirmation_required",
+      };
+    }
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          idempotency_key: input.idempotency_key,
+          ...(input.limit ? { limit: input.limit } : {}),
+          ...(input.decision ? { decision: input.decision } : {}),
+          ...(input.reason ? { reason: input.reason } : {}),
+          ...(input.acknowledged === true ? { acknowledged: true } : {}),
+          ...(input.confirmation ? { confirmation: input.confirmation.trim().toLowerCase() } : {}),
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const result: AdapterWriteResult = {
+        ok: response.ok,
+        path,
+        kind: "nota",
+        status: response.status,
+        outcome: response.ok ? "executed" : response.status === 503 ? "unknown" : "refused",
+        message: response.ok
+          ? `Decisão registrada. Receipt: ${String(body.receipt ?? "—")}`
+          : String(body.message ?? (Array.isArray(body.reason) ? body.reason.join(", ") : body.reason) ?? `HTTP ${response.status}`),
+        ...(typeof body.code === "string" ? { code: body.code } : {}),
+      };
+      this.lastOperatorResult = result;
+      return result;
+    } catch {
+      const result: AdapterWriteResult = {
+        ok: false,
+        path,
+        kind: "nota",
+        outcome: "unknown",
+        code: "browser_transport",
+        message: "Sem resposta; releia o recurso antes de repetir.",
+      };
+      this.lastOperatorResult = result;
+      return result;
     }
   }
 
@@ -486,7 +571,16 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     // the extra GET. Comercial stopped rendering the dispatch controls when
     // they moved to their own route.
     if (id === "warmbly" && page.commercial) {
-      await this.attachOperatorLedger(page.commercial);
+      const parsed = parseHash(location ?? "#/warmbly");
+      if (parsed.surface === "cohorts" || parsed.surface === "revisao") {
+        const list = asRecord(await this.getJson("/v1/warmbly/operator/cohorts?limit=50")) ?? {};
+        const selected = parsed.resource
+          ? asRecord(await this.getJson(`/v1/warmbly/operator/cohorts/${encodeURIComponent(parsed.resource)}`))
+          : undefined;
+        page.warmbly_gate = { list, ...(selected ? { selected } : {}) };
+      } else {
+        await this.attachOperatorLedger(page.commercial);
+      }
     }
     if (id === "crescimento" && payloads[1]) {
       const pncp = this.domainBody(payloads[1], fallback);

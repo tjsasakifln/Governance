@@ -59,6 +59,8 @@ export interface DestinationPage {
   sessions?: AgentSession[];
   activities?: AgentActivity[];
   hoje?: HojeViewModel;
+  /** Warmbly's versioned human-gate contract. The UI renders, never re-derives, eligibility. */
+  warmbly_gate?: Record<string, unknown>;
 }
 
 export interface AdapterError {
@@ -133,6 +135,19 @@ export interface ControlCenterReadAdapter {
    * `resume` must replay. There is no single-call resume.
    */
   warmblyDispatch?(input: WarmblyDispatchInput): AdapterWriteResult | Promise<AdapterWriteResult>;
+  warmblyGate?(input: WarmblyGateInput): AdapterWriteResult | Promise<AdapterWriteResult>;
+}
+
+export interface WarmblyGateInput {
+  action: "create" | "reproduce" | "validate" | "review" | "decide";
+  version_id?: string;
+  candidate_id?: string;
+  limit?: number;
+  decision?: "APPROVE" | "REJECT" | "HOLD" | "GO" | "NO_GO";
+  reason?: string;
+  acknowledged?: boolean;
+  confirmation?: string;
+  idempotency_key: string;
 }
 
 export const WARMBLY_DISPATCH_ACTIONS = ["pause", "resume_confirm", "resume", "acknowledge"] as const;

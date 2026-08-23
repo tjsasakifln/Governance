@@ -8,6 +8,11 @@ import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths
 import { parseHash } from "./destinations";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
 import {
+  humanGateIdempotencyKey,
+  settleHumanGateIntent,
+  type HumanGateIntent,
+} from "./human-gate-idempotency";
+import {
   armPendingResumeConfirmation,
   clearPendingResumeConfirmation as clearPendingResume,
   pendingResumeConfirmation as readPendingResume,
@@ -91,7 +96,7 @@ export interface MountableRoot {
   querySelectorAll?(selector: string): ArrayLike<{
     addEventListener(type: string, listener: (event: Event) => void): void;
     getAttribute(name: string): string | null;
-    querySelector(selector: string): { value: string } | null;
+    querySelector(selector: string): { value: string; checked?: boolean } | null;
     focus?(options?: { preventScroll?: boolean }): void;
     scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
   }>;
@@ -154,6 +159,8 @@ function applyPaint(
       result.ok && !result.loading ? result.page?.commercial : undefined,
     ),
   );
+  bindWarmblyHumanGate(root, adapter, repaint);
+  bindWarmblyGateFilters(root, renderHash, navigate);
   bindCopyControls(root);
   bindListFilters(root, renderHash, navigate);
   consumeQueueFocus(
@@ -483,6 +490,67 @@ function bindWarmblyDispatch(
         }
         onDone();
       })();
+    });
+  }
+}
+
+function bindWarmblyHumanGate(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.warmblyGate || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-human-gate]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    const raw = form.getAttribute("data-human-gate");
+    if (raw !== "create" && raw !== "reproduce" && raw !== "validate" && raw !== "review" && raw !== "decide") continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const decision = form.querySelector('[name="decision"]')?.value;
+      const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
+      const acknowledgement = form.querySelector('[name="ack"]')?.checked === true;
+      const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
+      const intent: HumanGateIntent = {
+        action: raw,
+        ...(form.getAttribute("data-version") ? { version_id: form.getAttribute("data-version")! } : {}),
+        ...(form.getAttribute("data-candidate") ? { candidate_id: form.getAttribute("data-candidate")! } : {}),
+        ...(limit > 0 ? { limit } : {}),
+        ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
+        ...(form.querySelector('[name="reason"]')?.value ? { reason: form.querySelector('[name="reason"]')!.value } : {}),
+        ...(decision === "APPROVE" ? { acknowledged: acknowledgement } : {}),
+        ...(raw === "decide" && confirmation ? { confirmation } : {}),
+      };
+      void Promise.resolve(adapter.warmblyGate?.({
+        ...intent,
+        idempotency_key: humanGateIdempotencyKey(intent),
+      })).then((result) => {
+        settleHumanGateIntent(intent, result?.outcome);
+        if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
+    });
+  }
+}
+
+function bindWarmblyGateFilters(root: MountableRoot, hash: string, navigate: Navigate): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-human-gate-filters]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form || !form.getAttribute("data-human-gate-filters")) continue;
+    form.addEventListener("change", (event) => {
+      event.preventDefault();
+      const [path, query = ""] = hash.split("?");
+      const params = new URLSearchParams(query);
+      for (const name of ["freshness", "decision"]) {
+        const value = form.querySelector(`[name="${name}"]`)?.value ?? "all";
+        if (value === "all") params.delete(name);
+        else params.set(name, value);
+      }
+      const rendered = params.toString();
+      navigate(`${path}${rendered ? `?${rendered}` : ""}`);
     });
   }
 }

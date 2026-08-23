@@ -53,6 +53,7 @@ const OVERLAY_COMPOSE = path.resolve(
   "docker-compose.production-edge.yml",
 );
 const GENERATOR = path.join(PRODUCTION_BUNDLE, "secrets", "generate-local.sh");
+const WARMBLY_INSTALLER = path.join(PRODUCTION_BUNDLE, "secrets", "install-warmbly-operator-token.sh");
 const WORKFLOWS = path.resolve(packageRoot(), "..", "..", ".github", "workflows");
 const tempDirs: string[] = [];
 
@@ -322,6 +323,7 @@ describe("production-edge security bundle", () => {
       "CC_AUTH_DOMAIN",
       "CC_COOKIE_DOMAIN",
       "CC_TRUSTED_PROXY_CIDRS",
+      "CC_WARMBLY_OPERATOR_TOKEN",
     ]);
     for (const row of manifest.secrets) {
       assert.ok(row.destination.includes("${CC_SECRET_DIR}/"));
@@ -333,6 +335,28 @@ describe("production-edge security bundle", () => {
         assert.doesNotMatch(text, /generate-local\.sh/);
       }
     }
+  });
+
+  it("installs only the Warmbly operator credential atomically, mode 0600, without printing it", () => {
+    const sourceDir = scratchDir("cc-warmbly-source-");
+    const dest = scratchDir("cc-warmbly-dest-");
+    const source = path.join(sourceDir, "credential");
+    const value = "wmbly_fixture_human_gate_123456789";
+    writeFileSync(source, `${value}\n`, { mode: 0o600 });
+    const result = spawnSync("bash", [WARMBLY_INSTALLER, source, dest], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, new RegExp(value));
+    assert.doesNotMatch(result.stderr, new RegExp(value));
+    const installed = path.join(dest, "CC_WARMBLY_OPERATOR_TOKEN");
+    assert.equal(readFileSync(installed, "utf8"), value);
+    assert.equal(statSync(installed).mode & 0o777, 0o600);
+    assert.deepEqual(readdirSync(dest), ["CC_WARMBLY_OPERATOR_TOKEN"]);
+
+    const bad = path.join(sourceDir, "bad");
+    writeFileSync(bad, "not-a-warmbly-credential\n", { mode: 0o600 });
+    const refused = spawnSync("bash", [WARMBLY_INSTALLER, bad, dest], { encoding: "utf8" });
+    assert.notEqual(refused.status, 0);
+    assert.equal(readFileSync(installed, "utf8"), value, "a rejected rotation must preserve the old credential");
   });
 
   it("generator writes 0600 files, prints no values, and refuses placeholders and CI", () => {

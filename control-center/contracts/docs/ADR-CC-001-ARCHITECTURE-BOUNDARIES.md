@@ -1,5 +1,15 @@
 # ADR-CC-001 — Control Center architecture boundaries
 
+## Amendment: versioned outbound human gate (2026-08-23)
+
+Control Center may record the bounded control-plane decisions defined by
+`confenge.human-gate.v1`: create/reproduce an immutable Warmbly cohort version,
+request/read validation, record candidate APPROVE/REJECT/HOLD, and record
+version-exact GO/NO-GO. This authority is narrower than transport authority:
+Control Center still MUST NOT calculate eligibility, edit the frozen preview,
+queue a touchpoint, dispatch a cohort, or send email. Warmbly remains the
+versioned contract and last-mile policy authority; auto-send remains off.
+
 - **Status:** Accepted for campaign `CONFENGE-CONTROL-CENTER-FANOUT-2026-08-20`
 - **Date:** 2026-08-20
 - **Package:** `control-center/contracts/`

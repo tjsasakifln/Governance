@@ -15,4 +15,4 @@ services:
 networks:
   warmbly_net:
     external: true
-    name: ${WARMBLY_DOCKER_NETWORK:-warmbly}
+    name: ${WARMBLY_DOCKER_NETWORK:-warmbly-confenge_default}

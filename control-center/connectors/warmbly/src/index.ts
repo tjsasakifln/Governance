@@ -47,3 +47,5 @@ export {
  * exported from this connector stays read-only.
  */
 export * from "./operator/index.ts";
+export { HUMAN_GATE_CONTRACT, HUMAN_GATE_PREFIX, createHumanGateHttpHandler } from "./human-gate/http.ts";
+export type { HumanGateHttpOptions } from "./human-gate/http.ts";

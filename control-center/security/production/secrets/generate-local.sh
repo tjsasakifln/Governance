@@ -148,6 +148,7 @@ users:
     email: "${OPERATOR_EMAIL}"
     groups:
       - operators
+      - admins
 USERS
 chmod 600 "$DEST/users.yml"
 

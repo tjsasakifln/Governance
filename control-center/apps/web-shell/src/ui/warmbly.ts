@@ -43,12 +43,16 @@ export interface WarmblySurfaceInput {
   operatorResult?: AdapterWriteResult;
   /** Challenge bound to the exact reason and observation shown on this render. */
   confirmation?: PendingResumeConfirmation;
+  gate?: Record<string, unknown>;
+  query?: string;
 }
 
 export type WarmblySurfaceRenderer = (input: WarmblySurfaceInput) => string;
 
 const WARMBLY_SURFACE_LABELS: Record<WarmblySurface, string> = {
   operacao: "Operação segura",
+  cohorts: "Cohorts",
+  revisao: "Revisão",
 };
 
 /* ------------------------------------------------------------------ *
@@ -636,7 +640,80 @@ function operationSurface(input: WarmblySurfaceInput): string {
  */
 const WARMBLY_SURFACE_RENDERERS: Record<WarmblySurface, WarmblySurfaceRenderer> = {
   operacao: operationSurface,
+  cohorts: cohortSurface,
+  revisao: reviewSurface,
 };
+
+function array(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(record) : [];
+}
+
+function gateData(input: WarmblySurfaceInput, key: "list" | "selected"): Record<string, unknown> {
+  return record(record(input.gate)[key]);
+}
+
+function cohortData(input: WarmblySurfaceInput): Record<string, unknown>[] {
+  return array(gateData(input, "list").data);
+}
+
+function validationPill(candidate: Record<string, unknown>): string {
+  const validation = record(candidate.validation);
+  const observed = show(validation.status).toUpperCase();
+  const status = ["VALID", "RISKY", "INVALID", "UNKNOWN", "STALE"].includes(observed)
+    ? observed
+    : "UNKNOWN";
+  const tone = status === "VALID"
+    ? "ok"
+    : status === "INVALID"
+      ? "error"
+      : "stale";
+  return `<span class="pill ${tone}" data-validation-status="${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+}
+
+function cohortSurface(input: WarmblySurfaceInput): string {
+  const params = new URLSearchParams(input.query ?? "");
+  const freshness = params.get("freshness") ?? "all";
+  const decisionFilter = params.get("decision") ?? "all";
+  const cohorts = cohortData(input).filter((cohort) => {
+    const decision = show(record(cohort.decision).decision);
+    return (freshness === "all" || show(cohort.freshness) === freshness)
+      && (decisionFilter === "all" || decision === decisionFilter);
+  });
+  const rows = cohorts.map((cohort) => {
+    const preview = record(record(cohort.manifest).preview);
+    const decision = record(cohort.decision);
+    return `<tr><td><a href="#/warmbly/revisao?resource=${escapeHtml(show(cohort.id))}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(show(preview.accounts_considered))}</td><td>${escapeHtml(show(preview.accounts_eligible))}</td><td>${escapeHtml(show(preview.accounts_excluded))}</td><td>${escapeHtml(show(preview.recipients_final))}</td><td>${escapeHtml(show(decision.decision))}</td></tr>`;
+  }).join("");
+  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. Auto-send permanece OFF.</p>
+  <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label><label>Decisão<select name="decision"><option value="all">Todas</option><option value="GO"${decisionFilter === "GO" ? " selected" : ""}>GO</option><option value="NO_GO"${decisionFilter === "NO_GO" ? " selected" : ""}>NO_GO</option></select></label></form>
+  <form class="operator-form" data-human-gate="create"><label>Tamanho pequeno (1–10)<input name="limit" type="number" min="1" max="10" value="5" required></label><button type="submit">Criar cohort congelada</button></form>
+  <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Decisão</th></tr></thead><tbody>${rows || `<tr><td colspan="7">Nenhuma cohort. Uma cohort vazia nunca pode receber GO.</td></tr>`}</tbody></table></div></section>`;
+}
+
+function reviewSurface(input: WarmblySurfaceInput): string {
+  const selected = gateData(input, "selected");
+  const cohort = record(selected.data);
+  if (!cohort.id) {
+    return `<section class="stack"><h2>Revisão</h2><p class="banner empty">Selecione uma versão em <a href="#/warmbly/cohorts">Cohorts</a>. Nenhuma elegibilidade é inferida localmente.</p></section>`;
+  }
+  const manifest = record(cohort.manifest);
+  const preview = record(manifest.preview);
+  const candidates = array(cohort.candidates);
+  const candidateCards = candidates.map((candidate) => {
+    const validation = record(candidate.validation);
+    const review = record(candidate.review);
+    const blocked = Array.isArray(candidate.blocked_by) ? candidate.blocked_by.join(", ") : "";
+    return `<article class="card" data-candidate-id="${escapeHtml(show(candidate.candidate_id))}"><p class="kicker">${validationPill(candidate)} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p><h3>${escapeHtml(show(candidate.company))}</h3>
+    <dl>${fact("Destinatário exato", show(candidate.mailbox))}${fact("Purpose", show(candidate.mailbox_purpose))}${fact("Validação", show(validation.reason))}${fact("Evidência vence", stamp(validation.expires_at))}${fact("Review", show(review.decision))}${fact("Efetiva", show(review.effective))}${fact("Bloqueios", blocked || "nenhum")}</dl>
+    <details><summary>Ver mensagem exata congelada</summary><p><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p><pre class="message-preview">${escapeHtml(show(candidate.body_text))}</pre><p class="constraint">content hash ${escapeHtml(show(candidate.content_hash))}; policy ${escapeHtml(show(cohort.policy_version))}; evidence ${escapeHtml(show(candidate.evidence_hash))}</p></details>
+    <form class="operator-form" data-human-gate="validate" data-version="${escapeHtml(show(cohort.id))}" data-candidate="${escapeHtml(show(candidate.candidate_id))}"><button type="submit">Solicitar validation</button></form>
+    <form class="operator-form" data-human-gate="review" data-version="${escapeHtml(show(cohort.id))}" data-candidate="${escapeHtml(show(candidate.candidate_id))}"><label>Decisão<select name="decision"><option>APPROVE</option><option>HOLD</option><option>REJECT</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label><input type="checkbox" name="ack" required> Revisei destinatário, mensagem e evidência desta versão</label><button type="submit">Registrar decisão</button></form></article>`;
+  }).join("");
+  return `<section class="stack" aria-labelledby="review-title"><h2 id="review-title">Revisão v${escapeHtml(show(cohort.version))}</h2><p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
+  <dl>${fact("Considerados", show(preview.accounts_considered))}${fact("Elegíveis", show(preview.accounts_eligible))}${fact("Excluídos", show(preview.accounts_excluded))}${fact("Destinatários finais", show(preview.recipients_final))}${fact("Suppression", show(preview.suppressed))}${fact("Opt-out", show(preview.opt_out))}${fact("Risky excluídos", show(preview.risky_excluded))}</dl>
+  <form class="operator-form" data-human-gate="reproduce" data-version="${escapeHtml(show(cohort.id))}"><button type="submit">Reproduzir versão imutável</button></form>${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
+  <form class="operator-form" data-human-gate="decide" data-version="${escapeHtml(show(cohort.id))}"><label>Decisão final<select name="decision"><option>NO_GO</option><option>GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(show(cohort.version))}</code><input name="confirmation" required pattern="v${escapeHtml(show(cohort.version))}"></label><button type="submit">Registrar GO/NO-GO</button></form><p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
+}
 
 function warmblySubnav(current: WarmblySurface): string {
   return `<nav class="subnav" aria-label="Superfícies de operação Warmbly">${WARMBLY_SURFACES.map(
