@@ -64,7 +64,7 @@ test("cohort decision view renders explicit zero but never turns UNKNOWN into ze
   if (!commercial) return;
   commercial.operations = {
     cohorts: { acquisition: [] },
-    controlled_email: {
+    controlled_outbound: {
       availability: "OBSERVED",
       last_update_at: "2026-08-22T18:00:00.000Z",
       current: {

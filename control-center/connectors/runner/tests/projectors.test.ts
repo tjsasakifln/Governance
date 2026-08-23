@@ -131,7 +131,7 @@ test("controlled-email cohort preserves observed zero and UNKNOWN independently"
   });
   const commercial = projected.find((row) => row.snapshot_kind === "commercial");
   assert.ok(commercial);
-  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_email as {
+  const controlled = (commercial.payload.operations as Record<string, unknown>).controlled_outbound as {
     current: { sent: number; max_daily_volume: number; outcomes: Record<string, number | null> };
   };
   assert.equal(controlled.current.sent, 0, "an observed reservation-ledger zero must survive");
