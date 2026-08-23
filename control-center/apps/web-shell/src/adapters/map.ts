@@ -918,6 +918,10 @@ export function mapHojePayloads(input: {
     engineering: engineeringRaw ? engineeringFrom(engineeringRaw, input.fallback) : null,
     infra,
     activities,
+    // Raw envelope, kept unmapped on purpose: the per-domain panorama reads
+    // `snapshots.<domain>.presence/absence_reason/healthy` straight from the
+    // contract instead of a lossy re-projection.
+    operational_envelope: input.snapshot,
   };
 }
 
