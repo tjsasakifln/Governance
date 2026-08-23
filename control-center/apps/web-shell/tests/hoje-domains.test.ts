@@ -130,7 +130,8 @@ test("the action total is the sum of the parcels the operator can see", () => {
       0,
     ) + summary.unmapped.reduce((sum, row) => sum + row.count, 0);
   assert.equal(summary.action_total, visible);
-  assert.ok(summary.action_total > 0);
+  assert.ok(summary.action_total !== null && summary.action_total > 0);
+  assert.match(summary.action_total_note, /sinais para triagem, não itens únicos/);
   for (const card of summary.cards) {
     assert.equal(
       card.action_count,
@@ -150,7 +151,11 @@ test("acknowledged alerts still count: reconhecer não esvazia a fila", () => {
 
   attention[0]!.status = "resolved";
   const resolved = summarizeDomains(envelope);
-  assert.ok(resolved.action_total < withOpen.action_total);
+  assert.ok(
+    resolved.action_total !== null &&
+      withOpen.action_total !== null &&
+      resolved.action_total < withOpen.action_total,
+  );
 });
 
 test("alerts in a domain without a card are surfaced, not swallowed", () => {
@@ -199,8 +204,8 @@ test("a missing envelope produces desconhecido everywhere, never six healthy car
       assert.equal(card.state, "desconhecido");
       assert.match(card.state_reason, /Faltam dados/);
     }
-    assert.equal(summary.action_total, 0);
-    assert.match(summary.action_total_note, /ausência de leitura, não ausência de trabalho/);
+    assert.equal(summary.action_total, null);
+    assert.match(summary.action_total_note, /Ausência de leitura não significa ausência de trabalho/);
     assertNoHealthyOnUntrusted(summary);
   }
 });
@@ -255,11 +260,13 @@ test("the rendered Hoje page shows the panorama, the total, the links and no 'ig
   assert.match(html, /data-domain-state="erro_coleta"/);
   assert.match(html, /data-domain-state="desconhecido"/);
   assert.match(html, /data-action-total="\d+"/);
+  assert.match(html, /sinal\(is\) operacional\(is\) exigem triagem/);
   assert.match(html, /href="#\/comercial"/);
   assert.match(html, /href="#\/clientes"/);
   assert.match(html, /href="#\/financeiro"/);
   assert.match(html, /href="#\/engenharia"/);
   assert.match(html, /href="#\/infra"/);
+  assert.match(html, /href="#\/warmbly"/);
   assert.match(html, /data-outbound-state="PAUSED"/);
   assert.match(html, /data-integration="github"/);
   assert.match(html, /última atualização/);

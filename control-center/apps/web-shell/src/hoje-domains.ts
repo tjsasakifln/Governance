@@ -122,8 +122,9 @@ export interface HojeDomainSummary {
   integrations: HojeIntegration[];
   outbound: HojeOutbound;
   unmapped: HojeUnmappedAlerts[];
-  action_total: number;
-  /** How `action_total` was computed, so the number is auditable on screen. */
+  /** Null when the envelope is absent: lack of a reading is not a measured zero. */
+  action_total: number | null;
+  /** What the aggregate means and how it was computed. */
   action_total_note: string;
 }
 
@@ -272,7 +273,7 @@ const CARD_SEEDS: readonly CardSeed[] = [
     id: "warmbly",
     label: "Warmbly / disparo de saída",
     envelopeDomain: null,
-    href: "#/comercial?surface=cohorts",
+    href: "#/warmbly",
     href_label: "Abrir controles do disparo",
   },
 ];
@@ -413,7 +414,7 @@ function outboundFrom(commercial: DomainSlot | null): HojeOutbound {
     const volume = sent !== null || cap !== null ? ` Enviados na hora/teto: ${sent ?? "sem dado"}/${cap ?? "sem dado"}.` : "";
     detail = `Outbound ativo — e-mail frio pode sair.${volume}`;
   }
-  return { state, label, observed, detail, href: "#/comercial?surface=cohorts" };
+  return { state, label, observed, detail, href: "#/warmbly" };
 }
 
 function warmblyCard(
@@ -659,7 +660,7 @@ function emptySummary(): HojeDomainSummary {
     observed: false,
     detail:
       "Faltam dados: o envelope operacional não chegou nesta leitura, então o estado do disparo é desconhecido.",
-    href: "#/comercial?surface=cohorts",
+    href: "#/warmbly",
   };
   const cards = CARD_SEEDS.map((seed) =>
     seed.id === "warmbly"
@@ -673,9 +674,9 @@ function emptySummary(): HojeDomainSummary {
     integrations: [],
     outbound,
     unmapped: [],
-    action_total: 0,
+    action_total: null,
     action_total_note:
-      "Nenhuma contagem pôde ser feita: o envelope operacional não chegou. Zero aqui significa ausência de leitura, não ausência de trabalho.",
+      "Nenhuma contagem pôde ser feita: o envelope operacional não chegou. Ausência de leitura não significa ausência de trabalho.",
   };
 }
 
@@ -728,7 +729,7 @@ export function summarizeDomains(envelopeRaw: unknown): HojeDomainSummary {
     unmapped,
     action_total: cardTotal + unmappedTotal,
     action_total_note:
-      "Soma das pendências listadas nos cards abaixo. Cada parcela está visível e leva ao recorte de origem.",
+      "Soma bruta dos sinais listados nos cards abaixo. Uma mesma entidade pode aparecer em mais de um sinal agregado; portanto este número mede sinais para triagem, não itens únicos.",
   };
 }
 

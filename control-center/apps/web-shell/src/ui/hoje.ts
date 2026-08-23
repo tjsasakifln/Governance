@@ -139,6 +139,12 @@ function integrationRow(row: HojeIntegration): string {
 }
 
 function domainSummaryBlock(summary: HojeDomainSummary): string {
+  const total = summary.action_total;
+  const totalText = total === null ? "indisponível" : String(total);
+  const totalSuffix =
+    total === null
+      ? " — total de sinais para triagem indisponível."
+      : " sinal(is) operacional(is) exigem triagem agora.";
   const unmapped =
     summary.unmapped.length === 0
       ? ""
@@ -153,8 +159,8 @@ function domainSummaryBlock(summary: HojeDomainSummary): string {
       ? `<p class="domain-empty" data-integrations="0">Faltam dados: nenhuma observação de origem chegou nesta leitura. Não significa que as integrações estejam sãs.</p>`
       : `<ul class="domain-integrations">${summary.integrations.map(integrationRow).join("")}</ul>`;
   return `
-    <p class="domain-total" data-action-total="${escapeHtml(String(summary.action_total))}">
-      <strong>${escapeHtml(String(summary.action_total))}</strong> item(ns) exigem ação agora.
+    <p class="domain-total" data-action-total="${escapeHtml(total === null ? "unknown" : totalText)}">
+      <strong>${escapeHtml(totalText)}</strong>${escapeHtml(totalSuffix)}
       <span class="hint">${escapeHtml(summary.action_total_note)}</span>
     </p>
     ${unmapped}
