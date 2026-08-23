@@ -222,7 +222,7 @@ async function handle(
       }
       const result = await deps.warmblyOperator({
         method,
-        url: url.pathname,
+        url: `${url.pathname}${url.search}`,
         headers: req.headers,
         rawHeaders: req.rawHeaders,
         remoteAddress: req.socket?.remoteAddress,

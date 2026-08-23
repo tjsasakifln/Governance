@@ -154,6 +154,8 @@ function applyPaint(
       result.ok && !result.loading ? result.page?.commercial : undefined,
     ),
   );
+  bindWarmblyHumanGate(root, adapter, repaint);
+  bindWarmblyGateFilters(root, renderHash, navigate);
   bindCopyControls(root);
   bindListFilters(root, renderHash, navigate);
   consumeQueueFocus(
@@ -483,6 +485,60 @@ function bindWarmblyDispatch(
         }
         onDone();
       })();
+    });
+  }
+}
+
+function bindWarmblyHumanGate(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.warmblyGate || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-human-gate]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    const raw = form.getAttribute("data-human-gate");
+    if (raw !== "create" && raw !== "reproduce" && raw !== "validate" && raw !== "review" && raw !== "decide") continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const decision = form.querySelector('[name="decision"]')?.value;
+      const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
+      const key = `cc-human-gate:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${i}`}`;
+      void Promise.resolve(adapter.warmblyGate?.({
+        action: raw,
+        idempotency_key: key,
+        ...(form.getAttribute("data-version") ? { version_id: form.getAttribute("data-version")! } : {}),
+        ...(form.getAttribute("data-candidate") ? { candidate_id: form.getAttribute("data-candidate")! } : {}),
+        ...(limit > 0 ? { limit } : {}),
+        ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
+        ...(form.querySelector('[name="reason"]')?.value ? { reason: form.querySelector('[name="reason"]')!.value } : {}),
+      })).then((result) => {
+        if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
+    });
+  }
+}
+
+function bindWarmblyGateFilters(root: MountableRoot, hash: string, navigate: Navigate): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-human-gate-filters]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form || !form.getAttribute("data-human-gate-filters")) continue;
+    form.addEventListener("change", (event) => {
+      event.preventDefault();
+      const [path, query = ""] = hash.split("?");
+      const params = new URLSearchParams(query);
+      for (const name of ["freshness", "decision"]) {
+        const value = form.querySelector(`[name="${name}"]`)?.value ?? "all";
+        if (value === "all") params.delete(name);
+        else params.set(name, value);
+      }
+      const rendered = params.toString();
+      navigate(`${path}${rendered ? `?${rendered}` : ""}`);
     });
   }
 }

@@ -117,6 +117,7 @@ export async function createWarmblyOperatorHandlerFromEnv(
     createAgentActivityLedgerSink,
     createFanOutOperatorActionLedger,
     createMemoryOperatorActionLedger,
+    createHumanGateHttpHandler,
     createOperatorHttpHandler,
     createWarmblyOperatorChannel,
     defaultOperatorSinkErrorHandler,
@@ -147,5 +148,18 @@ export async function createWarmblyOperatorHandlerFromEnv(
     logger: log,
     identityPolicy: connector.defaultOperatorIdentityPolicy(trustedHops),
   });
-  return createOperatorHttpHandler(channel) as WarmblyOperatorHandler;
+  const operator = createOperatorHttpHandler(channel);
+  const humanGate = createHumanGateHttpHandler({
+    baseUrl,
+    token,
+    logger: log,
+    identityPolicy: connector.defaultOperatorIdentityPolicy(trustedHops),
+    ...(required(env, "CC_WARMBLY_OPERATOR_TIMEOUT_MS")
+      ? { timeoutMs: Number(required(env, "CC_WARMBLY_OPERATOR_TIMEOUT_MS")) }
+      : {}),
+  });
+  return ((req) =>
+    (req.url ?? "").split("?")[0]?.startsWith("/v1/warmbly/operator/cohorts")
+      ? humanGate(req as never)
+      : operator(req as never)) as WarmblyOperatorHandler;
 }

@@ -17,6 +17,7 @@ import {
   type AdapterReadResult,
   type AdapterWriteResult,
   type WarmblyDispatchInput,
+  type WarmblyGateInput,
   type ControlCenterReadAdapter,
   type DestinationPage,
 } from "./contract";
@@ -199,6 +200,68 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       };
       this.lastOperatorResult = unresolved;
       return unresolved;
+    }
+  }
+
+  async warmblyGate(input: WarmblyGateInput): Promise<AdapterWriteResult> {
+    const base = "/v1/warmbly/operator/cohorts";
+    const version = input.version_id ?? "";
+    const candidate = input.candidate_id ?? "";
+    const path = input.action === "create" ? base
+      : input.action === "reproduce" ? `${base}/${version}/reproduce`
+      : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
+      : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
+      : `${base}/${version}/decision`;
+    if (
+      (input.action !== "create" && !version)
+      || (["validate", "review"].includes(input.action) && !candidate)
+    ) {
+      return {
+        ok: false,
+        path,
+        kind: "nota",
+        message: "alvo do gate incompleto",
+        outcome: "refused",
+        code: "client_precondition",
+      };
+    }
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          idempotency_key: input.idempotency_key,
+          ...(input.limit ? { limit: input.limit } : {}),
+          ...(input.decision ? { decision: input.decision } : {}),
+          ...(input.reason ? { reason: input.reason } : {}),
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      const result: AdapterWriteResult = {
+        ok: response.ok,
+        path,
+        kind: "nota",
+        status: response.status,
+        outcome: response.ok ? "executed" : response.status === 503 ? "unknown" : "refused",
+        message: response.ok
+          ? `Decisão registrada. Receipt: ${String(body.receipt ?? "—")}`
+          : String(body.reason ?? body.message ?? `HTTP ${response.status}`),
+        ...(typeof body.code === "string" ? { code: body.code } : {}),
+      };
+      this.lastOperatorResult = result;
+      return result;
+    } catch {
+      const result: AdapterWriteResult = {
+        ok: false,
+        path,
+        kind: "nota",
+        outcome: "unknown",
+        code: "browser_transport",
+        message: "Sem resposta; releia o recurso antes de repetir.",
+      };
+      this.lastOperatorResult = result;
+      return result;
     }
   }
 
@@ -486,7 +549,16 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     // the extra GET. Comercial stopped rendering the dispatch controls when
     // they moved to their own route.
     if (id === "warmbly" && page.commercial) {
-      await this.attachOperatorLedger(page.commercial);
+      const parsed = parseHash(location ?? "#/warmbly");
+      if (parsed.surface === "cohorts" || parsed.surface === "revisao") {
+        const list = asRecord(await this.getJson("/v1/warmbly/operator/cohorts?limit=50")) ?? {};
+        const selected = parsed.resource
+          ? asRecord(await this.getJson(`/v1/warmbly/operator/cohorts/${encodeURIComponent(parsed.resource)}`))
+          : undefined;
+        page.warmbly_gate = { list, ...(selected ? { selected } : {}) };
+      } else {
+        await this.attachOperatorLedger(page.commercial);
+      }
     }
     if (id === "crescimento" && payloads[1]) {
       const pncp = this.domainBody(payloads[1], fallback);

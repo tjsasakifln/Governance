@@ -207,6 +207,8 @@ function pageBody(
         operator: page.operator,
         ...(confirmation ? { confirmation } : {}),
         ...(operatorResult ? { operatorResult } : {}),
+        ...(page.warmbly_gate ? { gate: page.warmbly_gate } : {}),
+        ...(query ? { query } : {}),
       },
       surface,
     );
