@@ -118,6 +118,40 @@ test("viewport overflow is confined to nav/subnav; html/body clip accidental hor
   assert.match(css, /min-height:\s*44px/);
 });
 
+/**
+ * Static guards for the desktop layout contract. They pin the declarations, not
+ * the rendered geometry -- the behavioural proof lives in
+ * scripts/launch-probe.mjs, which measures the real build in Chromium at
+ * 1366x768, 1440x900 and 1920x1080 and fails on a dead right-hand panel or a
+ * second vertical scroll context.
+ */
+test("main is a single full-bleed scroll context with a centred, capped content column", () => {
+  const css = readFileSync(join(rootDir, "src/styles.css"), "utf8");
+  const mainBlock = /\nmain\s*\{([^}]*)\}/.exec(css)?.[1];
+  assert.ok(mainBlock, "top-level main rule not found");
+
+  // The design system, not a magic number in one rule, owns the measure.
+  assert.match(css, /:root\s*\{[^}]*--content-max:\s*[\d.]+rem/s);
+  assert.match(mainBlock, /padding-inline:\s*max\(\s*var\(--main-gutter\)/);
+  assert.match(mainBlock, /--content-max/);
+  // A bare max-width on the scroll container is the regression being fixed: it
+  // pins the content to the left edge of the desktop grid column.
+  assert.doesNotMatch(mainBlock, /^\s*max-width\s*:/m);
+
+  // main owns the only vertical scroll context.
+  assert.match(mainBlock, /overflow-y:\s*auto/);
+  assert.match(mainBlock, /overscroll-behavior-y:\s*contain/);
+  // Without a positioned ancestor the .sr-only absolutes inside the page body
+  // resolve against the initial containing block, escape this scroll container
+  // and inflate the document scrolling area into a second scrollbar.
+  assert.match(mainBlock, /position:\s*relative/);
+
+  // The desktop sidebar stretches to its grid row; a guessed topbar height
+  // pushes the shell past the viewport and adds a third scroll context.
+  assert.doesNotMatch(css, /height:\s*calc\(100dvh\s*-/);
+  assert.match(css, /grid-template-columns:\s*13\.5rem\s+minmax\(0,\s*1fr\)/);
+});
+
 test("keyboard-focusable nav exists and skip link is present", () => {
   const root = { innerHTML: "" };
   const handle = mount(root, createMockAdapter(), createMemoryRuntime("#/hoje"));
