@@ -300,6 +300,11 @@ export type WarmblyWeeklyRevenueChain = {
 };
 
 export type WarmblyIntelExecutive = Record<string, unknown> & {
+  schema_version?: string;
+  month?: string;
+  include_synthetic?: boolean;
+  causal_proof?: boolean;
+  real_empty?: boolean;
   weekly_revenue_chains?: WarmblyWeeklyRevenueChain[];
 };
 

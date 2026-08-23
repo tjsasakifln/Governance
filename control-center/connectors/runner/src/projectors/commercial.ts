@@ -1,5 +1,8 @@
 import { resolveClientIdentity } from "@confenge/control-center-contracts";
-import { realIntelReportDriftReason } from "../../../warmbly/src/collector/envelope.ts";
+import {
+  realIntelExecutiveDriftReason,
+  realIntelReportDriftReason,
+} from "../../../warmbly/src/collector/envelope.ts";
 import { WARMBLY_FULL_OPERATIONS } from "../../../warmbly/src/mapper/normalize.ts";
 import { availabilityFromEnvelope, freshnessForAvailability } from "./availability.ts";
 import {
@@ -38,6 +41,8 @@ const WINDOW_MS: Record<Exclude<CohortWindow, "open">, number> = {
 const CATALOG_CURRENCY = "BRL";
 const ISO_4217 = /^[A-Z]{3}$/;
 const OPAQUE_COMMERCIAL_ID = /^[A-Za-z0-9._:-]{1,160}$/;
+const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+const WARMBLY_WEEKLY_REVENUE_CHAIN_SCHEMA = "confenge.weekly_revenue_chain.v1";
 const WEEKLY_REVENUE_CHAIN_CAP = 50;
 
 function opaqueCommercialId(value: unknown): string {
@@ -46,17 +51,27 @@ function opaqueCommercialId(value: unknown): string {
   return id !== "UNKNOWN" && OPAQUE_COMMERCIAL_ID.test(id) ? id : "UNKNOWN";
 }
 
-function observedInstant(value: unknown): string | undefined {
-  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) return undefined;
+function utcInstant(value: unknown): string | undefined {
+  if (typeof value !== "string" || !UTC_INSTANT.test(value)) return undefined;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return undefined;
+  const inputSecond = value.replace(/\.\d{1,9}Z$/, "Z");
+  const parsedSecond = new Date(parsed).toISOString().replace(/\.\d{3}Z$/, "Z");
+  if (inputSecond !== parsedSecond) return undefined;
   return value;
 }
 
-function observedOpaqueText(value: unknown): Record<string, unknown> {
+function observedInstant(value: unknown, collectedAt: number): string | undefined {
+  const instant = utcInstant(value);
+  return instant && Date.parse(instant) <= collectedAt ? instant : undefined;
+}
+
+function observedOpaqueText(value: unknown, collectedAt: number): Record<string, unknown> {
   const row = asRecord(value);
   if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
   const text = opaqueCommercialId(row.value);
   if (text === "UNKNOWN") return { availability: "UNKNOWN" };
-  const observedAt = observedInstant(row.observed_at);
+  const observedAt = observedInstant(row.observed_at, collectedAt);
   return {
     availability: "OBSERVED",
     value: text,
@@ -64,19 +79,19 @@ function observedOpaqueText(value: unknown): Record<string, unknown> {
   };
 }
 
-function observedDecision(value: unknown): Record<string, unknown> {
-  const row = observedOpaqueText(value);
+function observedDecision(value: unknown, collectedAt: number): Record<string, unknown> {
+  const row = observedOpaqueText(value, collectedAt);
   return row.availability === "OBSERVED" && ["GO", "NO-GO", "WAIT"].includes(String(row.value))
     ? row
     : { availability: "UNKNOWN" };
 }
 
-function observedDeadline(value: unknown): Record<string, unknown> {
+function observedDeadline(value: unknown, collectedAt: number): Record<string, unknown> {
   const row = asRecord(value);
   if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
-  const deadline = observedInstant(row.value);
+  const deadline = utcInstant(row.value);
   if (!deadline) return { availability: "UNKNOWN" };
-  const observedAt = observedInstant(row.observed_at);
+  const observedAt = observedInstant(row.observed_at, collectedAt);
   return {
     availability: "OBSERVED",
     value: deadline,
@@ -84,35 +99,66 @@ function observedDeadline(value: unknown): Record<string, unknown> {
   };
 }
 
-function observedProviderMoney(value: unknown): Record<string, unknown> {
+function observedLinkedOpaqueText(value: unknown, expectedId: string, collectedAt: number): Record<string, unknown> {
+  const row = observedOpaqueText(value, collectedAt);
+  return row.availability === "OBSERVED" && expectedId !== "UNKNOWN" && row.value === expectedId
+    ? row
+    : { availability: "UNKNOWN" };
+}
+
+function observedProviderMoney(value: unknown, expectedId: string, collectedAt: number): Record<string, unknown> {
   const row = asRecord(value);
   if (row?.availability !== "OBSERVED") return { availability: "UNKNOWN" };
   const id = opaqueCommercialId(row.id);
-  if (id === "UNKNOWN") return { availability: "UNKNOWN" };
+  if (id === "UNKNOWN" || expectedId === "UNKNOWN" || id !== expectedId) {
+    return { availability: "UNKNOWN" };
+  }
   const status = opaqueCommercialId(row.status);
   const currency = typeof row.currency === "string" && ISO_4217.test(row.currency) ? row.currency : undefined;
   const amount = Number.isSafeInteger(row.amount_cents) && Number(row.amount_cents) >= 0
     ? Number(row.amount_cents)
     : undefined;
-  const observedAt = observedInstant(row.observed_at);
+  const hasDenominatedAmount = amount !== undefined && currency !== undefined;
+  const observedAt = observedInstant(row.observed_at, collectedAt);
   return {
     availability: "OBSERVED",
     id,
     status,
-    ...(amount === undefined ? {} : { amount_cents: amount }),
-    ...(currency ? { currency } : {}),
+    ...(hasDenominatedAmount ? { amount_cents: amount, currency } : {}),
     ...(observedAt ? { observed_at: observedAt } : {}),
   };
 }
 
-function weeklyRevenueChainsFromExecutive(value: unknown): Record<string, unknown>[] {
-  const rows = asArray(asRecord(value)?.weekly_revenue_chains);
+function weeklyRevenueChainsFromExecutive(value: unknown, observedAt: string): Record<string, unknown>[] {
+  if (realIntelExecutiveDriftReason(value)) return [];
+  const executive = asRecord(value) as Record<string, unknown>;
+  const collectedAt = Date.parse(observedAt);
+  if (Number.isNaN(collectedAt)) return [];
+  const rows = asArray(executive.weekly_revenue_chains);
   const byCorrelation = new Map<string, Record<string, unknown>>();
+  const duplicatedCorrelations = new Set<string>();
   for (const item of rows) {
     const row = asRecord(item);
     const identity = asRecord(row?.canonical_identity);
     const correlationId = opaqueCommercialId(identity?.correlation_id);
-    if (!row || !identity || correlationId === "UNKNOWN" || byCorrelation.has(correlationId)) continue;
+    if (
+      !row ||
+      !identity ||
+      correlationId === "UNKNOWN" ||
+      row.schema_version !== WARMBLY_WEEKLY_REVENUE_CHAIN_SCHEMA ||
+      typeof row.held !== "boolean" ||
+      row.synthetic !== false
+    ) {
+      continue;
+    }
+    if (byCorrelation.has(correlationId) || duplicatedCorrelations.has(correlationId)) {
+      byCorrelation.delete(correlationId);
+      duplicatedCorrelations.add(correlationId);
+      continue;
+    }
+    const proposalId = opaqueCommercialId(identity.proposal_id);
+    const chargeId = opaqueCommercialId(identity.charge_id);
+    const paymentId = opaqueCommercialId(identity.payment_id);
     byCorrelation.set(correlationId, {
       schema_version: "control-center.weekly-revenue-chain.v1",
       canonical_identity: {
@@ -120,34 +166,41 @@ function weeklyRevenueChainsFromExecutive(value: unknown): Record<string, unknow
         account_id: opaqueCommercialId(identity.account_id),
         opportunity_id: opaqueCommercialId(identity.opportunity_id),
         offer_id: opaqueCommercialId(identity.offer_id),
-        proposal_id: opaqueCommercialId(identity.proposal_id),
-        charge_id: opaqueCommercialId(identity.charge_id),
-        payment_id: opaqueCommercialId(identity.payment_id),
+        proposal_id: proposalId,
+        charge_id: chargeId,
+        payment_id: paymentId,
       },
-      latest_deliverable: observedOpaqueText(row.latest_deliverable),
-      latest_evidence: observedOpaqueText(row.latest_evidence),
-      decision: observedDecision(row.decision),
-      responsible: observedOpaqueText(row.responsible),
-      deadline: observedDeadline(row.deadline),
-      next_action: observedOpaqueText(row.next_action),
-      proposal: observedOpaqueText(row.proposal),
-      charge: observedProviderMoney(row.charge),
-      receipt: observedProviderMoney(row.receipt),
-      held: row.held === true,
-      synthetic: row.synthetic === true,
+      latest_deliverable: observedOpaqueText(row.latest_deliverable, collectedAt),
+      latest_evidence: observedOpaqueText(row.latest_evidence, collectedAt),
+      decision: observedDecision(row.decision, collectedAt),
+      responsible: observedOpaqueText(row.responsible, collectedAt),
+      deadline: observedDeadline(row.deadline, collectedAt),
+      next_action: observedOpaqueText(row.next_action, collectedAt),
+      proposal: observedLinkedOpaqueText(row.proposal, proposalId, collectedAt),
+      charge: observedProviderMoney(row.charge, chargeId, collectedAt),
+      receipt: observedProviderMoney(row.receipt, paymentId, collectedAt),
+      held: row.held,
+      synthetic: false,
+      source: {
+        system: "warmbly",
+        surface: "GET /v1/confenge/intel/executive?include_synthetic=0",
+        contract: "confenge.commercial_intel.v1",
+        month: executive.month,
+        observed_at: observedAt,
+        include_synthetic: false,
+      },
       authority: {
         operation_and_visualization: "governance-control-center",
         action_and_outcome: "warmbly",
         financial_facts: "asaas",
       },
     });
-    if (byCorrelation.size >= WEEKLY_REVENUE_CHAIN_CAP) break;
   }
   return [...byCorrelation.values()].sort((a, b) => {
     const aId = String(asRecord(a.canonical_identity)?.correlation_id ?? "");
     const bId = String(asRecord(b.canonical_identity)?.correlation_id ?? "");
     return aId.localeCompare(bId);
-  });
+  }).slice(0, WEEKLY_REVENUE_CHAIN_CAP);
 }
 
 /**
@@ -249,6 +302,13 @@ function stripIdentity(row: Record<string, unknown>): Record<string, unknown> {
     }
   }
   return out;
+}
+
+function executiveSummary(value: unknown): Record<string, unknown> | null {
+  const executive = asRecord(value);
+  if (!executive) return null;
+  const { weekly_revenue_chains: _separatelyValidated, ...summary } = executive;
+  return stripIdentity(summary);
 }
 
 /**
@@ -558,7 +618,7 @@ function operationsFromWarmbly(
 
   const scoreboard = nested.intel_scoreboard ?? payload.intel_scoreboard ?? payload.confenge_intel_scoreboard;
   const executive = nested.intel_executive ?? payload.intel_executive ?? payload.confenge_intel_executive;
-  const weeklyRevenueChains = weeklyRevenueChainsFromExecutive(executive);
+  const weeklyRevenueChains = weeklyRevenueChainsFromExecutive(executive, observedAt);
   const report = nested.intel_report ?? payload.intel_report ?? payload.confenge_intel_report;
   const organic =
     nested.intel_organic_scoreboard ?? payload.intel_organic_scoreboard ?? payload.confenge_intel_organic_scoreboard;
@@ -617,7 +677,7 @@ function operationsFromWarmbly(
     exceptions,
     intel: {
       scoreboard: scoreboardPresent(scoreboard) ? scoreboard : null,
-      executive: asRecord(executive) ? stripIdentity(asRecord(executive) as Record<string, unknown>) : null,
+      executive: executiveSummary(executive),
       exceptions: intelExceptionsPresent ? capList(intelExceptions) : null,
       exceptions_total: intelExceptionsPresent ? intelExceptionsTotal : 0,
       exceptions_capped: intelExceptionsPresent && intelExceptionsTotal > LIST_CAP,
@@ -843,7 +903,7 @@ function scoreboardToCohorts(scoreboard: unknown, executive: unknown, observedAt
         observation: row.observation,
       };
     }),
-    executive: asRecord(executive) ? stripIdentity(asRecord(executive) as Record<string, unknown>) : null,
+    executive: executiveSummary(executive),
   };
 }
 

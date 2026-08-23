@@ -66,6 +66,80 @@ test("controlled outbound aggregate survives the real projection and persistence
   assertSanitizedJson(fitted, "controlled-outbound");
 });
 
+test("canonical weekly revenue facts survive persistence without embedded PII", () => {
+  const [commercial] = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: observedAt,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.9,
+    payload: {
+      operations: {
+        intel_scoreboard: {
+          schema_version: "confenge.inbound_truth_scoreboard.v1",
+          stages: [],
+          include_synthetic: false,
+        },
+        intel_executive: {
+          schema_version: "confenge.commercial_intel.v1",
+          month: "2026-08",
+          include_synthetic: false,
+          causal_proof: false,
+          real_empty: false,
+          weekly_revenue_chains: [{
+            schema_version: "confenge.weekly_revenue_chain.v1",
+            canonical_identity: {
+              correlation_id: "corr_real_001",
+              account_id: "acc_real_001",
+              opportunity_id: "opp_real_001",
+              offer_id: "CFG-DIAG-EXP-v1",
+              proposal_id: "prop_real_001",
+              charge_id: "charge_real_001",
+              payment_id: "payment_real_001",
+            },
+            latest_deliverable: { availability: "UNKNOWN" },
+            latest_evidence: { availability: "UNKNOWN" },
+            decision: { availability: "OBSERVED", value: "WAIT" },
+            responsible: { availability: "OBSERVED", value: "role_commercial_owner", email: "must-not-persist@example.com" },
+            deadline: { availability: "UNKNOWN" },
+            next_action: { availability: "UNKNOWN" },
+            proposal: { availability: "OBSERVED", value: "prop_real_001" },
+            charge: {
+              availability: "OBSERVED",
+              id: "charge_real_001",
+              status: "CONFIRMED",
+              amount_cents: 800000,
+              currency: "BRL",
+            },
+            receipt: {
+              availability: "OBSERVED",
+              id: "payment_real_001",
+              status: "RECEIVED",
+              amount_cents: 800000,
+              currency: "BRL",
+            },
+            held: false,
+            synthetic: false,
+          }],
+        },
+      },
+    },
+  });
+  assert.ok(commercial);
+  const fitted = fitPersistPayload(commercial.payload);
+  const operations = fitted.operations as {
+    weekly_revenue_chains: Array<{ canonical_identity: { account_id: string } }>;
+    intel: { executive: Record<string, unknown> };
+    growth: { scoreboard: { executive: Record<string, unknown> } };
+  };
+  assert.equal(operations.weekly_revenue_chains.length, 1);
+  assert.equal(operations.weekly_revenue_chains[0]?.canonical_identity.account_id, "acc_real_001");
+  assert.equal(JSON.stringify(operations.weekly_revenue_chains).includes("must-not-persist"), false);
+  assert.equal("weekly_revenue_chains" in operations.intel.executive, false);
+  assert.equal("weekly_revenue_chains" in operations.growth.scoreboard.executive, false);
+  assertSanitizedJson(fitted, "weekly-revenue-chain");
+});
+
 test("oversized intel exception lists are capped under the persist byte limit", () => {
   const exceptions = Array.from({ length: 500 }, (_, i) => ({
     id: `ex-${i}`,

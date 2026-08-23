@@ -185,6 +185,10 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["availability", "id", "status"],
+          "dependentRequired": {
+            "amount_cents": ["currency"],
+            "currency": ["amount_cents"]
+          },
           "properties": {
             "availability": { "const": "OBSERVED" },
             "id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9._:-]+$" },
@@ -202,7 +206,7 @@
       "required": [
         "schema_version", "canonical_identity", "latest_deliverable", "latest_evidence",
         "decision", "responsible", "deadline", "next_action", "proposal", "charge", "receipt",
-        "held", "synthetic", "authority"
+        "held", "synthetic", "source", "authority"
       ],
       "properties": {
         "schema_version": { "const": "control-center.weekly-revenue-chain.v1" },
@@ -240,7 +244,20 @@
         "charge": { "$ref": "#/$defs/provider_money_fact" },
         "receipt": { "$ref": "#/$defs/provider_money_fact" },
         "held": { "type": "boolean" },
-        "synthetic": { "type": "boolean" },
+        "synthetic": { "const": false },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["system", "surface", "contract", "month", "observed_at", "include_synthetic"],
+          "properties": {
+            "system": { "const": "warmbly" },
+            "surface": { "const": "GET /v1/confenge/intel/executive?include_synthetic=0" },
+            "contract": { "const": "confenge.commercial_intel.v1" },
+            "month": { "type": "string", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])$" },
+            "observed_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" },
+            "include_synthetic": { "const": false }
+          }
+        },
         "authority": {
           "type": "object",
           "additionalProperties": false,

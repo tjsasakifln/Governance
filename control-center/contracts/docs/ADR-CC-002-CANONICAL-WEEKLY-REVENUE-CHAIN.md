@@ -16,11 +16,13 @@ The Control Center projects, validates, and visualizes the chain. Warmbly owns c
 
 Each observed text or money fact carries `availability: OBSERVED`. An unavailable fact is exactly `{ "availability": "UNKNOWN" }`; it cannot carry `amount_cents: 0`. A real observed zero is valid only when the source explicitly marks the money fact observed.
 
+The collector accepts these facts only from Warmbly's producer-owned `confenge.commercial_intel.v1` executive contract when it proves `include_synthetic=false`, `causal_proof=false`, and a valid source month. Each projected chain retains that source contract, month, route, and collection instant. A proposal, charge, or receipt fact must repeat the matching canonical ID. An observed amount and currency travel together; a partial money pair is withheld.
+
 Human commercial decisions are limited to `GO`, `NO-GO`, and `WAIT`. Provider events cannot infer them. Synthetic rows are labeled and excluded from the default real-only Warmbly query.
 
 ## Consequences
 
-- The projector drops rows without a safe opaque correlation and converts malformed optional identities to `UNKNOWN`.
+- The projector drops rows without a safe opaque correlation, drops every member of an ambiguous duplicate correlation, and converts malformed optional identities to `UNKNOWN`.
 - The Control Center may show the operational chain but cannot become a second CRM or financial ledger.
 - A sandbox replay may prove the software path. Production remains gated until a human decision and a real Asaas event are observed.
 - Schema changes to the Warmbly identity-link table ship with reversible up/down migrations in Warmbly.
