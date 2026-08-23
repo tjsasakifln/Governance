@@ -261,6 +261,7 @@ test("the rendered Hoje page shows the panorama, the total, the links and no 'ig
   assert.match(html, /data-domain-state="desconhecido"/);
   assert.match(html, /data-action-total="\d+"/);
   assert.match(html, /sinal\(is\) operacional\(is\) exigem triagem/);
+  assert.doesNotMatch(html, /data-domain-link=[^>]*>[^<]*item\(ns\)/);
   assert.match(html, /href="#\/comercial"/);
   assert.match(html, /href="#\/clientes"/);
   assert.match(html, /href="#\/financeiro"/);

@@ -120,7 +120,7 @@ function domainCard(card: HojeDomainCard): string {
         }
         · confiança ${escapeHtml(confidence)}
       </p>
-      <p class="domain-link"><a href="${escapeHtml(card.href)}" data-domain-link="${escapeHtml(card.id)}">${escapeHtml(card.href_label)} (${escapeHtml(String(card.action_count))} item(ns))</a></p>
+      <p class="domain-link"><a href="${escapeHtml(card.href)}" data-domain-link="${escapeHtml(card.id)}">${escapeHtml(card.href_label)} (${escapeHtml(String(card.action_count))} sinal(is))</a></p>
     </article>
   `;
 }
