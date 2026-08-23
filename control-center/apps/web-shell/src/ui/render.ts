@@ -1,4 +1,9 @@
 import type { AdapterWriteResult, DestinationPage } from "../adapters/contract";
+import {
+  BRAND_LOGO_HEIGHT,
+  BRAND_LOGO_SRC,
+  BRAND_LOGO_WIDTH,
+} from "../brand";
 import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -220,7 +225,17 @@ export function renderShell(model: ShellModel): string {
     <a class="skip-link" href="#conteudo">Saltar para o conteúdo</a>
     <div class="shell" data-destination="${escapeHtml(model.destination)}" data-surface="${escapeHtml(model.surface ?? "")}" data-resource="${escapeHtml(model.resource ?? "")}" data-view-state="${escapeHtml(model.viewKind)}" data-productive-origin="${escapeHtml(PRODUCTIVE_URL)}" data-auth-origin="${escapeHtml(AUTH_URL)}">
       <header class="topbar">
-        <p class="brand">Control Center</p>
+        <a class="brand" href="${hashFor("hoje", null)}" data-brand="confenge">
+          <img
+            class="brand-logo"
+            src="${BRAND_LOGO_SRC}"
+            alt="CONFENGE"
+            width="${BRAND_LOGO_WIDTH}"
+            height="${BRAND_LOGO_HEIGHT}"
+            decoding="async"
+          />
+          <span class="brand-product">Control Center</span>
+        </a>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
       </header>
       <nav class="nav" aria-label="Áreas do Control Center">
