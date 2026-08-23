@@ -99,7 +99,7 @@ test("real Warmbly mapping selects controlled-email telemetry by cohort and poli
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       month: "2026-08",
       include_synthetic: false,
       real_empty: false,
@@ -167,7 +167,7 @@ test("controlled-email aggregation fails closed without a proven policy version"
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: false,
       controlled_email: [
@@ -218,7 +218,7 @@ test("synthetic or unproven reports never publish real controlled-email outcomes
         },
       },
       confenge_intel_report: {
-        schema_version: "confenge.observability_report.v1",
+        schema_version: "confenge.inbound_learning_report.v1",
         include_synthetic: includeSynthetic,
         real_empty: false,
         controlled_email: [{
@@ -267,7 +267,7 @@ test("controlled-email grant integrity flags expose unsafe observed states witho
       },
     },
     confenge_intel_report: {
-      schema_version: "confenge.observability_report.v1",
+      schema_version: "confenge.inbound_learning_report.v1",
       include_synthetic: false,
       real_empty: true,
       controlled_email: [],
