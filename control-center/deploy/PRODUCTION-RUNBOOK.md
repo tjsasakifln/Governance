@@ -93,11 +93,15 @@ environment:
 ```bash
 /opt/confenge-control-center/control-center/security/production/secrets/install-warmbly-operator-token.sh \
   /root/.confenge/control-center/warmbly-human-gate.one-time \
-  /etc/confenge/control-center/secrets
+  /etc/confenge/control-center/secrets \
+  1000:1000
 ```
 
-The installer is atomic, does not print the value and does not touch any other
-secret. Remove the one-time source after `/v1/me` proves `permissions=196` and
+The numeric owner is the `node` runtime UID/GID declared by the Context image;
+without it a local Compose secret remains a root-owned bind mount and the service
+must fail closed. The installer is atomic, keeps mode `0600`, does not print the
+value and does not touch any other secret. Remove the one-time source after
+the Context container can read the mount and `/v1/me` proves `permissions=196` and
 the absence of `send_campaigns`. Never reuse the collector's broader read key.
 
 On an upgraded installation, preserve the current password hash and add `admins`

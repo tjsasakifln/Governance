@@ -30,8 +30,11 @@ Evidência executada em 2026-08-23:
   existentes de pause/resume.
 - Context Service: 93/93 — PASS, incluindo token file-backed e fail-closed em
   credential ausente, vazia ou ilegível.
-- Deploy: 22/22; security: 40/40 — PASS, incluindo compose canônico, rede
-  explícita, secret 0600, rotação atômica e ausência de token em output.
+- Deploy: 22/22; security: 40/40 — PASS na entrega inicial, incluindo compose
+  canônico, rede explícita, secret 0600, rotação atômica e ausência de token em
+  output. O smoke pós-deploy encontrou e corrigiu o ownership do bind mount:
+  `0600` agora pertence ao UID/GID 1000 do runtime `node`, e o Context continua
+  falhando fechado quando a credencial é ausente, vazia ou ilegível.
 - Go targeted human gate + handler compile — PASS.
 - PostgreSQL 16 integration — PASS: duas escritas concorrentes são serializadas,
   produzem um único receipt, payload divergente conflita e todos os receipts

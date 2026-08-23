@@ -343,13 +343,16 @@ describe("production-edge security bundle", () => {
     const source = path.join(sourceDir, "credential");
     const value = "wmbly_fixture_human_gate_123456789";
     writeFileSync(source, `${value}\n`, { mode: 0o600 });
-    const result = spawnSync("bash", [WARMBLY_INSTALLER, source, dest], { encoding: "utf8" });
+    const owner = `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`;
+    const result = spawnSync("bash", [WARMBLY_INSTALLER, source, dest, owner], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr);
     assert.doesNotMatch(result.stdout, new RegExp(value));
     assert.doesNotMatch(result.stderr, new RegExp(value));
     const installed = path.join(dest, "CC_WARMBLY_OPERATOR_TOKEN");
     assert.equal(readFileSync(installed, "utf8"), value);
     assert.equal(statSync(installed).mode & 0o777, 0o600);
+    assert.equal(statSync(installed).uid, process.getuid?.() ?? 0);
+    assert.equal(statSync(installed).gid, process.getgid?.() ?? 0);
     assert.deepEqual(readdirSync(dest), ["CC_WARMBLY_OPERATOR_TOKEN"]);
 
     const bad = path.join(sourceDir, "bad");
@@ -357,6 +360,12 @@ describe("production-edge security bundle", () => {
     const refused = spawnSync("bash", [WARMBLY_INSTALLER, bad, dest], { encoding: "utf8" });
     assert.notEqual(refused.status, 0);
     assert.equal(readFileSync(installed, "utf8"), value, "a rejected rotation must preserve the old credential");
+
+    const invalidOwner = spawnSync("bash", [WARMBLY_INSTALLER, source, dest, "node:node"], {
+      encoding: "utf8",
+    });
+    assert.notEqual(invalidOwner.status, 0);
+    assert.equal(readFileSync(installed, "utf8"), value, "an invalid owner must preserve the old credential");
   });
 
   it("generator writes 0600 files, prints no values, and refuses placeholders and CI", () => {
