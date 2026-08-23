@@ -1016,6 +1016,71 @@ test("identical catalog entries collapse into one card and keep the worst state"
   assert.equal(services[0]?.duplicate_count, 2);
   assert.equal(services[0]?.status, "degraded");
   assert.equal(infra.payload.duplicate_group_count, 1);
+  assert.equal(infra.payload.partial_outage, false);
+  assert.equal(infra.payload.status, "degraded");
+});
+
+test("duplicate services retain independent checks and the worst freshness timestamp", () => {
+  const newer = "2026-02-23T12:10:00.000Z";
+  const older = "2026-02-23T11:00:00.000Z";
+  const common = {
+    service_id: "cfg-health",
+    display_name: "cfg-health",
+    source: "infrastructure",
+    confidence: 0.9,
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        {
+          ...common,
+          observed_at: newer,
+          freshness_status: "FRESH",
+          status: "healthy",
+          checks: [{ check: "http", status: "healthy", summary: "HTTP 200" }],
+        },
+        {
+          ...common,
+          observed_at: older,
+          freshness_status: "STALE",
+          status: "degraded",
+          checks: [{ check: "tls", status: "degraded", summary: "certificate aging" }],
+        },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const [service] = infraServices(infra);
+  assert.ok(service);
+  assert.deepEqual(service.checks, [
+    { name: "http", status: "healthy", detail: "HTTP 200" },
+    { name: "tls", status: "degraded", detail: "certificate aging" },
+  ]);
+  assert.deepEqual(service.http, { status: "healthy", detail: "HTTP 200" });
+  assert.deepEqual(service.tls, { status: "degraded", detail: "certificate aging" });
+  assert.equal(service.freshness_status, "STALE");
+  assert.equal(service.observed_at, older);
+  assert.equal(service.checked_at, older);
+  assert.equal((service.provenance as Record<string, unknown>).observed_at, older);
+});
+
+test("an unknown service beside a healthy one is inconclusive, not a partial outage", () => {
+  const service = (id: string, status: string) => ({
+    service_id: id,
+    display_name: id,
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: status === "unknown" ? "UNKNOWN" : "FRESH",
+    status,
+    confidence: status === "unknown" ? 0 : 0.9,
+    checks: [],
+  });
+  const [infra] = projectCollector(
+    infraEnvelope({ service_health: [service("healthy", "healthy"), service("unknown", "unknown")] }),
+  );
+  assert.ok(infra);
+  assert.equal(infra.payload.partial_outage, false);
+  assert.equal(infra.payload.status, "unknown");
 });
 
 test("a service with no identity is flagged as a catalog error, not named 'service'", () => {

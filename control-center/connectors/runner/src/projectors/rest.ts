@@ -208,22 +208,46 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
   const errors = members
     .map((member) => member.lastError)
     .filter((value): value is string => value !== undefined);
-  const worstMember =
-    members.find((member) => member.status === worstStatus && member.lastError !== undefined) ??
-    members.find((member) => member.status === worstStatus) ??
-    base;
+  // Preserve every distinct probe carried by duplicate catalog rows. For a
+  // repeated probe kind, retain the worst result and its detail. Selecting the
+  // checks from one "overall worst" row loses independent evidence (for
+  // example HTTP from one row and TLS from another).
+  const checksByName = new Map<string, Record<string, unknown>>();
+  for (const member of members) {
+    for (const rawCheck of asArray(member.row.checks)) {
+      const check = asRecord(rawCheck);
+      if (!check) continue;
+      const name = textOrUndefined(check.name) ?? "check";
+      const candidateStatus = normalizeHealthStatus(check.status);
+      const current = checksByName.get(name);
+      const currentStatus = normalizeHealthStatus(current?.status);
+      if (!current || STATUS_SEVERITY[candidateStatus] > STATUS_SEVERITY[currentStatus]) {
+        checksByName.set(name, { ...check, name, status: candidateStatus });
+      }
+    }
+  }
+  const mergedChecks = capList([...checksByName.values()]);
+  const freshestWorstMembers = members.filter((member) => member.freshness === worstFreshness);
+  const evidenceMember = [...freshestWorstMembers].sort((a, b) => {
+    const aObserved = String(a.row.observed_at ?? "");
+    const bObserved = String(b.row.observed_at ?? "");
+    return aObserved.localeCompare(bObserved);
+  })[0] ?? base;
   const merged: Record<string, unknown> = {
     ...base.row,
-    ...(worstMember.row.http ? { http: worstMember.row.http } : {}),
-    ...(worstMember.row.tls ? { tls: worstMember.row.tls } : {}),
-    ...(worstMember.row.docker ? { docker: worstMember.row.docker } : {}),
-    ...(worstMember.row.backup ? { backup: worstMember.row.backup } : {}),
-    ...(worstMember.row.host_metrics ? { host_metrics: worstMember.row.host_metrics } : {}),
+    checks: mergedChecks,
     status: worstStatus,
     freshness_status: worstFreshness,
+    observed_at: evidenceMember.row.observed_at,
+    checked_at: evidenceMember.row.checked_at,
     partial_outage: members.some((member) => member.row.partial_outage === true),
     duplicate_count: members.length,
   };
+  for (const kind of ["http", "tls", "docker", "backup", "host_metrics"] as const) {
+    const slot = checkSlot(mergedChecks, kind);
+    if (slot) merged[kind] = slot;
+    else delete merged[kind];
+  }
   if (confidences.length > 0) {
     merged.confidence = Math.min(...confidences);
   }
@@ -245,6 +269,7 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
   if (provenance) {
     merged.provenance = {
       ...provenance,
+      observed_at: evidenceMember.row.observed_at,
       freshness_status: worstFreshness,
       ...(confidences.length > 0 ? { confidence: Math.min(...confidences) } : {}),
     };
@@ -344,8 +369,13 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   const first = asRecord(health[0]) ?? payload;
   const projected = health.map((item, index) => projectService(item, index, envelope, freshness));
   const grouped = groupServices(projected);
-  const statuses = projected.map((service) => service.status);
-  const partial = statuses.some((status) => status !== "healthy") && statuses.some((status) => status === "healthy");
+  // Availability is a property of the distinct monitored services, not of raw
+  // duplicate catalog rows. UNKNOWN is inconclusive and must not be described
+  // as an outage merely because another service is healthy.
+  const statuses = grouped.services.map((service) => normalizeHealthStatus(service.status));
+  const partial =
+    statuses.some((status) => status === "degraded" || status === "down") &&
+    statuses.some((status) => status === "healthy");
   const overallStatus = statuses.reduce<HealthStatus>(
     (worst, status) => (STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst),
     normalizeHealthStatus(first.status),
