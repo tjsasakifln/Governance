@@ -426,9 +426,14 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
 
 function commercialOps(snapshot: CommercialSnapshot, surface: string | null, hash: string): string {
   const ops = operationsOf(snapshot);
+  const listViews = ops.list_views && typeof ops.list_views === "object"
+    ? (ops.list_views as Record<string, unknown>)
+    : {};
+  const overview = ops.overview && typeof ops.overview === "object"
+    ? (ops.overview as Record<string, unknown>)
+    : {};
   const current = surface && surface.length > 0 ? surface : "visao";
   const auto = ops.auto_send && typeof ops.auto_send === "object" ? (ops.auto_send as Record<string, unknown>) : {};
-  const overview = ops.overview && typeof ops.overview === "object" ? (ops.overview as Record<string, unknown>) : {};
   const cohorts = ops.cohorts && typeof ops.cohorts === "object" ? (ops.cohorts as Record<string, unknown>) : {};
   const activity = Array.isArray(ops.activity) ? ops.activity : [];
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
@@ -477,6 +482,9 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
       noun: "atividade(s) observada(s)",
       emptyData: "Sem atividade observada neste recorte. Ausência não é zero.",
       card: activityOpsCard,
+      remote: listViews.atividade,
+      declaredTotal: typeof overview.activity === "number" ? overview.activity : activity.length,
+      complete: typeof overview.activity === "number" ? overview.activity === activity.length : true,
     });
   } else if (current === "pipeline") {
     body = `<section aria-labelledby="pipeline-title"><h2 id="pipeline-title">Pipeline ativo</h2><div class="stack">${
@@ -509,6 +517,9 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
       emptyData: "Nenhuma exceção observada.",
       intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
       card: exceptionOpsCard,
+      remote: listViews.excecoes,
+      declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
+      complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,
     });
   } else {
     body = `<section aria-labelledby="comercial-ops-title">

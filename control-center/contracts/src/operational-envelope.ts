@@ -26,6 +26,7 @@ export type AbsenceReason = (typeof ABSENCE_REASONS)[number];
 export const OPERATIONAL_HTTP_PATHS = [
   "/v1/operational-snapshots",
   "/v1/domains/{domain}",
+  "/v1/domains/commercial/lists/{list}",
   "/v1/attention",
   "/v1/today",
   "/v1/source-observations",

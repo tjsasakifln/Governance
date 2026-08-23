@@ -392,6 +392,76 @@ test("Exceções renders search, filters, sorting, a count and pagination over t
   assert.equal(cards.length, 25, "a page must render exactly one page of cards");
 });
 
+test("HTTP list response replaces the capped preview and preserves a page beyond row 50", async () => {
+  const preview = exceptionRows(50);
+  const snapshot = snapshotWith({
+    exceptions: preview,
+    overview: { exceptions: 130, exceptions_shown: 50 },
+  });
+  const remoteItem = exceptionRows(130)[100];
+  assert.ok(remoteItem);
+  const { fetchImpl, calls } = recordingFetch((url) => {
+    const path = url.split("?")[0];
+    if (path?.endsWith("/v1/domains/commercial")) return snapshot;
+    if (path?.endsWith("/v1/domains/commercial/lists/exceptions")) {
+      return {
+        schema_version: "control-center.commercial-list.v1",
+        list: "exceptions",
+        generated_at: GENERATED_AT,
+        loaded_total: 130,
+        declared_total: 130,
+        complete: true,
+        matched: 130,
+        items: [remoteItem],
+        page: 5,
+        page_count: 6,
+        page_size: 25,
+        range_start: 101,
+        range_end: 101,
+        filtered: false,
+        facet_values: {
+          estado: ["acknowledged", "open", "resolved"],
+          tipo: ["missing_version", "orphan"],
+          origem: ["warmbly.attention", "warmbly.intel.exceptions"],
+          responsavel: [],
+          prioridade: [],
+        },
+        unavailable_facets: ["responsavel", "prioridade"],
+        query: {
+          q: "",
+          facets: { estado: "all", tipo: "all", origem: "all", responsavel: "all", prioridade: "all" },
+          periodo: "all",
+          ordem: "urgencia",
+          pagina: 5,
+          porPagina: 25,
+        },
+      };
+    }
+    return undefined;
+  });
+  const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, {
+    kind: "human",
+    id: "founder-local",
+  });
+  const root = { innerHTML: "" };
+  paintShell(root, adapter, "#/comercial/excecoes?pagina=5");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.match(root.innerHTML, /data-list-total="130"/);
+  assert.match(root.innerHTML, /data-list-page="5"/);
+  assert.match(root.innerHTML, /data-exception-id="exc-0100"/);
+  assert.equal(/data-exception-id="exc-0000"/.test(root.innerHTML), false);
+  assert.ok(calls.some((call) => /commercial\/lists\/exceptions\?scope=commercial&pagina=5/.test(call)));
+});
+
+test("a capped legacy preview is labelled incomplete instead of claiming its 50 rows are the total", async () => {
+  const html = await renderAtAsync("#/comercial/excecoes", {
+    exceptions: exceptionRows(50),
+    overview: { exceptions: 130, exceptions_shown: 50 },
+  });
+  assert.match(html, /data-list-incomplete="true"/);
+  assert.match(html, /50 .* pesquisáveis de 130 declarados pela origem/);
+});
+
 test("page two of Exceções shows the next slice and both direction links", async () => {
   const html = await renderAtAsync("#/comercial/excecoes?pagina=2", { exceptions: exceptionRows(53) });
   assert.match(html, /data-list-page="2"/);

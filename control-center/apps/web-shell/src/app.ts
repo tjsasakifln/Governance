@@ -352,7 +352,7 @@ export function paintShell(
   const parsed = parseHash(location);
   const override = parseViewKind(parsed.view);
   adapter.setScenario?.(scenarioFromView(override));
-  const result = adapter.readDestination(parsed.destination);
+  const result = adapter.readDestination(parsed.destination, location);
   if (isPromise(result)) {
     applyPaint(root, adapter, parsed, override, { ok: true, loading: true, page: null }, location, navigate);
     void result.then((resolved) => {

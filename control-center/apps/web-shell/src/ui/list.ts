@@ -9,6 +9,7 @@ import {
   listHref,
   parseListQuery,
   referenceMsOf,
+  remoteListResultOf,
   type FacetSpec,
   type ListSpec,
   type ListView,
@@ -29,6 +30,11 @@ export interface ListChromeInput {
   readonly emptyData: string;
   readonly intro?: string;
   readonly card: (row: Record<string, unknown>) => string;
+  /** Server-filtered bounded page. Omitted by the mock adapter. */
+  readonly remote?: unknown;
+  /** Coverage metadata used when talking to an older server without list pages. */
+  readonly declaredTotal?: number;
+  readonly complete?: boolean;
 }
 
 function option(value: string, label: string, selected: boolean): string {
@@ -53,9 +59,14 @@ function facetField(
 }
 
 function countText(view: ListView, noun: string): string {
+  const coverage = view.complete
+    ? `${view.total} ${noun}`
+    : `${view.total} ${noun} pesquisáveis de ${view.declaredTotal} declarados pela origem`;
   const head = view.filtered
-    ? `${view.matched} de ${view.total} ${noun} após busca/filtro`
-    : `${view.total} ${noun}`;
+    ? view.complete
+      ? `${view.matched} de ${view.total} ${noun} após busca/filtro`
+      : `${view.matched} de ${view.total} ${noun} pesquisáveis após busca/filtro · ${view.declaredTotal} declarados pela origem`
+    : coverage;
   if (view.matched === 0) return head;
   return `${head} · mostrando ${view.rangeStart}–${view.rangeEnd} · página ${view.page} de ${view.pageCount}`;
 }
@@ -93,17 +104,24 @@ function pagination(view: ListView, hash: string, heading: string, listId: strin
 export function renderFilteredList(input: ListChromeInput): string {
   const { spec, rows, hash, heading, headingId, noun } = input;
   const params = queryParamsOf(hash);
-  const query = parseListQuery(params, spec, rows);
+  const remote = remoteListResultOf(input.remote, spec);
+  const query = remote?.view.query ?? parseListQuery(params, spec, rows);
   const referenceMs = referenceMsOf(rows, spec, input.generatedAt);
-  const view = buildListView(rows, spec, query, referenceMs);
+  const localView = buildListView(rows, spec, query, referenceMs);
+  const declaredTotal = Math.max(rows.length, input.declaredTotal ?? rows.length);
+  const view = remote?.view ?? {
+    ...localView,
+    declaredTotal,
+    complete: input.complete ?? declaredTotal === rows.length,
+  };
   const clearHref = clearListHref(hash);
 
   const available = spec.facets
-    .map((facet) => ({ facet, values: facetValues(rows, facet) }))
+    .map((facet) => ({ facet, values: remote?.facetValues[facet.id] ?? facetValues(rows, facet) }))
     .filter((entry) => entry.values.length > 0);
-  const unavailable = spec.facets.filter(
-    (facet) => !available.some((entry) => entry.facet.id === facet.id),
-  );
+  const unavailable = remote
+    ? spec.facets.filter((facet) => remote.unavailableFacets.includes(facet.id))
+    : spec.facets.filter((facet) => !available.some((entry) => entry.facet.id === facet.id));
 
   const filters = `
     <form class="filters" data-list-filters="${escapeHtml(spec.id)}" aria-label="Busca e filtros · ${escapeHtml(heading)}">
@@ -166,12 +184,17 @@ export function renderFilteredList(input: ListChromeInput): string {
       ? ""
       : `<p class="constraint">Período medido a partir de ${escapeHtml(new Date(referenceMs).toISOString())} (instante do snapshot), não do relógio local.</p>`;
 
+  const coverageWarning = view.complete
+    ? ""
+    : `<p class="banner stale" data-list-incomplete="true" role="status">A origem declarou ${view.declaredTotal} ${escapeHtml(noun)}, mas esta coleta tornou ${view.total} pesquisáveis. A busca e a contagem abaixo não fingem cobrir os ${view.declaredTotal - view.total} itens ausentes; aguarde uma coleta completa.</p>`;
+
   return `
     <section class="list-surface" aria-labelledby="${escapeHtml(headingId)}" data-list="${escapeHtml(spec.id)}" data-list-total="${view.total}" data-list-matched="${view.matched}" data-list-page="${view.page}" data-list-pages="${view.pageCount}" data-list-sort="${escapeHtml(view.query.ordem)}">
       <h2 id="${escapeHtml(headingId)}">${escapeHtml(heading)}</h2>
       ${input.intro ?? ""}
       ${filters}
       <p class="count" role="status" data-list-count="${view.matched}">${escapeHtml(countText(view, noun))}</p>
+      ${coverageWarning}
       ${unavailableNote}
       ${reference}
       <div class="stack">${view.items.map((row) => input.card(row)).join("")}</div>

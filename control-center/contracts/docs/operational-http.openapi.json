@@ -94,6 +94,67 @@
         }
       }
     },
+    "/v1/domains/commercial/lists/{list}": {
+      "get": {
+        "tags": ["operational"],
+        "operationId": "getCommercialList",
+        "summary": "Bounded, searchable page of a persisted commercial queue",
+        "parameters": [
+          {
+            "name": "list",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["activity", "exceptions"] }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "../schemas/primitives.v1.schema.json#/$defs/scope" }
+          },
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "estado", "in": "query", "schema": { "type": "string" } },
+          { "name": "tipo", "in": "query", "schema": { "type": "string" } },
+          { "name": "origem", "in": "query", "schema": { "type": "string" } },
+          { "name": "responsavel", "in": "query", "schema": { "type": "string" } },
+          { "name": "prioridade", "in": "query", "schema": { "type": "string" } },
+          { "name": "periodo", "in": "query", "schema": { "type": "string", "enum": ["all", "24h", "7d", "30d"] } },
+          { "name": "ordem", "in": "query", "schema": { "type": "string", "enum": ["urgencia", "recentes", "antigos", "identificador"] } },
+          { "name": "pagina", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "por_pagina", "in": "query", "schema": { "type": "integer", "enum": [25, 50, 100] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "At most one requested page plus truthful loaded/declared coverage metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["schema_version", "list", "loaded_total", "declared_total", "complete", "matched", "items", "page", "page_count", "page_size", "facet_values", "unavailable_facets", "query"],
+                  "properties": {
+                    "schema_version": { "const": "control-center.commercial-list.v1" },
+                    "list": { "type": "string", "enum": ["activity", "exceptions"] },
+                    "loaded_total": { "type": "integer", "minimum": 0 },
+                    "declared_total": { "type": "integer", "minimum": 0 },
+                    "complete": { "type": "boolean" },
+                    "matched": { "type": "integer", "minimum": 0 },
+                    "items": { "type": "array", "maxItems": 100, "items": { "type": "object" } },
+                    "page": { "type": "integer", "minimum": 1 },
+                    "page_count": { "type": "integer", "minimum": 1 },
+                    "page_size": { "type": "integer", "enum": [25, 50, 100] },
+                    "facet_values": { "type": "object" },
+                    "unavailable_facets": { "type": "array", "items": { "type": "string" } },
+                    "query": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/v1/attention": {
       "get": {
         "tags": ["operational"],

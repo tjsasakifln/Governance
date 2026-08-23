@@ -134,6 +134,11 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     assert.ok(Array.isArray(stored));
     assert.equal(stored.length, 50);
     assert.equal(capped.operations?.intel_exceptions_total, 60);
+    assert.equal(
+      JSON.stringify(capped).includes('"id":"ex-59"'),
+      false,
+      "the complete runner handoff must not widen the serializable collector payload",
+    );
   });
 });
 

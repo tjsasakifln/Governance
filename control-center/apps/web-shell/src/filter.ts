@@ -57,8 +57,12 @@ export interface ListQuery {
 }
 
 export interface ListView {
-  /** Rows observed before any filter. */
+  /** Rows actually loaded and searchable before any filter. */
   readonly total: number;
+  /** Total declared by the source; may exceed `total` after an incomplete collection. */
+  readonly declaredTotal: number;
+  /** True only when every declared row is loaded and searchable. */
+  readonly complete: boolean;
   /** Rows that survived search + facets + period. */
   readonly matched: number;
   /** The current page of matched rows. */
@@ -71,6 +75,12 @@ export interface ListView {
   /** True when at least one of search/facet/period is narrowing the list. */
   readonly filtered: boolean;
   readonly query: ListQuery;
+}
+
+export interface RemoteListResult {
+  readonly view: ListView;
+  readonly facetValues: Readonly<Record<string, readonly string[]>>;
+  readonly unavailableFacets: readonly string[];
 }
 
 export const PERIODS: readonly PeriodSpec[] = [
@@ -464,6 +474,8 @@ export function buildListView(
   const items = matchedRows.slice(offset, offset + query.porPagina);
   return {
     total: rows.length,
+    declaredTotal: rows.length,
+    complete: true,
     matched,
     items,
     page,
@@ -472,6 +484,73 @@ export function buildListView(
     rangeEnd: matched === 0 ? 0 : offset + items.length,
     filtered: isNarrowed(query),
     query,
+  };
+}
+
+function recordOf(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function finiteInt(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+/** Validate the Context Service's bounded, server-filtered list response. */
+export function remoteListResultOf(value: unknown, spec: ListSpec): RemoteListResult | null {
+  const rec = recordOf(value);
+  if (!rec || rec.schema_version !== "control-center.commercial-list.v1") return null;
+  const rawItems = Array.isArray(rec.items) ? rec.items : null;
+  const rawQuery = recordOf(rec.query);
+  const rawFacets = recordOf(rawQuery?.facets);
+  const rawFacetValues = recordOf(rec.facet_values);
+  if (!rawItems || !rawQuery || !rawFacets || !rawFacetValues) return null;
+  const items = rawItems.map(recordOf).filter((row): row is Record<string, unknown> => row !== null);
+  const facets: Record<string, string> = {};
+  const values: Record<string, readonly string[]> = {};
+  for (const facet of spec.facets) {
+    const rawValues = rawFacetValues[facet.id];
+    values[facet.id] = Array.isArray(rawValues)
+      ? rawValues.filter((item): item is string => typeof item === "string")
+      : [];
+    const rawFacet = rawFacets[facet.id];
+    facets[facet.id] = typeof rawFacet === "string" ? rawFacet : "all";
+  }
+  const total = finiteInt(rec.loaded_total, items.length);
+  const declaredTotal = Math.max(total, finiteInt(rec.declared_total, total));
+  const matched = finiteInt(rec.matched, total);
+  const page = Math.max(1, finiteInt(rec.page, 1));
+  const pageCount = Math.max(1, finiteInt(rec.page_count, 1));
+  const requestedSize = finiteInt(rec.page_size, DEFAULT_PAGE_SIZE);
+  const porPagina = PAGE_SIZES.includes(requestedSize) ? requestedSize : DEFAULT_PAGE_SIZE;
+  const query: ListQuery = {
+    q: typeof rawQuery.q === "string" ? rawQuery.q : "",
+    facets,
+    periodo: typeof rawQuery.periodo === "string" ? rawQuery.periodo : "all",
+    ordem: typeof rawQuery.ordem === "string" ? rawQuery.ordem : spec.defaultSort,
+    pagina: page,
+    porPagina,
+  };
+  const unavailable = Array.isArray(rec.unavailable_facets)
+    ? rec.unavailable_facets.filter((item): item is string => typeof item === "string")
+    : spec.facets.filter((facet) => values[facet.id]?.length === 0).map((facet) => facet.id);
+  return {
+    view: {
+      total,
+      declaredTotal,
+      complete: rec.complete === true && total === declaredTotal,
+      matched,
+      items,
+      page,
+      pageCount,
+      rangeStart: finiteInt(rec.range_start, matched === 0 ? 0 : (page - 1) * porPagina + 1),
+      rangeEnd: finiteInt(rec.range_end, matched === 0 ? 0 : (page - 1) * porPagina + items.length),
+      filtered: rec.filtered === true,
+      query,
+    },
+    facetValues: values,
+    unavailableFacets: unavailable,
   };
 }
 

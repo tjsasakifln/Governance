@@ -1,5 +1,6 @@
 import type { DestinationId } from "../destinations";
-import { getDestination } from "../destinations";
+import { getDestination, parseHash, queryParamsOf } from "../destinations";
+import { LIST_PARAM_IDS } from "../filter";
 import { clientIdentityGapFrom } from "../client-identity";
 import type {
   ActorRef,
@@ -63,9 +64,9 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     return { ...this.operator };
   }
 
-  async readDestination(id: DestinationId): Promise<AdapterReadResult> {
+  async readDestination(id: DestinationId, location?: string): Promise<AdapterReadResult> {
     try {
-      const page = await this.loadPage(id);
+      const page = await this.loadPage(id, location);
       return { ok: true, loading: false, page };
     } catch (err) {
       return {
@@ -287,7 +288,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     }
   }
 
-  private async loadPage(id: DestinationId): Promise<DestinationPage> {
+  private async loadPage(id: DestinationId, location?: string): Promise<DestinationPage> {
     const fallback = fallbackProvenance(this.baseUrl || "relative", new Date().toISOString());
     if (id === "hoje") {
       return this.loadHoje(fallback);
@@ -298,7 +299,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     if (id === "agentes") {
       return this.loadAgentes(fallback);
     }
-    return this.loadDomain(id, fallback);
+    return this.loadDomain(id, fallback, location);
   }
 
   private async loadHoje(fallback: Provenance): Promise<DestinationPage> {
@@ -376,9 +377,27 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     return body;
   }
 
-  private async loadDomain(id: DestinationId, fallback: Provenance): Promise<DestinationPage> {
+  private commercialListPath(id: DestinationId, location?: string): string | null {
+    if (id !== "comercial" || !location) return null;
+    const surface = parseHash(location).surface;
+    const list = surface === "atividade" ? "activity" : surface === "excecoes" ? "exceptions" : null;
+    if (!list) return null;
+    const current = queryParamsOf(location);
+    const params = new URLSearchParams({ scope: getDestination(id).scope });
+    for (const key of LIST_PARAM_IDS) {
+      const value = current[key];
+      if (value !== undefined && value !== "") params.set(key, value);
+    }
+    return `/v1/domains/commercial/lists/${list}?${params.toString()}`;
+  }
+
+  private async loadDomain(id: DestinationId, fallback: Provenance, location?: string): Promise<DestinationPage> {
     const paths = readPathsFor(id);
-    const payloads = await Promise.all(paths.map((path) => this.getJson(path)));
+    const listPath = this.commercialListPath(id, location);
+    const payloads = await Promise.all([
+      ...paths.map((path) => this.getJson(path)),
+      ...(listPath ? [this.getJson(listPath).catch(() => undefined)] : []),
+    ]);
     const payload = payloads[0];
     const dest = getDestination(id);
     const rec = asRecord(payload) ?? {};
@@ -395,6 +414,19 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     };
     if (id === "comercial" || id === "crescimento") {
       page.commercial = commercialFrom(inner, fallback);
+    }
+    if (id === "comercial" && page.commercial && listPath) {
+      const listPayload = asRecord(payloads[paths.length]);
+      if (listPayload) {
+        const list = listPayload.list === "activity" ? "activity" : listPayload.list === "exceptions" ? "exceptions" : null;
+        if (list) {
+          const ops = (page.commercial.operations ??= {});
+          ops[list] = itemsOf(listPayload.items);
+          const views = asRecord(ops.list_views) ?? {};
+          views[list === "activity" ? "atividade" : "excecoes"] = listPayload;
+          ops.list_views = views;
+        }
+      }
     }
     if (id === "comercial" && page.commercial) {
       await this.attachLastOperatorAction(page.commercial);
