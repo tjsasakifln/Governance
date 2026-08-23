@@ -238,7 +238,10 @@ export function representativeOperationalSnapshots(): OperationalSnapshotRow[] {
         inbound_unread_count: 3,
         at_risk_client_count: 1,
         operations: {
-          overview: { activity: 1, exceptions: 2, pipeline: 1 },
+          // One grouped exception row carries two occurrence ids. The list
+          // total counts searchable rows, not the occurrences inside a group,
+          // so the complete fixture truth is HEALTHY rather than partial.
+          overview: { activity: 1, exceptions: 1, pipeline: 1 },
           activity: [
             {
               source_id: "lead-fixture-aurora",

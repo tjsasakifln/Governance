@@ -59,6 +59,9 @@ const server = createServer(
     service,
     operational,
     operatorActions: createMemoryOperatorActionService(founderActorId),
+    // Isolated E2E harness identity. Production startServer resolves this only
+    // from trusted Authelia Remote-* headers; the browser cannot set the actor.
+    operatorActor: () => FOUNDER,
     logger: silentLogger,
   }),
 );

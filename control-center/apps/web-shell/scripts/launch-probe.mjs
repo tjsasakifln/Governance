@@ -410,11 +410,40 @@ try {
   }
   console.log("critical_path=triage_to_detail keyboard=Enter result=found");
 
+  // First prove the negative boundary: even a complete-looking row must not
+  // expose a write when its truth receipt is absent. Intercept exactly one list
+  // read; the following navigation uses the untouched production fixture.
+  const exceptionsListPattern = "**/v1/domains/commercial/lists/exceptions**";
+  await page.route(exceptionsListPattern, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const { truth: _omitted, ...withoutTruth } = body;
+    await route.fulfill({ response, json: withoutTruth });
+  }, { times: 1 });
+  await page.goto(`${baseUrl}#/comercial/excecoes`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-exception-id="exception-fixture-owner"]');
+  if ((await page.locator("[data-operational-truth]").count()) !== 0) {
+    throw new Error("truth-less exception fixture unexpectedly rendered a truth receipt");
+  }
+  if ((await page.locator('[data-operator-form="START_EXCEPTION_WORK"]').count()) !== 0) {
+    throw new Error("truth-less exception fixture exposed START_EXCEPTION_WORK");
+  }
+  const writesAllowedWithoutTruth = await page.locator('[data-list="excecoes"]').getAttribute("data-list-writes-allowed");
+  if (writesAllowedWithoutTruth !== "false") {
+    throw new Error(`truth-less exception fixture should block writes, got ${writesAllowedWithoutTruth}`);
+  }
+  const blockedCopy = await page.locator('[data-list="excecoes"] .banner.stale').first().innerText();
+  if (!blockedCopy.includes("Ações bloqueadas")) {
+    throw new Error(`truth-less exception fixture lacks blocking guidance: ${blockedCopy}`);
+  }
+  console.log("critical_path=exception_without_truth writes=blocked");
+  await page.unroute(exceptionsListPattern);
+
   await page.goto(`${baseUrl}#/comercial/excecoes`, { waitUntil: "networkidle" });
   await page.waitForSelector('[data-exception-id="exception-fixture-owner"]');
   const exceptionTruth = await page.locator("[data-operational-truth]").first().getAttribute("data-operational-truth");
-  if (exceptionTruth !== "UNKNOWN") {
-    throw new Error(`partial grouped exception payload should be UNKNOWN, got ${exceptionTruth}`);
+  if (exceptionTruth !== "HEALTHY") {
+    throw new Error(`complete grouped exception payload should be HEALTHY, got ${exceptionTruth}`);
   }
   const grouped = await page.locator('[data-exception-id="exception-fixture-owner"]').getAttribute("data-occurrence-count");
   if (grouped !== "2") throw new Error(`grouped duplicate evidence lost: ${grouped}`);

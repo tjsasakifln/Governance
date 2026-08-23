@@ -7,6 +7,7 @@ import { frozenClock } from "../src/clock.ts";
 import { createRequestListener } from "../src/http.ts";
 import { silentLogger } from "../src/log.ts";
 import { createFixtureOperationalPort } from "../src/operational/fixture.ts";
+import { representativeOperationalSnapshots } from "../src/operational/representative.ts";
 import { createOperationalService } from "../src/operational/service.ts";
 import type { OperationalSnapshotRow } from "../src/operational/types.ts";
 import { REPRESENTATIVE_REPO_DOMAINS } from "../src/representative.ts";
@@ -85,6 +86,30 @@ async function withServer(rows: OperationalSnapshotRow[], fn: (base: string) => 
 function headers(): Record<string, string> {
   return { "x-actor-id": FOUNDER.id, "x-actor-kind": FOUNDER.kind };
 }
+
+test("representative grouped exceptions produce complete HEALTHY list truth", async () => {
+  await withServer(representativeOperationalSnapshots(), async (base) => {
+    const response = await fetch(`${base}/v1/domains/commercial/lists/exceptions?scope=commercial`, {
+      headers: headers(),
+    });
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as Record<string, unknown>;
+    assert.equal(body.loaded_total, 1, "a grouped exception is one searchable row");
+    assert.equal(body.declared_total, 1, "declared total must use the same row cardinality");
+    assert.equal(body.complete, true);
+    assert.deepEqual(body.truth, {
+      state: "HEALTHY",
+      as_of: OBSERVED_AT,
+      source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+      confidence: 0.84,
+      reason: "fresh_observation",
+    });
+    const items = body.items as Array<Record<string, unknown>>;
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.id, "exception-fixture-owner");
+    assert.equal(items[0]?.occurrence_count, 2, "group evidence remains intact without inflating list totals");
+  });
+});
 
 test("commercial list pages cross the producer's 50-row preview without widening the HTTP payload", async () => {
   const rows = projectedRows(130);
