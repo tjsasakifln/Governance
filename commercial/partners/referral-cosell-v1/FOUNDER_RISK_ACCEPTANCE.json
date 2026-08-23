@@ -1,0 +1,40 @@
+{
+  "schema_version": "partner-program.v1",
+  "status": "FOUNDER_APPROVED_WITH_DEFERRED_COUNSEL_REVIEW",
+  "professional_legal_review": "DEFERRED_UNTIL_FIRST_REVENUE",
+  "founder_risk_acceptance": "APPROVED",
+  "operational_use": "PRIVATE_NEGOTIATION_ONLY",
+  "supersedable": true,
+  "jurisdiction": "Brazil",
+  "business_context": "B2B_ENGINEERING_CONSULTING",
+  "artifact": "founder_risk_acceptance",
+  "decider_name": "Tiago Jun Sasaki",
+  "decided_at": "2026-08-19",
+  "timezone": "America/Sao_Paulo",
+  "decision_token": "FOUNDER_APPROVED_PARTNER_PROGRAM_DEFERRED_COUNSEL_2026_08_19",
+  "canonical_issue": "https://github.com/tjsasakifln/Governance/issues/7",
+  "legal_approved": false,
+  "private_negotiation_enabled": true,
+  "publication_enabled": false,
+  "real_partner_created": false,
+  "real_money_mutation_approved": false,
+  "counsel_review_trigger": "FIRST_PARTNER_ATTRIBUTED_REVENUE",
+  "counsel_review_trigger_reuse": "FIRST_PAYMENT_RECEIVED",
+  "counsel_review_target_business_days": 10,
+  "integrity_oab_conflict_auto_accept": false,
+  "produced_by": "internal_technical_adversarial_review_not_hired_counsel",
+  "authorizes": [
+    "controlled_private_negotiation_of_versioned_referral_cosell_baseline"
+  ],
+  "does_not_authorize": [
+    "LEGAL_APPROVED",
+    "site_publication",
+    "cobranca",
+    "real_partner_creation",
+    "signature",
+    "consultoria_contact",
+    "outlook_drafts",
+    "automatic_financial_provider_mutation",
+    "catalog_or_diagnostico_or_extra_reopening"
+  ]
+}

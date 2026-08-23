@@ -10,6 +10,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   ServiceHealth,
 } from "../types";
 import { renderFilteredList } from "./list";
@@ -304,89 +305,6 @@ export function commercialBlock(
 }
 
 /**
- * Operator cockpit for the CONFENGE outbound kill switch.
- *
- * Three controls and nothing else: pause, resume, acknowledge. There is no send
- * control here and there must never be one — this surface can stop outbound and
- * let it flow again, and that is the whole of its authority.
- *
- * Every reading is rendered as observed-or-"—". `state` is tri-state because
- * Warmbly reporting nothing is not the same as Warmbly reporting "running", and
- * an operator who is told ACTIVE when nobody knows will make the wrong call.
- */
-function dispatchPanel(ops: Record<string, unknown>): string {
-  const d = ops.dispatch && typeof ops.dispatch === "object" ? (ops.dispatch as Record<string, unknown>) : {};
-  const state = String(d.state ?? "UNKNOWN");
-  const label =
-    state === "PAUSED" ? "PAUSADO" : state === "ACTIVE" ? "ATIVO" : "DESCONHECIDO";
-  const show = (v: unknown): string => (v === undefined || v === null || v === "" ? "—" : String(v));
-  const window =
-    d.window_start && d.window_end
-      ? `${String(d.window_start)}–${String(d.window_end)} ${show(d.timezone)}`
-      : "—";
-  const inWindow =
-    typeof d.in_send_window === "boolean" ? (d.in_send_window ? "dentro da janela" : "fora da janela") : "—";
-  const volume =
-    typeof d.sent_last_hour === "number" || typeof d.cap === "number"
-      ? `${show(d.sent_last_hour)} / ${show(d.cap)}`
-      : "—";
-  const last = ops.last_operator_action && typeof ops.last_operator_action === "object"
-    ? (ops.last_operator_action as Record<string, unknown>)
-    : null;
-  const lastBlock = last
-    ? `<dl class="facts">
-        ${fact("Última ação", show(last.action))}
-        ${fact("Resultado", show(last.outcome))}
-        ${fact("Operador", show(last.actor_id))}
-        ${fact("Quando", show(last.recorded_at))}
-        ${fact("Motivo registrado", show(last.reason))}
-      </dl>`
-    // Absence of a recorded action is not "nobody acted": this ledger is
-    // in-process and a restart empties it.
-    : `<p class="constraint">Nenhuma ação de operador registrada nesta instância do Control Center. Um reinício do serviço esvazia este registro — ausência aqui não prova que ninguém agiu.</p>`;
-
-  return `
-    <section class="stack domain-dispatch" aria-labelledby="dispatch-title" data-domain="dispatch" data-dispatch-state="${escapeHtml(state)}">
-      <h2 id="dispatch-title">Disparo de saída (Warmbly)</h2>
-      <article class="card" data-dispatch-observed="${d.observed === true ? "true" : "false"}">
-        <p class="kicker"><span class="pill">${escapeHtml(label)}</span></p>
-        <dl class="facts">
-          ${fact("Estado do disparo", escapeHtml(label))}
-          ${fact("Motivo da pausa", escapeHtml(show(d.pause_reason)))}
-          ${fact("Janela comercial", escapeHtml(window))}
-          ${fact("Agora", escapeHtml(inWindow))}
-          ${fact("Próximo slot", escapeHtml(show(d.next_slot_at)))}
-          ${fact("Enviados na hora / teto", escapeHtml(volume))}
-          ${fact("Aprovados na fila", escapeHtml(show(d.queued_approved)))}
-        </dl>
-        ${d.why ? `<p class="constraint">${escapeHtml(String(d.why))}</p>` : ""}
-      </article>
-      <article class="card">
-        <h3>Última ação do operador</h3>
-        ${lastBlock}
-      </article>
-      <article class="card">
-        <h3>Controles</h3>
-        <p class="constraint" data-operator-scope="warmbly-write">Estas três ações escrevem no Warmbly. Não existe controle de envio aqui: pausar, retomar e reconhecer é toda a autoridade desta superfície.</p>
-        <form data-warmbly-dispatch="pause" class="operator-form">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
-          <button type="submit">PAUSAR OUTBOUND</button>
-        </form>
-        <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" /></label>
-          <p class="constraint">Retomar libera e-mail frio para empresas reais. Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>
-          <button type="submit">RETOMAR OUTBOUND (dois passos)</button>
-        </form>
-        <form data-warmbly-dispatch="acknowledge" class="operator-form">
-          <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
-          <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">RECONHECER ALERTA</button>
-        </form>
-      </article>
-    </section>`;
-}
-
-/**
  * Read-model rows arrive as `unknown[]` because `operations` is passed through
  * from the Warmbly projector without a schema of its own.
  */
@@ -469,8 +387,11 @@ function commercialOps(snapshot: CommercialSnapshot, surface: string | null, has
           <p>${escapeHtml(String(inbound.anchor_label ?? "Scoreboard Warmbly, se presente. Não é coorte de aquisição."))}</p>
           <p>configured=${escapeHtml(String(inbound.configured))} schema=${escapeHtml(String(inbound.schema ?? "ausente"))}</p>
         </article>
-      </section>
-      ${dispatchPanel(ops)}`;
+        <article class="card" data-dispatch-moved="true">
+          <h3>Controles de disparo do Warmbly</h3>
+          <p>Pausar, retomar e reconhecer alertas saíram desta aba. Eles agora vivem em <a href="#/warmbly">Operação Warmbly</a>, junto do estado do outbound, da janela comercial, da fila, dos limites e da trilha de auditoria.</p>
+        </article>
+      </section>`;
   } else if (current === "atividade") {
     body = renderFilteredList({
       spec: ACTIVITY_LIST,
@@ -699,24 +620,137 @@ function checkLine(label: string, value: { status?: string; detail?: string } | 
   return fact(label, escapeHtml([value.status, value.detail].filter(Boolean).join(" · ")));
 }
 
+const HEALTH_LABELS: Record<ServiceHealth["status"], string> = {
+  healthy: "saudável",
+  degraded: "degradado",
+  down: "fora do ar",
+  unknown: "sem conclusão",
+};
+
+/**
+ * Why this row is a defect, per code. A single hardcoded sentence used to claim
+ * the origin gave no identity even for ambiguous_service_id, where it gave two
+ * — and two distinct ids colliding is the entire problem. An unrecognised code
+ * gets no invented cause: the code itself is the whole statement.
+ */
+export function catalogErrorExplanation(code: string): string {
+  switch (code) {
+    case "missing_service_identity":
+      return "A origem não informou identidade para este serviço.";
+    case "ambiguous_service_id":
+      return "Duas entradas distintas do catálogo produzem o mesmo identificador. Os serviços seguem separados; corrigir os ids na origem.";
+    default:
+      return "Código não reconhecido por esta versão do cockpit; nenhuma causa é presumida.";
+  }
+}
+
+interface PresentedHealth {
+  readonly status: ServiceHealth["status"];
+  readonly conclusive: boolean;
+}
+
+/**
+ * "Saudável" is a conclusion, and a conclusion needs evidence. A row whose
+ * freshness is not FRESH, or whose confidence is zero — not configured,
+ * blocked, or failed collection — has none, so the card refuses to print the
+ * word and says "sem conclusão" instead. The raw value stays on the element as
+ * data-raw-status so nothing is hidden, only un-asserted.
+ */
+export function presentHealth(item: ServiceHealth): PresentedHealth {
+  const conclusive =
+    item.evidence_conclusive !== false &&
+    item.provenance.freshness_status === "FRESH" &&
+    item.provenance.confidence > 0;
+  if (!conclusive && item.status === "healthy") {
+    return { status: "unknown", conclusive: false };
+  }
+  return { status: item.status, conclusive };
+}
+
 export function healthCard(item: ServiceHealth): string {
-  const tone = item.status === "healthy" && item.provenance.freshness_status === "FRESH" ? "green" : "not-green";
+  const presented = presentHealth(item);
+  const tone = presented.status === "healthy" && presented.conclusive ? "green" : "not-green";
+  const confidence = item.provenance.confidence.toFixed(2).replace(".", ",");
+  const degraded = presented.status !== "healthy";
+  const runbook = degraded ? item.runbook_url : undefined;
+  const inconclusive = presented.conclusive
+    ? ""
+    : `<p class="constraint" data-inconclusive="true">Sem evidência conclusiva: freshness ${escapeHtml(
+        item.provenance.freshness_status,
+      )}, confiança ${escapeHtml(confidence)}. Nenhum estado conclusivo é afirmado para este serviço.</p>`;
+  // Doubt about the collector run is stated, never folded into the service's
+  // own status: one probe that timed out must not repaint a host that answered.
+  const snapshotCaveat =
+    item.snapshot_evidence && !item.snapshot_evidence.conclusive
+      ? `<p class="constraint" data-snapshot-evidence="${escapeHtml(
+          item.snapshot_evidence.freshness_status,
+        )}">Coleta que trouxe este serviço: ${escapeHtml(
+          item.snapshot_evidence.freshness_status,
+        )}, confiança ${escapeHtml(
+          item.snapshot_evidence.confidence.toFixed(2).replace(".", ","),
+        )}. O estado abaixo vem da evidência do próprio serviço.</p>`
+      : "";
+  const catalogError = item.catalog_error
+    ? `<p class="constraint" data-catalog-error="${escapeHtml(item.catalog_error)}">Erro de catálogo/telemetria: ${escapeHtml(
+        item.catalog_error,
+      )}. ${escapeHtml(catalogErrorExplanation(item.catalog_error))}</p>`
+    : "";
+  const duplicates =
+    item.duplicate_count && item.duplicate_count > 1
+      ? `<p class="constraint" data-duplicate-count="${item.duplicate_count}">${item.duplicate_count} entradas idênticas do catálogo agrupadas neste card.</p>`
+      : "";
+  const runbookFact = degraded
+    ? runbook
+      ? fact(
+          "Runbook",
+          `<a class="wrap-any" href="${escapeHtml(runbook)}" rel="noreferrer noopener">${escapeHtml(runbook)}</a>`,
+        )
+      : fact("Runbook", escapeHtml("não cadastrado no catálogo"), ` data-absent="true"`)
+    : "";
   return `
-    <article class="card health" data-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
+    <article class="card health" data-status="${escapeHtml(presented.status)}" data-raw-status="${escapeHtml(item.status)}" data-id="${escapeHtml(item.id)}" data-tone="${tone}" data-conclusive="${presented.conclusive ? "true" : "false"}" data-partial-outage="${item.partial_outage === true ? "true" : "false"}">
       <header>
-        <p class="kicker"><span class="pill">${escapeHtml(item.status)}</span> <span class="sr-only">${escapeHtml(item.status)}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
+        <p class="kicker"><span class="pill">${escapeHtml(presented.status)}</span> <span class="sr-only">${escapeHtml(
+          HEALTH_LABELS[presented.status],
+        )}</span> <span class="scope">${escapeHtml(item.scope)}</span></p>
         <h3>${escapeHtml(item.service_name)}</h3>
       </header>
+      ${catalogError}
+      ${snapshotCaveat}
+      ${inconclusive}
+      ${duplicates}
       ${item.message ? `<p>${escapeHtml(item.message)}</p>` : ""}
-      ${item.latency_ms !== undefined ? `<p>Latência observada: ${item.latency_ms} ms</p>` : ""}
       ${item.partial_outage ? `<p class="constraint">Partial outage</p>` : ""}
       <dl class="facts">
+        ${fact("Função", escapeHtml(item.role ?? "não declarada no catálogo"), item.role ? "" : ` data-absent="true"`)}
+        ${fact("Endpoint lógico", `<span class="wrap-any">${escapeHtml(item.endpoint ?? "não declarado no catálogo")}</span>`, item.endpoint ? "" : ` data-absent="true"`)}
+        ${item.service_id ? fact("Id no catálogo", escapeHtml(item.service_id)) : ""}
+        ${fact(
+          "Última verificação",
+          `<time datetime="${escapeHtml(item.checked_at)}">${escapeHtml(formatLocal(item.checked_at))}</time>`,
+        )}
+        ${fact("Estado avaliado", escapeHtml(`${presented.status} · ${HEALTH_LABELS[presented.status]}`))}
+        ${fact(
+          item.latency_check ? `Latência observada (${item.latency_check})` : "Latência observada",
+          item.latency_ms !== undefined
+            ? escapeHtml(`${item.latency_ms} ms`)
+            : escapeHtml("não medida (sem sonda de tempo neste serviço)"),
+          item.latency_ms === undefined ? ` data-absent="true"` : "",
+        )}
+        ${fact("Freshness", escapeHtml(item.provenance.freshness_status))}
+        ${fact(
+          "Erro recente",
+          escapeHtml(item.last_error ?? "nenhum erro registrado nesta coleta"),
+          item.last_error ? "" : ` data-absent="true"`,
+        )}
         ${checkLine("HTTP", item.http)}
         ${checkLine("TLS", item.tls)}
         ${checkLine("Docker", item.docker)}
         ${checkLine("Backup", item.backup)}
+        ${checkLine("Host", item.host_metrics)}
         ${item.disk ? fact("Disco", escapeHtml(item.disk.detail ?? `${item.disk.used_pct ?? "?"}%`)) : ""}
         ${item.memory ? fact("Memória", escapeHtml(item.memory.detail ?? `${item.memory.used_pct ?? "?"}%`)) : ""}
+        ${runbookFact}
         ${
           item.pncp_freshness
             ? fact(
@@ -730,6 +764,48 @@ export function healthCard(item: ServiceHealth): string {
       </dl>
       ${provenanceBlock(item.provenance)}
     </article>
+  `;
+}
+
+const CATALOG_REASON_LABELS: Record<string, string> = {
+  NOT_CONFIGURED: "coletor não configurado neste ambiente",
+  BLOCKED_BY_SECRET: "credencial ausente; coleta bloqueada",
+  UPSTREAM_ERROR: "erro na origem durante a coleta",
+  UNKNOWN: "coleta sem evidência utilizável",
+  STALE: "coleta mais antiga que a janela de frescor",
+  collect_failed: "a coleta falhou",
+  timeout: "a coleta excedeu o tempo limite",
+};
+
+/**
+ * Why the Infra evidence is worth what it is worth. Confidence 0,00 alone
+ * cannot tell "never configured" from "the probe failed", and that ambiguity is
+ * the operator's complaint, so the reason is named on screen.
+ */
+export function infraCatalogBlock(summary: InfraCatalogSummary): string {
+  const reason = summary.unavailability_reason ?? summary.availability;
+  const reasonLabel = reason ? (CATALOG_REASON_LABELS[reason] ?? reason) : undefined;
+  const confidence = summary.confidence.toFixed(2).replace(".", ",");
+  return `
+    <dl class="facts catalog" data-catalog-summary="true" data-freshness="${escapeHtml(summary.freshness_status)}" data-catalog-errors="${summary.catalog_error_count ?? 0}">
+      ${fact("Serviços monitorados", escapeHtml(String(summary.monitored_service_count ?? "desconhecido")))}
+      ${fact("Evidência da coleta", escapeHtml(`${summary.freshness_status} · confiança ${confidence}`))}
+      ${
+        reasonLabel
+          ? fact("Motivo", escapeHtml(`${reason} · ${reasonLabel}`))
+          : fact("Motivo", escapeHtml("coleta íntegra"), ` data-absent="true"`)
+      }
+      ${
+        summary.catalog_error_count !== undefined
+          ? fact("Erros de catálogo/telemetria", escapeHtml(String(summary.catalog_error_count)))
+          : ""
+      }
+      ${
+        summary.duplicate_group_count !== undefined
+          ? fact("Duplicatas agrupadas", escapeHtml(String(summary.duplicate_group_count)))
+          : ""
+      }
+    </dl>
   `;
 }
 

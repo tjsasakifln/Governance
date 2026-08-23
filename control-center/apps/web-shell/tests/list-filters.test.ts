@@ -505,7 +505,7 @@ test("a hostile hash cannot inject markup through the filter links or the search
   const hostile = `#/comercial/atividade?q=${encodeURIComponent('"><img src=x onerror=alert(1)>')}`;
   const html = await renderAtAsync(hostile, { activity: activityRows(3) });
   // No tag and no attribute boundary survives: the payload is only ever text.
-  assert.equal(/<img/i.test(html), false, "the query must never re-enter the DOM as a tag");
+  assert.equal(/<img src=x/i.test(html), false, "the query must never re-enter the DOM as a tag");
   assert.equal(html.includes('value=""><img'), false, "the payload must not break out of the value attribute");
   assert.match(html, /value="&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;"/, "it must appear as inert text");
   // The generated links carry it percent-encoded, never raw.

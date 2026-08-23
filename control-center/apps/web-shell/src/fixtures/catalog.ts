@@ -13,6 +13,7 @@ import type {
   Directive,
   EngineeringSnapshot,
   FinanceSnapshot,
+  InfraCatalogSummary,
   PriorityRecommendation,
   Provenance,
   ServiceHealth,
@@ -300,6 +301,63 @@ export const COMMERCIAL_SNAPSHOT: CommercialSnapshot = {
   },
   offer_version_drift: { count: 1, detail: "proposta com versão de catálogo defasada" },
   attention_item_ids: ["cc:attention-item:01K3CC-INBOUND-UNREAD"],
+  /**
+   * Shaped exactly like `operations` of `control-center.commercial-operations.v1`
+   * as the runner projects it, so the mock surface exercises the same reader the
+   * HTTP adapter feeds. `dispatch` is the block the connector forwards verbatim;
+   * `operator_ledger*` is what the Control Center's own ledger read-back adds.
+   */
+  operations: {
+    dispatch: {
+      state: "PAUSED",
+      observed: true,
+      pause_reason: "pico de bounce acima do limite em 2026-08-20",
+      window_start: "09:00",
+      window_end: "18:00",
+      timezone: "America/Sao_Paulo",
+      in_send_window: true,
+      next_slot_at: "2026-08-21T09:00:00Z",
+      sent_last_hour: 12,
+      cap: 60,
+      queued_approved: 34,
+    },
+    operator_ledger_status: "read",
+    operator_ledger: [
+      {
+        action: "pause_dispatch",
+        outcome: "executed",
+        actor_id: "founder",
+        target: "dispatch:confenge-outbound",
+        reason: "pico de bounce acima do limite",
+        refusal_code: null,
+        upstream_status: 200,
+        recorded_at: "2026-08-20T17:38:00Z",
+        correlation_id: "wop_01K3CC0000000000000001",
+      },
+      {
+        action: "resume_dispatch",
+        outcome: "refused",
+        actor_id: "founder",
+        target: "dispatch:confenge-outbound",
+        reason: "bounce normalizado",
+        refusal_code: "confirmation_required",
+        upstream_status: null,
+        recorded_at: "2026-08-20T17:36:00Z",
+        correlation_id: "wop_01K3CC0000000000000000",
+      },
+    ],
+    last_operator_action: {
+      action: "pause_dispatch",
+      outcome: "executed",
+      actor_id: "founder",
+      target: "dispatch:confenge-outbound",
+      reason: "pico de bounce acima do limite",
+      refusal_code: null,
+      upstream_status: 200,
+      recorded_at: "2026-08-20T17:38:00Z",
+      correlation_id: "wop_01K3CC0000000000000001",
+    },
+  },
 };
 
 export const FINANCE_SNAPSHOT: FinanceSnapshot = {
@@ -430,6 +488,14 @@ export const CLIENT_FIXTURES: ClientStatus[] = [
   },
 ];
 
+/**
+ * The operator runbook for infrastructure. A real document, on https, with no
+ * credentials in the URL — the catalog supplies it per service and the shell
+ * only renders links it can vouch for.
+ */
+const RUNBOOK_URL =
+  "https://github.com/tjsasakifln/Governance/blob/main/control-center/deploy/RUNBOOK.md";
+
 export const HEALTH_FIXTURES: ServiceHealth[] = [
   {
     schema_version: "control-center.service-health.v1",
@@ -447,6 +513,11 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
       { freshness_window_seconds: 60 },
     ),
     checked_at: "2026-08-20T17:12:00Z",
+    service_id: "context-service",
+    role: "API de contexto operacional (somente leitura)",
+    endpoint: "https://api.confenge.com.br/v1/context",
+    last_error: "http: sonda de saúde retornou erro de transporte",
+    runbook_url: RUNBOOK_URL,
     message: "Última sonda falhou. Sem chute de saúde.",
     checks: [{ name: "ready", status: "unknown", detail: "probe error" }],
     http: { status: "unknown", detail: "probe error" },
@@ -475,6 +546,11 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
     ),
     checked_at: "2026-08-20T16:00:00Z",
     latency_ms: 820,
+    service_id: "web-cfg",
+    role: "Painel de configuração web (edge)",
+    endpoint: "https://cfg.confenge.com.br/health",
+    last_error: "reachability: observação mais antiga que a janela de frescor",
+    duplicate_count: 2,
     checks: [{ name: "ready", status: "degraded", detail: "observation older than window" }],
   },
   {
@@ -494,9 +570,22 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
     ),
     checked_at: "2026-08-20T17:58:00Z",
     latency_ms: 42,
+    service_id: "github-collector",
+    role: "Coletor GitHub (execuções agendadas)",
+    endpoint: "https://api.confenge.com.br/collectors/github/health",
     checks: [{ name: "ready", status: "healthy" }],
   },
 ];
+
+export const INFRA_CATALOG_SUMMARY: InfraCatalogSummary = {
+  freshness_status: "STALE",
+  confidence: 0.55,
+  monitored_service_count: HEALTH_FIXTURES.length,
+  catalog_error_count: 0,
+  duplicate_group_count: 1,
+  availability: "STALE",
+  unavailability_reason: "STALE",
+};
 
 export const DIRECTIVE_FIXTURES: Directive[] = [
   {
@@ -854,6 +943,7 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       attention: attentionByScope((item) => item.scope === "infrastructure"),
       priorities: [],
       health: HEALTH_FIXTURES,
+      health_summary: INFRA_CATALOG_SUMMARY,
     }),
     crescimento: pageFor("crescimento", {
       headline: "Inbound e visibilidade. Sem atribuição inventada entre sistemas.",
@@ -861,6 +951,13 @@ export function defaultPages(): Record<DestinationId, DestinationPage> {
       priorities: [],
       commercial: COMMERCIAL_SNAPSHOT,
       health: HEALTH_FIXTURES,
+    }),
+    warmbly: pageFor("warmbly", {
+      headline:
+        "Estado do outbound, janela, fila, limites e trilha antes dos controles. Pausar, retomar e reconhecer — nada mais.",
+      attention: [],
+      priorities: [],
+      commercial: COMMERCIAL_SNAPSHOT,
     }),
     memoria: pageFor("memoria", {
       headline: "Diretivas humanas por kind, escopo, vigência e trilha de auditoria.",
