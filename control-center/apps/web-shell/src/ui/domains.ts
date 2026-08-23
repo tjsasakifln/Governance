@@ -49,6 +49,7 @@ import {
   scopeLabel,
   routeClassLabel,
   goReviewVerdictLabel,
+  severityLabel,
   statusPill,
   technicalDetails,
 } from "./labels";
@@ -600,27 +601,30 @@ function activityOpsCard(
     ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
   const triage = String(row.triage_state ?? row.state ?? "new");
+  const event = String(row.event ?? "activity");
+  const state = String(row.state ?? "");
   const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
   const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
   const sync = String(row.sync_status ?? "observed");
   const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
   const canonical = String(row.canonical_id ?? rowId);
-  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-state="${escapeHtml(String(row.state ?? ""))}" data-triage-state="${escapeHtml(triage)}">
-    <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(String(row.event ?? "activity"), commercialEventLabel(String(row.event ?? "activity")))}</p>
+  return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}" data-triage-state="${escapeHtml(triage)}">
+    <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(event, commercialEventLabel(event))}${state && state !== triage ? ` · ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
     <h3>${heading}</h3>
     <p>${escapeHtml(String(row.evidence ?? "Sem descrição adicional da origem."))}</p>
     <dl class="facts">
       ${fact("Idade", escapeHtml(age))}
-      ${fact("Origem", escapeHtml(String(row.source ?? "Warmbly")))}
+      ${fact("Origem", escapeHtml(sourceSystemLabel(String(row.source ?? "warmbly"))))}
       ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
-      ${fact("Prioridade", escapeHtml(String(row.priority ?? "não informada")))}
+      ${fact("Prioridade", row.priority ? escapeHtml(severityLabel(String(row.priority))) : "não informada")}
       ${fact("Próximo passo", escapeHtml(String(row.next_action ?? "abrir o detalhe e definir a próxima ação")))}
       ${fact("Sincronização", escapeHtml(ownMapValue(syncLabels, sync) ?? "estado de sincronização não reconhecido"))}
     </dl>
     ${row.sync_detail ? `<p class="banner error" role="alert">Falha de sincronização: ${escapeHtml(String(row.sync_detail))}. Próxima ação: confirme no Warmbly antes de repetir.</p>` : ""}
     ${technicalDetails([
       { term: "source_id", value: rowId },
-      { term: "state", value: String(row.state ?? "") },
+      { term: "event", value: event },
+      { term: "state", value: state },
       { term: "triage_state", value: triage },
       { term: "sync_status", value: sync },
     ], "daily-triage")}
@@ -654,8 +658,6 @@ function exceptionOpsCard(row: Record<string, unknown>): string {
   let resolution: string;
   if (resolutionKind === "warmbly_action") {
     resolution = `<a class="alert-open" href="${escapeHtml(leadDetailHash("excecoes", null, id))}">Abrir detalhe e corrigir no Warmbly</a>`;
-  } else if (resolutionKind === "deep_link" && typeof row.resolution_href === "string" && /^https:\/\/[^\s]+$/i.test(row.resolution_href)) {
-    resolution = `<a class="alert-open" href="${escapeHtml(row.resolution_href)}" target="_blank" rel="noreferrer noopener">Abrir ponto exato de correção no Warmbly</a>`;
   } else {
     resolution = `<p class="constraint">Correção upstream não suportada pelo allowlist atual. Próxima ação: use a orientação abaixo e registre o desfecho; não marque como resolvida só por reconhecer.</p>`;
   }

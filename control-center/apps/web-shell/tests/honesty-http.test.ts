@@ -331,6 +331,7 @@ test("operator action receipt preserves actor, correlation and duplicate outcome
     target_canonical_id: "cc:attention-item:x",
     target_source_id: "x",
     note: "tratar",
+    idempotency_key: "corr-receipt-1",
   });
   assert.equal(result.outcome, "duplicate");
   assert.deepEqual(result.receipt, {
@@ -345,11 +346,62 @@ test("operator action receipt preserves actor, correlation and duplicate outcome
   assert.match(result.message, /requisição duplicada/);
 });
 
+test("operator action fails closed on a successful HTTP response without an exact receipt", async () => {
+  for (const body of [
+    {},
+    {
+      id: "cc:operator-action:x",
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:other",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      correlation_id: "corr-x",
+      resulting_status: "accepted",
+    },
+    {
+      id: "cc:operator-action:x",
+      action_type: "SEND_EMAIL",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      correlation_id: "corr-x",
+      resulting_status: "accepted",
+    },
+  ]) {
+    const adapter = createHttpAdapter(
+      "http://127.0.0.1:8787",
+      (async () => jsonResponse(body, 201)) as typeof fetch,
+      { kind: "human", id: "founder-local" },
+    );
+    const result = await adapter.operatorAction({
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      note: "triado",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.outcome, "unknown");
+    assert.equal(result.code, "invalid_operator_receipt");
+    assert.equal(result.receipt, undefined);
+  }
+});
+
 test("generated idempotency keys are bounded and never expose the operator note", async () => {
   let requestBody: Record<string, unknown> = {};
   const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
     requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    return jsonResponse({ id: "cc:operator-action:x", correlation_id: "corr-x", occurred_at: "2026-08-22T12:00:00.000Z" }, 201);
+    return jsonResponse({
+      id: "cc:operator-action:x",
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:x",
+      target_source_id: "x",
+      actor: { kind: "human", id: "founder-local" },
+      correlation_id: String(requestBody.correlation_id),
+      occurred_at: "2026-08-22T12:00:00.000Z",
+      resulting_status: "accepted",
+    }, 201);
   }) as typeof fetch;
   const adapter = createHttpAdapter("http://127.0.0.1:8787", fetchImpl, { kind: "human", id: "founder-local" });
   const sensitiveNote = "Fixture com nome de cliente que não deve ir para a chave";

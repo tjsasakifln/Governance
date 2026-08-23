@@ -1,20 +1,21 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { test } from "node:test";
-import { createMemoryOperatorActionService } from "../src/operational/actions.ts";
+import { createMemoryOperatorActionService, parseOperatorActionSubmission } from "../src/operational/actions.ts";
 import { createRequestListener } from "../src/http.ts";
 import { frozenClock } from "../src/clock.ts";
 import { sequentialIds } from "../src/ids.ts";
 import { silentLogger } from "../src/log.ts";
 import { createContextService } from "../src/service.ts";
 import { createFixtureStore } from "../src/store/fixture.ts";
+import { createOperatorActorResolverFromEnv } from "../src/security/operator-identity.ts";
 
 const FOUNDER = { kind: "human" as const, id: "human:founder", display_name: "Founder" };
 const AGENT = { kind: "agent" as const, id: "agent:cc", display_name: "Agent" };
 
 async function withServer(
   fn: (base: string) => Promise<void>,
-  actorKind: "human" | "agent" = "human",
+  trustedOperatorIdentity = true,
 ): Promise<void> {
   const store = createFixtureStore();
   const service = createContextService({
@@ -30,6 +31,14 @@ async function withServer(
     service,
     logger: silentLogger,
     operatorActions: createMemoryOperatorActionService(FOUNDER.id),
+    ...(trustedOperatorIdentity
+      ? {
+          operatorActor: (req: IncomingMessage) => ({
+            kind: (req.headers["x-actor-kind"] === "agent" ? "agent" : "human") as "human" | "agent",
+            id: String(req.headers["x-actor-id"] ?? ""),
+          }),
+        }
+      : {}),
   });
   const server = createServer(listener);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
@@ -41,7 +50,6 @@ async function withServer(
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
-  void actorKind;
 }
 
 async function post(base: string, actor: { kind: string; id: string }, body: unknown): Promise<{ status: number; json: Record<string, unknown> }> {
@@ -82,6 +90,20 @@ test("founder can record a reversible validation action", async () => {
     });
     assert.equal(replay.json.resulting_status, "duplicate");
   });
+});
+
+test("operator receipt time is service-owned and ignores a caller-supplied timestamp", () => {
+  const before = Date.now();
+  const parsed = parseOperatorActionSubmission(FOUNDER, {
+    action_type: "MARK_TRIAGED",
+    target_canonical_id: "cc:attention-item:clock",
+    target_source_id: "clock",
+    idempotency_key: "clock-owned",
+    occurred_at: "1999-01-01T00:00:00.000Z",
+  }, FOUNDER.id);
+  const after = Date.now();
+  assert.notEqual(parsed.occurred_at, "1999-01-01T00:00:00.000Z");
+  assert.ok(Date.parse(parsed.occurred_at) >= before && Date.parse(parsed.occurred_at) <= after);
 });
 
 test("agent cannot impersonate founder and send mutations are refused", async () => {
@@ -132,4 +154,61 @@ test("memory service fails closed on conflicting idempotency payload", async () 
     });
     assert.equal(conflicted.status, 409);
   });
+});
+
+test("memory service rejects a reused idempotency key when only the audit note changes", async () => {
+  await withServer(async (base) => {
+    const common = {
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:ex-note",
+      target_source_id: "ex-note",
+      idempotency_key: "conflict-note-mem",
+      correlation_id: "conflict-note-mem",
+      scope: "commercial",
+    };
+    assert.equal((await post(base, FOUNDER, { ...common, note: "primeira decisão" })).status, 201);
+    assert.equal((await post(base, FOUNDER, { ...common, note: "decisão alterada" })).status, 409);
+  });
+});
+
+test("operator actions stay off when no trusted-edge identity resolver is configured", async () => {
+  await withServer(async (base) => {
+    const attempt = await post(base, FOUNDER, {
+      action_type: "MARK_TRIAGED",
+      target_canonical_id: "cc:attention-item:spoof",
+      target_source_id: "spoof",
+      idempotency_key: "spoofed-browser-actor",
+    });
+    assert.equal(attempt.status, 404);
+  }, false);
+});
+
+test("trusted operator identity comes from Authelia and ignores browser actor headers", () => {
+  const autheliaUser = "founder-local";
+  const resolver = createOperatorActorResolverFromEnv({
+    CC_OPERATOR_ACTION_TRUSTED_HOPS: "127.0.0.1/32",
+  });
+  assert.ok(resolver);
+  const req = {
+    socket: { remoteAddress: "127.0.0.1" },
+    headers: {
+      "remote-user": autheliaUser,
+      "remote-groups": "operators",
+      "remote-name": "Founder",
+      "remote-email": "founder@example.com",
+      "x-actor-id": "human:mallory",
+      "x-actor-kind": "human",
+    },
+    rawHeaders: [
+      "Remote-User", autheliaUser,
+      "Remote-Groups", "operators",
+      "Remote-Name", "Founder",
+      "Remote-Email", "founder@example.com",
+      "X-Actor-Id", "human:mallory",
+      "X-Actor-Kind", "human",
+    ],
+  } as unknown as IncomingMessage;
+  assert.deepEqual(resolver(req), { kind: "human", id: autheliaUser, display_name: "Founder" });
+  (req.socket as { remoteAddress: string }).remoteAddress = "203.0.113.9";
+  assert.throws(() => resolver(req), /operator identity denied/);
 });

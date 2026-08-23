@@ -6,6 +6,7 @@ import type { Logger } from "./log.ts";
 import { assertJsonSize } from "./sanitize.ts";
 import { parseScope } from "./scope.ts";
 import type { OperatorActionService } from "./operational/actions.ts";
+import type { OperatorActorResolver } from "./security/operator-identity.ts";
 import type { OperationalService } from "./operational/service.ts";
 import { COMMERCIAL_LIST_IDS, type CommercialListId } from "./operational/commercial-list.ts";
 import type { ContextService } from "./service.ts";
@@ -16,6 +17,8 @@ export interface HttpDeps {
   logger: Logger;
   operational?: OperationalService;
   operatorActions?: OperatorActionService;
+  /** Trusted-edge identity resolver for append-only operator writes. */
+  operatorActor?: OperatorActorResolver;
   /**
    * Warmbly operator channel. Optional: when absent every operator route 404s,
    * which is the fail-closed default for an unconfigured deployment.
@@ -231,6 +234,28 @@ async function handle(
       send(res, result.status, result.body);
       return;
     }
+    if (url.pathname === "/v1/operator-actions") {
+      if (!deps.operatorActions || !deps.operatorActor) {
+        send(res, 404, { error: "operator_action_not_configured" });
+        return;
+      }
+      const actor = deps.operatorActor(req);
+      if (method === "POST") {
+        const contentType = String(req.headers["content-type"] ?? "");
+        if (!contentType.toLowerCase().startsWith("application/json")) {
+          send(res, 415, { error: "unsupported_media_type" });
+          return;
+        }
+        send(res, 201, await deps.operatorActions.submit(actor, await readBody(req)));
+        return;
+      }
+      if (method === "GET") {
+        send(res, 200, { items: await deps.operatorActions.list(actor, queryScope(url)) });
+        return;
+      }
+      send(res, 405, { error: "method_not_allowed" });
+      return;
+    }
     const actor = actorFromRequest(req);
     const parts = url.pathname.split("/").filter(Boolean);
 
@@ -301,20 +326,6 @@ async function handle(
     }
     if (method === "GET" && url.pathname === "/v1/audit") {
       send(res, 200, { items: deps.service.listAudit(actor) });
-      return;
-    }
-    if (method === "POST" && url.pathname === "/v1/operator-actions") {
-      if (!deps.operatorActions) {
-        throw invalid("operator action port is not configured");
-      }
-      send(res, 201, await deps.operatorActions.submit(actor, await readBody(req)));
-      return;
-    }
-    if (method === "GET" && url.pathname === "/v1/operator-actions") {
-      if (!deps.operatorActions) {
-        throw invalid("operator action port is not configured");
-      }
-      send(res, 200, { items: await deps.operatorActions.list(actor, queryScope(url)) });
       return;
     }
     if (method === "POST" && url.pathname === "/v1/directives") {

@@ -578,17 +578,6 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
     if (["discarded", "dismissed", "ignored", "false_positive"].includes(state)) return "discarded";
     return "new";
   };
-  const safeResolutionHref = (row: Record<string, unknown>): string | null => {
-    const raw = firstText(row, ["resolution_url", "operator_url", "deep_link"]);
-    if (!raw || raw.length > 1000) return null;
-    try {
-      const url = new URL(raw);
-      if (url.protocol !== "https:" || url.username || url.password) return null;
-      return url.toString();
-    } catch {
-      return null;
-    }
-  };
   const push = (row: Record<string, unknown>, source: "warmbly.intel.exceptions" | "warmbly.attention") => {
     const rawId = typeof row.id === "string" && row.id.trim() ? row.id.trim() : "";
     const id = rawId || `${source}:${out.length}`;
@@ -631,7 +620,6 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
       return;
     }
     const observed = isoOr(row.at ?? row.opened_at ?? row.updated_at, observedAt);
-    const resolutionHref = safeResolutionHref(row);
     const impact = firstText(row, ["impact", "business_impact"])
       ?? (String(row.priority ?? row.severity ?? "").toLowerCase().match(/critical|high|p0|p1/)
         ? "Pode interromper ou atrasar o atendimento comercial."
@@ -661,9 +649,11 @@ function mergeExceptions(intel: unknown[], attention: unknown[], observedAt: str
       occurrence_count: 1,
       occurrence_ids: [id],
       group_key: groupKey,
-      resolution_kind: explicitLeadId ? "warmbly_action" : resolutionHref ? "deep_link" : "unsupported",
+      // External URLs are upstream-controlled data, not an authorization
+      // boundary. Until a configured origin allowlist exists, only the
+      // structured lead id may produce an actionable target.
+      resolution_kind: explicitLeadId ? "warmbly_action" : "unsupported",
       resolution_target: explicitLeadId,
-      resolution_href: resolutionHref,
       sync_status: firstText(row, ["sync_status", "synchronization_status"]) ?? "observed",
       sync_detail: firstText(row, ["sync_detail", "synchronization_error"]),
       ...(explicitLeadId ? { lead_id: explicitLeadId } : {}),

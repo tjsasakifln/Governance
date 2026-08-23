@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { isDeepStrictEqual } from 'node:util';
 import { ConflictError } from '../errors.js';
 import { generatePublicId } from '../ids.js';
 import { logEvent } from '../log.js';
@@ -19,7 +20,14 @@ function operatorPayloadConflicts(existing: OperatorAction, input: RecordOperato
   return (
     existing.actionType !== input.actionType ||
     existing.targetCanonicalId !== input.targetCanonicalId ||
-    existing.targetSourceId !== input.targetSourceId
+    existing.targetSourceId !== input.targetSourceId ||
+    existing.actorId !== input.actorId ||
+    existing.correlationId !== input.correlationId ||
+    existing.scope !== input.scope ||
+    existing.evidenceRef !== (input.evidenceRef ?? null) ||
+    existing.note !== (input.note ?? null) ||
+    !isDeepStrictEqual(existing.beforeJson, input.beforeJson ?? {}) ||
+    !isDeepStrictEqual(existing.afterJson, input.afterJson ?? {})
   );
 }
 

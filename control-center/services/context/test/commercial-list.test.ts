@@ -147,7 +147,7 @@ test("declared rows missing from the collection are reported as incomplete, neve
   });
 });
 
-test("real zero, absent source and disguised stale remain three different list truths", async () => {
+test("real zero, unproven absence and disguised stale remain three different list truths", async () => {
   await withServer(projectedRows(0), async (base) => {
     const response = await fetch(`${base}/v1/domains/commercial/lists/activity?scope=commercial`, {
       headers: headers(),
@@ -162,7 +162,8 @@ test("real zero, absent source and disguised stale remain three different list t
       headers: headers(),
     });
     const body = (await response.json()) as Record<string, unknown>;
-    assert.equal((body.truth as Record<string, unknown>).state, "ABSENT");
+    assert.equal((body.truth as Record<string, unknown>).state, "UNKNOWN");
+    assert.equal((body.truth as Record<string, unknown>).reason, "recency_unknown");
   });
 
   const staleRows = projectedRows(0).map((row) => ({ ...row, freshness_status: "STALE" as const }));

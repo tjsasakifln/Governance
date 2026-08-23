@@ -47,6 +47,7 @@ test("operator action is append-only, idempotent, and refuses forbidden types at
     observedAt,
     freshnessStatus: "FRESH",
     confidence: 1,
+    note: "reviewed",
   });
   assert.equal(replay.inserted, false);
   assert.equal(replay.action.resultingStatus, "duplicate");
@@ -109,6 +110,30 @@ test("same idempotency key with a conflicting payload fails closed at PostgreSQL
     ["conflict-payload"],
   );
   assert.equal(counted.rows[0]?.n, 1);
+});
+
+test("a reused key cannot silently replace only the operator note", async () => {
+  const source = { system: "control-center", kind: "operator-action", locator: "ex-note" };
+  const observedAt = new Date("2026-08-21T12:00:00.000Z");
+  const common = {
+    actionType: "MARK_TRIAGED" as const,
+    targetCanonicalId: "cc:attention-item:ex-note",
+    targetSourceId: "ex-note",
+    actorId: "human:founder",
+    occurredAt: observedAt,
+    correlationId: "corr-note",
+    idempotencyKey: "conflict-note",
+    scope: "commercial" as const,
+    source,
+    observedAt,
+    freshnessStatus: "FRESH" as const,
+    confidence: 1,
+  };
+  await ctx.persistence.recordOperatorAction({ ...common, note: "primeira decisão" });
+  await assert.rejects(
+    ctx.persistence.recordOperatorAction({ ...common, note: "decisão alterada" }),
+    /conflicting payload/,
+  );
 });
 
 test("daily triage and exception workflow actions are allowed but remain append-only local receipts", async () => {

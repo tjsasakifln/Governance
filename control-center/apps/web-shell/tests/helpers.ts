@@ -28,6 +28,19 @@ export function recordingFetch(
     calls.push(`${init?.method ?? "GET"} ${url}`);
     const path = url.replace(/^https?:\/\/[^/]+/, "");
     if ((init?.method ?? "GET") !== "GET") {
+      if (path.endsWith("/v1/operator-actions")) {
+        const request = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({
+          id: "cc:operator-action:test-receipt",
+          action_type: request.action_type,
+          target_canonical_id: request.target_canonical_id,
+          target_source_id: request.target_source_id,
+          actor: { kind: "human", id: "founder-local" },
+          correlation_id: request.correlation_id,
+          occurred_at: "2026-08-22T12:00:00.000Z",
+          resulting_status: "accepted",
+        }, 201);
+      }
       const body = router(path);
       return jsonResponse(body ?? { ok: true }, 201);
     }

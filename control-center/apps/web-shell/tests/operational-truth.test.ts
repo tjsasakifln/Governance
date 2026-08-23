@@ -30,4 +30,13 @@ test("malformed truth is not silently painted as healthy", () => {
   assert.equal(parseOperationalTruth({ state: "HEALTHY" }), null);
   assert.equal(parseOperationalTruth({ state: "HEALTHY", as_of: "2026-08-22T20:00:00Z", source, confidence: 1, reason: "invented" }), null);
   assert.equal(operationalTruthBlock(parseOperationalTruth({ state: "HEALTHY" })), "");
+  for (const confidence of [-0.1, 1.1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(parseOperationalTruth({
+      state: "HEALTHY",
+      as_of: "2026-08-22T20:00:00Z",
+      source,
+      confidence,
+      reason: "fresh_observation",
+    }), null);
+  }
 });

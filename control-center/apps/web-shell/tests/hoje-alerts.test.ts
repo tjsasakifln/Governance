@@ -169,8 +169,18 @@ test("acknowledging from the card POSTs ACKNOWLEDGE_EXCEPTION and nothing else",
     const url = String(input);
     const method = init?.method ?? "GET";
     if (method === "POST") {
-      calls.push({ url, method, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
-      return new Response(JSON.stringify({ id: "cc:operator-action:ack" }), {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      calls.push({ url, method, body });
+      return new Response(JSON.stringify({
+        id: "cc:operator-action:ack",
+        action_type: body.action_type,
+        target_canonical_id: body.target_canonical_id,
+        target_source_id: body.target_source_id,
+        actor: { kind: "human", id: "founder-local" },
+        correlation_id: body.correlation_id,
+        occurred_at: "2026-08-22T12:00:00.000Z",
+        resulting_status: "accepted",
+      }), {
         status: 201,
         headers: { "content-type": "application/json" },
       });

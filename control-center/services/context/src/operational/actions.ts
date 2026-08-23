@@ -7,6 +7,7 @@ import {
 import { assertFounder } from "../actor.ts";
 import { conflict, forbidden, invalid } from "../errors.ts";
 import type { ActorRef } from "../types.ts";
+import { isDeepStrictEqual } from "node:util";
 
 export const ALLOWED_OPERATOR_ACTIONS = OPERATOR_ACTION_TYPES;
 export const FORBIDDEN_OPERATOR_ACTIONS = FORBIDDEN_OPERATOR_ACTION_TYPES;
@@ -48,7 +49,14 @@ function payloadsConflict(existing: OperatorActionRecord, next: OperatorActionRe
   return (
     existing.action_type !== next.action_type ||
     existing.target_canonical_id !== next.target_canonical_id ||
-    existing.target_source_id !== next.target_source_id
+    existing.target_source_id !== next.target_source_id ||
+    existing.actor.id !== next.actor.id ||
+    existing.correlation_id !== next.correlation_id ||
+    existing.scope !== next.scope ||
+    existing.evidence_ref !== next.evidence_ref ||
+    existing.note !== next.note ||
+    !isDeepStrictEqual(existing.before, next.before) ||
+    !isDeepStrictEqual(existing.after, next.after)
   );
 }
 
@@ -77,7 +85,9 @@ export function parseOperatorActionSubmission(
     target_canonical_id: str(rec.target_canonical_id ?? rec.targetCanonicalId),
     target_source_id: str(rec.target_source_id ?? rec.targetSourceId),
     actor: { kind: "human", id: actor.id },
-    occurred_at: str(rec.occurred_at) || now,
+    // Audit time belongs to the service clock. A caller may describe evidence
+    // in `before`/`after`, but cannot backdate or future-date the receipt.
+    occurred_at: now,
     correlation_id: str(rec.correlation_id ?? rec.correlationId) || idempotencyKey,
     idempotency_key: idempotencyKey,
     resulting_status: "accepted",

@@ -275,9 +275,8 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          "x-actor-id": this.operator.id,
-          "x-actor-kind": this.operator.kind,
         },
+        credentials: "include",
         body: JSON.stringify({
           action_type: input.action_type,
           target_canonical_id: input.target_canonical_id,
@@ -309,27 +308,49 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       const actor = body.actor && typeof body.actor === "object" && !Array.isArray(body.actor)
         ? (body.actor as Record<string, unknown>)
         : {};
+      const resultingStatus = stringValue(body, "resulting_status");
+      const receiptId = stringValue(body, "id");
+      const correlationId = stringValue(body, "correlation_id");
+      const occurredAt = stringValue(body, "occurred_at");
+      const receiptIsValid =
+        (resultingStatus === "accepted" || resultingStatus === "duplicate") &&
+        Boolean(receiptId && correlationId && occurredAt && !Number.isNaN(Date.parse(occurredAt))) &&
+        correlationId === idempotency &&
+        stringValue(body, "action_type") === input.action_type &&
+        stringValue(body, "target_canonical_id") === input.target_canonical_id &&
+        stringValue(body, "target_source_id") === input.target_source_id &&
+        stringValue(actor, "kind") === "human" &&
+        stringValue(actor, "id") === this.operator.id;
+      if (!receiptIsValid) {
+        const unproven: AdapterWriteResult = {
+          ok: false,
+          path: "/v1/operator-actions",
+          kind: "nota",
+          message: "a resposta não trouxe um receipt íntegro; a gravação permanece indeterminada",
+          outcome: "unknown",
+          code: "invalid_operator_receipt",
+          status: response.status,
+        };
+        this.lastOperatorResult = unproven;
+        return unproven;
+      }
       const accepted: AdapterWriteResult = {
         ok: true,
         path: "/v1/operator-actions",
         kind: "nota",
-        message: body.resulting_status === "duplicate"
+        message: resultingStatus === "duplicate"
           ? "requisição duplicada: o receipt original foi preservado; Warmbly não foi alterado"
           : "ação registrada no Control Center; Warmbly não foi alterado",
-        ...(stringValue(body, "id") && stringValue(body, "correlation_id") && stringValue(body, "occurred_at")
-          ? {
-              outcome: stringValue(body, "resulting_status") ?? "accepted",
-              receipt: {
-                id: stringValue(body, "id")!,
-                correlation_id: stringValue(body, "correlation_id")!,
-                occurred_at: stringValue(body, "occurred_at")!,
-                outcome: stringValue(body, "resulting_status") ?? "accepted",
-                ...(stringValue(actor, "id") ? { actor_id: stringValue(actor, "id")! } : {}),
-                target: stringValue(body, "target_canonical_id") ?? input.target_canonical_id,
-                writes_to: "control-center" as const,
-              },
-            }
-          : {}),
+        outcome: resultingStatus!,
+        receipt: {
+          id: receiptId!,
+          correlation_id: correlationId!,
+          occurred_at: occurredAt!,
+          outcome: resultingStatus!,
+          actor_id: stringValue(actor, "id")!,
+          target: input.target_canonical_id,
+          writes_to: "control-center" as const,
+        },
       };
       this.lastOperatorResult = accepted;
       return accepted;

@@ -569,7 +569,7 @@ test("equivalent exceptions group without losing occurrence evidence or workflow
     payload: {
       counts: { deals_open: 0, inbound_now: 0 },
       attention: [
-        { id: "att-duplicate", group_key: "owner-gap:acme", kind: "missing_owner", why: "sem owner", status: "acknowledged" },
+        { id: "att-duplicate", group_key: "owner-gap:acme", kind: "missing_owner", why: "sem owner", status: "acknowledged", resolution_url: "https://attacker.example/phish" },
       ],
       operations: {
         intel_exceptions: [
@@ -588,6 +588,7 @@ test("equivalent exceptions group without losing occurrence evidence or workflow
   assert.deepEqual(ops.exceptions[0]?.occurrence_ids, ["intel-original", "att-duplicate"]);
   assert.equal(ops.exceptions[0]?.workflow_state, "acknowledged");
   assert.equal(ops.exceptions[0]?.resolution_kind, "unsupported");
+  assert.equal(ops.exceptions[0]?.resolution_href, undefined);
 });
 
 test("absent intel sources stay NO_DATA and a data wrapper is never configured", () => {

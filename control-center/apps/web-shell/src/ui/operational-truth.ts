@@ -65,7 +65,8 @@ export function parseOperationalTruth(value: unknown): OperationalTruth | null {
   if (
     typeof row.state !== "string" || !STATES.has(row.state as OperationalTruthState) ||
     typeof row.as_of !== "string" || typeof row.reason !== "string" || !REASONS.has(row.reason) ||
-    typeof row.confidence !== "number" || !source ||
+    typeof row.confidence !== "number" || !Number.isFinite(row.confidence) ||
+    row.confidence < 0 || row.confidence > 1 || !source ||
     typeof source.system !== "string" || typeof source.kind !== "string" || typeof source.locator !== "string"
   ) return null;
   return {
