@@ -1524,3 +1524,26 @@ test("a historical version's message preview is equally free of annotation", () 
     assert.ok(preview.includes("data-exact-body"));
   }
 });
+
+// 14. A legacy version that is also the newest version of its cohort is a dead
+// end: there is no current version to open, and saying "the server did not say"
+// blames a data gap for what is actually the cohort's real state.
+test("a legacy version with no successor says so instead of blaming the server", () => {
+  reset();
+  const html = warmblyBlock(legacyInput({ is_current_version: true, current_version_id: "" }), "revisao");
+  assert.match(html, /data-open-current="none"/);
+  assert.ok(html.includes("prepare uma cohort nova"), "must name the way forward");
+  assert.ok(!html.includes("O servidor não informou qual é a versão corrente"), "must not blame the server");
+  assert.match(html, /data-legacy-banner="true"/);
+  assert.ok(!/data-human-gate="(review|decide|adjust|validate)"/.test(html), "still no controls");
+});
+
+test("a legacy version that does have a successor still links to it", () => {
+  reset();
+  const html = warmblyBlock(
+    legacyInput({ is_current_version: false, current_version_id: "11111111-2222-3333-4444-555555555555" }),
+    "revisao",
+  );
+  assert.match(html, /data-open-current="true"/);
+  assert.ok(html.includes("Abrir versão corrente"));
+});
