@@ -171,7 +171,11 @@ export interface HumanGateHttpOptions {
   logger?: Logger;
 }
 
-/** Fixed-route authenticated proxy. It has no dispatch/send route by construction. */
+/**
+ * Fixed-route authenticated proxy. It has no `send`, `queue` or `resume` route
+ * by construction, and its one dispatch route hands an already-GO'd cohort to
+ * Warmbly's queue rather than sending anything.
+ */
 export function createHumanGateHttpHandler(options: HumanGateHttpOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 12_000;

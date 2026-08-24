@@ -6,6 +6,11 @@
  * control here and there must never be one — this surface can stop outbound and
  * let it flow again, and that is the whole of its authority.
  *
+ * The cohort dispatch that hands a GO'd cohort to Warmbly's queue lives in the
+ * Revisão surface further down this module, behind a registered GO, the
+ * `admins` group and a typed version confirmation. It enqueues; it does not
+ * send, and it is deliberately not one of the three controls above.
+ *
  * Everything an operator needs to decide is rendered *before* the controls:
  * dispatch state, why it is in that state, the commercial window, the approved
  * queue, the hourly cap, and who last touched the switch. Every reading is
