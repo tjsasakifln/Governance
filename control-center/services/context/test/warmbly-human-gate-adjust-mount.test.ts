@@ -346,7 +346,7 @@ test("adjust accepts no client-settable actor and no identity from an untrusted 
   }
 });
 
-test("the mount adds no send, dispatch or queue cohort route alongside adjust", async () => {
+test("the mount adds no send or queue cohort route, and dispatch only as one admins-only route", async () => {
   const upstream = await stubWarmbly();
   const { dir, path } = credentialFile();
   try {
@@ -360,9 +360,9 @@ test("the mount adds no send, dispatch or queue cohort route alongside adjust", 
       async (base) => {
         const hostile = [
           `/v1/warmbly/operator/cohorts/${COHORT}/send`,
-          `/v1/warmbly/operator/cohorts/${COHORT}/dispatch`,
           `/v1/warmbly/operator/cohorts/${COHORT}/queue`,
           `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/send`,
+          `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/dispatch`,
           `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/adjust/send`,
         ];
         for (const route of hostile) {
@@ -374,6 +374,18 @@ test("the mount adds no send, dispatch or queue cohort route alongside adjust", 
           assert.ok(res.status === 404, `${route} answered ${res.status}`);
           await res.text();
         }
+
+        // Cohort dispatch exists, and only at the cohort level, and only for
+        // admins. `operators` — the group these headers carry — is refused
+        // before anything reaches Warmbly.
+        const asOperators = await fetch(`${base}/v1/warmbly/operator/cohorts/${COHORT}/dispatch`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...AUTHELIA },
+          body: adjustBody(),
+        });
+        assert.equal(asOperators.status, 403, "dispatch is admins-only at the mount");
+        const refusal = (await asOperators.json()) as Record<string, unknown>;
+        assert.equal(refusal.code, "insufficient_human_gate_role");
 
         // `fetch` collapses `..` before the request line is written, so a raw
         // socket is the only way to make the server itself see the traversal.

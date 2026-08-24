@@ -60,9 +60,15 @@ test("adjust is one POST route under the operators role and nothing else", () =>
   assert.deepEqual(
     HUMAN_GATE_ROUTES.filter((r) => r.method === "POST").map((r) => r.operation).sort(),
     [...HUMAN_GATE_WRITE_OPERATIONS].sort(),
-    "the write surface is exactly the six declared operations",
+    "the write surface is exactly the seven declared operations",
   );
-  assert.equal(HUMAN_GATE_OPERATIONS.length, 9, "three reads plus six writes; nothing else exists");
+  assert.equal(HUMAN_GATE_OPERATIONS.length, 10, "three reads plus seven writes; nothing else exists");
+  // Dispatch hands a GO'd cohort to Warmbly's queue, so it carries the same
+  // authority as the GO it depends on and never the reviewer's.
+  const dispatch = HUMAN_GATE_ROUTES.filter((route) => route.operation === "dispatch");
+  assert.equal(dispatch.length, 1, "dispatch must have exactly one route");
+  assert.equal(dispatch[0]?.method, "POST");
+  assert.equal(dispatch[0]?.role, "admins", "dispatch is admins-only, like GO");
 });
 
 test("the adjust request shape is exactly the five contract fields", () => {

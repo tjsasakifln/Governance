@@ -48,6 +48,12 @@ const routes: readonly HumanGateRoute[] = [
   // it is not a GO, so it is deliberately NOT behind the admins gate.
   { method: "POST", operation: "adjust", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/candidates/(${UUID})/adjust$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/candidates/${m[2]}/adjust`, role: "operators", validate: validateAdjustRequest },
   { method: "POST", operation: "decision", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/decision$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/decision`, role: "admins" },
+  // Hands a cohort that already carries a durable GO to Warmbly's own queue.
+  // `admins`, like the GO it depends on: authorising the send and performing it
+  // are the same authority, and neither is `operators`. There is no candidate
+  // form of this route — a dispatch is of the whole authorised cohort or of
+  // nothing — and Warmbly caps the batch at ten whatever arrives here.
+  { method: "POST", operation: "dispatch", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/dispatch$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/dispatch`, role: "admins" },
 ];
 
 /** Exposed for tests and for the cockpit: the complete reachable surface. */

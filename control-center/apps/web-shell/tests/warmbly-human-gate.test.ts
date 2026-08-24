@@ -18,7 +18,7 @@ test("cohort table renders true denominators from Warmbly",()=>{
 });
 
 test("progressive review renders exact preview, validation and proportional confirmations",()=>{
-  const html=warmblyBlock({...input,query:"estado=todas"},"revisao");assert.match(html,/data-validation-status="VALID"/);assert.match(html,/Exact fixture subject/);assert.match(html,/Exact frozen fixture body/);assert.doesNotMatch(html,/data-human-gate="validate"/);assert.match(html,/APPROVE/);assert.match(html,/REJECT/);assert.match(html,/HOLD/);assert.match(html,/pattern="v3"/);assert.match(html,/GO não envia e-mail/);
+  const html=warmblyBlock({...input,query:"estado=todas"},"revisao");assert.match(html,/data-validation-status="VALID"/);assert.match(html,/Exact fixture subject/);assert.match(html,/Exact frozen fixture body/);assert.doesNotMatch(html,/data-human-gate="validate"/);assert.match(html,/APPROVE/);assert.match(html,/REJECT/);assert.match(html,/HOLD/);assert.match(html,/pattern="v3"/);assert.match(html,/GO autoriza e não envia/);
 });
 
 test("review renders every Warmbly validation state without inferring validity",()=>{

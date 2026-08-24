@@ -92,6 +92,24 @@ export interface GateReadback {
   detail: string;
 }
 
+/**
+ * What a bounded dispatch actually did, as Warmbly reported it.
+ *
+ * Every field is optional because an absent counter is not a zero: the operator
+ * must be able to tell "o servidor disse que zero foram bloqueados" from "o
+ * servidor não disse quantos foram bloqueados".
+ */
+export interface GateDispatchCounts {
+  attempted?: number;
+  accepted?: number;
+  failed?: number;
+  skippedDuplicate?: number;
+  blocked?: number;
+  maxDaily?: number;
+  killSwitchAvailable?: boolean;
+  failures?: readonly { mailbox: string; reason: string }[];
+}
+
 export interface AdapterWriteResult {
   ok: boolean;
   path: string;
@@ -154,6 +172,8 @@ export interface AdapterWriteResult {
   receiptId?: string;
   /** Field-level diff the server returned for an accepted adjust. */
   diff?: readonly GateDiffEntry[];
+  /** Counters Warmbly returned for an accepted cohort dispatch. */
+  dispatch?: GateDispatchCounts;
   /** Result of the GET readback performed after a definitive response. */
   readback?: GateReadback;
 }
@@ -212,6 +232,10 @@ export const WARMBLY_GATE_ACTIONS = [
   "review",
   "decide",
   "adjust",
+  // Hands an already-GO'd cohort to Warmbly's queue. It is not a send: Warmbly
+  // enqueues each member and its own worker delivers inside the send window,
+  // under the rolling-hour governor, with the kill switch still in front.
+  "dispatch",
 ] as const;
 export type WarmblyGateAction = (typeof WARMBLY_GATE_ACTIONS)[number];
 

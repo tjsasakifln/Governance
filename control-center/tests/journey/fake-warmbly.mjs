@@ -146,8 +146,64 @@ createServer((req, res) => {
       if (body.decision === "APPROVE" && c.validation?.status !== "VALID") {
         return send(res, 422, { code: "validation_not_valid", message: "APPROVE requires a current VALID validation" });
       }
-      c.review = { id: randomUUID(), decision: body.decision, reason: body.reason ?? "", effective: true, invalidated_by: [], actor_id: "00000000-0000-4000-8000-00000000000a", created_at: new Date(0).toISOString(), correlation_id: "corr-review", receipt: `receipt-review-${body.decision}` };
+      c.review = { id: randomUUID(), decision: body.decision, reason: body.reason ?? "", effective: body.decision === "APPROVE", invalidated_by: [], actor_id: "00000000-0000-4000-8000-00000000000a", created_at: new Date(0).toISOString(), correlation_id: "corr-review", receipt: `receipt-review-${body.decision}` };
       return send(res, 200, { data: v, receipt: c.review.receipt, correlation_id: "corr-review" });
+    }
+
+    // GO/NO-GO, so the journey can reach the state where a dispatch is offered.
+    const dec = p.match(/^\/v1\/confenge\/cohorts\/([0-9a-f-]+)\/decision$/);
+    if (req.method === "POST" && dec) {
+      const v = versions.get(dec[1]);
+      if (!v) return send(res, 404, { code: "not_found" });
+      if (body.confirmation !== `v${v.version}`) return send(res, 409, { code: "confirmation_mismatch", message: "confirmation must name the current version" });
+      // GO fails closed on anything still undecided, and on a cohort with
+      // nothing approved: an authority over zero sendable messages is not an
+      // authority. A candidate the founder held or rejected is decided.
+      const undecided = v.candidates.filter((c) => !c.review?.decision);
+      const approved = v.candidates.filter((c) => c.review?.decision === "APPROVE" && c.review?.effective === true);
+      if (body.decision === "GO" && undecided.length > 0) {
+        return send(res, 409, { code: "approval_missing_or_invalid", message: `${undecided.length} candidate(s) still undecided` });
+      }
+      if (body.decision === "GO" && approved.length === 0) {
+        return send(res, 409, { code: "approval_missing_or_invalid", message: "no effective APPROVE in this version" });
+      }
+      v.decision = { decision: body.decision, reason: body.reason ?? "", actor_id: "00000000-0000-4000-8000-00000000000a", receipt: `receipt-decision-${body.decision}` };
+      return send(res, 200, { data: v, receipt: v.decision.receipt, correlation_id: "corr-decision" });
+    }
+
+    // Bounded dispatch: hands the GO'd cohort to the queue. It never sends —
+    // exactly like the real one, which enqueues and lets the worker deliver.
+    const dis = p.match(/^\/v1\/confenge\/cohorts\/([0-9a-f-]+)\/dispatch$/);
+    if (req.method === "POST" && dis) {
+      const v = versions.get(dis[1]);
+      if (!v) return send(res, 404, { code: "not_found" });
+      if (v.decision?.decision !== "GO") return send(res, 409, { code: "cohort_grant_missing", message: "no bounded authority for this version" });
+      const eligible = v.candidates.filter((c) => c.review?.decision === "APPROVE" && c.review?.effective === true);
+      let attempted = 0;
+      let skipped = 0;
+      for (const c of eligible) {
+        if (c.queued_at) { skipped += 1; continue; }
+        c.queued_at = "2026-08-23T18:30:00Z";
+        attempted += 1;
+      }
+      return send(res, 200, {
+        data: {
+          authorization_id: "00000000-0000-4000-8000-0000000000a1",
+          cohort_id: v.cohort_id,
+          attempted,
+          provider_accepted: attempted,
+          failed: 0,
+          skipped_duplicate: skipped,
+          blocked: 0,
+          real_email_sent: false,
+          auto_send_enabled: false,
+          green_autorun_enabled: false,
+          kill_switch_available: true,
+          max_daily: 10,
+        },
+        receipt: "receipt-dispatch-1",
+        correlation_id: "corr-dispatch",
+      });
     }
 
     const adj = p.match(/^\/v1\/confenge\/cohorts\/([0-9a-f-]+)\/candidates\/([0-9a-f-]+)\/adjust$/);

@@ -637,7 +637,12 @@ function bindWarmblyHumanGate(
         // to the trail: actor, instant, version, frozen hash and recipient are
         // all recorded already.
         ...(isApprove ? { acknowledged: true } : {}),
-        ...((raw === "decide" || raw === "adjust") && confirmation ? { confirmation } : {}),
+        // GO, adjust and dispatch each cost a typed version confirmation. The
+        // adapter refuses all three before the wire without it, so a missing
+        // one here would be a refusal the operator never asked for.
+        ...((raw === "decide" || raw === "adjust" || raw === "dispatch") && confirmation
+          ? { confirmation }
+          : {}),
         ...(raw === "adjust"
           ? {
               subject: form.querySelector('[name="subject"]')?.value ?? "",
@@ -1191,6 +1196,23 @@ async function gateReadback(
         : {
             status: "not_confirmed",
             detail: `O servidor ainda registra "${String(recorded ?? "nada")}" como decisão final.`,
+          };
+    }
+    case "dispatch": {
+      // There is nothing on the cohort resource that proves a queue depth, so
+      // this readback deliberately does not claim one. What it can say is that
+      // the version still reads GO — i.e. the authority the dispatch consumed
+      // is the one the operator was looking at. The counters Warmbly returned
+      // are the evidence of what was queued, and they are rendered verbatim.
+      const recorded = gateRecord(cohort.decision).decision;
+      return recorded === "GO"
+        ? {
+            status: "confirmed",
+            detail: "O servidor devolve esta versão ainda com GO registrado; os números enfileirados vêm da resposta do disparo.",
+          }
+        : {
+            status: "not_confirmed",
+            detail: `O servidor registra "${String(recorded ?? "nada")}" como decisão final desta versão, não GO.`,
           };
     }
     case "validate": {

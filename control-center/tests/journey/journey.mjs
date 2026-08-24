@@ -44,6 +44,8 @@ async function loadChromium() {
 const chromium = await loadChromium();
 
 const BASE = process.argv[2];
+// Same stack, forward-auth identity carrying `admins`. GO and dispatch live there.
+const ADMIN_BASE = process.argv[3] ?? BASE;
 const exe = process.env.CC_CHROMIUM ?? (process.env.HOME + "/.cache/ms-playwright/chromium-1237/chrome-linux64/chrome");
 
 const results = [];
@@ -275,6 +277,110 @@ await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(1000);
 check("a reload keeps the same resource", page.url() === before, page.url().split("#")[1] || "");
 
+// ---- 11b. On the new version: decide everything, GO, then hand it to the queue
+//
+// This is where the founder actually ends. v2 was frozen with every validation
+// reset, so approving here also exercises the auto-verification path, and the
+// one recipient that never verifies has to be held by hand before GO is
+// possible at all. GO and dispatch are admins-only, so this runs against the
+// forward-auth identity that carries that group — and the operators-only page
+// is checked first, to prove the refusal is real and not merely cosmetic.
+if (adjusted) {
+  const v2 = (page.url().split("resource=")[1] || "").slice(0, 36);
+
+  // The operators-only identity must not be able to decide or dispatch.
+  check("an operators-only session cannot register GO", 
+    await page.locator("form[data-human-gate='decide'] button[disabled]").count() > 0);
+  check("and is told which group it is missing",
+    await page.locator("[data-go-authority='absent']").count() > 0);
+
+  const admin = await newPage();
+  await admin.goto(`${ADMIN_BASE}/#/warmbly/revisao?resource=${v2}&estado=todas`, { waitUntil: "networkidle" });
+  await admin.waitForTimeout(1400);
+  const title = await admin.locator("#review-title").innerText().catch(() => "");
+  check("the admins session opens the same version", /v2/i.test(title), title);
+
+  // Approve everything except the mailbox the stand-in refuses to verify.
+  // Always taking `.first()` would spend every round re-clicking that one: its
+  // approval correctly stops before APPROVE, so it never leaves the queue.
+  for (let round = 0; round < 6; round += 1) {
+    const btn = admin
+      .locator("[data-candidate-id]")
+      .filter({ hasNotText: "empresa-quatro" })
+      .locator("[data-approve-submit]:not([disabled])")
+      .first();
+    if (await btn.count() === 0) break;
+    await btn.click();
+    await admin.waitForTimeout(2200);
+  }
+  const stillPending = await admin.locator("[data-queue-pending]").first().getAttribute("data-queue-pending");
+  check("approving drains v2 down to the recipient that cannot be verified", stillPending === "1",
+    `${stillPending} pending`);
+
+  // The stubborn one is held by hand, with a written motive.
+  // Scoped to the card that is actually stuck. `.first()` on the whole page
+  // would land on an already-approved candidate and flip it out of Aprovadas —
+  // which is exactly what it did the first time this journey ran.
+  const hold = admin
+    .locator("[data-candidate-id]")
+    .filter({ hasText: "empresa-quatro" })
+    .locator("form[data-human-gate='review'][data-gate-key$=':HOLD_REJECT']")
+    .first();
+  if (await hold.count() > 0) {
+    await hold.locator("[name='reason']").first().fill("verificacao do destinatario nao conclui nesta caixa");
+    await hold.locator("button[type=submit]").first().click();
+    await admin.waitForTimeout(2000);
+  }
+  const progress2 = await admin.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
+  check("nothing is left pending on v2", /0 pendente/.test(progress2), progress2.replace(/\s+/g, " "));
+
+  // Dispatch must not be on the page before GO.
+  check("no dispatch control exists before GO", await admin.locator("form[data-human-gate='dispatch']").count() === 0);
+  check("and the page says why", await admin.locator("[data-dispatch-gate='no-go']").count() > 0);
+
+  // GO.
+  const go = admin.locator("form[data-human-gate='decide']").first();
+  await go.locator("select[name='decision']").selectOption("GO");
+  await go.locator("[name='reason']").first().fill("cohort revisada e aprovada pelo fundador");
+  await go.locator("[name='confirmation']").first().fill("v2");
+  await go.locator("button[type=submit]").first().click();
+  await admin.waitForTimeout(2200);
+  const goOutcome = await admin.locator("[data-write-result]").first().innerText().catch(() => "");
+  check("GO is registered on the version", /EXECUTADA/.test(goOutcome), goOutcome.replace(/\s+/g, " ").slice(0, 70));
+
+  // Only now does the dispatch control exist.
+  const dispatchForm = admin.locator("form[data-human-gate='dispatch']");
+  const hasDispatch = await dispatchForm.count() === 1;
+  check("the dispatch control appears only after GO", hasDispatch);
+  if (!hasDispatch) { await admin.close(); throw new Error("dispatch control absent after GO"); }
+  check("it states that it queues and does not send",
+    (await admin.locator("[data-dispatch-meaning]").first().innerText().catch(() => "")).includes("não envia e-mail"));
+  check("it names the gates Warmbly still enforces",
+    (await admin.locator("[data-dispatch-gates]").first().innerText().catch(() => "")).includes("kill switch"));
+
+  // The cohort reaches the queue only with the typed version.
+  await dispatchForm.locator("[name='confirmation']").first().fill("v2");
+  await dispatchForm.locator("button[type=submit]").first().click();
+  await admin.waitForTimeout(2600);
+  const counts = await admin.locator("[data-dispatch-counts]").first().innerText().catch(() => "");
+  check("the cohort reached the queue and the numbers come from the server",
+    /Tentados/.test(counts) && /Aceitos pelo provedor/.test(counts), counts.replace(/\s+/g, " ").slice(0, 90));
+  check("the outcome says queued, not delivered",
+    (await admin.locator("[data-dispatch-not-sent]").first().innerText().catch(() => "")).includes("não de entrega"));
+  check("the dispatch carried a receipt",
+    /receipt|recibo/i.test(await admin.locator("[data-write-evidence]").first().innerText().catch(() => "")));
+
+  // Repeating is safe, and the server is what says so.
+  await admin.locator("form[data-human-gate='dispatch'] [name='confirmation']").first().fill("v2");
+  await admin.locator("form[data-human-gate='dispatch'] button[type=submit]").first().click();
+  await admin.waitForTimeout(2600);
+  const again = await admin.locator("[data-dispatch-counts]").first().innerText().catch(() => "");
+  const dup = (again.match(/Pulados por duplicidade\s*(\d+)/) || [])[1];
+  check("a repeated dispatch queues nothing new and counts the duplicates", dup !== undefined && Number(dup) > 0,
+    again.replace(/\s+/g, " ").slice(0, 90));
+  await admin.close();
+}
+
 // ---- 12b. A reload of the reviewed version never resurrects an approval
 //
 // The optimistic marks die with the page, so what is asserted here is the
@@ -314,10 +420,16 @@ await reviewed.close();
 
 // ---- 13. A second tab sees the same server truth
 const tab2 = await newPage();
-await tab2.goto(before, { waitUntil: "networkidle" });
+// Explicitly the "todas" recorte: by now every candidate of this version is
+// decided, so the default Pendentes is legitimately empty and counting cards
+// there would measure the filter, not the second tab's view of server truth.
+await tab2.goto(`${before}${before.includes("?") ? "&" : "?"}estado=todas`, { waitUntil: "networkidle" });
 await tab2.waitForTimeout(1200);
 check("a second tab renders the same cohort", (await tab2.locator("[data-adjust-editor]").count()) === 5,
   `${await tab2.locator("[data-adjust-editor]").count()} candidates in tab 2`);
+const tab2Progress = await tab2.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
+check("and the second tab reads the same decisions from the server",
+  /0 pendente/.test(tab2Progress) && /4 aprovada/.test(tab2Progress), tab2Progress.replace(/\s+/g, " "));
 
 // ---- 14. Console / network hygiene
 check("no application errors in the browser console", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
