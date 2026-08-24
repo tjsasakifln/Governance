@@ -22,6 +22,7 @@ import {
   queueFocusDomId,
   queueFocusToken,
 } from "./lead-detail";
+import { editorialReasonLabel, readEditorialState } from "./editorial-state";
 import { renderFilteredList } from "./list";
 import { provenanceBlock } from "./provenance";
 import {
@@ -960,6 +961,165 @@ function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean):
   </article>`;
 }
 
+/* ------------------------------------------------------------------ */
+/* Revisão editorial (Comercial -> Rascunhos)                          */
+/* ------------------------------------------------------------------ */
+
+/** Dado que não chegou. Não é vazio nem zero. */
+const REVIEW_ABSENT = "ausente";
+/** Campo que o servidor desta versão simplesmente não reporta. */
+const REVIEW_UNREPORTED = "não informado";
+
+const EDITORIAL_STATE_LABELS: Record<string, string> = {
+  CURRENT: "atual",
+  LEGACY_SUPERSEDED: "histórico, substituído",
+};
+
+const EDITORIAL_LEGACY_NOTICE =
+  "Rascunho histórico: uma versão mais recente o substituiu. Fica visível para auditoria e não aceita decisão.";
+
+function reviewText(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function reviewList(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const parts = value
+    .map((entry) => reviewText(entry))
+    .filter((entry): entry is string => entry !== null);
+  return parts.length === 0 ? null : parts.join(", ");
+}
+
+/** Fato de leitura. Ausência vira palavra explícita, nunca campo escondido. */
+function reviewFact(label: string, value: string | null, absentWord = REVIEW_ABSENT, extra = ""): string {
+  return value === null
+    ? fact(label, escapeHtml(absentWord), ` data-absent="true"`)
+    : fact(label, escapeHtml(value), extra);
+}
+
+/** Rótulo em português com o token cru ao lado. Código sem tradução sai uma vez só. */
+function reviewCode(raw: string, label: string): string {
+  return label === raw ? raw : `${label} (${raw})`;
+}
+
+function reviewRouteClass(raw: string | null): string | null {
+  return raw === null ? null : reviewCode(raw, routeClassLabel(raw));
+}
+
+/** Motivos do estado editorial em português, sem perder o código original. */
+function reviewReasonCodes(codes: readonly string[]): string {
+  if (codes.length === 0) return "nenhum";
+  return codes.map((code) => reviewCode(code, editorialReasonLabel(code))).join("; ");
+}
+
+function reviewProvenance(row: Record<string, unknown>): string | null {
+  const evidence = reviewList(row.evidence_ids);
+  const source = reviewText(row.fact_source);
+  if (evidence === null && source === null) return null;
+  return `${evidence ?? "sem identificador de evidência"} (origem: ${source ?? REVIEW_UNREPORTED})`;
+}
+
+function reviewComposer(row: Record<string, unknown>): string | null {
+  const composer = reviewText(row.composer_version);
+  const prompt = reviewText(row.prompt_version);
+  if (composer === null && prompt === null) return null;
+  return `${composer ?? REVIEW_UNREPORTED} (prompt: ${prompt ?? REVIEW_UNREPORTED})`;
+}
+
+function reviewTargetFit(value: unknown): string | null {
+  const fit = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  if (!fit) return null;
+  const state = reviewText(fit.state);
+  const reason = reviewText(fit.reason);
+  const asOf = reviewText(fit.as_of);
+  const knownFresh = typeof fit.fresh === "boolean";
+  if (state === null && asOf === null && reason === null && !knownFresh) return null;
+  const freshness = knownFresh
+    ? (fit.fresh === true ? "leitura atual" : "leitura desatualizada")
+    : "frescor não informado";
+  const parts = [freshness, `apurado em ${asOf ?? REVIEW_UNREPORTED}`];
+  if (reason !== null) parts.push(reason);
+  return `${state ?? REVIEW_UNREPORTED} (${parts.join("; ")})`;
+}
+
+/**
+ * Altura pelo conteúdo: o fundador lê assunto e corpo inteiros na lista, sem
+ * abrir nada. Os campos continuam editáveis quando a decisão é permitida.
+ */
+function reviewRows(text: string, min: number, max: number): number {
+  const lines = text
+    .split("\n")
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 78)), 0);
+  return Math.min(max, Math.max(min, lines + 1));
+}
+
+function reviewDraftCard(item: unknown): string {
+  const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const account = row.account && typeof row.account === "object" ? (row.account as Record<string, unknown>) : {};
+  const id = String(row.id ?? "");
+  const contentHash = String(row.content_hash ?? "");
+  const subject = String(row.subject ?? "");
+  const bodyText = String(row.body_text ?? "");
+  const rawEditorialState = reviewText(row.editorial_state);
+  // Estado e acionabilidade vêm da leitura compartilhada; a regra não se repete aqui.
+  const editorial = readEditorialState({ ...row, actionable: row.editorial_actionable });
+  const actionable = editorial.actionable;
+  const editorialReading = rawEditorialState === null
+    ? "atual (não informado pelo servidor, tratado como atual)"
+    : ownMapValue(EDITORIAL_STATE_LABELS, rawEditorialState) ?? rawEditorialState;
+  const composerVersion = reviewText(row.composer_version);
+  const notice = reviewText(editorial.notice) ?? EDITORIAL_LEGACY_NOTICE;
+  const routeClass = reviewText(row.route_class);
+  const routeClassAttr = routeClass === null ? "" : ` data-route-class="${escapeHtml(routeClass)}"`;
+  const reasonAttr = editorial.reasonCodes.length === 0
+    ? ""
+    : ` data-reason-codes="${escapeHtml(editorial.reasonCodes.join(" "))}"`;
+  const subjectRows = reviewRows(subject, 2, 4);
+  const bodyRows = reviewRows(bodyText, 12, 40);
+  const contextFacts = `<dl class="facts" data-review-context="${escapeHtml(id)}">
+                ${reviewFact("Fato observado", reviewText(row.fact_used))}
+                ${reviewFact("Proveniência", reviewProvenance(row))}
+                ${reviewFact("Classe de rota", reviewRouteClass(routeClass), REVIEW_UNREPORTED, routeClassAttr)}
+                ${reviewFact("Target fit", reviewTargetFit(row.target_fit), REVIEW_UNREPORTED)}
+                ${reviewFact("Composer", reviewComposer(row), REVIEW_UNREPORTED)}
+                ${reviewFact("Content hash", reviewText(row.content_hash))}
+                ${reviewFact("Estado editorial", editorialReading)}
+                ${reviewFact("Reason codes", reviewReasonCodes(editorial.reasonCodes), REVIEW_ABSENT, reasonAttr)}
+              </dl>`;
+  const decision = actionable
+    ? `<form data-review-form="${escapeHtml(id)}" class="operator-form">
+                <input type="hidden" name="expected_content_hash" value="${escapeHtml(contentHash)}" />
+                <label>Assunto <textarea name="subject" rows="${subjectRows}">${escapeHtml(subject)}</textarea></label>
+                <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(bodyText)}</textarea></label>
+                <label>Decisão <select name="action">
+                  <option value="SAVE_ADJUSTMENT">Salvar ajuste</option>
+                  <option value="APPROVE">Aprovar e agendar</option>
+                  <option value="REJECT">Rejeitar e reescrever</option>
+                </select></label>
+                <label>Motivo da rejeição <textarea name="reason"></textarea></label>
+                <label>Caixa genérica/departamental <select name="generic_ack"><option value="false">não confirmar</option><option value="true">confirmo conscientemente</option></select></label>
+                <button type="submit">Registrar decisão</button>
+              </form>`
+    : `<div class="operator-form review-readonly" data-review-readonly="${escapeHtml(id)}">
+                <label>Assunto <textarea name="subject" rows="${subjectRows}" readonly>${escapeHtml(subject)}</textarea></label>
+                <label>Corpo <textarea name="body_text" rows="${bodyRows}" readonly>${escapeHtml(bodyText)}</textarea></label>
+              </div>`;
+  return `<article class="card review-draft" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}" data-editorial-state="${escapeHtml(editorial.state)}" data-editorial-actionable="${actionable ? "true" : "false"}" data-composer-version="${escapeHtml(composerVersion ?? "")}">
+              <p class="kicker">${escapeHtml(String(row.state ?? ""))} · ${escapeHtml(String(row.purpose ?? ""))} · toque ${escapeHtml(String(row.ordinal ?? ""))}</p>
+              <h3>${escapeHtml(String(account.nome_fantasia ?? account.razao_social ?? row.account_id ?? "Lead"))}</h3>
+              <p>Destinatário: ${escapeHtml(String(row.recipient ?? "ausente"))}</p>
+              <p>Razão: ${escapeHtml(String(row.stop_reason ?? row.generation_error ?? "pronto para revisão"))}</p>
+              ${actionable ? "" : `<p class="banner stale" role="note" data-editorial-notice="true">${escapeHtml(notice)}</p>`}
+              ${contextFacts}
+              ${decision}
+            </article>`;
+}
+
 function commercialOps(
   snapshot: CommercialSnapshot,
   surface: string | null,
@@ -988,31 +1148,7 @@ function commercialOps(
       <p class="constraint">Aprovar vincula o hash exato e agenda a próxima janela útil. Nenhum botão envia imediatamente.</p>
       <div class="stack">${reviewDrafts.length === 0
         ? `<p class="banner empty">Nenhum rascunho aguardando revisão.</p>`
-        : reviewDrafts.map((item) => {
-            const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-            const account = row.account && typeof row.account === "object" ? (row.account as Record<string, unknown>) : {};
-            const id = String(row.id ?? "");
-            const hash = String(row.content_hash ?? "");
-            return `<article class="card review-draft" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}">
-              <p class="kicker">${escapeHtml(String(row.state ?? ""))} · ${escapeHtml(String(row.purpose ?? ""))} · toque ${escapeHtml(String(row.ordinal ?? ""))}</p>
-              <h3>${escapeHtml(String(account.nome_fantasia ?? account.razao_social ?? row.account_id ?? "Lead"))}</h3>
-              <p>Destinatário: ${escapeHtml(String(row.recipient ?? "ausente"))}</p>
-              <p>Razão: ${escapeHtml(String(row.stop_reason ?? row.generation_error ?? "pronto para revisão"))}</p>
-              <form data-review-form="${escapeHtml(id)}" class="operator-form">
-                <input type="hidden" name="expected_content_hash" value="${escapeHtml(hash)}" />
-                <label>Assunto <textarea name="subject">${escapeHtml(String(row.subject ?? ""))}</textarea></label>
-                <label>Corpo <textarea name="body_text">${escapeHtml(String(row.body_text ?? ""))}</textarea></label>
-                <label>Decisão <select name="action">
-                  <option value="SAVE_ADJUSTMENT">Salvar ajuste</option>
-                  <option value="APPROVE">Aprovar e agendar</option>
-                  <option value="REJECT">Rejeitar e reescrever</option>
-                </select></label>
-                <label>Motivo da rejeição <textarea name="reason"></textarea></label>
-                <label>Caixa genérica/departamental <select name="generic_ack"><option value="false">não confirmar</option><option value="true">confirmo conscientemente</option></select></label>
-                <button type="submit">Registrar decisão</button>
-              </form>
-            </article>`;
-          }).join("")}</div>
+        : reviewDrafts.map((item) => reviewDraftCard(item)).join("")}</div>
     </section>`;
   } else if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];

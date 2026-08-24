@@ -1114,3 +1114,193 @@ test("the operation cockpit reads the gate too, because its stepper has to know 
   );
 });
 
+
+/* ------------------------------------------------------------------ *
+ * 12. Legacy copy is history, not an offer.
+ *
+ * A founder opened a version composed by a superseded composer and found
+ * defective copy presented exactly like current copy, with APPROVE, adjust and
+ * GO beside it. Nothing on the screen said the text was historical. These
+ * tests pin the fix: the version stays fully readable for audit, and every
+ * decision affordance stops being emitted at all.
+ * ------------------------------------------------------------------ */
+
+const LEGACY_NOTICE =
+  "Esta versão foi congelada por um redator que não é mais o vigente e por isso não pode ser enviada.";
+
+function legacyCohort(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return cohort({
+    editorial_state: "LEGACY_SUPERSEDED",
+    actionable: false,
+    editorial_reason_codes: ["composer_superseded"],
+    editorial_notice: LEGACY_NOTICE,
+    is_current_version: false,
+    current_version: 3,
+    current_version_id: NEXT_COHORT_ID,
+    candidates: [
+      candidate({
+        editorial_state: "LEGACY_SUPERSEDED",
+        actionable: false,
+        editorial_reason_codes: ["composer_superseded"],
+      }),
+    ],
+    ...overrides,
+  });
+}
+
+function legacyInput(overrides: Record<string, unknown> = {}): Parameters<typeof warmblyBlock>[0] {
+  return surfaceInput({ gate: gatePayload(["operators", "admins"], legacyCohort(overrides)) });
+}
+
+test("a historical version says so at the top, in plain Portuguese, with the reason", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  assert.match(html, /data-legacy-banner="true"/);
+  assert.match(html, /data-review-cohort="[^"]*" data-editorial-state="LEGACY_SUPERSEDED"/);
+  assert.match(html, /data-actionable="false"/);
+  assert.ok(html.includes("Versão histórica. Não enviar."), "the banner must name the state plainly");
+  assert.ok(
+    html.includes("composta por um redator anterior ao vigente"),
+    "composer_superseded must be translated, not shown as a raw code",
+  );
+  assert.ok(html.includes(LEGACY_NOTICE), "the server's own notice must be rendered");
+});
+
+test("every editorial reason code has a Portuguese sentence, and an unknown one is shown verbatim", () => {
+  reset();
+  const html = warmblyBlock(
+    legacyInput({
+      editorial_reason_codes: ["composer_unstamped", "policy_superseded", "motivo_desconhecido"],
+    }),
+    "revisao",
+  );
+  assert.ok(html.includes("sem carimbo de redator"));
+  assert.ok(html.includes("criada sob uma policy anterior"));
+  assert.ok(html.includes("motivo_desconhecido"), "an unknown code must not be silently dropped");
+});
+
+test("the historical banner offers the current version as its primary way out", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  const link = html.match(/<a class="button" data-open-current="true" href="([^"]+)">([^<]+)<\/a>/);
+  assert.ok(link, "the escape hatch link must exist");
+  assert.equal(link[1], `#/warmbly/revisao?resource=${NEXT_COHORT_ID}`);
+  assert.equal(link[2], "Abrir versão corrente");
+  assert.ok(html.includes("v3"), "the current version number travels with the link");
+});
+
+test("without a current_version_id the banner says so instead of inventing a link", () => {
+  reset();
+  const html = warmblyBlock(legacyInput({ current_version_id: undefined, current_version: undefined }), "revisao");
+  assert.match(html, /data-legacy-banner="true"/);
+  assert.doesNotMatch(html, /data-open-current="true"/);
+  assert.match(html, /data-open-current="absent"/);
+});
+
+test("a historical version emits no approve, hold, validate, adjust, reproduce or GO markup at all", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  for (const gate of ["validate", "review", "adjust", "reproduce", "decide"]) {
+    assert.doesNotMatch(
+      html,
+      new RegExp(`data-human-gate="${gate}"`),
+      `${gate} must not be rendered on a historical version, not even disabled`,
+    );
+  }
+  assert.doesNotMatch(html, /data-adjust-editor=/);
+  assert.doesNotMatch(html, /Registrar APPROVE|Registrar HOLD\/REJECT|Registrar GO\/NO-GO/);
+  assert.match(html, /data-non-actionable-notice="true"/);
+  assert.match(html, /data-non-actionable-surface="true"/);
+});
+
+test("a historical version stays fully readable: message, CTA, facts and hashes all render", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  assert.match(html, /data-exact-body="true">Corpo exato congelado/);
+  assert.match(html, /data-exact-subject="true"[^>]*><strong>Assunto:<\/strong> Assunto exato congelado/);
+  assert.match(html, /data-cta="true"/);
+  assert.match(html, /compras@empresa\.invalid/);
+  for (const label of ["Content hash", "Frozen hash", "Policy version", "Composer version", "Estado editorial"]) {
+    assert.ok(html.includes(label), `${label} must survive on a historical version`);
+  }
+  assert.ok(html.includes("Versão histórica (não enviável)"));
+});
+
+test("the frozen message never claims to be current when it is not", () => {
+  reset();
+  const historical = warmblyBlock(legacyInput(), "revisao");
+  assert.ok(historical.includes("Mensagem exata congelada (assunto e corpo). Versão histórica, não enviar."));
+  const current = warmblyBlock(surfaceInput(), "revisao");
+  assert.ok(current.includes("Mensagem exata congelada (assunto e corpo). Versão corrente."));
+  for (const html of [historical, current]) {
+    assert.doesNotMatch(
+      html,
+      /Mensagem exata congelada \(assunto e corpo\)<\/summary>/,
+      "the bare label that told the operator nothing must be gone",
+    );
+  }
+});
+
+test("a historical card is marked as such and carries a non-actionable chip", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  assert.match(html, /<article class="card" data-candidate-id="[^"]*" data-editorial-state="LEGACY_SUPERSEDED"/);
+  assert.match(html, /data-non-actionable="true"/);
+  assert.match(html, /data-approve-allowed="false"/);
+});
+
+test("a current version keeps every control exactly as before", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  for (const gate of ["validate", "review", "adjust", "reproduce", "decide"]) {
+    assert.match(html, new RegExp(`data-human-gate="${gate}"`), `${gate} must still be offered on a current version`);
+  }
+  assert.match(html, /data-review-cohort="[^"]*" data-editorial-state="CURRENT" data-actionable="true"/);
+  assert.doesNotMatch(html, /data-legacy-banner="true"/);
+  assert.doesNotMatch(html, /data-non-actionable-notice="true"/);
+  assert.doesNotMatch(html, /data-non-actionable-surface="true"/);
+});
+
+test("an absent editorial_state is an older backend, not a historical version", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  assert.match(html, /data-editorial-state="CURRENT"/);
+  assert.doesNotMatch(html, /data-legacy-banner="true"/);
+  assert.match(html, /data-human-gate="decide"/);
+  assert.match(html, /data-human-gate="review"/);
+});
+
+test("actionable:false alone is enough to withdraw the controls", () => {
+  reset();
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], cohort({ actionable: false })) }),
+    "revisao",
+  );
+  assert.match(html, /data-legacy-banner="true"/);
+  assert.doesNotMatch(html, /data-human-gate="decide"/);
+});
+
+test("a non-actionable candidate loses its controls even inside a current version", () => {
+  reset();
+  const html = warmblyBlock(
+    surfaceInput({
+      gate: gatePayload(
+        ["operators", "admins"],
+        cohort({
+          candidates: [
+            candidate({
+              editorial_state: "LEGACY_SUPERSEDED",
+              editorial_reason_codes: ["composer_unstamped"],
+            }),
+          ],
+        }),
+      ),
+    }),
+    "revisao",
+  );
+  assert.match(html, /data-editorial-state="LEGACY_SUPERSEDED"/, "the card carries the candidate's own state");
+  assert.doesNotMatch(html, /data-human-gate="review"/);
+  assert.doesNotMatch(html, /data-adjust-editor=/);
+  assert.match(html, /data-human-gate="decide"/, "the version itself is still decidable");
+  assert.ok(html.includes("sem carimbo de redator"));
+});
