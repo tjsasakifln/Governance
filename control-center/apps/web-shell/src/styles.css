@@ -206,6 +206,19 @@ a {
   background: var(--bg-card);
 }
 
+/*
+ * The queue's own recortes, inside the progress card.
+ *
+ * Deliberately not sticky: the Warmbly subnav already owns the top of the
+ * viewport, and two sticky rows stacked over the message being reviewed is the
+ * message losing to its own chrome on a phone.
+ */
+.subnav.queue-filters {
+  position: static;
+  margin: 0.5rem 0 0.2rem;
+  padding: 0;
+}
+
 .operator-form {
   display: grid;
   gap: 0.45rem;
@@ -1360,4 +1373,28 @@ button[data-toggle-messages] {
   color: var(--fg);
   font: inherit;
   text-decoration: none;
+}
+
+/*
+ * The single action of the happy path, told apart from the exception controls
+ * around it. A reviewer scanning a card must not have to read four identical
+ * buttons to find the one that means "aprovar".
+ */
+.approve-form button[data-approve-submit] {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.approve-form button[data-approve-submit][disabled] {
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-weight: 400;
+}
+
+/* The optional comment is optional-looking: closed, quiet, out of the path. */
+.approve-form [data-approve-comment] > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  opacity: 0.8;
 }

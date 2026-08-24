@@ -33,6 +33,39 @@ O `resource` viaja na subnav: abrir “Revisão” a partir de “Cohorts” **n
 versão selecionada, e uma Revisão sem `resource` oferece a lista de versões em vez
 de uma página vazia.
 
+#### Revisão é uma fila de decisões, não um formulário
+
+`#/warmbly/revisao` abre no recorte **Pendentes** (`?estado=pendentes`, que é o
+padrão e por isso não aparece na URL) e diz quanto falta:
+`N pendentes · N aprovadas · N em ajuste · N no total`. Os recortes
+`aprovadas`, `ajuste` e `todas` continuam legíveis e preservam `resource` e o
+estado de expansão das mensagens.
+
+No caminho feliz, **uma mensagem válida é aprovada com uma única ação**: sem
+motivo digitado, sem caixa de ciência e sem acionar a verificação do destinatário
+antes. O clique em Aprovar é a ciência e viaja como `acknowledged=true`; um
+APPROVE sem comentário registra `approved_by_human_reviewer` e o comentário
+opcional vence esse padrão. Quando o candidato não tem validação vigente, a
+própria aprovação pede a verificação ao Warmbly, relê o estado e só registra o
+APPROVE se ele voltar `VALID` — caso contrário nada é decidido e a tela diz o
+estado observado.
+
+A aprovação sai da fila na hora (otimista) e volta para ela em qualquer desfecho
+que não seja aplicação confirmada: recusa, falha, desconhecido, ou releitura que
+não confirma o efeito. Nada disso é durável — um reload lê a fila do servidor.
+
+APPROVE continua bloqueado onde verificar de novo não resolve: sem destinatário,
+destinatário que não é endereço, veredito já resolvido como `INVALID`/`RISKY`, e
+bloqueios materiais declarados pelo servidor (`hard_bounce`, suppression,
+opt-out, duplicidade, copy QA, proveniência ausente). HOLD e REJECT continuam
+exigindo motivo escrito, e o controle “Verificar o destinatário agora” continua
+disponível como escape — só não é mais pré-requisito, e só aparece onde a
+validação não é VALID.
+
+Teclado: `A` aprova o card que já está sob o foco (nunca outro), `Ctrl/Cmd+Enter`
+aprova a primeira pendência. Nenhum dos dois dispara com o cursor dentro de um
+campo de texto — o editor de ajuste vive na mesma página.
+
 `#/comercial/cohorts` (“Comercial → Coortes”) é **outra coisa**: são coortes de
 aquisição e métricas por período. Nenhum runbook do gate humano deve apontar para
 lá — o caminho correto é **Operação Warmbly → Cohorts**. Pausar, retomar e

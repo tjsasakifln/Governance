@@ -11,8 +11,8 @@ account × trigger × offer × decision-unit × route
   -- Warmbly seleciona uma rota preferida e explica exclusões -->
 cohort/version imutável
   -- leitura autenticada --> candidate + preview exato congelado
-  -- escrita idempotente --> validation vinculada à evidência
-  -- escrita humana --> APPROVE | REJECT | HOLD por candidate
+  -- escrita idempotente, disparada pela própria aprovação --> validation
+  -- escrita humana, uma ação --> APPROVE | REJECT | HOLD por candidate
   -- escrita humana de maior privilégio --> GO | NO_GO da versão
   -- somente se GO e todos os gates ao vivo continuarem válidos --> queue
   -- fora do Control Center e desabilitado por padrão --> send
@@ -23,7 +23,7 @@ cohort/version imutável
 | Account/trigger/offer/decision-unit/route | Warmbly + feed canônico | origem, `as_of`, freshness, policy e motivos | nenhuma no frontend | não |
 | Cohort/version | Warmbly | lista, denominadores e relatório de exclusões | criar/reproduzir uma versão imutável, com idempotency key | não |
 | Candidate/preview | snapshot congelado Warmbly | destinatário, provenance, rota, assunto e corpo exatos | nenhuma mutação da mensagem | não |
-| Validation | verificador do Warmbly | VALID/RISKY/INVALID/UNKNOWN/STALE, motivo e validade | solicitar/repetir validação | não |
+| Validation | verificador do Warmbly | VALID/RISKY/INVALID/UNKNOWN/STALE, motivo e validade | solicitar/repetir validação — a aprovação a solicita sozinha quando não há uma vigente | não |
 | Review decision | Warmbly | decisão atual, vínculo e invalidações | APPROVE/REJECT/HOLD com ator Authelia e motivo | não |
 | Cohort decision | Warmbly | prontidão e todos os bloqueios | GO/NO_GO sobre uma versão exata | não |
 | Queue | Warmbly | estado de autorização/preflight/queue | GO materializa somente a autorização exata; Warmbly ainda revalida todos os gates antes da queue | não |
@@ -33,6 +33,26 @@ cohort/version imutável
 
 - O frontend exibe elegibilidade e motivos recebidos do contrato versionado; não
   calcula, completa ou corrige candidatos localmente.
+- A aprovação é uma única ação humana e o Control Center paga o custo técnico
+  dela: quando não há validation vigente, APPROVE dispara a validation, relê o
+  estado no servidor e só registra a decisão se ele devolver VALID. A ordem é
+  sempre validation → releitura → review; um estado que não é VALID interrompe a
+  cadeia sem tentar o APPROVE. Nada disso afrouxa o gate — apenas retira do
+  humano um passo que é determinístico.
+- APPROVE é bloqueado na tela somente onde repetir a verificação não pode ajudar:
+  ausência de destinatário, destinatário sintaticamente inválido, veredito já
+  resolvido como INVALID ou RISKY, e bloqueios materiais que o próprio servidor
+  declarou (`hard_bounce`, suppression, opt-out, duplicidade, copy QA,
+  proveniência ausente). Toda essa classificação lê `validation.status` e
+  `blocked_by` do payload; nenhuma vem de relógio ou heurística local.
+- A ciência do revisor é o próprio clique em Aprovar, e continua viajando como
+  `acknowledged=true`. O adaptador recusa antes do fio qualquer APPROVE sem esse
+  campo, então a remoção da caixa de seleção não abriu caminho de bypass: mudou
+  quem informa o campo, não se ele é exigido.
+- Uma aprovação registrada localmente sai da fila de pendências na hora, e
+  volta para ela em qualquer desfecho que não seja aplicação confirmada —
+  recusa, falha, desconhecido, ou releitura que não confirma o efeito. Nenhuma
+  decisão local sobrevive a um reload: a fila é do servidor.
 - Cada APPROVE fica ligado aos hashes de recipient, content, policy e evidence e
   à expiração da validation. Qualquer drift ou expiração torna a aprovação
   inválida sem apagar a decisão humana original.
@@ -59,9 +79,14 @@ cohort/version imutável
 
 ## Falhas e concorrência
 
-- POSTs exigem `Idempotency-Key`; acknowledgement e confirmação de versão fazem
-  parte da intenção; retry, duas abas e restart devolvem o mesmo
-  receipt, ou 409 se a chave for reutilizada com payload diferente.
+- POSTs exigem `Idempotency-Key`; acknowledgement, motivo e confirmação de versão
+  fazem parte da intenção; retry, duas abas e restart devolvem o mesmo
+  receipt, ou 409 se a chave for reutilizada com payload diferente. Uma
+  aprovação sem comentário tem motivo `approved_by_human_reviewer`, que é
+  estável e portanto mantém a chave estável entre tentativas.
+- Um clique repetido durante a cadeia validation → review não vira segunda
+  intenção: o formulário fica reservado do primeiro clique até o fim da cadeia,
+  e a espera é dita na própria fila, não no card que já saiu dela.
 - Timeout depois de write é mostrado como desfecho desconhecido; a tela relê o
   recurso pelo correlation id/receipt antes de permitir repetição.
 - Payload parcial é 400, ausência de sessão é 401, grupo insuficiente é 403,
