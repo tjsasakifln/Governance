@@ -6,7 +6,7 @@ import type {
   GateReadback,
   WarmblyGateAction,
 } from "./adapters/contract";
-import { isWarmblyGateAction } from "./adapters/contract";
+import { APPROVAL_DEFAULT_REASON, isWarmblyGateAction } from "./adapters/contract";
 import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
 import { parseHash } from "./destinations";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
@@ -29,6 +29,11 @@ import {
   resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
+import {
+  confirmReviewDecided,
+  markReviewDecided,
+  rollbackReviewDecided,
+} from "./review-queue";
 import {
   QUEUE_FOCUS_PARAM,
   QUEUE_FOCUS_TOKEN_PATTERN,
@@ -175,12 +180,14 @@ function applyPaint(
   bindMessageToggle(root, renderHash, navigate);
   bindCopyControls(root);
   bindListFilters(root, renderHash, navigate);
+  bindReviewQueueShortcut();
   consumeQueueFocus(
     root,
     hash,
     view.kind === "ready" || view.kind === "stale",
     replaceLocation,
   );
+  advanceReviewQueue(root, view.kind === "ready" || view.kind === "stale");
 }
 
 /**
@@ -576,11 +583,11 @@ function bindWarmblyHumanGate(
       const key = form.getAttribute("data-gate-key") ?? `${raw}:${versionId}:${candidateId}:`;
       // The APPROVE form carries its decision on the element, because APPROVE
       // and HOLD/REJECT are different forms with different requirements: one
-      // demands the acknowledgement, the other must never demand it.
+      // may resolve the recipient verification on the way and needs no typed
+      // motive, the other always demands one and never verifies anything.
       const fixedDecision = form.getAttribute("data-decision");
       const decision = fixedDecision ?? form.querySelector('[name="decision"]')?.value;
       const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
-      const acknowledgement = form.querySelector('[name="ack"]')?.checked === true;
       const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
       const reason = form.querySelector('[name="reason"]')?.value ?? "";
 
@@ -610,14 +617,26 @@ function bindWarmblyHumanGate(
       }
 
       if (!beginGateFlight(key)) return;
+      const isApprove = raw === "review" && decision === "APPROVE";
       const intent: HumanGateIntent = {
         action: raw,
         ...(versionId ? { version_id: versionId } : {}),
         ...(candidateId ? { candidate_id: candidateId } : {}),
         ...(limit > 0 ? { limit } : {}),
         ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
-        ...(reason ? { reason } : {}),
-        ...(decision === "APPROVE" ? { acknowledged: acknowledgement } : {}),
+        // An ordinary approval types nothing, and the trail must still say what
+        // happened. The default is folded in here, not only at the wire, so the
+        // idempotency identity and the recorded motive are the same string.
+        ...(isApprove
+          ? { reason: reason.trim() || APPROVAL_DEFAULT_REASON }
+          : reason
+            ? { reason }
+            : {}),
+        // Pressing Aprovar *is* the acknowledgement. The form carries no
+        // checkbox because a second click declaring the first one adds nothing
+        // to the trail: actor, instant, version, frozen hash and recipient are
+        // all recorded already.
+        ...(isApprove ? { acknowledged: true } : {}),
         ...((raw === "decide" || raw === "adjust") && confirmation ? { confirmation } : {}),
         ...(raw === "adjust"
           ? {
@@ -627,51 +646,57 @@ function bindWarmblyHumanGate(
             }
           : {}),
       };
+      // Optimistic, and only for the two decisions that take a candidate out of
+      // the pending queue. The mark goes up before the write so the next
+      // message is on screen immediately; every outcome short of a confirmed
+      // application rolls it back.
+      const optimistic =
+        raw === "review" && versionId && candidateId
+          ? decision === "APPROVE"
+            ? "aprovado"
+            : decision === "HOLD" || decision === "REJECT"
+              ? "ajuste"
+              : null
+          : null;
+      if (optimistic) markReviewDecided(versionId, candidateId, optimistic);
       // Paint the pending state before the await. The key is computed first so
       // this paint already renders the form as busy.
       onDone();
       void (async () => {
-        let result: AdapterWriteResult | undefined;
+        let result: AdapterWriteResult;
         try {
-          result = await Promise.resolve(
-            adapter.warmblyGate?.({
-              ...intent,
-              idempotency_key: humanGateIdempotencyKey(intent),
-            }),
-          );
+          result = isApprove
+            ? await approveCandidate(adapter, intent, {
+                versionId,
+                candidateId,
+                autoValidate: form.getAttribute("data-auto-validate") === "true",
+                releaseFlight: () => endGateFlight(key),
+              })
+            : await (async () => {
+                const written = await writeGateIntent(adapter, intent, raw, versionId, candidateId);
+                endGateFlight(key);
+                return settleGateIntent(adapter, intent, written);
+              })();
         } catch {
-          // The adapter threw instead of answering, so this client cannot know
-          // whether the POST reached the gate. `unknown` is the only honest
-          // verdict — and it is the one that keeps the idempotency key.
-          result = {
-            ok: false,
-            path: "",
-            kind: "nota",
-            message: "O canal falhou sem responder.",
-            outcome: "unknown",
-            code: "browser_transport",
-            gateAction: raw,
-            ...(versionId || candidateId
-              ? {
-                  gateTarget: {
-                    ...(versionId ? { cohort_id: versionId } : {}),
-                    ...(candidateId ? { candidate_id: candidateId } : {}),
-                  },
-                }
-              : {}),
-          };
+          // Belt and braces over the guards each step already has. A chain that
+          // threw leaves this client unable to say what reached the gate, so
+          // the verdict is `unknown` and the optimistic mark comes back down.
+          result = browserTransportResult(raw, versionId, candidateId);
+          adapter.lastOperatorResult = result;
         } finally {
+          // A form left claimed by a chain that died is a control the operator
+          // can never press again without reloading.
           endGateFlight(key);
         }
-        // Only a definitive outcome advances the key. An `unknown` keeps it, so
-        // the retry of an uncertain intent is the same intent to the server.
-        settleHumanGateIntent(intent, result?.outcome);
-        if (result) {
-          if (result.code === "adjust_route_unavailable") markAdjustRouteMissing();
-          const readback = await gateReadback(adapter, intent, result);
-          adapter.lastOperatorResult = { ...result, readback };
-          if (raw === "adjust" && result.ok) clearAdjustDraft(candidateId);
+        if (optimistic) {
+          if (confirmedApplication(result)) confirmReviewDecided(versionId, candidateId);
+          else rollbackReviewDecided(versionId, candidateId);
         }
+        if (raw === "adjust" && result.ok) clearAdjustDraft(candidateId);
+        // The reviewer's hands stay where they were: the next pending card
+        // takes the focus so the following approval needs no scroll and no
+        // pointer hunt.
+        if (raw === "review" && confirmedApplication(result)) requestQueueAdvance();
         const next = gateNavigation(raw, result);
         if (next) {
           navigate(next);
@@ -681,6 +706,349 @@ function bindWarmblyHumanGate(
       })();
     });
   }
+}
+
+/** The verdict this client falls back to when the adapter never answered at all. */
+function browserTransportResult(
+  action: WarmblyGateAction,
+  versionId: string,
+  candidateId: string,
+): AdapterWriteResult {
+  return {
+    ok: false,
+    path: "",
+    kind: "nota",
+    message: "O canal falhou sem responder.",
+    outcome: "unknown",
+    code: "browser_transport",
+    gateAction: action,
+    ...(versionId || candidateId
+      ? {
+          gateTarget: {
+            ...(versionId ? { cohort_id: versionId } : {}),
+            ...(candidateId ? { candidate_id: candidateId } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * One gate write, and nothing else.
+ *
+ * An adapter that throws instead of answering leaves this client unable to say
+ * whether the POST reached the gate, so `unknown` is the only honest verdict —
+ * and it is the one that keeps the idempotency key for the retry.
+ */
+async function writeGateIntent(
+  adapter: ControlCenterReadAdapter,
+  intent: HumanGateIntent,
+  action: WarmblyGateAction,
+  versionId: string,
+  candidateId: string,
+): Promise<AdapterWriteResult> {
+  try {
+    const result = await Promise.resolve(
+      adapter.warmblyGate?.({ ...intent, idempotency_key: humanGateIdempotencyKey(intent) }),
+    );
+    if (result) return result;
+  } catch {
+    // Falls through to the same unknown verdict as an absent channel.
+  }
+  return browserTransportResult(action, versionId, candidateId);
+}
+
+/**
+ * Everything a write owes after the channel answered: settle the idempotency
+ * generation, re-read the resource, and publish the outcome the next paint
+ * renders.
+ */
+async function settleGateIntent(
+  adapter: ControlCenterReadAdapter,
+  intent: HumanGateIntent,
+  result: AdapterWriteResult,
+): Promise<AdapterWriteResult> {
+  if (result.code === "adjust_route_unavailable") markAdjustRouteMissing();
+  const readback = await gateReadback(adapter, intent, result);
+  // A refusal is definitive before any write. An executed response is only
+  // definitive after the resource readback confirms it. If that GET fails or
+  // disagrees, retaining the same idempotency key is what lets a later retry
+  // reconcile the original write instead of creating a second intent.
+  const settledOutcome =
+    result.outcome === "refused"
+      ? "refused"
+      : result.outcome === "executed" && readback.status === "confirmed"
+        ? "executed"
+        : undefined;
+  settleHumanGateIntent(intent, settledOutcome);
+  const settled: AdapterWriteResult = { ...result, readback };
+  adapter.lastOperatorResult = settled;
+  return settled;
+}
+
+/**
+ * Whether a write may be treated as applied.
+ *
+ * Accepted-by-the-channel is not applied, and a readback that says the server
+ * does not record the change is the clearest possible "no". Only these two
+ * together let an optimistic mark stand.
+ */
+function confirmedApplication(result: AdapterWriteResult): boolean {
+  if (!result.ok || result.outcome !== "executed") return false;
+  return result.readback?.status === "confirmed";
+}
+
+/**
+ * Approving a candidate, as one reviewer action.
+ *
+ * The server refuses APPROVE outside a current VALID validation and will go on
+ * refusing it — that invariant is Warmbly's and it is not weakened here. What
+ * this removes is the human step in front of it: obtaining the validation is a
+ * deterministic call with no judgement in it, so the approve action makes it,
+ * reads the resulting status back from the server, and only then registers the
+ * decision. A verification that does not come back VALID stops the chain with
+ * the reason written out; APPROVE is not attempted, and nothing is guessed
+ * about a status the server did not state.
+ */
+async function approveCandidate(
+  adapter: ControlCenterReadAdapter,
+  intent: HumanGateIntent,
+  args: {
+    versionId: string;
+    candidateId: string;
+    autoValidate: boolean;
+    releaseFlight: () => void;
+  },
+): Promise<AdapterWriteResult> {
+  const { versionId, candidateId, autoValidate, releaseFlight } = args;
+  const target = { cohort_id: versionId, candidate_id: candidateId };
+  if (autoValidate) {
+    const validateIntent: HumanGateIntent = {
+      action: "validate",
+      version_id: versionId,
+      candidate_id: candidateId,
+    };
+    const validated = await settleGateIntent(
+      adapter,
+      validateIntent,
+      await writeGateIntent(adapter, validateIntent, "validate", versionId, candidateId),
+    );
+    if (!confirmedApplication(validated)) {
+      releaseFlight();
+      const refusal: AdapterWriteResult = {
+        ...validated,
+        ok: false,
+        code: "approval_validation_unavailable",
+        message:
+          validated.outcome === "refused"
+            ? `A verificação do destinatário não completou (${validated.code ?? validated.status ?? "sem código"}): ${validated.message}. O APPROVE não foi enviado.`
+            : "A verificação foi pedida, mas a releitura não devolveu o estado dela, então esta tela não sabe se o destinatário está VALID. O APPROVE não foi enviado e nada foi decidido.",
+        gateAction: "validate",
+        gateTarget: target,
+      };
+      adapter.lastOperatorResult = refusal;
+      return refusal;
+    }
+    const status = await readValidationStatus(adapter, versionId, candidateId);
+    if (status !== "VALID") {
+      releaseFlight();
+      // "O servidor disse RISKY" and "não deu para ler o que o servidor diz"
+      // are different answers, and only the first one is about the recipient.
+      // Collapsing them would tell the reviewer a mailbox is bad when what
+      // actually failed was a GET.
+      const refusal: AdapterWriteResult = {
+        ok: false,
+        path: validated.path,
+        kind: "nota",
+        outcome: "refused",
+        ...(status === null
+          ? {
+              code: "approval_validation_unavailable",
+              message:
+                "A verificação foi pedida, mas a releitura não devolveu o estado dela, então esta tela não sabe se o destinatário está VALID. O APPROVE não foi enviado e nada foi decidido.",
+            }
+          : {
+              code: "approval_validation_not_valid",
+              message: `A verificação foi feita agora e o servidor reporta ${status}, não VALID. O APPROVE não foi enviado.`,
+            }),
+        gateAction: "validate",
+        gateTarget: target,
+        ...(validated.receiptId ? { receiptId: validated.receiptId } : {}),
+        ...(validated.correlationId ? { correlationId: validated.correlationId } : {}),
+      };
+      adapter.lastOperatorResult = refusal;
+      return refusal;
+    }
+  }
+  const written = await writeGateIntent(adapter, intent, "review", versionId, candidateId);
+  releaseFlight();
+  return settleGateIntent(adapter, intent, written);
+}
+
+/** The validation status the server reports for one candidate, right now. */
+async function readValidationStatus(
+  adapter: ControlCenterReadAdapter,
+  cohortId: string,
+  candidateId: string,
+): Promise<string | null> {
+  const candidate = await readGateCandidate(adapter, cohortId, candidateId);
+  if (!candidate) return null;
+  const status = gateRecord(candidate.validation).status;
+  return typeof status === "string" && status !== "" ? status.toUpperCase() : null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Queue advance.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Whether the next paint owes the reviewer the focus of the next pending card.
+ *
+ * Module scope for the same reason `restoreFocusId` is: the repaint replaces
+ * `root.innerHTML` wholesale, so the handler that asked for the advance is gone
+ * long before the markup that can satisfy it exists.
+ */
+let queueAdvancePending = false;
+
+export function requestQueueAdvance(): void {
+  queueAdvancePending = true;
+}
+
+/**
+ * Puts the reviewer on the next pending approval.
+ *
+ * Only a paint that actually rendered the queue may consume the request — a
+ * loading frame would swallow it and leave the reviewer's focus on nothing.
+ * `preventScroll` plus an explicit `scrollIntoView` keeps the page from
+ * jumping: the card is centred deliberately rather than yanked to the top by
+ * the browser's own focus scroll.
+ */
+export function advanceReviewQueue(root: MountableRoot, painted: boolean): boolean {
+  if (!queueAdvancePending) return false;
+  if (typeof root.querySelectorAll !== "function") return false;
+  const buttons = root.querySelectorAll("[data-approve-submit]");
+  let next: (typeof buttons)[number] | undefined;
+  for (let index = 0; index < buttons.length; index += 1) {
+    const button = buttons[index];
+    // A disabled control is not somewhere to leave a reviewer: it is a
+    // candidate the server blocked, and landing on it would look like the queue
+    // had stalled.
+    if (button && button.getAttribute("disabled") === null) {
+      next = button;
+      break;
+    }
+  }
+  if (!next) {
+    // Nothing left to approve. The request is spent either way: the queue-empty
+    // card is the thing the reviewer should be reading now.
+    if (painted) queueAdvancePending = false;
+    return false;
+  }
+  queueAdvancePending = false;
+  next.focus?.({ preventScroll: true });
+  next.scrollIntoView?.({ block: "center", inline: "nearest" });
+  return true;
+}
+
+/** Test seam. Production never needs to forget a pending advance. */
+export function resetQueueAdvance(): void {
+  queueAdvancePending = false;
+}
+
+/* ------------------------------------------------------------------ *
+ * Keyboard.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Whether the caret is somewhere a keystroke means text, not a decision.
+ *
+ * The adjust editor is a real editor on the same page as the approve controls,
+ * so a shortcut that fires while someone is writing a subject line would
+ * approve an outbound message as a side effect of typing. Every field is out of
+ * bounds; a focused button is not, because that is where the queue advance
+ * leaves the reviewer.
+ */
+export function isEditingTarget(
+  element: { tagName?: string; isContentEditable?: boolean } | null | undefined,
+): boolean {
+  if (!element) return false;
+  if (element.isContentEditable === true) return true;
+  const tag = typeof element.tagName === "string" ? element.tagName.toUpperCase() : "";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+/**
+ * What a keystroke is allowed to reach.
+ *
+ * `focused-card` may only approve the message the reviewer is already on;
+ * `first-pending` may fall back to the top of the queue.
+ */
+export type ApprovalShortcutScope = "focused-card" | "first-pending" | null;
+
+/**
+ * The two keystrokes that approve, and how far each one reaches.
+ *
+ * Bare `A` is the throughput shortcut and is deliberately the narrower of the
+ * two: it approves only the card that already has the focus, which after an
+ * approval is the next pending one. A stray `a` typed while reading anything
+ * else authorises no outbound message. Ctrl/Cmd+Enter is explicit enough to
+ * address the queue.
+ *
+ * Modifiers are refused rather than ignored — `Ctrl+A` is select-all and must
+ * stay select-all — and nothing at all fires while a field has the caret.
+ */
+export function approvalShortcutScope(
+  event: {
+    key?: string;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    altKey?: boolean;
+    shiftKey?: boolean;
+    repeat?: boolean;
+  },
+  editing: boolean,
+  blockingOverlay = false,
+): ApprovalShortcutScope {
+  if (editing || blockingOverlay || event.repeat === true || event.altKey === true) return null;
+  const key = typeof event.key === "string" ? event.key : "";
+  if (key === "Enter") {
+    return event.ctrlKey === true || event.metaKey === true ? "first-pending" : null;
+  }
+  if (key.toLowerCase() !== "a") return null;
+  return event.ctrlKey !== true && event.metaKey !== true && event.shiftKey !== true
+    ? "focused-card"
+    : null;
+}
+
+/** Bound once for the life of the page: a repaint drops markup, not documents. */
+let queueShortcutBound = false;
+
+/** A decision shortcut never crosses an active modal/overlay boundary. */
+function hasBlockingOverlay(): boolean {
+  return document.querySelector(
+    'dialog[open], [aria-modal="true"], [data-modal-open="true"], [data-overlay-open="true"]',
+  ) !== null;
+}
+
+function bindReviewQueueShortcut(): void {
+  if (queueShortcutBound || typeof document === "undefined") return;
+  queueShortcutBound = true;
+  document.addEventListener("keydown", (event) => {
+    const active = document.activeElement as HTMLElement | null;
+    const scope = approvalShortcutScope(event, isEditingTarget(active), hasBlockingOverlay());
+    if (!scope) return;
+    // The card under the caret first, so a reviewer who tabbed into a specific
+    // message approves that one and not whatever happens to be at the top.
+    const scoped = active?.closest?.("[data-candidate-id]") ?? null;
+    const button =
+      scoped?.querySelector("[data-approve-submit]:not([disabled])")
+      ?? (scope === "first-pending"
+        ? document.querySelector("[data-approve-submit]:not([disabled])")
+        : null);
+    if (!(button instanceof HTMLElement)) return;
+    event.preventDefault();
+    button.click();
+  });
 }
 
 /** Where the operator is taken after a write, according to the server's answer. */
@@ -700,6 +1068,43 @@ function gateRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+/**
+ * One candidate, as the server reports it right now.
+ *
+ * Shared by the readback and by the approve chain so both ask the same question
+ * of the same route: a second way of reading the gate is a second way of being
+ * wrong about it.
+ */
+async function readGateCandidate(
+  adapter: ControlCenterReadAdapter,
+  cohortId: string,
+  candidateId: string,
+): Promise<Record<string, unknown> | null> {
+  let read: import("./adapters/contract").AdapterReadResult;
+  try {
+    read = await Promise.resolve(
+      adapter.readDestination("warmbly", `#/warmbly/revisao?resource=${encodeURIComponent(cohortId)}`),
+    );
+  } catch {
+    return null;
+  }
+  if (!read.ok || read.loading || !read.page) return null;
+  const cohort = gateRecord(gateRecord(gateRecord(read.page.warmbly_gate).selected).data);
+  if (!cohort.id) return null;
+  const candidates = Array.isArray(cohort.candidates) ? cohort.candidates.map(gateRecord) : [];
+  // The intent carries the id as the markup stamped it — a string, always. A
+  // strict comparison against a payload that typed it differently finds nothing
+  // and reports the write as unconfirmed, which rolls back a decision the
+  // server actually recorded.
+  return candidates.find((row) => gateCandidateId(row) === candidateId) ?? null;
+}
+
+/** The candidate id as a string, however the payload chose to type it. */
+function gateCandidateId(candidate: Record<string, unknown>): string {
+  const raw = candidate.candidate_id;
+  return raw === undefined || raw === null || raw === "" ? "" : String(raw);
 }
 
 /**
@@ -742,7 +1147,7 @@ async function gateReadback(
   }
   const candidates = Array.isArray(cohort.candidates) ? cohort.candidates.map(gateRecord) : [];
   const candidate = intent.candidate_id
-    ? candidates.find((row) => row.candidate_id === intent.candidate_id)
+    ? candidates.find((row) => gateCandidateId(row) === intent.candidate_id)
     : undefined;
   switch (intent.action) {
     case "create":
@@ -762,13 +1167,22 @@ async function gateReadback(
       if (!candidate) {
         return { status: "not_confirmed", detail: "O candidato não aparece nesta versão na releitura." };
       }
-      const recorded = gateRecord(candidate.review).decision;
-      return recorded === intent.decision
-        ? { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` }
-        : {
-            status: "not_confirmed",
-            detail: `O servidor ainda registra "${String(recorded ?? "nada")}" neste candidato.`,
-          };
+      const review = gateRecord(candidate.review);
+      const recorded = review.decision;
+      if (recorded !== intent.decision) {
+        return {
+          status: "not_confirmed",
+          detail: `O servidor ainda registra "${String(recorded ?? "nada")}" neste candidato.`,
+        };
+      }
+      if (intent.decision === "APPROVE" && review.effective !== true) {
+        return {
+          status: "not_confirmed",
+          detail:
+            "O servidor registra APPROVE, mas não confirma que a aprovação está efetiva para o destinatário, conteúdo, policy e evidência atuais.",
+        };
+      }
+      return { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` };
     }
     case "decide": {
       const recorded = gateRecord(cohort.decision).decision;

@@ -6,20 +6,61 @@
    `admins` registram GO/NO-GO.
 2. Abra **Warmbly → Cohorts**. Confirme source/as_of/freshness e os quatro
    denominadores (considerados, elegíveis, excluídos, finais). Crie no máximo 10.
-3. Abra a versão em **Revisão**. Para cada candidato, revele o preview exato,
-   confira recipient/route/provenance/subject/body e solicite validation.
-4. VALID vigente permite APPROVE depois da ciência explícita. A UI e o Warmbly
-   exigem `acknowledged=true`; RISKY/INVALID/UNKNOWN/STALE ficam bloqueados;
-   registre HOLD ou REJECT com motivo. Se recipient, copy, policy, evidence ou
-   suppression mudar, a aprovação aparece inválida e deve ser refeita.
-5. GO exige todos aprovados, source fresh e a confirmação digitada da versão.
+3. Abra a versão em **Revisão**. A tela abre no recorte **Pendentes** e diz
+   quanto falta (`N pendentes · N aprovadas · N em ajuste · N no total`). Leia o
+   destinatário, o fato observado e a proveniência, e leia o assunto e o corpo
+   exatos — eles ficam abertos por padrão.
+4. Se nada estiver bloqueado, **Aprovar é uma ação só**. Não digite motivo e não
+   marque caixa nenhuma: o clique é a ciência, e a trilha grava ator do Authelia,
+   instante, versão, hash congelado, destinatário e decisão. Sem comentário
+   escrito, o motivo registrado é `approved_by_human_reviewer`; o campo de
+   comentário continua disponível e vence o padrão quando preenchido.
+   - **Verificação do destinatário**: quando não há validação vigente, aprovar
+     pede a verificação ao Warmbly, relê o estado e só então registra o APPROVE.
+     Não acione "Verificar o destinatário agora" antes de aprovar — esse controle
+     existe como escape, e só aparece onde a validação não é VALID.
+   - Se a verificação não voltar VALID, **nada é decidido**: a tela diz o estado
+     observado e que o APPROVE não foi enviado.
+   - A mensagem aprovada sai da fila na hora e a próxima assume a posição, com o
+     foco no botão dela. `A` (com o foco no card) e `Ctrl/Cmd+Enter` aprovam pelo
+     teclado; dentro de qualquer campo de texto o atalho não dispara.
+   - Se a API recusar, falhar, responder desfecho desconhecido ou a releitura não
+     confirmar o efeito, a mensagem **volta para Pendentes** com o motivo no card.
+     Repetir usa a mesma idempotency key.
+5. **APPROVE continua bloqueado** onde verificar de novo não resolve: sem
+   destinatário, destinatário que não é endereço, validação já resolvida como
+   RISKY ou INVALID, hard bounce, suppression, opt-out, duplicidade, reprovação
+   de copy QA ou proveniência ausente marcada pelo servidor. Nesses casos a tela
+   nomeia o bloqueio e o próximo movimento; registre HOLD ou REJECT **com motivo
+   escrito**, que continua obrigatório. Se recipient, copy, policy, evidence ou
+   suppression mudar depois, a aprovação aparece inválida (`effective=false`),
+   volta para Pendentes e deve ser refeita.
+6. GO exige todos aprovados, source fresh e a confirmação digitada da versão.
    O Warmbly compara o valor (por exemplo `v3`) à versão imutável; o proxy não
    consegue remover ou fabricar essa confirmação.
    Use NO_GO para interromper/revogar. GO cria a autoridade bounded exata em
    `READY_FOR_LIVE_PREFLIGHT`; não enfileira, não envia e não liga auto-send.
-6. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
+7. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
    e correlation id. O frontend preserva a idempotency key da intenção incerta;
    só depois repita a mesma intenção.
+
+### O que mudou no gate humano (e o que não mudou)
+
+A fila deixou de ser um formulário e virou uma fila de decisões. O que saiu foi
+custo humano; nenhuma salvaguarda material foi removida.
+
+| Antes | Agora | Por quê |
+|---|---|---|
+| Clicar em "verificar destinatário agora" antes de aprovar | Aprovar obtém a verificação sozinho | Obter validation é chamada determinística, sem julgamento humano |
+| Digitar um motivo para APPROVE | `approved_by_human_reviewer` automático, comentário opcional | O motivo digitado era sempre a mesma palavra; a trilha já tinha ator, instante, versão e hash |
+| Marcar "revisei destinatário" | O clique em Aprovar é a ciência | Um segundo clique declarando o primeiro não acrescenta nada à auditoria |
+| Lista com aprovadas no topo | Recorte **Pendentes** por padrão, com contador | Rolar a própria produção para achar o próximo trabalho não escala |
+
+O que **não** mudou: `acknowledged=true` continua viajando no corpo do APPROVE e
+o adaptador recusa antes do fio um APPROVE sem ele; o Warmbly continua recusando
+APPROVE fora de uma validação VALID vigente; GO continua exigindo `admins` e a
+confirmação digitada da versão; HOLD/REJECT continuam exigindo motivo escrito; e
+o Control Center continua sem qualquer rota de send, dispatch ou queue.
 
 ## Métricas e alertas
 

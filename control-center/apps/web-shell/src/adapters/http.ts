@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import {
   ADAPTER_ACTIONS,
+  APPROVAL_DEFAULT_REASON,
   type AdapterAction,
   type AdapterReadResult,
   type AdapterWriteResult,
@@ -432,11 +433,24 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     ) {
       return refuse("alvo do gate incompleto", "gate_precondition");
     }
+    // The acknowledgement stays on the wire and stays mandatory here. What
+    // changed is where it comes from: the reviewer's click on Aprovar is the
+    // acknowledgement, and the button says so above itself, so there is no
+    // second checkbox asking them to declare the action they just took. This
+    // guard therefore no longer describes a control — it is the invariant that
+    // stops any other caller from constructing an APPROVE without one.
     if (input.action === "review" && input.decision === "APPROVE" && input.acknowledged !== true) {
       return refuse(
         "APPROVE exige ciência explícita do destinatário, mensagem, policy e evidência",
         "approval_acknowledgement_required",
       );
+    }
+    if (
+      input.action === "review"
+      && (input.decision === "HOLD" || input.decision === "REJECT")
+      && !input.reason?.trim()
+    ) {
+      return refuse("HOLD/REJECT exige motivo escrito", "gate_precondition");
     }
     if (input.action === "decide" && !input.confirmation?.trim()) {
       return refuse(
@@ -465,6 +479,13 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         );
       }
     }
+    // An ordinary approval carries no typed motive, and the trail must not
+    // record an empty one. `approved_by_human_reviewer` is what "o revisor leu
+    // e aprovou" looks like as data; a comment the reviewer did write always
+    // wins over it.
+    const reason =
+      input.reason?.trim()
+      || (input.action === "review" && input.decision === "APPROVE" ? APPROVAL_DEFAULT_REASON : "");
     try {
       const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
         method: "POST",
@@ -474,7 +495,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
           idempotency_key: input.idempotency_key,
           ...(input.limit ? { limit: input.limit } : {}),
           ...(input.decision ? { decision: input.decision } : {}),
-          ...(input.reason ? { reason: input.reason } : {}),
+          ...(reason ? { reason } : {}),
           ...(input.acknowledged === true ? { acknowledged: true } : {}),
           ...(input.confirmation ? { confirmation: input.confirmation.trim().toLowerCase() } : {}),
           ...(input.action === "adjust"

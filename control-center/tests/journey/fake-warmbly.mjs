@@ -110,6 +110,33 @@ createServer((req, res) => {
       return v ? send(res, 200, { data: v }) : send(res, 404, { code: "not_found" });
     }
 
+    // Recipient verification. Deterministic on purpose: every mailbox comes
+    // back VALID except empresa-quatro, whose prober identity is refused —
+    // which is what lets the journey prove that an approval which cannot get a
+    // VALID stops before registering anything.
+    const val = p.match(/^\/v1\/confenge\/cohorts\/([0-9a-f-]+)\/candidates\/([0-9a-f-]+)\/validation$/);
+    if (req.method === "POST" && val) {
+      const v = versions.get(val[1]);
+      if (!v) return send(res, 404, { code: "not_found" });
+      const c = v.candidates.find((x) => x.candidate_id === val[2]);
+      if (!c) return send(res, 404, { code: "candidate_not_found" });
+      const refuses = c.mailbox.includes("empresa-quatro");
+      c.validation = {
+        id: randomUUID(),
+        status: refuses ? "UNKNOWN" : "VALID",
+        reason: refuses ? "identity_rdns_missing: prober identity refused" : "rcpt accepted",
+        provider: "in-house",
+        method: "smtp_rcpt",
+        evidence_hash: `v-${val[2]}`,
+        checked_at: "2026-08-23T18:00:00Z",
+        expires_at: "2026-08-24T18:00:00Z",
+        correlation_id: "corr-validation",
+        receipt: `receipt-validation-${val[2]}`,
+      };
+      c.blocked_by = refuses ? ["validation_not_valid:UNKNOWN"] : [];
+      return send(res, 200, { data: v, receipt: c.validation.receipt, correlation_id: "corr-validation" });
+    }
+
     const rev = p.match(/^\/v1\/confenge\/cohorts\/([0-9a-f-]+)\/candidates\/([0-9a-f-]+)\/review$/);
     if (req.method === "POST" && rev) {
       const v = versions.get(rev[1]);

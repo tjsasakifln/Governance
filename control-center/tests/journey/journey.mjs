@@ -97,24 +97,126 @@ check("exact subject is visible without opening anything", await subj.isVisible(
 check("exact body is visible without opening anything", await body.isVisible().catch(() => false));
 check("recipient is shown on the card", (await page.locator("[data-candidate-identity]").first().innerText().catch(() => "")).includes("@"));
 check("preview denominators are rendered", await page.locator("[data-preview-denominators]").count() > 0);
+const structure = await page.evaluate(() => {
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  const cards = [...document.querySelectorAll("[data-candidate-id]")];
+  return {
+    duplicateIds: ids.filter((id, index) => id !== "" && ids.indexOf(id) !== index),
+    nestedForms: document.querySelectorAll("form form").length,
+    malformedCards: cards.filter(
+      (card) =>
+        card.querySelectorAll("[data-exact-subject]").length !== 1
+        || card.querySelectorAll("[data-exact-body]").length !== 1
+        || card.querySelectorAll("[data-candidate-identity]").length !== 1,
+    ).length,
+  };
+});
+check("the browser parsed every candidate card as one intact structure",
+  structure.malformedCards === 0 && structure.nestedForms === 0,
+  `malformed=${structure.malformedCards} nested_forms=${structure.nestedForms}`);
+check("the review surface has no duplicate element ids", structure.duplicateIds.length === 0,
+  structure.duplicateIds.join(","));
 
-// ---- 4. APPROVE gating follows the server's verdict
+// ---- 4. The queue opens on pending work and says how much is left
+check("the review surface opens on the pending recorte",
+  await page.locator("[data-review-progress][data-queue-filter='pendentes']").count() > 0);
+const progress = await page.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
+check("the queue states its own progress", /5 pendente/.test(progress), progress.replace(/\s+/g, " "));
+
+// ---- 5. APPROVE gating: only a settled non-VALID verdict blocks a human
 const approveAllowed = await page.locator("[data-approve-allowed='true']").count();
 const approveBlocked = await page.locator("[data-approve-blocked]").count();
-check("APPROVE is offered only for VALID candidates", approveAllowed === 2, `allowed=${approveAllowed}`);
-check("APPROVE is blocked, with a reason, for the rest", approveBlocked === 3, `blocked=${approveBlocked}`);
+const autoValidate = await page.locator("[data-approve-needs-validation='true']").count();
+check("only the settled INVALID candidate blocks APPROVE", approveBlocked === 1, `blocked=${approveBlocked}`);
+check("every other candidate can be approved in one action", approveAllowed === 4, `allowed=${approveAllowed}`);
+check("candidates without a live validation say the approval verifies first", autoValidate === 2,
+  `auto-validate=${autoValidate}`);
 const blockedReason = await page.locator("[data-approve-blocked]").first().innerText().catch(() => "");
 check("the APPROVE block explains itself", blockedReason.trim().length > 0, blockedReason.replace(/\s+/g, " ").slice(0, 70));
 
-// ---- 5. HOLD / REJECT do not inherit the APPROVE acknowledgement
-check("HOLD/REJECT are marked as needing no acknowledgement",
-  await page.locator("[data-no-ack-required]").count() > 0);
+// ---- 6. One action approves: no reason typed, no checkbox ticked
+const firstApprove = page.locator("[data-approve-submit]:not([disabled])").first();
+const cardBefore = await page.locator("[data-candidate-id]").count();
+check("the approve control carries no required motive and no acknowledgement checkbox",
+  await page.locator("form.approve-form [name='ack']").count() === 0
+  && await page.locator("form.approve-form [name='reason'][required]").count() === 0);
+await firstApprove.focus();
+const pendingBeforeShortcutGuards = await page.locator("[data-queue-progress-text]").first().innerText();
+await page.evaluate(() => {
+  document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Enter", ctrlKey: true, repeat: true, bubbles: true, cancelable: true,
+  }));
+});
+await page.waitForTimeout(250);
+check("a repeating keyboard event cannot approve or advance the queue",
+  await page.locator("[data-queue-progress-text]").first().innerText() === pendingBeforeShortcutGuards);
+await page.evaluate(() => {
+  const overlay = document.createElement("div");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("data-journey-overlay", "true");
+  document.body.append(overlay);
+  document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Enter", ctrlKey: true, bubbles: true, cancelable: true,
+  }));
+  overlay.remove();
+});
+await page.waitForTimeout(250);
+check("a keyboard shortcut cannot cross an active modal overlay",
+  await page.locator("[data-queue-progress-text]").first().innerText() === pendingBeforeShortcutGuards);
+await firstApprove.click();
+await page.waitForTimeout(1800);
+const cardAfter = await page.locator("[data-candidate-id]").count();
+check("one click took the message out of the pending queue", cardAfter === cardBefore - 1,
+  `${cardBefore} -> ${cardAfter}`);
+const progressAfter = await page.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
+check("the queue counted the approval", /1 aprovada/.test(progressAfter), progressAfter.replace(/\s+/g, " "));
+check("the approved message is still readable in its own recorte",
+  await page.locator("[data-review-filter='aprovadas']").count() > 0);
 
-// ---- 6. RBAC is visible
+// ---- 7. Approving a candidate with no live validation verifies it on the way
+//
+// empresa-cinco arrives with no validation at all and the stand-in verifies it
+// as VALID; empresa-quatro is the one whose prober identity is refused and is
+// exercised separately below. Naming them apart matters: picking whichever came
+// first would silently test the same candidate twice.
+const needsCheckBefore = await page.locator("[data-approve-needs-validation='true']").count();
+const verifiable = page
+  .locator("[data-approve-needs-validation='true']")
+  .filter({ hasText: "empresa-cinco" })
+  .locator("[data-approve-submit]:not([disabled])");
+if (await verifiable.count() > 0) {
+  await verifiable.first().click();
+  await page.waitForTimeout(2200);
+  const stillPending = await page.locator("[data-approve-needs-validation='true']").count();
+  check("approving an unverified recipient verified it and registered without a second click",
+    stillPending === needsCheckBefore - 1, `${needsCheckBefore} -> ${stillPending}`);
+  check("and the queue counted that approval too",
+    /2 aprovada/.test(await page.locator("[data-queue-progress-text]").first().innerText().catch(() => "")));
+}
+
+// ---- 8. A verification that cannot come back VALID stops before APPROVE
+const stubborn = page.locator("[data-approve-needs-validation='true'] [data-approve-submit]:not([disabled])");
+if (await stubborn.count() > 0) {
+  await stubborn.first().click();
+  await page.waitForTimeout(2200);
+  check("a recipient that will not verify blocks the approval and says so",
+    await page.locator("[data-outcome-code='approval_validation_not_valid']").count() > 0);
+  const stopText = await page.locator("[data-outcome-recovery]").first().innerText().catch(() => "");
+  check("and it says the APPROVE was not sent", /não foi enviado|não foi tentad/i.test(
+    stopText + (await page.locator("[data-outcome-detail]").first().innerText().catch(() => "")),
+  ), stopText.replace(/\s+/g, " ").slice(0, 80));
+}
+
+// ---- 9. HOLD / REJECT keep their written motive
+check("HOLD/REJECT still demand a written motive",
+  await page.locator("[data-no-ack-required]").count() > 0
+  && await page.locator("form [name='reason'][required]").count() > 0);
+
+// ---- 10. RBAC is visible
 check("effective operator capability is shown", await page.locator("[data-can-review]").count() > 0);
 check("GO authority is stated explicitly", await page.locator("[data-go-authority], [data-can-decide]").count() > 0);
 
-// ---- 7. Adjust: two-step, diff before write, then vN+1
+// ---- 11. Adjust: two-step, diff before write, then vN+1
 const adjustEditor = page.locator("[data-adjust-editor]").first();
 check("an adjust editor exists on the candidate", await adjustEditor.count() > 0);
 let adjusted = false;
@@ -167,20 +269,57 @@ if (adjusted) {
   check("the outcome carries a receipt", /receipt|recibo/i.test(receipt), receipt.replace(/\s+/g, " ").slice(0, 80));
 }
 
-// ---- 8. Reload keeps the operator where they were
+// ---- 12. Reload keeps the operator where they were
 const before = page.url();
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(1000);
 check("a reload keeps the same resource", page.url() === before, page.url().split("#")[1] || "");
 
-// ---- 9. A second tab sees the same server truth
+// ---- 12b. A reload of the reviewed version never resurrects an approval
+//
+// The optimistic marks die with the page, so what is asserted here is the
+// server's own record: two approvals registered, neither of them back in the
+// pending queue. This is the failure that would let a message be approved
+// twice, so it is proved against a fresh load rather than against local state.
+const reviewed = await newPage();
+await reviewed.goto(`${BASE}/#/warmbly/revisao?resource=${ORIGINAL_RESOURCE}`, { waitUntil: "networkidle" });
+await reviewed.waitForTimeout(1400);
+const afterReload = await reviewed.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
+check("a reload reads the approvals back from the server, not from this browser",
+  /2 aprovada/.test(afterReload), afterReload.replace(/\s+/g, " "));
+check("and no approved message came back as pending",
+  await reviewed.locator("[data-queue-state='aprovado']").count() === 0
+  && /3 pendente/.test(afterReload), afterReload.replace(/\s+/g, " "));
+await reviewed.goto(`${BASE}/#/warmbly/revisao?resource=${ORIGINAL_RESOURCE}&estado=aprovadas`, { waitUntil: "networkidle" });
+await reviewed.waitForTimeout(1400);
+const approvedCards = await reviewed.locator("[data-queue-state='aprovado']").count();
+check("the approved recorte holds exactly the two decided messages, with no second APPROVE offered",
+  approvedCards === 2 && await reviewed.locator("[data-gate-key$=':APPROVE']").count() === 0,
+  `${approvedCards} approved cards`);
+
+// ---- 12c. The queue works on a phone
+await reviewed.setViewportSize({ width: 390, height: 844 });
+await reviewed.goto(`${BASE}/#/warmbly/revisao?resource=${ORIGINAL_RESOURCE}`, { waitUntil: "networkidle" });
+await reviewed.waitForTimeout(1400);
+const overflow = await reviewed.evaluate(
+  () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+);
+check("the review queue does not scroll sideways on a 390px viewport", overflow <= 1, `overflow=${overflow}px`);
+const tapTarget = await reviewed.locator("[data-approve-submit]:not([disabled])").first().boundingBox();
+check("the approve control is a real tap target on a phone",
+  !!tapTarget && tapTarget.height >= 40, tapTarget ? `${Math.round(tapTarget.height)}px tall` : "absent");
+check("the recortes stay reachable on a phone",
+  await reviewed.locator("[data-review-filters] a").count() === 4);
+await reviewed.close();
+
+// ---- 13. A second tab sees the same server truth
 const tab2 = await newPage();
 await tab2.goto(before, { waitUntil: "networkidle" });
 await tab2.waitForTimeout(1200);
 check("a second tab renders the same cohort", (await tab2.locator("[data-adjust-editor]").count()) === 5,
   `${await tab2.locator("[data-adjust-editor]").count()} candidates in tab 2`);
 
-// ---- 10. Console / network hygiene
+// ---- 14. Console / network hygiene
 check("no application errors in the browser console", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 check("no failed or 5xx requests", failedRequests.length === 0, failedRequests.slice(0, 3).join(" | "));
 

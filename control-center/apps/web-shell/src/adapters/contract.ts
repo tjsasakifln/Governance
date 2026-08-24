@@ -219,6 +219,19 @@ export function isWarmblyGateAction(value: string | null): value is WarmblyGateA
   return typeof value === "string" && (WARMBLY_GATE_ACTIONS as readonly string[]).includes(value);
 }
 
+/**
+ * What the audit trail records when a reviewer approves a normal message and
+ * writes nothing.
+ *
+ * A required free-text field on the happy path bought the trail nothing: the
+ * reviewer types the same word every time, and the row that matters is already
+ * complete without it — actor, instant, version, frozen hash, recipient and
+ * decision all come from the server. This constant makes the ordinary case say
+ * exactly what it is, and leaves the optional comment for when the reviewer
+ * actually has something to record.
+ */
+export const APPROVAL_DEFAULT_REASON = "approved_by_human_reviewer";
+
 export interface WarmblyGateInput {
   action: WarmblyGateAction;
   version_id?: string;

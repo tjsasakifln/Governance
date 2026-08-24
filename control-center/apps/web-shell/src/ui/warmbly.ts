@@ -23,13 +23,24 @@ import {
   isWarmblySurface,
   type WarmblySurface,
 } from "../destinations";
-import type { AdapterWriteResult } from "../adapters/contract";
+import { APPROVAL_DEFAULT_REASON, type AdapterWriteResult } from "../adapters/contract";
 import {
   adjustDraft,
   adjustRouteMissing,
   gateInFlight,
   type AdjustDraft,
 } from "../human-gate-flight";
+import {
+  DEFAULT_REVIEW_QUEUE_FILTER,
+  REVIEW_QUEUE_FILTERS,
+  REVIEW_QUEUE_FILTER_LABELS,
+  REVIEW_QUEUE_PARAM,
+  resolveReviewQueueFilter,
+  reviewQueueCounts,
+  reviewQueueFilterMatches,
+  reviewQueueState,
+  type ReviewQueueFilter,
+} from "../review-queue";
 import { AUTH_HOST, PRODUCTIVE_HOST } from "../topology";
 import type { ActorRef, CommercialSnapshot } from "../types";
 import type { PendingResumeConfirmation } from "../warmbly-confirmation";
@@ -309,6 +320,24 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     title: "Recusada: candidato não encontrado nesta versão",
     recovery:
       "O candidato não existe mais nesta versão da cohort. Recarregue a revisão antes de agir de novo.",
+  },
+  /* ---------------------------------------------------------------- *
+   * Aprovação que resolve a verificação do destinatário no caminho.
+   * Os dois códigos abaixo nascem no cliente, e existem porque "a
+   * verificação falhou" e "a aprovação foi recusada" mandam o operador
+   * para lugares diferentes.
+   * ---------------------------------------------------------------- */
+  approval_validation_unavailable: {
+    kind: "refused",
+    title: "Recusada: a verificação do destinatário não completou",
+    recovery:
+      "O APPROVE não chegou a ser enviado e nada foi decidido neste candidato. Leia o motivo da verificação no detalhe técnico; se for indisponibilidade do verificador, tente aprovar de novo em seguida. Se persistir, registre HOLD com o motivo.",
+  },
+  approval_validation_not_valid: {
+    kind: "refused",
+    title: "Recusada: o destinatário foi verificado agora e não voltou VALID",
+    recovery:
+      "A verificação foi feita nesta ação e o APPROVE não foi enviado, então nada foi decidido. O Warmbly recusa aprovação fora de uma validação VALID: registre HOLD ou REJECT, ou corrija a origem do contato e recomponha.",
   },
   adjust_route_unavailable: {
     kind: "refused",
@@ -1232,41 +1261,140 @@ function validationPill(candidate: Record<string, unknown>): string {
 }
 
 /**
- * Whether APPROVE is offered at all for this candidate.
+ * A mailbox this screen can tell apart from a typo.
  *
- * The server refuses APPROVE on anything but a current VALID validation. A UI
- * that renders the control anyway teaches the operator that approving is a
- * thing they may try, and then hands them a refusal with no explanation. The
- * verdict comes from the server's own `validation.status` plus its own
- * `blocked_by` — never from a date this screen compared itself.
+ * Deliberately crude: one local part, one `@`, one dotted domain, no spaces.
+ * Deliverability is Warmbly's verdict, not a regex's — this only catches the
+ * case where there is nothing to deliver to at all.
  */
-export function approvalGate(candidate: Record<string, unknown>): {
-  allowed: boolean;
-  reason: string;
-} {
-  const status = show(record(candidate.validation).status).toUpperCase();
-  const blockers = Array.isArray(candidate.blocked_by)
+const SYNTACTIC_MAILBOX = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+/**
+ * Blocker families that no amount of re-checking can clear.
+ *
+ * Matched by prefix against the server's own `blocked_by`. `approval_missing_or_invalid`
+ * is deliberately absent: it names the very thing the reviewer is about to do,
+ * and treating it as a block would make every candidate unapprovable.
+ */
+const MATERIAL_BLOCKER_PREFIXES = [
+  "hard_bounce",
+  "suppress",
+  "opt_out",
+  "optout",
+  "duplicate",
+  "copy_qa",
+  "missing_provenance",
+  "mailbox_",
+  "recipient_",
+  "route_not",
+  "policy_",
+] as const;
+
+/** Validation verdicts the server has actually resolved. Re-checking will not move them. */
+const SETTLED_INVALID_STATUSES = ["INVALID", "RISKY"] as const;
+
+/** Last uppercase word of a blocker code: the verdict it carries, if it carries one. */
+function lastToken(value: string): string {
+  const parts = value.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+  return parts[parts.length - 1] ?? "";
+}
+
+function blockersOf(candidate: Record<string, unknown>): string[] {
+  return Array.isArray(candidate.blocked_by)
     ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
     : [];
-  const validationBlocker = blockers.find((entry) => entry.startsWith("validation"));
-  if (validationBlocker) {
-    return {
-      allowed: false,
-      reason: `O servidor marcou este candidato com o bloqueio "${validationBlocker}". Peça uma nova verificação do destinatário antes de aprovar.`,
-    };
-  }
-  if (status === "VALID") return { allowed: true, reason: "" };
-  if (status === NOT_IN_PAYLOAD.toUpperCase() || status === "—") {
+}
+
+export interface ApprovalGate {
+  /** Whether the reviewer may press Aprovar at all. */
+  allowed: boolean;
+  /** Why not, when blocked. Always names the way forward. */
+  reason: string;
+  /**
+   * Whether pressing Aprovar has to obtain a validation first. The reviewer
+   * never asks for that: it is a deterministic machine step and the approve
+   * action performs it.
+   */
+  needsValidation: boolean;
+}
+
+/**
+ * Whether APPROVE is offered at all for this candidate, and whether approving
+ * has to verify the recipient on the way.
+ *
+ * The server refuses APPROVE outside a current VALID validation, and that
+ * invariant is untouched. What changed is who pays for it: obtaining the
+ * validation is a deterministic call with no human judgement in it, so the
+ * approve action makes it instead of demanding a preparatory click. A missing,
+ * stale or unresolved validation is therefore *not* a block — it is one extra
+ * request inside the same single reviewer action.
+ *
+ * A block survives only where re-checking provably cannot help: no mailbox at
+ * all, a mailbox that is not an address, a validation the server already
+ * settled as INVALID or RISKY, or a material blocker the server raised on its
+ * own (`hard_bounce`, suppression, opt-out, duplicate, copy QA, provenance).
+ * Every verdict here comes from the payload; nothing is inferred from a clock.
+ */
+export function approvalGate(candidate: Record<string, unknown>): ApprovalGate {
+  const mailbox = textOf(candidate.mailbox);
+  if (mailbox === null) {
     return {
       allowed: false,
       reason:
-        "O payload não trouxe o estado da validação deste candidato. Sem validação vigente o servidor recusa APPROVE.",
+        "O servidor não enviou destinatário nenhum para este candidato, então não há endereço a aprovar. Registre HOLD e recomponha a cohort.",
+      needsValidation: false,
     };
   }
-  return {
-    allowed: false,
-    reason: `A validação deste destinatário está ${status}, não VALID. O servidor recusa APPROVE fora de uma validação vigente: peça a verificação e aprove só depois que ela voltar VALID.`,
-  };
+  if (!SYNTACTIC_MAILBOX.test(mailbox)) {
+    return {
+      allowed: false,
+      reason: `O destinatário "${mailbox}" não é um endereço de e-mail. Registre REJECT e corrija a origem do contato antes de recompor.`,
+      needsValidation: false,
+    };
+  }
+  if (candidate.hard_bounce === true) {
+    return {
+      allowed: false,
+      reason:
+        "O servidor registra hard bounce neste endereço. Ele não pode receber entrega: registre REJECT.",
+      needsValidation: false,
+    };
+  }
+  const blockers = blockersOf(candidate);
+  const material = blockers.filter((entry) =>
+    MATERIAL_BLOCKER_PREFIXES.some((prefix) => entry.startsWith(prefix)),
+  );
+  if (material.length > 0) {
+    return {
+      allowed: false,
+      reason: `O servidor marcou este candidato com ${material.join(", ")}. Isso não se resolve verificando o destinatário de novo: registre HOLD ou REJECT com o motivo.`,
+      needsValidation: false,
+    };
+  }
+  const status = (textOf(record(candidate.validation).status) ?? "").toUpperCase();
+  const validationBlockers = blockers.filter((entry) => entry.startsWith("validation"));
+  // A validation blocker names its verdict in the last token — `validation_not_valid:INVALID`
+  // — and only that token is compared. Matching a suffix against the whole
+  // string read `approval_missing_or_invalid` as INVALID and blocked every
+  // candidate that was merely still waiting for its first review.
+  const settled = SETTLED_INVALID_STATUSES.find(
+    (entry) =>
+      status === entry
+      || validationBlockers.some((blocker) => lastToken(blocker) === entry),
+  );
+  if (settled) {
+    return {
+      allowed: false,
+      reason: `A verificação deste destinatário já voltou ${settled}, e o servidor recusa APPROVE fora de uma validação VALID. Verificar de novo não muda um veredito resolvido: registre HOLD ou REJECT.`,
+      needsValidation: false,
+    };
+  }
+  const validationBlocker = blockers.find((entry) => entry.startsWith("validation"));
+  // VALID with no validation blocker is the happy path and costs one request.
+  // Everything else here is unresolved rather than refused, so approving pays
+  // for the verification instead of the reviewer preparing it by hand.
+  const needsValidation = status !== "VALID" || validationBlocker !== undefined;
+  return { allowed: true, reason: "", needsValidation };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1425,6 +1553,7 @@ function candidateCard(
 ): string {
   const cohortId = show(cohort.id);
   const candidateId = show(candidate.candidate_id);
+  const queue = reviewQueueState(cohortId, candidate);
   const validation = record(candidate.validation);
   const review = record(candidate.review);
   // Produção manda `observed_fact` e `fact_source` como texto simples. Ler o
@@ -1521,22 +1650,48 @@ function candidateCard(
       ? candidate.copy_qa_failures.filter((entry): entry is string => typeof entry === "string")
       : [];
 
-  // Not merely disabled: a historical version emits no decision markup at all,
-  // so there is nothing for devtools to re-enable.
-  const controls = editorial.actionable
-    ? `
+  // The manual re-check survives only where it is the actual next move: a
+  // candidate whose validation is not a current VALID. On the happy path the
+  // approve action obtains the validation itself, so offering this control
+  // there would be asking the reviewer to prepare work the machine does.
+  const validateControl =
+    gate.needsValidation || !gate.allowed
+      ? `
     ${gateInFlight(validateKey) ? pendingBlock("Pedindo a verificação do destinatário") : ""}
     <form class="operator-form" data-human-gate="validate" data-gate-key="${escapeHtml(validateKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
-      <p class="constraint">Pede ao Warmbly que verifique agora se este endereço aceita entrega. Não envia mensagem nenhuma.</p>
+      <p class="constraint">Pede ao Warmbly que verifique agora se este endereço aceita entrega. Não envia mensagem nenhuma${gate.needsValidation ? ", e aprovar já faz isso sozinho" : ""}.</p>
       <button type="submit"${gateInFlight(validateKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(validateKey) ? "Enviando…" : "Verificar o destinatário agora"}</button>
     </form>
+`
+      : "";
 
+  // An approved candidate keeps every exception tool and loses exactly one
+  // control: the one that would approve it a second time.
+  const approveControl =
+    queue.state === "aprovado"
+      ? `
+    <p class="banner ok" role="status" data-already-approved="${escapeHtml(queue.optimistic ? "local" : "server")}">${
+      queue.optimistic
+        ? "Aprovação registrada nesta sessão. A releitura do servidor ainda não voltou; se ela discordar, este candidato volta para a fila."
+        : "Este candidato já está aprovado nesta versão. Para reverter, registre HOLD ou REJECT abaixo."
+    }</p>
+`
+      : `
     ${gateInFlight(approveKey) ? pendingBlock("Registrando a aprovação") : ""}
-    <form class="operator-form" data-human-gate="review" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+    <form class="operator-form approve-form" data-human-gate="review" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}"${gate.needsValidation ? ` data-auto-validate="true"` : ""}>
       <h4>Aprovar este candidato</h4>
-      <label>Motivo<input name="reason" required minlength="3"></label>
-      <label><input type="checkbox" name="ack"${gate.allowed ? " required" : ""}${gate.allowed ? "" : " disabled"}> Revisei destinatário, mensagem exata, policy e evidência desta versão</label>
-      <button type="submit"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Registrar APPROVE"}</button>
+      <p class="constraint" data-approve-meaning="true">Clicar em Aprovar é a ciência: a trilha grava sua identidade do Authelia, o instante, esta versão v${escapeHtml(version)}, o hash congelado, o destinatário exato e a decisão. Não há segunda caixa a marcar.</p>
+      ${
+        gate.needsValidation
+          ? `<p class="constraint" data-approve-autovalidate="true">Este destinatário ainda não tem verificação vigente. Aprovar pede a verificação ao Warmbly primeiro e só registra o APPROVE se ela voltar VALID — você não precisa acionar nada antes.</p>`
+          : ""
+      }
+      <button type="submit" data-approve-submit="true"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Aprovar"}</button>
+      <details data-approve-comment="true">
+        <summary>Comentário para a trilha (opcional)</summary>
+        <label>Observação<input name="reason" maxlength="200"></label>
+        <p class="constraint">Em branco, a trilha grava <code>${escapeHtml(APPROVAL_DEFAULT_REASON)}</code>. Aprovação comum não exige texto.</p>
+      </details>
       ${
         gate.allowed
           ? ""
@@ -1548,21 +1703,27 @@ function candidateCard(
           : `<p class="constraint" data-blocked-reason="review">Revisar exige o grupo <code>operators</code> no Authelia.</p>`
       }
     </form>
+`;
 
+  // Not merely disabled: a historical version emits no decision markup at all,
+  // so there is nothing for devtools to re-enable.
+  const controls = editorial.actionable
+    ? `
+    ${approveControl}
     ${gateInFlight(holdKey) ? pendingBlock("Registrando HOLD/REJECT") : ""}
     <form class="operator-form" data-human-gate="review" data-gate-key="${escapeHtml(holdKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
       <h4>Segurar ou rejeitar</h4>
       <label>Decisão<select name="decision"><option value="HOLD">HOLD</option><option value="REJECT">REJECT</option></select></label>
       <label>Motivo<input name="reason" required minlength="3"></label>
-      <p class="constraint" data-no-ack-required="true">HOLD e REJECT não pedem a ciência de aprovação: segurar ou rejeitar nunca autoriza uma mensagem.</p>
+      <p class="constraint" data-no-ack-required="true">HOLD e REJECT exigem motivo escrito: segurar ou rejeitar é a exceção, e o texto é o que explica a exceção depois.</p>
       <button type="submit"${authority.canReview && !gateInFlight(holdKey) ? "" : " disabled"}>${gateInFlight(holdKey) ? "Enviando…" : "Registrar HOLD/REJECT"}</button>
     </form>
-
+${validateControl}
     ${adjustBlock({ cohortId, candidateId, version, frozenHash, candidate, authority, adjustKey, draft })}
 `
     : `<p class="constraint" data-non-actionable-notice="true">Versão histórica, não enviável. Verificar o destinatário, aprovar, segurar e ajustar não são oferecidos aqui. Abra a versão corrente pelo link no topo desta página.</p>`;
 
-  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}">
+  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-queue-state="${escapeHtml(queue.state)}" data-queue-optimistic="${queue.optimistic ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}" data-approve-needs-validation="${gate.needsValidation && gate.allowed ? "true" : "false"}">
     <p class="kicker">${validationPill(candidate)}${editorial.legacy ? ` <span class="pill error" data-non-actionable="true">NÃO ACIONÁVEL</span>` : ""} · ${escapeHtml(show(candidate.source))}</p>
     <h3>${escapeHtml(show(candidate.company))}</h3>
     ${feedback.forCandidate(candidateId)}
@@ -1724,6 +1885,94 @@ function legacyBanner(editorial: EditorialReading, cohortId: string): string {
   </section>`;
 }
 
+/**
+ * The href of one recorte of the queue.
+ *
+ * Every other parameter on the route survives — the selected version above all,
+ * and the expand/collapse state the reviewer chose. A filter link that dropped
+ * `resource` would land the reviewer on an empty Revisão.
+ */
+function queueFilterHref(params: URLSearchParams, filter: ReviewQueueFilter): string {
+  const next = new URLSearchParams(params);
+  if (filter === DEFAULT_REVIEW_QUEUE_FILTER) next.delete(REVIEW_QUEUE_PARAM);
+  else next.set(REVIEW_QUEUE_PARAM, filter);
+  const rendered = next.toString();
+  return `#/warmbly/revisao${rendered ? `?${rendered}` : ""}`;
+}
+
+function queueFilterCount(counts: ReturnType<typeof reviewQueueCounts>, filter: ReviewQueueFilter): number {
+  switch (filter) {
+    case "pendentes":
+      return counts.pendentes;
+    case "aprovadas":
+      return counts.aprovadas;
+    case "ajuste":
+      return counts.ajuste;
+    case "todas":
+      return counts.total;
+  }
+}
+
+/**
+ * How much of the cohort is left, and which recorte is on screen.
+ *
+ * The counts are of this version's own candidates, not of the preview
+ * denominators above: the reviewer is asking "quanto falta para eu terminar",
+ * and only the payload's candidate list answers that.
+ */
+function queueBlock(
+  counts: ReturnType<typeof reviewQueueCounts>,
+  filter: ReviewQueueFilter,
+  params: URLSearchParams,
+): string {
+  const tabs = REVIEW_QUEUE_FILTERS.map(
+    (id) =>
+      `<a href="${escapeHtml(queueFilterHref(params, id))}" data-review-filter="${id}" aria-current="${filter === id ? "page" : "false"}">${escapeHtml(
+        ownMapValue(REVIEW_QUEUE_FILTER_LABELS, id) ?? id,
+      )} (${queueFilterCount(counts, id)})</a>`,
+  ).join("");
+  return `<article class="card" data-review-progress="true" data-queue-filter="${escapeHtml(filter)}" data-queue-pending="${counts.pendentes}" data-queue-approved="${counts.aprovadas}" data-queue-adjust="${counts.ajuste}" data-queue-total="${counts.total}">
+    <p class="kicker"><span class="pill">FILA</span></p>
+    <h3 data-queue-progress-text="true">${counts.pendentes} pendente(s) · ${counts.aprovadas} aprovada(s) · ${counts.ajuste} em ajuste · ${counts.total} no total</h3>
+    <nav class="subnav queue-filters" data-review-filters="true" aria-label="Estado da revisão">${tabs}</nav>
+    <p class="constraint">A fila abre em Pendentes. Uma mensagem aprovada sai daqui na hora e a próxima assume a posição; as concluídas continuam legíveis nos outros recortes.</p>
+  </article>`;
+}
+
+/**
+ * What the reviewer sees when the recorte they asked for is empty.
+ *
+ * "Nada aqui" is three different situations — o cohort inteiro está decidido,
+ * ninguém aprovou nada ainda, ninguém segurou nada — and each one has a
+ * different next move.
+ */
+function emptyQueueBlock(
+  counts: ReturnType<typeof reviewQueueCounts>,
+  filter: ReviewQueueFilter,
+  params: URLSearchParams,
+  actionable: boolean,
+): string {
+  const everything = `<p><a class="button" data-queue-see-all="true" href="${escapeHtml(queueFilterHref(params, "todas"))}">Ver todas as ${counts.total}</a></p>`;
+  if (filter === "pendentes") {
+    // A historical version offers no GO control at all, so naming GO as the
+    // next step there would point the founder at a button this screen refuses
+    // to render.
+    const next = actionable
+      ? "O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão."
+      : "Esta versão é histórica e não é enviável, então não há próximo passo aqui: decida na versão corrente.";
+    return `<article class="card banner ok" role="status" data-queue-empty="pendentes">
+      <h3>Fila vazia: nada pendente nesta versão.</h3>
+      <p>Os ${counts.total} candidatos desta versão já foram decididos — ${counts.aprovadas} aprovado(s) e ${counts.ajuste} em ajuste ou rejeitado(s). ${escapeHtml(next)}</p>
+      ${everything}
+    </article>`;
+  }
+  return `<article class="card banner empty" data-queue-empty="${escapeHtml(filter)}">
+    <h3>Nenhum candidato neste recorte.</h3>
+    <p>Esta versão tem ${counts.pendentes} pendente(s), ${counts.aprovadas} aprovada(s) e ${counts.ajuste} em ajuste. Nada foi escondido: só o recorte escolhido está vazio.</p>
+    ${everything}
+  </article>`;
+}
+
 function reviewSurface(input: WarmblySurfaceInput): string {
   const selected = gateSection(input, "selected");
   const list = gateSection(input, "list");
@@ -1755,12 +2004,35 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   const manifest = record(cohort.manifest);
   const preview = record(manifest.preview);
   const candidates = array(cohort.candidates);
-  const expandAll = new URLSearchParams(input.query ?? "").get("mensagens") !== "recolhidas";
+  const params = new URLSearchParams(input.query ?? "");
+  const expandAll = params.get("mensagens") !== "recolhidas";
   const cohortId = show(cohort.id);
   const version = show(cohort.version);
   const reproduceKey = `reproduce:${cohortId}::`;
   const decideKey = `decide:${cohortId}::`;
-  const candidateCards = candidates
+  // The recorte links are built from the route's own query, and the selected
+  // version is restated into it when the route did not carry it. A filter that
+  // drops `resource` lands the reviewer on an empty Revisão, which is the exact
+  // defect the subnav already had to be fixed for.
+  const queueParams = new URLSearchParams(params);
+  if (!queueParams.get("resource") && cohort.id) queueParams.set("resource", cohortId);
+  const queueFilter = resolveReviewQueueFilter(params.get(REVIEW_QUEUE_PARAM));
+  const counts = reviewQueueCounts(cohortId, candidates);
+  const visible = candidates.filter((candidate) =>
+    reviewQueueFilterMatches(queueFilter, reviewQueueState(cohortId, candidate).state),
+  );
+  // A decision leaves the pending recorte the instant it is taken, so the card
+  // that would have carried the "enviando" state is already gone. The wait is
+  // reported here instead: a write in flight with no visible pending state is
+  // what invites the second click.
+  const decisionsInFlight = candidates.filter((candidate) => {
+    const id = show(candidate.candidate_id);
+    return (
+      gateInFlight(`review:${cohortId}:${id}:APPROVE`)
+      || gateInFlight(`review:${cohortId}:${id}:HOLD_REJECT`)
+    );
+  }).length;
+  const candidateCards = visible
     .map((candidate) => candidateCard(cohort, candidate, authority, feedback, expandAll))
     .join("");
   const cohortFeedback = feedback.forCohort(cohortId);
@@ -1794,7 +2066,22 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   ${previewBlock(preview)}
   <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
   ${reproduceControl}
-  ${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
+  ${
+    decisionsInFlight > 0
+      ? pendingBlock(
+          decisionsInFlight === 1
+            ? "Registrando a decisão de 1 candidato"
+            : `Registrando a decisão de ${decisionsInFlight} candidatos`,
+        )
+      : ""
+  }
+  ${queueBlock(counts, queueFilter, queueParams)}
+  ${
+    candidateCards
+      || (candidates.length === 0
+        ? `<p class="banner error">Cohort vazia: GO bloqueado.</p>`
+        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable))
+  }
   ${decideControl}
   <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>
   <p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
