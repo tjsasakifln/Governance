@@ -1,6 +1,6 @@
 # Control Center web shell
 
-Mobile-first cockpit for Confenge Control Center. This workstream is **fixture-backed and decoupled from a live backend**. It is not chat, not a generic ERP, and not a KPI wall.
+Mobile-first cockpit for Confenge Control Center. It is not chat, not a generic ERP, and not a KPI wall. Production reads its bounded context from the context service; local development can use fixtures.
 
 ## Destinations
 
@@ -49,7 +49,7 @@ Ajustar assunto/corpo cria uma **nova versão** (`POST …/candidates/{id}/adjus
 Enquanto essa rota não estiver implantada, a UI trata o 404 como estado esperado,
 diz isso e desabilita o editor em vez de oferecer um controle que não escreve.
 
-Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. Financial and commercial-send mutations (cobrança, checkout, refund, cancelamento, Asaas write, commercial send) are not offered.
+Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. `Comercial → Rascunhos` is the founder's exact-copy review surface: adjust, approve for the next eligible business window, or reject back into editorial recovery. Financial mutations and immediate commercial send are not offered.
 
 ## Cards de alerta
 
@@ -81,9 +81,9 @@ Responsável é **área**, não pessoa: nenhum contrato carrega responsável nom
 
 ## Decisions (local)
 
-- Governance remains the strategic/canonical authority; Warmbly remains the commercial/CRM operational authority. This shell only renders a read-model recorte.
+- Governance remains the strategic/canonical authority; Warmbly remains the commercial/CRM operational authority. The shell renders bounded read models and submits only typed human-review decisions through the context service.
 - Persistence of aggregated state (PostgreSQL), HTTP APIs, and MCP for agents land in **later convergence campaigns**. This package copies v1 field names locally (`source`, `observed_at`, `freshness_status`, `confidence`, cents+currency, directive kinds, freshness `FRESH|STALE|UNKNOWN|ERROR`) and does **not** import unpublished sibling `control-center/*` packages.
-- Mock adapters are the only I/O. They never `fetch`. Swap the adapter implementation later; keep the `ControlCenterReadAdapter` port.
+- The adapter port has fixture and HTTP implementations. Production uses the same-origin `/api/context` proxy; Warmbly credentials stay server-side.
 - Single-user human is implicit. The operator is an opaque display handle (`human:operator`). No identity, password, or secret is hardcoded.
 - Dates are UTC in data (`…Z`). Presentation uses `America/Sao_Paulo`.
 - PWA: a web manifest + SVG icons only. No service worker / offline cache.

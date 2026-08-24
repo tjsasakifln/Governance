@@ -13,6 +13,7 @@ import {
   type OperatorActionService,
 } from "./operational/actions.ts";
 import { createOperationalService, type OperationalService } from "./operational/service.ts";
+import { createWarmblyReviewPortFromEnv, type WarmblyReviewPort } from "./operational/warmbly-review.ts";
 import { createStoreFromEnv, createStoreFromEnvAsync } from "./store/from-env.ts";
 import type { PersistencePort } from "./store/adapter.ts";
 import type { PostgresStore } from "./store/postgres.ts";
@@ -23,6 +24,7 @@ export interface BootResult {
   service: ContextService;
   operational: OperationalService;
   operatorActions: OperatorActionService;
+  warmblyReview?: WarmblyReviewPort;
   founderActorId: string;
   defaultScope: Scope;
   fixture: string;
@@ -84,7 +86,8 @@ function assembleBoot(
     storeName === "postgres"
       ? createPostgresOperatorActionService((store as PostgresStore).persistence, founderActorId)
       : createMemoryOperatorActionService(founderActorId);
-  return { service, operational, operatorActions, founderActorId, defaultScope, fixture, storeName, repoDomains };
+  const warmblyReview = createWarmblyReviewPortFromEnv(env, founderActorId);
+  return { service, operational, operatorActions, warmblyReview, founderActorId, defaultScope, fixture, storeName, repoDomains };
 }
 
 export function bootFromEnv(

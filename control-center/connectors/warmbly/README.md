@@ -1,6 +1,6 @@
 # Warmbly connector (Control Center)
 
-Read-only adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline — plus one narrow, named **operator action channel** (`src/operator/`) for three operational controls.
+Read adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline. It also defines one narrow **operator action channel** (`src/operator/`) for three operational controls and a separate founder-only human-review bridge in `control-center/services/context`.
 
 Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stages as Control Center source of truth.
 
@@ -30,7 +30,8 @@ Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stag
   - `resume_dispatch` is two step because it is the action that can let traffic flow: `requestResumeConfirmation` mints a single-use, 2-minute, actor-bound and target-bound token, and `execute` refuses without it. `pause_dispatch` is one step and is never confirmation-gated.
   - Operator writes are **never retried** (a retried acknowledge would double-acknowledge). 4xx from Warmbly does not trip the circuit breaker; 5xx/429/timeout does.
   - The channel may share the read client's `CircuitBreaker`, so a degraded Warmbly blocks operator writes too. When the breaker is open, the refusal names the out-of-band fallback: `deploy/confenge-vps/pause.sh` on the VPS.
-- **Still forbidden, through this channel or any other:** `PATCH`/`PUT`/`DELETE` on any path, creating contacts/deals/tasks, campaign start/stop/send, `dispatch-now` / cohort dispatch, enroll, approve-content, draft send, `POST /v1/confenge/inbound/:id/outcome` and `/resolve`, Confenge import/sync/bootstrap, unibox reply/compose/snooze, and **any Asaas / checkout / refund / financial mutation** (`commercial/authority/authority-manifest.v1.json` still carries `real_money_mutation_approved: false`).
+- **Amended boundary (human-review bridge).** `control-center/services/context` may call only the exact review routes listed in `required_upstream_contract.json → human_review_bridge`. The authenticated founder may save copy adjustments, approve an exact content hash for the next eligible business window, reject a draft back into editorial recovery, or apply those decisions in a bounded batch. Approval never transports a message immediately.
+- **Still forbidden:** `PATCH`/`PUT`/`DELETE` on any path, creating contacts/deals/tasks, campaign start/stop/send, `dispatch-now` / cohort dispatch, enroll, draft send, review writes outside the typed review bridge, `POST /v1/confenge/inbound/:id/outcome` and `/resolve`, Confenge import/sync/bootstrap, unibox reply/compose/snooze, and **any Asaas / checkout / refund / financial mutation** (`commercial/authority/authority-manifest.v1.json` still carries `real_money_mutation_approved: false`).
 - Every aggregated item carries `source`, `observed_at` (UTC), `freshness_status`, and `confidence` when the upstream payload supplies it.
 - Deal money is integer **cents** + `currency`. Warmbly `value` is treated as major units (1500.50 BRL → 150050 cents).
 - No `GET /leads` exists on Warmbly. Contacts search + Confenge inbound (when enabled) are the lead surface. The gap is documented in `required_upstream_contract.json`.
@@ -60,6 +61,19 @@ See `required_upstream_contract.json` for the full table. Collect calls:
 | GET | `/v1/confenge/inbound` | inbound leads needing a human |
 
 Auth: `Authorization: Bearer <token>` and `API-Version: v1`. Tokens are prefixed `wmbly_`.
+
+## Human-review bridge (`control-center/services/context`)
+
+The Control Center's `Comercial → Rascunhos` surface uses a dedicated, server-side proxy. The browser never receives the Warmbly token and cannot choose an upstream path.
+
+| Control Center route | Warmbly route | Purpose |
+| --- | --- | --- |
+| `GET /v1/commercial/review-drafts` | `GET /v1/confenge/review/drafts` | list recoverable drafts awaiting review |
+| `GET /v1/commercial/review-drafts/:id` | `GET /v1/confenge/review/drafts/:id` | inspect one exact draft |
+| `POST /v1/commercial/review-drafts/:id` | `POST /v1/confenge/review/drafts/:id/decision` | save adjustment, approve, or reject |
+| `POST /v1/commercial/review-batches` | `POST /v1/confenge/review/batches` | apply up to 500 independently reported decisions |
+
+Every request requires the trusted founder identity. `APPROVE` carries `expected_content_hash` and only creates a durable queue entry for the next eligible business window. `REJECT` preserves the lead and routes the draft to AI-assisted editorial recovery. This bridge does not expose an immediate-send operation.
 
 ## Operator action channel (`src/operator/`)
 

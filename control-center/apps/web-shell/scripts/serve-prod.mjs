@@ -39,14 +39,14 @@ const actorKind = (process.env.CC_ACTOR_KIND ?? "").trim();
 
 function copyActorHeaders(req) {
   const headers = { accept: "application/json" };
-  for (const name of ["x-actor-id", "x-actor-kind", "content-type"]) {
-    const value = req.headers[name];
-    if (typeof value === "string" && value.trim()) {
-      headers[name] = value;
-    }
+  const contentType = req.headers["content-type"];
+  if (typeof contentType === "string" && contentType.trim()) {
+    headers["content-type"] = contentType;
   }
-  if (!headers["x-actor-id"] && actorId) headers["x-actor-id"] = actorId;
-  if (!headers["x-actor-kind"] && actorKind) headers["x-actor-kind"] = actorKind;
+  // Browser-supplied actor headers are never trusted. Production injects the
+  // configured founder identity at this server-side hop.
+  if (actorId) headers["x-actor-id"] = actorId;
+  if (actorKind) headers["x-actor-kind"] = actorKind;
   return headers;
 }
 
@@ -93,7 +93,12 @@ export const server = createServer((req, res) => {
     void readProxyBody(req)
       .then((body) => fetch(`${contextUpstream}${url.pathname}${url.search}`, {
         method: req.method,
-        headers: copyActorHeaders(req),
+        headers: {
+          ...copyActorHeaders(req),
+          ...(typeof req.headers["idempotency-key"] === "string"
+            ? { "idempotency-key": req.headers["idempotency-key"] }
+            : {}),
+        },
         ...(body === undefined ? {} : { body }),
       }))
       .then(async (upstream) => {

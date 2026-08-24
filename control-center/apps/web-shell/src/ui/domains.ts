@@ -761,6 +761,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
 export function commercialSubnav(surface: string | null): string {
   const items = [
     ["visao", "Visão"],
+    ["rascunhos", "Rascunhos"],
     ["cohorts", "Coortes"],
     ["atividade", "Atividade"],
     ["pipeline", "Pipeline"],
@@ -979,9 +980,41 @@ function commercialOps(
   const activity = Array.isArray(ops.activity) ? ops.activity : [];
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
   const exceptions = Array.isArray(ops.exceptions) ? ops.exceptions : [];
+  const reviewDrafts = Array.isArray(ops.review_drafts) ? ops.review_drafts : [];
   const availability = snapshot.availability ?? "UNKNOWN";
   let body = "";
-  if (current === "cohorts") {
+  if (current === "rascunhos") {
+    body = `<section aria-labelledby="rascunhos-title"><h2 id="rascunhos-title">Revisão editorial</h2>
+      <p class="constraint">Aprovar vincula o hash exato e agenda a próxima janela útil. Nenhum botão envia imediatamente.</p>
+      <div class="stack">${reviewDrafts.length === 0
+        ? `<p class="banner empty">Nenhum rascunho aguardando revisão.</p>`
+        : reviewDrafts.map((item) => {
+            const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+            const account = row.account && typeof row.account === "object" ? (row.account as Record<string, unknown>) : {};
+            const id = String(row.id ?? "");
+            const hash = String(row.content_hash ?? "");
+            return `<article class="card review-draft" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}">
+              <p class="kicker">${escapeHtml(String(row.state ?? ""))} · ${escapeHtml(String(row.purpose ?? ""))} · toque ${escapeHtml(String(row.ordinal ?? ""))}</p>
+              <h3>${escapeHtml(String(account.nome_fantasia ?? account.razao_social ?? row.account_id ?? "Lead"))}</h3>
+              <p>Destinatário: ${escapeHtml(String(row.recipient ?? "ausente"))}</p>
+              <p>Razão: ${escapeHtml(String(row.stop_reason ?? row.generation_error ?? "pronto para revisão"))}</p>
+              <form data-review-form="${escapeHtml(id)}" class="operator-form">
+                <input type="hidden" name="expected_content_hash" value="${escapeHtml(hash)}" />
+                <label>Assunto <textarea name="subject">${escapeHtml(String(row.subject ?? ""))}</textarea></label>
+                <label>Corpo <textarea name="body_text">${escapeHtml(String(row.body_text ?? ""))}</textarea></label>
+                <label>Decisão <select name="action">
+                  <option value="SAVE_ADJUSTMENT">Salvar ajuste</option>
+                  <option value="APPROVE">Aprovar e agendar</option>
+                  <option value="REJECT">Rejeitar e reescrever</option>
+                </select></label>
+                <label>Motivo da rejeição <textarea name="reason"></textarea></label>
+                <label>Caixa genérica/departamental <select name="generic_ack"><option value="false">não confirmar</option><option value="true">confirmo conscientemente</option></select></label>
+                <button type="submit">Registrar decisão</button>
+              </form>
+            </article>`;
+          }).join("")}</div>
+    </section>`;
+  } else if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];
     const inbound = cohorts.inbound_truth && typeof cohorts.inbound_truth === "object" ? (cohorts.inbound_truth as Record<string, unknown>) : {};
     const mixingRule = String(cohorts.mixing_rule ?? "");

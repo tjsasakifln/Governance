@@ -77,15 +77,58 @@
       "notes": "already on the read allowlist; the operator UI should render kill-switch state from this before offering resume"
     }
   },
+  "human_review_bridge": {
+    "owner": "control-center/services/context",
+    "identity": "authenticated founder from the trusted Authelia ForwardAuth hop",
+    "token_handling": "WARMBLY_API_TOKEN stays in the server-side context service and is never exposed to the browser",
+    "mapped_reads": [
+      {
+        "method": "GET",
+        "path": "/v1/confenge/review/drafts",
+        "permission": "PermViewContacts / APIPermReadContacts",
+        "notes": "bounded review list with exact content_hash, recipient risk and editorial state"
+      },
+      {
+        "method": "GET",
+        "path": "/v1/confenge/review/drafts/{draft_id}",
+        "permission": "PermViewContacts / APIPermReadContacts",
+        "notes": "one reviewable draft; draft_id is validated before forwarding"
+      }
+    ],
+    "mapped_writes": [
+      {
+        "method": "POST",
+        "path": "/v1/confenge/review/drafts/{draft_id}/decision",
+        "permission": "PermManageContacts / APIPermWriteContacts",
+        "actions": ["SAVE_ADJUSTMENT", "APPROVE", "REJECT"],
+        "notes": "APPROVE binds expected_content_hash and schedules the exact copy for the next eligible business window; it never sends immediately"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/confenge/review/batches",
+        "permission": "PermManageContacts / APIPermWriteContacts",
+        "limit": 500,
+        "notes": "bounded decisions with a per-item result; partial failures do not conceal successful items"
+      }
+    ],
+    "invariants": [
+      "no caller-supplied upstream method or path",
+      "APPROVE requires the exact expected_content_hash currently under review",
+      "generic or departmental recipients require explicit acknowledgement",
+      "REJECT preserves the lead and enters recoverable editorial processing",
+      "approval queues for the next eligible business window and does not bypass pause, kill switch or dispatch policy",
+      "no immediate-send operation exists in this bridge"
+    ]
+  },
   "forbidden_in_this_connector": [
     "PATCH/PUT/DELETE any path",
     "POST /v1/campaigns, /start, /stop, /test-email, enroll, import, dispatch",
-    "POST /v1/confenge/import, /sync, /crm/bootstrap, /campaign/bootstrap, /inbound/:id/outcome, /inbound/:id/resolve, send/enroll/approve",
+    "POST /v1/confenge/import, /sync, /crm/bootstrap, /campaign/bootstrap, /inbound/:id/outcome, /inbound/:id/resolve, send/enroll",
     "POST /v1/confenge/cohorts/:id/dispatch, /accounts/:id/resume, /drafts/:id/send",
     "POST /v1/unibox/reply, /compose, /snooze",
     "POST /v1/crm/deals (create), POST /v1/crm/tasks (create), POST /v1/contacts (create)",
     "Any Asaas / checkout / refund / financial mutation",
-    "Any POST outside the three operator_actions.mapped_writes rows"
+    "Any POST outside operator_actions.mapped_writes and human_review_bridge.mapped_writes"
   ],
   "gaps": [
     {

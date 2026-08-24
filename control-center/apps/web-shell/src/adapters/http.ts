@@ -632,6 +632,59 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     }
   }
 
+  async reviewDraftAction(input: {
+    id: string;
+    action: "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT";
+    expected_content_hash: string;
+    subject?: string;
+    body_text?: string;
+    reason?: string;
+    generic_recipient_acknowledged?: boolean;
+  }): Promise<AdapterWriteResult> {
+    const path = `/v1/commercial/review-drafts/${encodeURIComponent(input.id)}`;
+    const idempotency = `review:${input.action}:${input.id}:${input.expected_content_hash}`;
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "idempotency-key": idempotency,
+        },
+        credentials: "include",
+        body: JSON.stringify(input),
+      });
+      const raw = await response.text();
+      if (!response.ok) {
+        let message = `decisão recusada (${response.status})`;
+        try {
+          const body = JSON.parse(raw) as { message?: string };
+          if (body.message) message = body.message;
+        } catch {
+          // The status remains the safe diagnostic.
+        }
+        const failed: AdapterWriteResult = { ok: false, path, kind: "nota", message };
+        this.lastOperatorResult = failed;
+        return failed;
+      }
+      const message = input.action === "APPROVE"
+        ? "mensagem aprovada e agendada para a próxima janela útil"
+        : input.action === "REJECT"
+          ? "rascunho rejeitado e devolvido para reescrita"
+          : "ajuste salvo; aprovação ainda pendente";
+      const accepted: AdapterWriteResult = { ok: true, path, kind: "nota", message };
+      this.lastOperatorResult = accepted;
+      return accepted;
+    } catch (err) {
+      const failed: AdapterWriteResult = {
+        ok: false, path, kind: "nota",
+        message: err instanceof Error ? err.message : "Warmbly indisponível",
+      };
+      this.lastOperatorResult = failed;
+      return failed;
+    }
+  }
+
   async writeShortcut(kind: WriteShortcutKind, draft: { title: string; body: string }): Promise<AdapterWriteResult> {
     if (!(WRITE_SHORTCUT_KINDS as readonly string[]).includes(kind)) {
       return { ok: false, path: AUTHORIZED_WRITE_PATH, kind, message: "atalho não autorizado" };
@@ -822,6 +875,17 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     };
     if (id === "comercial" || id === "crescimento" || id === "warmbly") {
       page.commercial = commercialFrom(inner, fallback);
+      if (id === "comercial") {
+        // During a rolling deployment the read model may precede the review
+        // proxy. A 404 means the optional surface is not available yet; it
+        // must not blank the rest of the commercial cockpit.
+        const reviewPayload = asRecord(await this.readReviewJson("/v1/commercial/review-drafts?limit=100&offset=0"));
+        const reviewRows = itemsOf(reviewPayload?.data ?? reviewPayload);
+        page.commercial.operations = {
+          ...(page.commercial.operations ?? {}),
+          review_drafts: reviewRows,
+        };
+      }
     }
     if (id === "comercial" && page.commercial && listPath) {
       const listPayload = asRecord(payloads[paths.length]);
@@ -995,7 +1059,23 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     }
   }
 
-  private async getJson(path: string): Promise<unknown> {
+  private async readReviewJson(path: string): Promise<unknown> {
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      headers: { accept: "application/json" },
+      credentials: "include",
+    });
+    if (response.status === 404) return undefined;
+    if (!response.ok) {
+      throw new Error(`Backend operacional indisponível (${response.status} ${path}).`);
+    }
+    try {
+      return await response.json() as unknown;
+    } catch {
+      throw new Error(`Backend operacional devolveu JSON inválido em ${path}.`);
+    }
+  }
+
+  private async getJson(path: string, allowNotFound = false): Promise<unknown> {
     const url = `${this.baseUrl}${path}`;
     const response = await this.fetchImpl(url, {
       headers: {
@@ -1005,6 +1085,9 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       },
     });
     const text = await response.text();
+    if (allowNotFound && response.status === 404) {
+      return undefined;
+    }
     if (!response.ok) {
       throw new Error(`Backend operacional indisponível (${response.status} ${path}).`);
     }
