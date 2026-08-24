@@ -39,7 +39,7 @@ test("pendentes is the operational default, and an unknown recorte falls back to
 test("the server's own verdict decides the state, and an invalidated APPROVE is work again", () => {
   assert.equal(serverReviewState(candidate("a", null)), "pendente");
   assert.equal(serverReviewState(candidate("a", {})), "pendente");
-  assert.equal(serverReviewState(candidate("a", { decision: "APPROVE" })), "aprovado");
+  assert.equal(serverReviewState(candidate("a", { decision: "APPROVE" })), "pendente");
   assert.equal(serverReviewState(candidate("a", { decision: "APPROVE", effective: true })), "aprovado");
   // Drift under an approval — recipient, copy, policy or evidence moved — puts
   // the message back in front of the reviewer instead of hiding it as done.
@@ -95,7 +95,7 @@ test("the counts are of this version's candidates and add up to the total", () =
   resetReviewQueue();
   const rows = [
     candidate("c1", null),
-    candidate("c2", { decision: "APPROVE" }),
+    candidate("c2", { decision: "APPROVE", effective: true }),
     candidate("c3", { decision: "HOLD" }),
     candidate("c4", { decision: "APPROVE", effective: false }),
   ];

@@ -21,7 +21,11 @@ import {
   resetQueueAdvance,
 } from "../src/app";
 import { resetGateFlight } from "../src/human-gate-flight";
-import { REVIEW_QUEUE_PARAM, resetReviewQueue } from "../src/review-queue";
+import {
+  REVIEW_QUEUE_PARAM,
+  decidedReviewState,
+  resetReviewQueue,
+} from "../src/review-queue";
 import { warmblyBlock } from "../src/ui/warmbly";
 import { clearPendingResumeConfirmation } from "../src/warmbly-confirmation";
 
@@ -2174,6 +2178,117 @@ test("uma releitura que não confirma o efeito devolve a mensagem para a fila", 
   assert.match(dom.root.innerHTML, /data-queue-pending="1"/, "sem confirmação, continua sendo trabalho");
 });
 
+test("uma escrita aceita cuja releitura falha não some da fila nem avança a chave de idempotência", async () => {
+  reset();
+  let readable = true;
+  let makeUnreadable = true;
+  const { adapter, seen } = gateAdapter({
+    gate: () =>
+      readable
+        ? gatePayload(["operators", "admins"], cohort())
+        : { list_status: "unreadable", selected_status: "unreadable" },
+    respond: () => {
+      if (makeUnreadable) readable = false;
+      return {
+        ok: true,
+        path: "/x",
+        kind: "nota" as const,
+        message: "APPROVE aceito pelo canal.",
+        outcome: "executed",
+        gateAction: "review" as const,
+      };
+    },
+  });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  approve(dom);
+  await settle();
+  assert.equal(
+    decidedReviewState(COHORT_ID, CANDIDATE_ID),
+    undefined,
+    "a marca local não pode sobreviver sem confirmação",
+  );
+  assert.match(dom.root.innerHTML, /data-readback="unavailable"/);
+
+  // O recurso volta a ser legível e a mesma intenção é repetida. Como a
+  // primeira escrita nunca foi confirmada, a chave precisa ser a mesma.
+  readable = true;
+  makeUnreadable = false;
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  approve(dom);
+  await settle();
+  assert.equal(seen.length, 2);
+  assert.equal(seen[0]!.idempotency_key, seen[1]!.idempotency_key);
+});
+
+test("APPROVE gravado mas não efetivo continua pendente", async () => {
+  reset();
+  let review: Record<string, unknown> | null = null;
+  const { adapter } = gateAdapter({
+    gate: () =>
+      gatePayload(
+        ["operators", "admins"],
+        cohort({ candidates: [candidate({ review })] }),
+      ),
+    respond: () => {
+      review = { decision: "APPROVE", effective: false };
+      return {
+        ok: true,
+        path: "/x",
+        kind: "nota" as const,
+        message: "decisão registrada sem efeito",
+        outcome: "executed",
+        gateAction: "review" as const,
+      };
+    },
+  });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  approve(dom);
+  await settle();
+  assert.match(dom.root.innerHTML, /data-readback="not_confirmed"/);
+  assert.match(dom.root.innerHTML, /data-queue-state="pendente"/);
+});
+
+test("depois da confirmação a verdade de outra aba vence a antiga marca otimista", async () => {
+  reset();
+  let review: Record<string, unknown> | null = null;
+  const { adapter } = gateAdapter({
+    gate: () =>
+      gatePayload(
+        ["operators", "admins"],
+        cohort({ candidates: [candidate({ review })] }),
+      ),
+    respond: () => {
+      review = { decision: "APPROVE", effective: true };
+      return {
+        ok: true,
+        path: "/x",
+        kind: "nota" as const,
+        message: "registrado",
+        outcome: "executed",
+        gateAction: "review" as const,
+      };
+    },
+  });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  approve(dom);
+  await settle();
+  assert.equal(decidedReviewState(COHORT_ID, CANDIDATE_ID), undefined);
+
+  // Outra aba registra HOLD; repintar esta aba deve mostrar o servidor, não a
+  // aprovação que este browser decidiu antes.
+  review = { decision: "HOLD", effective: false };
+  paintShell(
+    dom.root as never,
+    adapter as never,
+    `#/warmbly/revisao?resource=${COHORT_ID}&${REVIEW_QUEUE_PARAM}=todas`,
+  );
+  assert.match(dom.root.innerHTML, /data-queue-state="ajuste"/);
+  assert.doesNotMatch(dom.root.innerHTML, /data-already-approved=/);
+});
+
 test("um duplo clique em Aprovar não vira duas aprovações, nem durante a verificação", async () => {
   reset();
   const state = validatingGate("VALID");
@@ -2285,6 +2400,9 @@ test("o atalho é A sozinho ou Ctrl/Cmd+Enter, e nada mais", () => {
   assert.equal(approvalShortcutScope({ key: "A" }, false), "focused-card");
   assert.equal(approvalShortcutScope({ key: "Enter", ctrlKey: true }, false), "first-pending");
   assert.equal(approvalShortcutScope({ key: "Enter", metaKey: true }, false), "first-pending");
+  assert.equal(approvalShortcutScope({ key: "Enter", ctrlKey: true, repeat: true }, false), null);
+  assert.equal(approvalShortcutScope({ key: "a", repeat: true }, false), null);
+  assert.equal(approvalShortcutScope({ key: "Enter", ctrlKey: true }, false, true), null);
   // Ctrl+A continua sendo selecionar tudo, e Enter sozinho continua sendo Enter.
   assert.equal(approvalShortcutScope({ key: "a", ctrlKey: true }, false), null);
   assert.equal(approvalShortcutScope({ key: "a", metaKey: true }, false), null);
@@ -2293,6 +2411,30 @@ test("o atalho é A sozinho ou Ctrl/Cmd+Enter, e nada mais", () => {
   assert.equal(approvalShortcutScope({ key: "Enter" }, false), null);
   assert.equal(approvalShortcutScope({ key: "b" }, false), null);
   assert.equal(approvalShortcutScope({}, false), null);
+});
+
+test("o adaptador recusa HOLD/REJECT sem motivo antes do fio", async () => {
+  reset();
+  let calls = 0;
+  const adapter = new HttpControlCenterAdapter({
+    baseUrl: "http://control-center.fixture",
+    fetchImpl: (async () => {
+      calls += 1;
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as typeof fetch,
+  });
+  for (const decision of ["HOLD", "REJECT"] as const) {
+    const result = await adapter.warmblyGate({
+      action: "review",
+      version_id: COHORT_ID,
+      candidate_id: CANDIDATE_ID,
+      decision,
+      reason: "   ",
+      idempotency_key: `idem-${decision.toLowerCase()}`,
+    });
+    assert.equal(result.code, "gate_precondition");
+  }
+  assert.equal(calls, 0);
 });
 
 test("um canal que morre sem responder devolve a mensagem para a fila como desfecho desconhecido", async () => {

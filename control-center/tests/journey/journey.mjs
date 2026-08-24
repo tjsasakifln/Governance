@@ -97,6 +97,25 @@ check("exact subject is visible without opening anything", await subj.isVisible(
 check("exact body is visible without opening anything", await body.isVisible().catch(() => false));
 check("recipient is shown on the card", (await page.locator("[data-candidate-identity]").first().innerText().catch(() => "")).includes("@"));
 check("preview denominators are rendered", await page.locator("[data-preview-denominators]").count() > 0);
+const structure = await page.evaluate(() => {
+  const ids = [...document.querySelectorAll("[id]")].map((node) => node.id);
+  const cards = [...document.querySelectorAll("[data-candidate-id]")];
+  return {
+    duplicateIds: ids.filter((id, index) => id !== "" && ids.indexOf(id) !== index),
+    nestedForms: document.querySelectorAll("form form").length,
+    malformedCards: cards.filter(
+      (card) =>
+        card.querySelectorAll("[data-exact-subject]").length !== 1
+        || card.querySelectorAll("[data-exact-body]").length !== 1
+        || card.querySelectorAll("[data-candidate-identity]").length !== 1,
+    ).length,
+  };
+});
+check("the browser parsed every candidate card as one intact structure",
+  structure.malformedCards === 0 && structure.nestedForms === 0,
+  `malformed=${structure.malformedCards} nested_forms=${structure.nestedForms}`);
+check("the review surface has no duplicate element ids", structure.duplicateIds.length === 0,
+  structure.duplicateIds.join(","));
 
 // ---- 4. The queue opens on pending work and says how much is left
 check("the review surface opens on the pending recorte",
@@ -121,6 +140,29 @@ const cardBefore = await page.locator("[data-candidate-id]").count();
 check("the approve control carries no required motive and no acknowledgement checkbox",
   await page.locator("form.approve-form [name='ack']").count() === 0
   && await page.locator("form.approve-form [name='reason'][required]").count() === 0);
+await firstApprove.focus();
+const pendingBeforeShortcutGuards = await page.locator("[data-queue-progress-text]").first().innerText();
+await page.evaluate(() => {
+  document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Enter", ctrlKey: true, repeat: true, bubbles: true, cancelable: true,
+  }));
+});
+await page.waitForTimeout(250);
+check("a repeating keyboard event cannot approve or advance the queue",
+  await page.locator("[data-queue-progress-text]").first().innerText() === pendingBeforeShortcutGuards);
+await page.evaluate(() => {
+  const overlay = document.createElement("div");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("data-journey-overlay", "true");
+  document.body.append(overlay);
+  document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Enter", ctrlKey: true, bubbles: true, cancelable: true,
+  }));
+  overlay.remove();
+});
+await page.waitForTimeout(250);
+check("a keyboard shortcut cannot cross an active modal overlay",
+  await page.locator("[data-queue-progress-text]").first().innerText() === pendingBeforeShortcutGuards);
 await firstApprove.click();
 await page.waitForTimeout(1800);
 const cardAfter = await page.locator("[data-candidate-id]").count();

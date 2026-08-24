@@ -445,6 +445,13 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         "approval_acknowledgement_required",
       );
     }
+    if (
+      input.action === "review"
+      && (input.decision === "HOLD" || input.decision === "REJECT")
+      && !input.reason?.trim()
+    ) {
+      return refuse("HOLD/REJECT exige motivo escrito", "gate_precondition");
+    }
     if (input.action === "decide" && !input.confirmation?.trim()) {
       return refuse(
         "GO/NO-GO exige a confirmação digitada da versão imutável",

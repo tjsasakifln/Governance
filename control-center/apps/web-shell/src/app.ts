@@ -29,7 +29,11 @@ import {
   resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
-import { markReviewDecided, rollbackReviewDecided } from "./review-queue";
+import {
+  confirmReviewDecided,
+  markReviewDecided,
+  rollbackReviewDecided,
+} from "./review-queue";
 import {
   QUEUE_FOCUS_PARAM,
   QUEUE_FOCUS_TOKEN_PATTERN,
@@ -684,8 +688,9 @@ function bindWarmblyHumanGate(
           // can never press again without reloading.
           endGateFlight(key);
         }
-        if (optimistic && !confirmedApplication(result)) {
-          rollbackReviewDecided(versionId, candidateId);
+        if (optimistic) {
+          if (confirmedApplication(result)) confirmReviewDecided(versionId, candidateId);
+          else rollbackReviewDecided(versionId, candidateId);
         }
         if (raw === "adjust" && result.ok) clearAdjustDraft(candidateId);
         // The reviewer's hands stay where they were: the next pending card
@@ -763,11 +768,19 @@ async function settleGateIntent(
   intent: HumanGateIntent,
   result: AdapterWriteResult,
 ): Promise<AdapterWriteResult> {
-  // Only a definitive outcome advances the key. An `unknown` keeps it, so the
-  // retry of an uncertain intent is the same intent to the server.
-  settleHumanGateIntent(intent, result.outcome);
   if (result.code === "adjust_route_unavailable") markAdjustRouteMissing();
   const readback = await gateReadback(adapter, intent, result);
+  // A refusal is definitive before any write. An executed response is only
+  // definitive after the resource readback confirms it. If that GET fails or
+  // disagrees, retaining the same idempotency key is what lets a later retry
+  // reconcile the original write instead of creating a second intent.
+  const settledOutcome =
+    result.outcome === "refused"
+      ? "refused"
+      : result.outcome === "executed" && readback.status === "confirmed"
+        ? "executed"
+        : undefined;
+  settleHumanGateIntent(intent, settledOutcome);
   const settled: AdapterWriteResult = { ...result, readback };
   adapter.lastOperatorResult = settled;
   return settled;
@@ -782,7 +795,7 @@ async function settleGateIntent(
  */
 function confirmedApplication(result: AdapterWriteResult): boolean {
   if (!result.ok || result.outcome !== "executed") return false;
-  return result.readback?.status !== "not_confirmed";
+  return result.readback?.status === "confirmed";
 }
 
 /**
@@ -826,7 +839,10 @@ async function approveCandidate(
         ...validated,
         ok: false,
         code: "approval_validation_unavailable",
-        message: `A verificação do destinatário não completou (${validated.code ?? validated.status ?? "sem código"}): ${validated.message}`,
+        message:
+          validated.outcome === "refused"
+            ? `A verificação do destinatário não completou (${validated.code ?? validated.status ?? "sem código"}): ${validated.message}. O APPROVE não foi enviado.`
+            : "A verificação foi pedida, mas a releitura não devolveu o estado dela, então esta tela não sabe se o destinatário está VALID. O APPROVE não foi enviado e nada foi decidido.",
         gateAction: "validate",
         gateTarget: target,
       };
@@ -988,10 +1004,12 @@ export function approvalShortcutScope(
     metaKey?: boolean;
     altKey?: boolean;
     shiftKey?: boolean;
+    repeat?: boolean;
   },
   editing: boolean,
+  blockingOverlay = false,
 ): ApprovalShortcutScope {
-  if (editing || event.altKey === true) return null;
+  if (editing || blockingOverlay || event.repeat === true || event.altKey === true) return null;
   const key = typeof event.key === "string" ? event.key : "";
   if (key === "Enter") {
     return event.ctrlKey === true || event.metaKey === true ? "first-pending" : null;
@@ -1005,12 +1023,19 @@ export function approvalShortcutScope(
 /** Bound once for the life of the page: a repaint drops markup, not documents. */
 let queueShortcutBound = false;
 
+/** A decision shortcut never crosses an active modal/overlay boundary. */
+function hasBlockingOverlay(): boolean {
+  return document.querySelector(
+    'dialog[open], [aria-modal="true"], [data-modal-open="true"], [data-overlay-open="true"]',
+  ) !== null;
+}
+
 function bindReviewQueueShortcut(): void {
   if (queueShortcutBound || typeof document === "undefined") return;
   queueShortcutBound = true;
   document.addEventListener("keydown", (event) => {
     const active = document.activeElement as HTMLElement | null;
-    const scope = approvalShortcutScope(event, isEditingTarget(active));
+    const scope = approvalShortcutScope(event, isEditingTarget(active), hasBlockingOverlay());
     if (!scope) return;
     // The card under the caret first, so a reviewer who tabbed into a specific
     // message approves that one and not whatever happens to be at the top.
@@ -1142,13 +1167,22 @@ async function gateReadback(
       if (!candidate) {
         return { status: "not_confirmed", detail: "O candidato não aparece nesta versão na releitura." };
       }
-      const recorded = gateRecord(candidate.review).decision;
-      return recorded === intent.decision
-        ? { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` }
-        : {
-            status: "not_confirmed",
-            detail: `O servidor ainda registra "${String(recorded ?? "nada")}" neste candidato.`,
-          };
+      const review = gateRecord(candidate.review);
+      const recorded = review.decision;
+      if (recorded !== intent.decision) {
+        return {
+          status: "not_confirmed",
+          detail: `O servidor ainda registra "${String(recorded ?? "nada")}" neste candidato.`,
+        };
+      }
+      if (intent.decision === "APPROVE" && review.effective !== true) {
+        return {
+          status: "not_confirmed",
+          detail:
+            "O servidor registra APPROVE, mas não confirma que a aprovação está efetiva para o destinatário, conteúdo, policy e evidência atuais.",
+        };
+      }
+      return { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` };
     }
     case "decide": {
       const recorded = gateRecord(cohort.decision).decision;

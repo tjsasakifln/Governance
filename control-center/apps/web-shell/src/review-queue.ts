@@ -12,9 +12,9 @@
  *
  * 1. A local mark is only ever *set* by an action this browser took, and only
  *    for the exact version and candidate it took it on.
- * 2. A local mark survives a repaint until it is rolled back, so a slow or
- *    stale server read can never resurrect an approved message as pending —
- *    which is the one failure mode that would get a message approved twice.
+ * 2. A local mark survives only while the write is in flight. Confirmation or
+ *    rollback removes it, so a later server HOLD, invalidation or another tab's
+ *    decision immediately becomes authoritative.
  *
  * Nothing here is durable: a reload drops every local mark and the surface goes
  * back to reading the server. That is deliberate. The server is the record; this
@@ -94,7 +94,12 @@ function idOf(value: unknown): string {
 export function serverReviewState(candidate: Record<string, unknown>): ReviewQueueState {
   const review = record(candidate.review);
   const decision = typeof review.decision === "string" ? review.decision.toUpperCase() : "";
-  if (decision === "APPROVE") return review.effective === false ? "pendente" : "aprovado";
+  // The decision token alone is not an effective approval. Warmbly binds an
+  // approval to the current recipient, copy, policy, evidence and validation;
+  // `effective: true` is the server's proof that those bindings still hold.
+  // Missing is therefore fail-closed just like false, especially during a
+  // partial/rolling response where the decision can arrive before its effect.
+  if (decision === "APPROVE") return review.effective === true ? "aprovado" : "pendente";
   if (decision === "HOLD" || decision === "REJECT") return "ajuste";
   return "pendente";
 }
@@ -129,6 +134,18 @@ export function markReviewDecided(
  * key, so the server, not this screen, decides whether it is a second write.
  */
 export function rollbackReviewDecided(cohortId: string, candidateId: string): void {
+  decided.delete(markKey(cohortId, candidateId));
+}
+
+/**
+ * Hands the candidate back to the server after a successful readback.
+ *
+ * A confirmed optimistic mark has finished its only job. Keeping it forever
+ * would let this tab overrule a later HOLD, invalidation or decision from a
+ * second tab until reload, which turns a short-lived UX bridge into a second
+ * source of truth.
+ */
+export function confirmReviewDecided(cohortId: string, candidateId: string): void {
   decided.delete(markKey(cohortId, candidateId));
 }
 
