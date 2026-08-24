@@ -12,7 +12,8 @@ export type ErrorCode =
   | "kind_immutable"
   | "conflict"
   | "store_misconfigured"
-  | "operator_action_forbidden";
+  | "operator_action_forbidden"
+  | "warmbly_review_failed";
 
 export class ServiceError extends Error {
   readonly code: ErrorCode;

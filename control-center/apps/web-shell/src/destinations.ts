@@ -127,7 +127,7 @@ export function hasChatDestination(): boolean {
   );
 }
 
-export const COMMERCIAL_SURFACES = ["visao", "cohorts", "atividade", "pipeline", "excecoes"] as const;
+export const COMMERCIAL_SURFACES = ["visao", "rascunhos", "cohorts", "atividade", "pipeline", "excecoes"] as const;
 export type CommercialSurface = (typeof COMMERCIAL_SURFACES)[number];
 
 /**

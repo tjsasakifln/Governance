@@ -194,6 +194,15 @@ export interface ControlCenterReadAdapter {
    */
   warmblyDispatch?(input: WarmblyDispatchInput): AdapterWriteResult | Promise<AdapterWriteResult>;
   warmblyGate?(input: WarmblyGateInput): AdapterWriteResult | Promise<AdapterWriteResult>;
+  reviewDraftAction?(input: {
+    id: string;
+    action: "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT";
+    expected_content_hash: string;
+    subject?: string;
+    body_text?: string;
+    reason?: string;
+    generic_recipient_acknowledged?: boolean;
+  }): AdapterWriteResult | Promise<AdapterWriteResult>;
 }
 
 export const WARMBLY_GATE_ACTIONS = [

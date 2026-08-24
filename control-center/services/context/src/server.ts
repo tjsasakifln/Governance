@@ -39,6 +39,7 @@ export async function startServer(
     service: boot.service,
     operational: boot.operational,
     operatorActions: boot.operatorActions,
+    warmblyReview: boot.warmblyReview,
     logger,
     ...(operatorActor ? { operatorActor } : {}),
     ...(warmblyOperator ? { warmblyOperator } : {}),

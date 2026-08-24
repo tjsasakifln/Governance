@@ -30,7 +30,7 @@ Caddy never binds host `:80`/`:443` and never issues public ACME.
 - Canonical overlay: `control-center/deploy/overlays/production-edge/docker-compose.production-edge.yml`
 - Caddyfile: `overlays/production-edge/Caddyfile` (must contain `forward_auth`; the open `deploy/Caddyfile` is not this pack)
 - Optional read-only collector join: `docker-compose.warmbly-collector.override.yml`
-- Warmbly human-gate join: `docker-compose.warmbly-human-gate.override.yml`
+- Warmbly human-gate and draft-review join: `docker-compose.warmbly-human-gate.override.yml`
 - Nginx vhost templates: `control-center/deploy/nginx/`
 - Secrets contract: `control-center/security/production/secrets/manifest.json` + `generate-local.sh`
 - Host secrets directory: `/etc/confenge/control-center/secrets` (dir `0700`, files `0600`)
@@ -111,9 +111,10 @@ the secret pack to make this group change.
 
 ## Ordered Warmbly prerequisite
 
-Merge and deploy the backward-compatible Warmbly human-gate API before the
-Control Center release. Apply migration `000116_confenge_human_gate` with the
-normal Warmbly deploy path; verify schema is `116`, `/ready` is ready, and all of
+Merge and deploy the backward-compatible Warmbly human-gate and editorial-review
+APIs before the Control Center release. Apply migrations through
+`000118_confenge_editorial_recovery` with the normal Warmbly deploy path; verify
+schema is `118`, `/ready` is ready, and all of
 these remain false/true as shown:
 
 ```
@@ -123,8 +124,11 @@ CONFENGE_REQUIRE_HUMAN_APPROVAL=true
 ```
 
 Keep the dispatch kill switch engaged for deployment and sandbox verification.
-The migration is additive and its down migration drops only the four human-gate
-tables. Do not expose the Control Center override until this prerequisite passes.
+The migrations are additive. Do not expose the Control Center override until
+this prerequisite passes. The same least-privilege human-gate credential and
+private Context-to-Warmbly network path serve draft review: mask `196` already
+contains the required contact read/write permissions and still contains no send
+permission. Do not create a browser token or expose the credential to `web`.
 
 ## Deploy (production-edge)
 
@@ -191,7 +195,11 @@ GitHub/infra/PNCP/Warmbly/Asaas persist honestly. `UNKNOWN`/`STALE`/`ERROR`/`BLO
 - Asaas is read-only (zero POST/PUT/PATCH/DELETE/refund/checkout).
 - The generic Warmbly collector remains read-only. The explicit human-gate control
   plane may write only immutable gate records through its fixed endpoint allowlist;
-  it has no send endpoint and no send permission. Never flip auto-send or autorun.
+  it has no send endpoint and no send permission. The founder-only review bridge
+  may read drafts and submit typed `SAVE_ADJUSTMENT`, `APPROVE`, `REJECT`, or
+  bounded batch decisions. Approval queues the exact reviewed content for the
+  next eligible business window; it never sends immediately. Never flip auto-send
+  or autorun during a deploy.
 - Collector DB URL host is `cc-postgres`.
 
 ## Backup
@@ -227,12 +235,12 @@ Mechanical requirement: `same_content=true` (SHA-256 of restored dump equals pla
 1. Preserve evidence and volumes (`confenge-cc-postgres-edge`).
 2. Take ops/auth vhosts out of traffic if the edge is the cause (restore nginx backup; `nginx -t` before reload).
 3. Remove `docker-compose.warmbly-human-gate.override.yml` and roll back the
-   Control Center compose/images first. Keep persisted gate records inert.
+   Control Center compose/images first. Keep persisted gate and review records inert.
 4. Revoke the `control-center-human-gate` API key. Do not alter the collector key,
    host PostgreSQL, or extra-cli.
 5. Roll back Warmbly only after Control Center no longer calls the new contract.
-   Keep migration 116 data for evidence; run its down migration only after export
-   and only if schema rollback is explicitly required.
+   Keep migration 118 data for evidence; run down migrations only after export and
+   only if schema rollback is explicitly required.
 6. Prove `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health`
    remains READY and `auto_send_enabled=false`.
 
@@ -257,6 +265,7 @@ Backup `/etc/nginx` first. Install only `ops.confenge.com.br` and `auth.ops.conf
 - Human-gate credential `/v1/me`: exact mask `196`, no `SEND_CAMPAIGNS`; do not log its value
 - authenticated `operators` can GET/list/review; only `admins` can GO/NO-GO
 - production smoke is GET-only; all POST verification uses fixtures/sandbox and `.invalid` recipients
+- review list reachable from `context`, with dispatch paused throughout rollout
 - GitHub collector FRESH when token+allowlist are set; otherwise honest ERROR/UNKNOWN
 
 ## `/intranet`

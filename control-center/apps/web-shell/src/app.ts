@@ -170,6 +170,7 @@ function applyPaint(
     ),
   );
   bindWarmblyHumanGate(root, adapter, repaint, navigate);
+  bindReviewActions(root, adapter, repaint);
   bindWarmblyGateFilters(root, renderHash, navigate);
   bindMessageToggle(root, renderHash, navigate);
   bindCopyControls(root);
@@ -374,6 +375,38 @@ function restoreListFocus(painted: boolean): void {
     return;
   }
   if (element instanceof HTMLSelectElement) element.focus();
+}
+
+function bindReviewActions(
+  root: MountableRoot,
+  adapter: ControlCenterReadAdapter,
+  onDone: () => void,
+): void {
+  if (!adapter.reviewDraftAction || typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-review-form]");
+  for (let i = 0; i < forms.length; i += 1) {
+    const form = forms[i];
+    if (!form) continue;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const id = form.getAttribute("data-review-form") ?? "";
+      const action = form.querySelector('[name="action"]')?.value as "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT" | undefined;
+      const expected = form.querySelector('[name="expected_content_hash"]')?.value ?? "";
+      if (!id || !action || !expected) return;
+      void Promise.resolve(adapter.reviewDraftAction?.({
+        id,
+        action,
+        expected_content_hash: expected,
+        subject: form.querySelector('[name="subject"]')?.value ?? "",
+        body_text: form.querySelector('[name="body_text"]')?.value ?? "",
+        reason: form.querySelector('[name="reason"]')?.value ?? "",
+        generic_recipient_acknowledged: form.querySelector('[name="generic_ack"]')?.value === "true",
+      })).then((result) => {
+        if (result) adapter.lastOperatorResult = result;
+        onDone();
+      });
+    });
+  }
 }
 
 function bindOperatorActions(

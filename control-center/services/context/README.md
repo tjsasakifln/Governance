@@ -52,7 +52,13 @@ GET  /v1/directives/:id
 GET  /v1/directives/:id/revisions
 POST /v1/proposals
 GET  /v1/proposals
+GET  /v1/commercial/review-drafts
+GET  /v1/commercial/review-drafts/:id
+POST /v1/commercial/review-drafts/:id
+POST /v1/commercial/review-batches
 ```
+
+As quatro rotas comerciais são uma ponte server-side e founder-only para o human gate do Warmbly. `APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte.
 
 Headers obrigatórios em tudo exceto `/healthz`: `X-Actor-Id`, `X-Actor-Kind` (`human` | `agent` | `system`).
 
@@ -97,6 +103,8 @@ Valores abaixo são **nomes e exemplos não-secretos**. Não commitar `.env`.
 | `CONTEXT_ACTOR_ID` / `CONTEXT_ACTOR_KIND` | CLI sim | ator da sessão CLI (`human` \| `agent` \| `system`) |
 | `HOST` / `PORT` | não | bind HTTP; default loopback `127.0.0.1:8787` |
 | `DATABASE_URL` | não | se setada, o processo **recusa** o fixture (convergência) |
+| `WARMBLY_BASE_URL` | revisão comercial | origem privada/loopback da API Warmbly |
+| `WARMBLY_API_TOKEN` | revisão comercial | credencial server-side com leitura e escrita de contatos; nunca vai ao browser |
 
 ## Adapter de persistência (handoff)
 

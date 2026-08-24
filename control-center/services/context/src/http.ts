@@ -9,6 +9,7 @@ import type { OperatorActionService } from "./operational/actions.ts";
 import type { OperatorActorResolver } from "./security/operator-identity.ts";
 import type { OperationalService } from "./operational/service.ts";
 import { COMMERCIAL_LIST_IDS, type CommercialListId } from "./operational/commercial-list.ts";
+import type { WarmblyReviewPort } from "./operational/warmbly-review.ts";
 import type { ContextService } from "./service.ts";
 import { LIMITS, type ActorRef, type Scope } from "./types.ts";
 
@@ -29,6 +30,7 @@ export interface HttpDeps {
    * able to pause or resume outbound email.
    */
   warmblyOperator?: (req: WarmblyOperatorHttpRequest) => Promise<WarmblyOperatorHttpResponse>;
+  warmblyReview?: WarmblyReviewPort;
 }
 
 export interface WarmblyOperatorHttpRequest {
@@ -252,6 +254,57 @@ async function handle(
       if (method === "GET") {
         send(res, 200, { items: await deps.operatorActions.list(actor, queryScope(url)) });
         return;
+      }
+      send(res, 405, { error: "method_not_allowed" });
+      return;
+    }
+    if (
+      url.pathname === "/v1/commercial/review-drafts" ||
+      url.pathname === "/v1/commercial/review-batches" ||
+      url.pathname.startsWith("/v1/commercial/review-drafts/")
+    ) {
+      if (!deps.warmblyReview || !deps.operatorActor) {
+        send(res, 404, { error: "warmbly_review_not_configured" });
+        return;
+      }
+      const actor = deps.operatorActor(req);
+      const reviewParts = url.pathname.split("/").filter(Boolean);
+      if (method === "GET" && url.pathname === "/v1/commercial/review-drafts") {
+        send(res, 200, await deps.warmblyReview.list(actor, url.searchParams));
+        return;
+      }
+      if (
+        method === "GET" &&
+        reviewParts[0] === "v1" &&
+        reviewParts[1] === "commercial" &&
+        reviewParts[2] === "review-drafts" &&
+        reviewParts[3] &&
+        !reviewParts[4]
+      ) {
+        send(res, 200, await deps.warmblyReview.get(actor, reviewParts[3]));
+        return;
+      }
+      if (method === "POST") {
+        const contentType = String(req.headers["content-type"] ?? "");
+        if (!contentType.toLowerCase().startsWith("application/json")) {
+          send(res, 415, { error: "unsupported_media_type" });
+          return;
+        }
+        const idempotencyKey = header(req, "idempotency-key") ?? "";
+        if (url.pathname === "/v1/commercial/review-batches") {
+          send(res, 200, await deps.warmblyReview.approveBatch(actor, await readBody(req), idempotencyKey));
+          return;
+        }
+        if (
+          reviewParts[0] === "v1" &&
+          reviewParts[1] === "commercial" &&
+          reviewParts[2] === "review-drafts" &&
+          reviewParts[3] &&
+          !reviewParts[4]
+        ) {
+          send(res, 200, await deps.warmblyReview.decide(actor, reviewParts[3], await readBody(req), idempotencyKey));
+          return;
+        }
       }
       send(res, 405, { error: "method_not_allowed" });
       return;
