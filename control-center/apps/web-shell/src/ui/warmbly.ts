@@ -34,6 +34,13 @@ import { AUTH_HOST, PRODUCTIVE_HOST } from "../topology";
 import type { ActorRef, CommercialSnapshot } from "../types";
 import type { PendingResumeConfirmation } from "../warmbly-confirmation";
 import {
+  editorialReasonLabel,
+  editorialReasonSentence,
+  mergeEditorialState,
+  readEditorialState,
+  type EditorialReading,
+} from "./editorial-state";
+import {
   operatorActionLabel,
   operatorOutcomeLabel,
   technicalDetails,
@@ -1363,6 +1370,9 @@ function candidateCard(
     ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
     : [];
   const gate = approvalGate(candidate);
+  // A candidate inherits the version's editorial verdict: nothing inside a
+  // historical version is decidable, however the candidate itself is stamped.
+  const editorial = mergeEditorialState(readEditorialState(cohort), readEditorialState(candidate));
   // expected_frozen_hash guards the VERSION the operator was looking at, so it
   // is the cohort's frozen_hash. A candidate carries content_hash and
   // evidence_hash and no frozen_hash of its own, so reading it from the
@@ -1383,50 +1393,10 @@ function candidateCard(
       ? candidate.copy_qa_failures.filter((entry): entry is string => typeof entry === "string")
       : [];
 
-  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-approve-allowed="${gate.allowed ? "true" : "false"}">
-    <p class="kicker">${validationPill(candidate)} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p>
-    <h3>${escapeHtml(show(candidate.company))}</h3>
-    ${feedback.forCandidate(candidateId)}
-    <dl class="facts" data-candidate-identity="true">
-      ${fact("Destinatário exato", show(candidate.mailbox))}
-      ${fact("Purpose do destinatário", show(candidate.mailbox_purpose))}
-      ${fact("Classe de rota", show(candidate.route_class))}
-    </dl>
-    <details data-message-preview="true"${expandAll ? " open" : ""}>
-      <summary>Mensagem exata congelada (assunto e corpo)</summary>
-      <p data-exact-subject="true"><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p>
-      <pre class="message-preview" data-exact-body="true">${escapeHtml(show(candidate.body_text))}</pre>
-      <p data-cta="true"><strong>Chamada para ação (CTA):</strong> ${escapeHtml(fromPayload(candidate.cta ?? candidate.cta_text))}</p>
-    </details>
-    <dl class="facts" data-observed-fact="true">
-      ${fact("Fato observado", fromPayload(candidate.observed_fact_text ?? evidence.text ?? evidence.summary))}
-      ${fact("Proveniência do fato", fromPayload(candidate.evidence_source ?? evidence.source ?? evidence.locator))}
-      ${fact("Observado em", fromPayload(candidate.evidence_observed_at ?? evidence.observed_at))}
-      ${fact("Evidence hash", fromPayload(candidate.evidence_hash))}
-    </dl>
-    <dl class="facts" data-candidate-integrity="true">
-      ${fact("Content hash", fromPayload(candidate.content_hash))}
-      ${fact("Frozen hash", fromPayload(candidate.frozen_hash))}
-      ${fact("Policy version", fromPayload(cohort.policy_version))}
-      ${fact("Composer version", fromPayload(candidate.composer_version ?? cohort.composer_version))}
-      ${fact("Validação", fromPayload(validation.status))}
-      ${fact("Motivo da validação", fromPayload(validation.reason))}
-      ${fact("Validação vence em", validation.expires_at ? stamp(validation.expires_at) : NOT_IN_PAYLOAD)}
-      ${fact("Revisão registrada", fromPayload(review.decision))}
-      ${fact("Revisão efetiva", fromPayload(review.effective))}
-      ${listFacts("Bloqueios", candidate.blocked_by)}
-      ${listFacts("Reprovações de copy QA", copyQaFailures.length > 0 ? copyQaFailures : copyQa.failures)}
-      ${fact("Duplicidade apontada pelo servidor", fromPayload(candidate.duplicate_of ?? candidate.duplicate))}
-      ${fact("Proveniência ausente", fromPayload(candidate.missing_provenance))}
-      ${fact("Hard bounce registrado", fromPayload(candidate.hard_bounce))}
-      ${fact("Excluído do preview por", fromPayload(candidate.exclusion_reason ?? candidate.excluded_reason))}
-    </dl>
-    ${
-      blockers.length > 0
-        ? `<p class="banner error" role="alert" data-candidate-blockers="${escapeHtml(blockers.join(" "))}">O servidor registrou ${blockers.length} bloqueio(s) neste candidato: ${escapeHtml(blockers.join(", "))}.</p>`
-        : ""
-    }
-
+  // Not merely disabled: a historical version emits no decision markup at all,
+  // so there is nothing for devtools to re-enable.
+  const controls = editorial.actionable
+    ? `
     ${gateInFlight(validateKey) ? pendingBlock("Pedindo a verificação do destinatário") : ""}
     <form class="operator-form" data-human-gate="validate" data-gate-key="${escapeHtml(validateKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
       <p class="constraint">Pede ao Warmbly que verifique agora se este endereço aceita entrega. Não envia mensagem nenhuma.</p>
@@ -1461,6 +1431,56 @@ function candidateCard(
     </form>
 
     ${adjustBlock({ cohortId, candidateId, version, frozenHash, candidate, authority, adjustKey, draft })}
+`
+    : `<p class="constraint" data-non-actionable-notice="true">Versão histórica, não enviável. Verificar o destinatário, aprovar, segurar e ajustar não são oferecidos aqui. Abra a versão corrente pelo link no topo desta página.</p>`;
+
+  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}">
+    <p class="kicker">${validationPill(candidate)}${editorial.legacy ? ` <span class="pill error" data-non-actionable="true">NÃO ACIONÁVEL</span>` : ""} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p>
+    <h3>${escapeHtml(show(candidate.company))}</h3>
+    ${feedback.forCandidate(candidateId)}
+    <dl class="facts" data-candidate-identity="true">
+      ${fact("Destinatário exato", show(candidate.mailbox))}
+      ${fact("Purpose do destinatário", show(candidate.mailbox_purpose))}
+      ${fact("Classe de rota", show(candidate.route_class))}
+    </dl>
+    <details data-message-preview="true"${expandAll ? " open" : ""}>
+      <summary>Mensagem exata congelada (assunto e corpo). ${editorial.legacy ? "Versão histórica, não enviar." : "Versão corrente."}</summary>
+      <p data-exact-subject="true"><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p>
+      <pre class="message-preview" data-exact-body="true">${escapeHtml(show(candidate.body_text))}</pre>
+      <p data-cta="true"><strong>Chamada para ação (CTA):</strong> ${escapeHtml(fromPayload(candidate.cta ?? candidate.cta_text))}</p>
+    </details>
+    <dl class="facts" data-observed-fact="true">
+      ${fact("Fato observado", fromPayload(candidate.observed_fact_text ?? evidence.text ?? evidence.summary))}
+      ${fact("Proveniência do fato", fromPayload(candidate.evidence_source ?? evidence.source ?? evidence.locator))}
+      ${fact("Observado em", fromPayload(candidate.evidence_observed_at ?? evidence.observed_at))}
+      ${fact("Evidence hash", fromPayload(candidate.evidence_hash))}
+    </dl>
+    <dl class="facts" data-candidate-integrity="true">
+      ${fact("Content hash", fromPayload(candidate.content_hash))}
+      ${fact("Frozen hash", fromPayload(candidate.frozen_hash))}
+      ${fact("Policy version", fromPayload(cohort.policy_version))}
+      ${fact("Composer version", fromPayload(candidate.composer_version ?? cohort.composer_version))}
+      ${fact("Estado editorial", editorial.legacy ? "Versão histórica (não enviável)" : "Versão corrente")}
+      ${editorial.reasonCodes.length > 0 ? listFacts("Motivos do estado editorial", editorial.reasonCodes.map(editorialReasonLabel)) : ""}
+      ${fact("Validação", fromPayload(validation.status))}
+      ${fact("Motivo da validação", fromPayload(validation.reason))}
+      ${fact("Validação vence em", validation.expires_at ? stamp(validation.expires_at) : NOT_IN_PAYLOAD)}
+      ${fact("Revisão registrada", fromPayload(review.decision))}
+      ${fact("Revisão efetiva", fromPayload(review.effective))}
+      ${listFacts("Bloqueios", candidate.blocked_by)}
+      ${listFacts("Reprovações de copy QA", copyQaFailures.length > 0 ? copyQaFailures : copyQa.failures)}
+      ${fact("Duplicidade apontada pelo servidor", fromPayload(candidate.duplicate_of ?? candidate.duplicate))}
+      ${fact("Proveniência ausente", fromPayload(candidate.missing_provenance))}
+      ${fact("Hard bounce registrado", fromPayload(candidate.hard_bounce))}
+      ${fact("Excluído do preview por", fromPayload(candidate.exclusion_reason ?? candidate.excluded_reason))}
+    </dl>
+    ${
+      blockers.length > 0
+        ? `<p class="banner error" role="alert" data-candidate-blockers="${escapeHtml(blockers.join(" "))}">O servidor registrou ${blockers.length} bloqueio(s) neste candidato: ${escapeHtml(blockers.join(", "))}.</p>`
+        : ""
+    }
+
+    ${controls}
     ${technicalDetails(
       [
         { term: "candidate_id", value: candidateId },
@@ -1468,6 +1488,8 @@ function candidateCard(
         { term: "frozen_hash", value: frozenHash },
         { term: "evidence_hash", value: show(candidate.evidence_hash) },
         { term: "blocked_by", value: blockers.join(",") },
+        { term: "editorial_state", value: editorial.state },
+        { term: "editorial_reason_codes", value: editorial.reasonCodes.join(",") },
       ],
       "warmbly-candidate",
     )}
@@ -1536,6 +1558,31 @@ function adjustBlock(args: {
     </details>`;
 }
 
+/**
+ * The founder's escape hatch out of a historical version.
+ *
+ * Loud, first thing on the page, and carrying the link to the current version
+ * as its primary control. Nothing below it is decidable.
+ */
+function legacyBanner(editorial: EditorialReading, cohortId: string): string {
+  if (!editorial.legacy) return "";
+  const reasons = editorialReasonSentence(editorial.reasonCodes);
+  const linkable = editorial.currentVersionId !== "" && editorial.currentVersionId !== cohortId;
+  return `<section class="banner error" role="alert" data-legacy-banner="true" data-editorial-state="${escapeHtml(editorial.state)}">
+    <h3>Versão histórica. Não enviar.</h3>
+    <p data-legacy-summary="true">Esta é uma versão antiga desta cohort, mantida legível só para auditoria. A mensagem abaixo não é enviável: aprovar, ajustar, verificar e registrar GO não são oferecidos nesta tela.</p>
+    ${reasons ? `<p data-legacy-reasons="true">Por que ficou histórica: ${escapeHtml(reasons)}.</p>` : ""}
+    ${editorial.notice ? `<p data-editorial-notice="true">${escapeHtml(editorial.notice)}</p>` : ""}
+    ${
+      linkable
+        ? `<p><a class="button" data-open-current="true" href="#/warmbly/revisao?resource=${escapeHtml(editorial.currentVersionId)}">Abrir versão corrente</a>${
+            editorial.currentVersion ? ` <span class="scope">v${escapeHtml(editorial.currentVersion)}</span>` : ""
+          }</p>`
+        : `<p class="constraint" data-open-current="absent">O servidor não informou qual é a versão corrente desta cohort, então esta tela não inventa um link. Abra Cohorts para achá-la.</p>`
+    }
+  </section>`;
+}
+
 function reviewSurface(input: WarmblySurfaceInput): string {
   const selected = gateSection(input, "selected");
   const list = gateSection(input, "list");
@@ -1578,22 +1625,36 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   const cohortFeedback = feedback.forCohort(cohortId);
   const leftover = feedback.remainder();
   const decisionValue = fromPayload(record(cohort.decision).decision);
-  return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>
-  ${leftover}${cohortFeedback}
-  ${gateUnreadableBanner(selected, "a versão selecionada")}
-  <p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
-  ${identityBlock(input)}
-  ${previewBlock(preview)}
-  <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
+  const editorial = readEditorialState(cohort);
+  // A historical version emits neither the GO/NO-GO form nor the reproduce
+  // form. The facts below them stay: this removes decisions, not information.
+  const reproduceControl = editorial.actionable
+    ? `
   ${gateInFlight(reproduceKey) ? pendingBlock("Reproduzindo a versão imutável") : ""}
   <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
-  ${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
+`
+    : "";
+  const decideControl = editorial.actionable
+    ? `
   ${gateInFlight(decideKey) ? pendingBlock("Registrando GO/NO-GO") : ""}
   <form class="operator-form" data-human-gate="decide" data-gate-key="${escapeHtml(decideKey)}" data-version="${escapeHtml(cohortId)}"><label>Decisão final<select name="decision"><option value="NO_GO">NO_GO</option><option value="GO">GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label><button type="submit"${authority.canDecide && !gateInFlight(decideKey) ? "" : " disabled"}>${gateInFlight(decideKey) ? "Enviando…" : "Registrar GO/NO-GO"}</button>${
     authority.canDecide
       ? ""
       : `<p class="constraint" data-go-authority="absent">GO/NO-GO está desabilitado nesta sessão: ele exige o grupo <code>admins</code> no Authelia. Peça a inclusão nesse grupo e reautentique; revisar candidatos continua permitido com <code>operators</code>.</p>`
   }</form>
+`
+    : `<p class="constraint" data-non-actionable-surface="true">Versão histórica, não enviável. GO/NO-GO e a reprodução da versão imutável não são oferecidos aqui. Decida na versão corrente.</p>`;
+  return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>
+  ${legacyBanner(editorial, cohortId)}
+  ${leftover}${cohortFeedback}
+  ${gateUnreadableBanner(selected, "a versão selecionada")}
+  <p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
+  ${identityBlock(input)}
+  ${previewBlock(preview)}
+  <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
+  ${reproduceControl}
+  ${candidateCards || `<p class="banner error">Cohort vazia: GO bloqueado.</p>`}
+  ${decideControl}
   <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>
   <p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
 }

@@ -367,6 +367,9 @@ export const UNRECOGNIZED_COMMERCIAL_STATE_LABEL = "estado não reconhecido";
 export const ROUTE_CLASS_LABELS: Record<string, string> = {
   DIRECT_PERSON: "pessoa identificada diretamente",
   DIRECT_COMPANY: "empresa identificada diretamente",
+  GENERIC_COMPANY: "caixa genérica da empresa, como contato@ ou comercial@",
+  ROLE_OR_DEPARTMENT: "caixa de cargo ou departamento",
+  PUBLIC_COMPANY_FREEMAIL: "empresa em domínio de e-mail gratuito",
   INBOUND: "mensagem recebida",
   UNKNOWN: "classe de rota desconhecida",
 };
