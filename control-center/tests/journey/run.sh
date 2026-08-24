@@ -18,8 +18,25 @@ TOKEN=stub-operator-token
 TOKFILE="$WORK/token"; printf %s "$TOKEN" > "$TOKFILE"
 
 PIDS=()
-cleanup() { for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null; done; rm -rf "$WORK"; }
+# npx tsx and npx vite fan out into a child chain, so killing only the pid we
+# backgrounded orphans the server and leaves its port held for the next run.
+# Sweep the ports we own as well.
+cleanup() {
+  for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null; done
+  for port in $WPORT $CPORT $SPORT $EPORT; do
+    for pid in $(lsof -t -i ":$port" -sTCP:LISTEN 2>/dev/null); do kill "$pid" 2>/dev/null; done
+  done
+  rm -rf "$WORK"
+}
 trap cleanup EXIT
+
+# serve-prod.mjs serves dist/, which is not tracked by git. An absent or stale
+# bundle would serve a UI older than the one under test, so build first: a
+# journey that proves the previous release is worse than no journey.
+echo "building the web shell the journey will drive..."
+if ! ( cd "$APP" && npm run build ) >"$WORK/build.log" 2>&1; then
+  echo "web shell build failed"; tail -30 "$WORK/build.log"; exit 1
+fi
 
 PORT=$WPORT TOKEN=$TOKEN node "$HERE/fake-warmbly.mjs" > "$WORK/warmbly.log" 2>&1 & PIDS+=($!)
 
