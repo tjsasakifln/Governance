@@ -195,7 +195,7 @@ GitHub/infra/PNCP/Warmbly/Asaas persist honestly. `UNKNOWN`/`STALE`/`ERROR`/`BLO
 - Asaas is read-only (zero POST/PUT/PATCH/DELETE/refund/checkout).
 - The generic Warmbly collector remains read-only. The explicit human-gate control
   plane may write only immutable gate records through its fixed endpoint allowlist;
-  it has no send endpoint and no send permission. The founder-only review bridge
+  it has no send endpoint and no send permission. The trusted operator review bridge
   may read drafts and submit typed `SAVE_ADJUSTMENT`, `APPROVE`, `REJECT`, or
   bounded batch decisions. Approval queues the exact reviewed content for the
   next eligible business window; it never sends immediately. Never flip auto-send

@@ -8,9 +8,10 @@ import { createWarmblyReviewPortFromEnv } from "../src/operational/warmbly-revie
 import type { WarmblyReviewPort } from "../src/operational/warmbly-review.ts";
 
 const FOUNDER = { kind: "human" as const, id: "founder-local" };
+const AUTHENTICATED_OPERATOR = { kind: "human" as const, id: "operator" };
 const DRAFT_ID = "11111111-2222-4333-8444-555555555555";
 
-test("Warmbly review proxy is founder-only and preserves exact-hash decision metadata", async () => {
+test("Warmbly review proxy preserves exact-hash decision metadata", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const fetchImpl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     calls.push({ url: String(input), init });
@@ -22,7 +23,7 @@ test("Warmbly review proxy is founder-only and preserves exact-hash decision met
   const port = createWarmblyReviewPortFromEnv({
     WARMBLY_BASE_URL: "https://warmbly.example.test/",
     WARMBLY_API_TOKEN: "test-token",
-  }, FOUNDER.id, fetchImpl);
+  }, fetchImpl);
   assert.ok(port);
 
   await port.list(FOUNDER, new URLSearchParams({ limit: "999", offset: "12" }));
@@ -37,12 +38,10 @@ test("Warmbly review proxy is founder-only and preserves exact-hash decision met
   assert.equal(headers.authorization, "Bearer test-token");
   assert.equal(headers["idempotency-key"], "review-key");
   assert.match(String(calls[1]?.init.body), /expected_content_hash/);
-
-  await assert.rejects(() => port.list({ kind: "agent", id: "agent-1" }, new URLSearchParams()));
 });
 
 test("Warmbly review proxy stays absent when its credential is not configured", () => {
-  assert.equal(createWarmblyReviewPortFromEnv({}, FOUNDER.id), undefined);
+  assert.equal(createWarmblyReviewPortFromEnv({}), undefined);
 });
 
 test("review HTTP routes use trusted-edge identity and require JSON for decisions", async () => {
@@ -72,7 +71,7 @@ test("review HTTP routes use trusted-edge identity and require JSON for decision
     warmblyReview,
     operatorActor(req: IncomingMessage) {
       assert.equal(req.headers["x-actor-id"], "browser-forgery");
-      return FOUNDER;
+      return AUTHENTICATED_OPERATOR;
     },
   });
   const server = createServer(listener);
@@ -84,7 +83,7 @@ test("review HTTP routes use trusted-edge identity and require JSON for decision
       headers: { "x-actor-id": "browser-forgery" },
     });
     assert.equal(listed.status, 200);
-    assert.deepEqual(observed[0]?.actor, FOUNDER);
+    assert.deepEqual(observed[0]?.actor, AUTHENTICATED_OPERATOR);
 
     const rejectedForm = await fetch(`${base}/v1/commercial/review-drafts/${DRAFT_ID}`, {
       method: "POST",
@@ -104,7 +103,7 @@ test("review HTTP routes use trusted-edge identity and require JSON for decision
       body: JSON.stringify({ action: "APPROVE", expected_content_hash: "sha256:exact" }),
     });
     assert.equal(decided.status, 200);
-    assert.deepEqual(observed[1]?.actor, FOUNDER);
+    assert.deepEqual(observed[1]?.actor, AUTHENTICATED_OPERATOR);
     assert.equal(observed[1]?.key, "review-http-key");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

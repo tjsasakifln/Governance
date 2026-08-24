@@ -58,7 +58,7 @@ POST /v1/commercial/review-drafts/:id
 POST /v1/commercial/review-batches
 ```
 
-As quatro rotas comerciais são uma ponte server-side e founder-only para o human gate do Warmbly. `APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte.
+As quatro rotas comerciais são uma ponte server-side protegida pela identidade operacional autenticada no edge para o human gate do Warmbly. `APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte.
 
 Headers obrigatórios em tudo exceto `/healthz`: `X-Actor-Id`, `X-Actor-Kind` (`human` | `agent` | `system`).
 

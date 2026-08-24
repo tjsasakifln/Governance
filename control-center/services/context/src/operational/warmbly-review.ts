@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 
-import { assertFounder } from "../actor.ts";
 import { invalid, ServiceError } from "../errors.ts";
 import type { ActorRef } from "../types.ts";
 
@@ -21,7 +20,6 @@ function boundedInt(value: string | null, fallback: number, max: number): number
 
 export function createWarmblyReviewPortFromEnv(
   env: NodeJS.ProcessEnv,
-  founderActorId: string,
   fetchImpl: typeof fetch = globalThis.fetch,
 ): WarmblyReviewPort | undefined {
   const baseUrl = (env.WARMBLY_BASE_URL ?? env.CC_WARMBLY_BASE_URL ?? "")
@@ -76,19 +74,16 @@ export function createWarmblyReviewPortFromEnv(
   }
 
   return {
-    async list(actor, query) {
-      assertFounder(actor, founderActorId);
+    async list(_actor, query) {
       const limit = boundedInt(query.get("limit"), 100, 200);
       const offset = boundedInt(query.get("offset"), 0, 100_000);
       return request(`/v1/confenge/review/drafts?limit=${limit}&offset=${offset}`);
     },
-    async get(actor, id) {
-      assertFounder(actor, founderActorId);
+    async get(_actor, id) {
       assertId(id);
       return request(`/v1/confenge/review/drafts/${id}`);
     },
-    async decide(actor, id, body, idempotencyKey) {
-      assertFounder(actor, founderActorId);
+    async decide(_actor, id, body, idempotencyKey) {
       assertId(id);
       if (!idempotencyKey) throw invalid("Idempotency-Key is required");
       return request(`/v1/confenge/review/drafts/${id}/decision`, {
@@ -97,8 +92,7 @@ export function createWarmblyReviewPortFromEnv(
         body: JSON.stringify(body),
       });
     },
-    async approveBatch(actor, body, idempotencyKey) {
-      assertFounder(actor, founderActorId);
+    async approveBatch(_actor, body, idempotencyKey) {
       if (!idempotencyKey) throw invalid("Idempotency-Key is required");
       return request("/v1/confenge/review/batches", {
         method: "POST",
