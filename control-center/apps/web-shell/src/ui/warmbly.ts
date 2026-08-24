@@ -339,6 +339,53 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery:
       "A verificação foi feita nesta ação e o APPROVE não foi enviado, então nada foi decidido. O Warmbly recusa aprovação fora de uma validação VALID: registre HOLD ou REJECT, ou corrija a origem do contato e recomponha.",
   },
+  /* ---------------------------------------------------------------- *
+   * Entrega da cohort à fila do Warmbly. Os códigos abaixo são os do
+   * próprio Warmbly: cada um é um portão diferente e manda o operador
+   * para um lugar diferente.
+   * ---------------------------------------------------------------- */
+  auto_send_forbidden: {
+    kind: "refused",
+    title: "Recusada: auto-send está ligado no Warmbly",
+    recovery:
+      "O Warmbly recusa entregar uma cohort controlada enquanto auto-send estiver ligado, e nada foi enfileirado. Isto é configuração do Warmbly, não do operador: desligue auto-send lá antes de disparar por aqui.",
+  },
+  green_autorun_forbidden: {
+    kind: "refused",
+    title: "Recusada: green autorun está ligado no Warmbly",
+    recovery:
+      "Nada foi enfileirado. Autorun e cohort controlada são excludentes: desligue o autorun no Warmbly antes de disparar por aqui.",
+  },
+  sending_paused: {
+    kind: "refused",
+    title: "Recusada: o disparo de saída está pausado",
+    recovery:
+      "Nada foi enfileirado. Retome o disparo em Operação segura — a retomada é de dois passos e mostra o resumo de impacto — e dispare a cohort em seguida.",
+  },
+  kill_switch_engaged: {
+    kind: "refused",
+    title: "Recusada: o kill switch de arquivo está acionado",
+    recovery:
+      `Nada foi enfileirado. O kill switch fica fora deste canal por construção: remova-o na VPS (${OUT_OF_BAND_PAUSE_FALLBACK} documenta o caminho) e dispare de novo depois.`,
+  },
+  cohort_grant_revoked: {
+    kind: "refused",
+    title: "Recusada: a autoridade desta cohort foi revogada",
+    recovery:
+      "Um NO_GO revogou a autoridade bounded desta versão e nada foi enfileirado. Registre GO de novo, ou prepare uma versão nova, antes de disparar.",
+  },
+  cohort_grant_expired: {
+    kind: "refused",
+    title: "Recusada: a autoridade desta cohort venceu",
+    recovery:
+      "A autoridade bounded tem prazo e o dela passou; nada foi enfileirado. Registre GO de novo nesta versão para obter uma autoridade vigente.",
+  },
+  cohort_grant_missing: {
+    kind: "refused",
+    title: "Recusada: esta versão não tem autoridade bounded",
+    recovery:
+      "Disparar exige um GO registrado nesta versão exata. Nada foi enfileirado: registre GO e dispare em seguida.",
+  },
   adjust_route_unavailable: {
     kind: "refused",
     title: "Ajuste ainda não disponível nesta instalação",
@@ -475,6 +522,7 @@ const GATE_ACTION_LABELS: Record<string, string> = {
   review: "registrar decisão de revisão",
   decide: "registrar GO/NO-GO",
   adjust: "ajustar assunto e corpo",
+  dispatch: "entregar a cohort à fila de envio",
 };
 
 const READBACK_LABELS: Record<string, string> = {
@@ -554,6 +602,7 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
           ? `<dl class="facts" data-server-diff="true">${diffRows}</dl>`
           : ""
       }
+      ${dispatchCounters(result.dispatch)}
       ${technicalDetails(
         [
           { term: "path", value: result.path },
@@ -569,6 +618,45 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
         "warmbly-operator-result",
       )}
     </article>`;
+}
+
+/**
+ * What a bounded dispatch actually queued, straight from Warmbly's counters.
+ *
+ * "Executada" is not an answer here: ten attempted with ten accepted and ten
+ * attempted with nine blocked are the same HTTP 200 and completely different
+ * operational facts. A counter the server did not send renders as absent rather
+ * than as zero, and every per-mailbox failure the server named is listed.
+ */
+function dispatchCounters(counts: AdapterWriteResult["dispatch"]): string {
+  if (!counts) return "";
+  const row = (label: string, value: number | undefined): string =>
+    value === undefined ? fact(label, NOT_IN_PAYLOAD) : fact(label, String(value));
+  const failures = (counts.failures ?? [])
+    .map(
+      (entry) =>
+        `<div data-dispatch-failure="${escapeHtml(entry.reason)}"><dt>${escapeHtml(entry.mailbox || "destinatário não nomeado")}</dt><dd>${escapeHtml(entry.reason || "motivo não informado pelo servidor")}</dd></div>`,
+    )
+    .join("");
+  return `
+      <dl class="facts" data-dispatch-counts="true">
+        ${row("Tentados", counts.attempted)}
+        ${row("Aceitos pelo provedor", counts.accepted)}
+        ${row("Falharam", counts.failed)}
+        ${row("Pulados por duplicidade", counts.skippedDuplicate)}
+        ${row("Bloqueados", counts.blocked)}
+        ${row("Teto diário da autoridade", counts.maxDaily)}
+        ${
+          counts.killSwitchAvailable === undefined
+            ? ""
+            : fact(
+                "Kill switch disponível",
+                counts.killSwitchAvailable ? "sim" : "não — pare o outbound fora de banda se precisar",
+              )
+        }
+      </dl>
+      <p class="constraint" data-dispatch-not-sent="true">Estes números são de enfileiramento, não de entrega. O envio acontece depois, pelo worker do Warmbly, dentro da janela comercial.</p>
+      ${failures ? `<dl class="facts" data-dispatch-failures="true">${failures}</dl>` : ""}`;
 }
 
 /** The "enviando…" state. A control with no pending state invites a second click. */
@@ -1973,6 +2061,62 @@ function emptyQueueBlock(
   </article>`;
 }
 
+/**
+ * Entregar a cohort à fila do Warmbly.
+ *
+ * The last control on the page, and the only one on this surface whose effect
+ * leaves the building. Four things make it what it is:
+ *
+ * 1. **It only exists after GO.** The server's own `decision` is what gates it,
+ *    not anything this screen inferred. Without a registered GO there is no
+ *    form at all — not a disabled one — so there is nothing for devtools to
+ *    re-enable, exactly as with a historical version.
+ * 2. **It says what it does and what it does not do.** It hands the authorised
+ *    cohort to Warmbly's queue. It does not send: the worker delivers inside
+ *    the commercial window, under the rolling-hour cap, and the pause switch in
+ *    Operação segura still stops everything.
+ * 3. **It costs a typed confirmation**, like GO. One click that queues real mail
+ *    to real companies is the one place on this surface where a second,
+ *    deliberate act is worth its cost.
+ * 4. **It never claims a number.** How many messages Warmbly accepted comes back
+ *    in the response and is rendered from it; this block only states the ceiling
+ *    the server enforces.
+ */
+function dispatchBlock(args: {
+  cohortId: string;
+  version: string;
+  decisionValue: string;
+  counts: ReturnType<typeof reviewQueueCounts>;
+  authority: OperatorAuthority;
+  actionable: boolean;
+}): string {
+  const { cohortId, version, decisionValue, counts, authority, actionable } = args;
+  if (!actionable) return "";
+  const dispatchKey = `dispatch:${cohortId}::`;
+  const pending = gateInFlight(dispatchKey);
+  if (decisionValue !== "GO") {
+    return `<p class="constraint" data-dispatch-gate="no-go">Entregar esta cohort à fila só é oferecido depois de um GO registrado nesta versão. A decisão final lida agora é ${escapeHtml(decisionValue)}.</p>`;
+  }
+  return `
+  ${pending ? pendingBlock("Entregando a cohort à fila do Warmbly") : ""}
+  <article class="card" data-cohort-dispatch="${escapeHtml(cohortId)}">
+    <p class="kicker"><span class="pill">GO REGISTRADO</span></p>
+    <h3>Entregar esta cohort à fila de envio</h3>
+    <p data-dispatch-meaning="true">Isto entrega ao Warmbly os ${counts.aprovadas} candidato(s) aprovado(s) desta versão. O Warmbly enfileira cada um e o worker dele envia dentro da janela comercial, no máximo 10 por hora e no máximo 10 por disparo. Esta tela não envia e-mail e não tem controle de send.</p>
+    <p class="constraint" data-dispatch-gates="true">O Warmbly recusa o disparo por conta própria se o GO tiver sido revogado ou vencido, se auto-send ou autorun estiverem ligados, se o disparo estiver pausado ou se o kill switch estiver acionado. Nenhum desses portões é contornável a partir daqui.</p>
+    <p class="constraint" data-dispatch-repeat="true">Disparar de novo é seguro: o Warmbly pula os candidatos já enfileirados desta versão e os conta como duplicados na resposta. Repetir não reenvia o que já saiu.</p>
+    <form class="operator-form" data-human-gate="dispatch" data-gate-key="${escapeHtml(dispatchKey)}" data-version="${escapeHtml(cohortId)}">
+      <label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label>
+      <button type="submit" data-dispatch-submit="true"${authority.canDecide && !pending ? "" : " disabled"}>${pending ? "Enviando…" : `Entregar v${escapeHtml(version)} à fila do Warmbly`}</button>
+      ${
+        authority.canDecide
+          ? ""
+          : `<p class="constraint" data-dispatch-authority="absent">Entregar a cohort à fila exige o grupo <code>admins</code> no Authelia, a mesma autoridade do GO. Revisar continua permitido com <code>operators</code>.</p>`
+      }
+    </form>
+  </article>`;
+}
+
 function reviewSurface(input: WarmblySurfaceInput): string {
   const selected = gateSection(input, "selected");
   const list = gateSection(input, "list");
@@ -2047,6 +2191,14 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
 `
     : "";
+  const dispatchControl = dispatchBlock({
+    cohortId,
+    version,
+    decisionValue,
+    counts,
+    authority,
+    actionable: editorial.actionable,
+  });
   const decideControl = editorial.actionable
     ? `
   ${gateInFlight(decideKey) ? pendingBlock("Registrando GO/NO-GO") : ""}
@@ -2084,7 +2236,8 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   }
   ${decideControl}
   <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>
-  <p class="constraint">GO não envia e-mail. O Control Center não expõe dispatch, queue ou send neste gate.</p></section>`;
+  ${dispatchControl}
+  <p class="constraint">GO autoriza e não envia. Entregar a cohort à fila é o passo seguinte e separado; o envio em si é do worker do Warmbly, dentro da janela comercial e sob o teto por hora. Esta tela continua sem qualquer controle de send, queue ou resume.</p></section>`;
 }
 
 function warmblySubnav(current: WarmblySurface, resource: string | null | undefined): string {

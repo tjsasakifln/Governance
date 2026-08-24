@@ -14,6 +14,11 @@ APP="$CC/apps/web-shell"
 WORK="$(mktemp -d)"
 
 WPORT=${WPORT:-8099}; CPORT=${CPORT:-8098}; SPORT=${SPORT:-8097}; EPORT=${EPORT:-8096}
+# A second edge+shell pair whose forward-auth identity carries `admins`.
+# GO and cohort dispatch are admins-only, so proving both the refusal (on the
+# operators-only pair) and the happy path needs two identities, and the fake
+# edge fixes its groups at startup.
+EPORT2=${EPORT2:-8095}; SPORT2=${SPORT2:-8094}
 TOKEN=stub-operator-token
 TOKFILE="$WORK/token"; printf %s "$TOKEN" > "$TOKFILE"
 
@@ -23,7 +28,7 @@ PIDS=()
 # Sweep the ports we own as well.
 cleanup() {
   for p in "${PIDS[@]:-}"; do kill "$p" 2>/dev/null; done
-  for port in $WPORT $CPORT $SPORT $EPORT; do
+  for port in $WPORT $CPORT $SPORT $EPORT $EPORT2 $SPORT2; do
     for pid in $(lsof -t -i ":$port" -sTCP:LISTEN 2>/dev/null); do kill "$pid" 2>/dev/null; done
   done
   rm -rf "$WORK"
@@ -58,8 +63,16 @@ PORT=$EPORT UPSTREAM_PORT=$CPORT EDGE_GROUPS="${EDGE_GROUPS:-operators}" \
   CC_ACTOR_ID=founder-local CC_ACTOR_KIND=human \
   node scripts/serve-prod.mjs > "$WORK/web.log" 2>&1 ) & PIDS+=($!)
 
+PORT=$EPORT2 UPSTREAM_PORT=$CPORT EDGE_GROUPS="operators,admins" \
+  node "$HERE/fake-edge.mjs" > "$WORK/edge-admin.log" 2>&1 & PIDS+=($!)
+
+( cd "$APP" && HOST=127.0.0.1 PORT=$SPORT2 CC_CONTEXT_UPSTREAM=http://127.0.0.1:$EPORT2 \
+  CC_ACTOR_ID=founder-local CC_ACTOR_KIND=human \
+  node scripts/serve-prod.mjs > "$WORK/web-admin.log" 2>&1 ) & PIDS+=($!)
+
 for i in $(seq 1 80); do curl -fsS "http://127.0.0.1:$CPORT/healthz" >/dev/null 2>&1 && break; sleep 0.5; done
 for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:$SPORT/healthz" >/dev/null 2>&1 && break; sleep 0.5; done
+for i in $(seq 1 60); do curl -fsS "http://127.0.0.1:$SPORT2/healthz" >/dev/null 2>&1 && break; sleep 0.5; done
 
 gate=$(curl -s -o /dev/null -w '%{http_code}' -H 'x-actor-id: founder-local' -H 'x-actor-kind: human' "http://127.0.0.1:$SPORT/v1/warmbly/operator/cohorts")
 echo "gate through the shell: $gate"
@@ -68,4 +81,4 @@ if [ "$gate" != "200" ]; then
   tail -20 "$WORK/context.log"; exit 1
 fi
 
-( cd "$APP" && node "$HERE/journey.mjs" "http://127.0.0.1:$SPORT" )
+( cd "$APP" && node "$HERE/journey.mjs" "http://127.0.0.1:$SPORT" "http://127.0.0.1:$SPORT2" )

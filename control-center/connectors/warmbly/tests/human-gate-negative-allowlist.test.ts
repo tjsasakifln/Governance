@@ -125,11 +125,105 @@ describe("the human gate cannot construct an outbound-send route", () => {
         `${forbidden} must never become an operation`,
       );
     }
-    // Exactly the five pre-existing writes plus adjust, plus three reads.
+    // Exactly the six writes plus dispatch, plus three reads.
     assert.deepEqual([...declared].sort(), [
-      "adjust", "create", "decision", "list_cohorts", "read_candidate",
+      "adjust", "create", "decision", "dispatch", "list_cohorts", "read_candidate",
       "read_cohort", "reproduce", "review", "validation",
     ]);
+  });
+});
+
+/**
+ * `dispatch` is the only segment ever taken off the forbidden list, so it gets
+ * the same adversarial treatment the list itself provides: reachable at exactly
+ * one shape, by exactly one method, for exactly one role, and nowhere else.
+ */
+describe("dispatch is reachable at exactly one shape and nowhere else", () => {
+  const only = `${HUMAN_GATE_PREFIX}/${COHORT}/dispatch`;
+
+  it("forwards the cohort dispatch and nothing else about it", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(request("POST", only, "admins,operators", WRITE_BODY));
+    assert.equal(res.status, 200);
+    assert.deepEqual(attempts, [`https://warmbly.invalid/v1/confenge/cohorts/${COHORT}/dispatch`]);
+  });
+
+  it("has no candidate-level dispatch, and no dispatch at the bare prefix", async () => {
+    const { attempts, handler } = trap();
+    for (const path of [
+      `${HUMAN_GATE_PREFIX}/dispatch`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/candidates/${CANDIDATE}/dispatch`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/dispatch/${CANDIDATE}`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/dispatch/all`,
+      `/v1/warmbly/operator/dispatch`,
+      `/v1/confenge/dispatch`,
+    ]) {
+      const res = await handler(request("POST", path, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, `${path} must be outside the allowlist`);
+      assert.equal(res.body.code, "human_gate_route_not_allowed");
+    }
+    assert.deepEqual(attempts, [], "no dispatch shape but the one may reach Warmbly");
+  });
+
+  it("refuses every method on dispatch except POST", async () => {
+    const { attempts, handler } = trap();
+    for (const method of ["GET", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
+      const res = await handler(request(method, only, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, method);
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("requires admins: operators alone cannot dispatch, and the refusal never reaches Warmbly", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(request("POST", only, "operators", WRITE_BODY));
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, "insufficient_human_gate_role");
+    assert.deepEqual(attempts, []);
+  });
+
+  it("refuses a dispatch whose cohort id is not a canonical UUID or tries to traverse", async () => {
+    const { attempts, handler } = trap();
+    for (const id of [
+      "..",
+      "../send",
+      `${COHORT}%2F..%2Fsend`,
+      "%2e%2e%2fqueue",
+      "https://evil.invalid",
+      "-".repeat(36),
+      "all",
+    ]) {
+      const res = await handler(
+        request("POST", `${HUMAN_GATE_PREFIX}/${id}/dispatch`, "admins,operators", WRITE_BODY),
+      );
+      assert.equal(res.status, 404, id);
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("still cannot reach send or queue, which is what dispatch is not", async () => {
+    const { attempts, handler } = trap();
+    for (const path of [
+      `${HUMAN_GATE_PREFIX}/${COHORT}/send`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/queue`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/dispatch/send`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/dispatch/queue`,
+    ]) {
+      const res = await handler(request("POST", path, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, path);
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("drops a query string that tries to raise the batch beyond the upstream cap", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(
+      request("POST", `${only}?limit=5000`, "admins,operators", WRITE_BODY),
+    );
+    assert.equal(res.status, 200);
+    // Writes never carry `url.search` upstream, so the batch size is whatever
+    // Warmbly decides — and Warmbly caps it at ten.
+    assert.deepEqual(attempts, [`https://warmbly.invalid/v1/confenge/cohorts/${COHORT}/dispatch`]);
   });
 });
 

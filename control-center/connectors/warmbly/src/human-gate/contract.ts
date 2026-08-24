@@ -23,8 +23,18 @@ export const WARMBLY_COHORTS_PREFIX = "/v1/confenge/cohorts";
 
 /**
  * Every operation the human gate can name. There is deliberately no generic
- * proxy entry and no `send`, `dispatch`, `queue`, `resume` or `payment` member:
- * the type itself is part of the security boundary.
+ * proxy entry and no `send`, `queue`, `resume` or `payment` member: the type
+ * itself is part of the security boundary.
+ *
+ * `dispatch` is the one deliberate widening, and it is narrow on purpose. It
+ * names exactly one upstream route — `POST {prefix}/{cohortId}/dispatch` — which
+ * is the call that hands an already-GO'd cohort to Warmbly's own queue. It does
+ * not send: Warmbly enqueues each member and its worker delivers inside the
+ * send window under the rolling-hour governor. Every gate that matters stays
+ * upstream and none of them is expressible from here: Warmbly re-checks the
+ * durable human-gate GO, the grant's revocation and expiry, `auto_send` and
+ * `green_autorun` being off, the pause state and the file kill switch, and caps
+ * the batch at ten regardless of what this connector asks for.
  */
 export const HUMAN_GATE_OPERATIONS = [
   "list_cohorts",
@@ -36,6 +46,7 @@ export const HUMAN_GATE_OPERATIONS = [
   "review",
   "adjust",
   "decision",
+  "dispatch",
 ] as const;
 export type HumanGateOperation = (typeof HUMAN_GATE_OPERATIONS)[number];
 
@@ -47,16 +58,22 @@ export const HUMAN_GATE_WRITE_OPERATIONS = [
   "review",
   "adjust",
   "decision",
+  "dispatch",
 ] as const;
 
 /**
  * Route classes this connector must never be able to construct, at any prefix.
  * Kept as data so `tests/human-gate-negative-allowlist.test.ts` can enumerate
  * them instead of a reviewer having to remember the list.
+ *
+ * `dispatch` left this list when the cockpit gained the control that hands a
+ * GO'd cohort to Warmbly's queue. Nothing else did, and the removal buys exactly
+ * one fixed route: the negative tests still prove that `dispatch` is
+ * unreachable at every other shape — under `/candidates/`, at the bare prefix,
+ * through traversal, and on every method except POST.
  */
 export const FORBIDDEN_HUMAN_GATE_SEGMENTS = [
   "send",
-  "dispatch",
   "queue",
   "resume",
   "auto-send",

@@ -5,7 +5,7 @@
  */
 
 export interface HumanGateIntent {
-  action: "create" | "reproduce" | "validate" | "review" | "decide" | "adjust";
+  action: "create" | "reproduce" | "validate" | "review" | "decide" | "adjust" | "dispatch";
   version_id?: string;
   candidate_id?: string;
   limit?: number;

@@ -35,12 +35,27 @@
    escrito**, que continua obrigatório. Se recipient, copy, policy, evidence ou
    suppression mudar depois, a aprovação aparece inválida (`effective=false`),
    volta para Pendentes e deve ser refeita.
-6. GO exige todos aprovados, source fresh e a confirmação digitada da versão.
+6. GO exige todos decididos, source fresh e a confirmação digitada da versão.
    O Warmbly compara o valor (por exemplo `v3`) à versão imutável; o proxy não
    consegue remover ou fabricar essa confirmação.
    Use NO_GO para interromper/revogar. GO cria a autoridade bounded exata em
    `READY_FOR_LIVE_PREFLIGHT`; não enfileira, não envia e não liga auto-send.
-7. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
+7. **Entregar a cohort à fila.** GO autoriza e não enfileira: o controle
+   "Entregar esta cohort à fila de envio" aparece na Revisão **somente depois de
+   um GO registrado**, exige `admins` e a versão digitada, e é o passo que
+   coloca as mensagens aprovadas na fila do Warmbly. O envio em si é do worker
+   do Warmbly, dentro da janela comercial (`09:00–18:00 America/Sao_Paulo`, dias
+   úteis) e sob o teto de 10/hora; no máximo 10 por disparo.
+   - A tela mostra os números que o Warmbly devolveu — tentados, aceitos,
+     falharam, duplicados, bloqueados. São números de **enfileiramento**, não de
+     entrega.
+   - Repetir o disparo é seguro: o Warmbly pula os já enfileirados e os conta
+     como duplicados.
+   - O Warmbly recusa por conta própria, e a tela nomeia cada caso: GO revogado
+     ou vencido, auto-send ou autorun ligados, disparo pausado, kill switch
+     acionado. Nenhum desses portões é contornável pelo Control Center.
+   - Não existe disparo agendado e nenhuma aprovação enfileira nada sozinha.
+8. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
    e correlation id. O frontend preserva a idempotency key da intenção incerta;
    só depois repita a mesma intenção.
 
@@ -55,12 +70,21 @@ custo humano; nenhuma salvaguarda material foi removida.
 | Digitar um motivo para APPROVE | `approved_by_human_reviewer` automático, comentário opcional | O motivo digitado era sempre a mesma palavra; a trilha já tinha ator, instante, versão e hash |
 | Marcar "revisei destinatário" | O clique em Aprovar é a ciência | Um segundo clique declarando o primeiro não acrescenta nada à auditoria |
 | Lista com aprovadas no topo | Recorte **Pendentes** por padrão, com contador | Rolar a própria produção para achar o próximo trabalho não escala |
+| Disparo só por API/CLI do Warmbly | Controle "Entregar à fila" na Revisão, após GO, `admins` + versão digitada | GO autorizava e nada acontecia depois; a cohort aprovada nunca chegava à fila |
 
 O que **não** mudou: `acknowledged=true` continua viajando no corpo do APPROVE e
 o adaptador recusa antes do fio um APPROVE sem ele; o Warmbly continua recusando
 APPROVE fora de uma validação VALID vigente; GO continua exigindo `admins` e a
 confirmação digitada da versão; HOLD/REJECT continuam exigindo motivo escrito; e
-o Control Center continua sem qualquer rota de send, dispatch ou queue.
+o Control Center continua sem qualquer rota de **send**, **queue** ou **resume**
+de cohort — a única rota nova é `POST {prefix}/{cohortId}/dispatch`, que
+enfileira e não envia.
+
+**Auto-send continua proibido por construção.** `CONFENGE_AUTO_SEND_ENABLED=true`
+derruba o boot do Warmbly (invariante testada, não é flag para ligar), e o
+próprio endpoint de disparo recusa quando auto-send ou green autorun estão
+ligados. Não existe, e não deve passar a existir, disparo agendado: a cohort
+entra na fila porque um humano com `admins` pediu.
 
 ## Métricas e alertas
 
@@ -79,7 +103,9 @@ denominadores, ou qualquer indício de auto-send/green autorun habilitado.
 
 - Produção: somente GET de lista/detalhe com conta autorizada; não execute POST.
 - Escritas: sandbox/fixtures, mailbox `.invalid`/Mailpit e kill switch ativo.
-- Nunca use o endpoint de dispatch para validar esta entrega e nunca envie mail.
+- Nunca use o endpoint de dispatch para validar uma entrega e nunca envie mail
+  como parte de um smoke: o disparo é uma decisão comercial do fundador, não um
+  passo de verificação. Exercite-o em sandbox/Mailpit.
 - Rollback app: reverta primeiro Governance, depois Warmbly; versões persistidas
   continuam inertes e legíveis.
 - Rollback schema: somente após rollback dos dois apps, execute a migration

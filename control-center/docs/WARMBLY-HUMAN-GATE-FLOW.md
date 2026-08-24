@@ -14,8 +14,9 @@ cohort/version imutável
   -- escrita idempotente, disparada pela própria aprovação --> validation
   -- escrita humana, uma ação --> APPROVE | REJECT | HOLD por candidate
   -- escrita humana de maior privilégio --> GO | NO_GO da versão
+  -- escrita humana de maior privilégio, separada do GO --> dispatch da cohort
   -- somente se GO e todos os gates ao vivo continuarem válidos --> queue
-  -- fora do Control Center e desabilitado por padrão --> send
+  -- worker do Warmbly, na janela comercial e sob o teto por hora --> send
 ```
 
 | Etapa | Autoridade | Leitura no Control Center | Escrita permitida | Pode enviar? |
@@ -26,8 +27,8 @@ cohort/version imutável
 | Validation | verificador do Warmbly | VALID/RISKY/INVALID/UNKNOWN/STALE, motivo e validade | solicitar/repetir validação — a aprovação a solicita sozinha quando não há uma vigente | não |
 | Review decision | Warmbly | decisão atual, vínculo e invalidações | APPROVE/REJECT/HOLD com ator Authelia e motivo | não |
 | Cohort decision | Warmbly | prontidão e todos os bloqueios | GO/NO_GO sobre uma versão exata | não |
-| Queue | Warmbly | estado de autorização/preflight/queue | GO materializa somente a autorização exata; Warmbly ainda revalida todos os gates antes da queue | não |
-| Send | runtime Warmbly | métricas/read model | não existe ação de envio no Control Center | sim, mas `auto_send=false` e fora deste gate |
+| Queue | Warmbly | estado de autorização/preflight/queue | entregar a cohort com GO à fila, `admins` e confirmação digitada; Warmbly revalida todos os gates e limita o lote a 10 | não |
+| Send | runtime Warmbly | métricas/read model | não existe ação de envio no Control Center | sim, pelo worker, com `auto_send=false` e fora deste gate |
 
 ## Invariantes de segurança
 
@@ -60,7 +61,24 @@ cohort/version imutável
   Cohort vazia ou candidato sem APPROVE efetivo e VALID vigente falha fechado.
 - Retomar dispatch não cria approval e não ignora suppression, opt-out, bounce,
   cap, janela, kill switch, validation ou TTL. O scheduler não adota cohort
-  controlada automaticamente.
+  controlada automaticamente: **não existe disparo agendado**. Uma cohort só
+  entra na fila quando um humano com `admins` pede, e nunca como efeito de
+  aprovar ou de registrar GO.
+- `dispatch` **enfileira, não envia**. Ele entrega ao Warmbly a cohort que já
+  tem GO durável; o worker do Warmbly é quem entrega, dentro da janela comercial
+  e sob o governador de taxa por hora. Os números que o Control Center mostra
+  depois de um disparo são de enfileiramento.
+- O Control Center não pode contornar nenhum portão do disparo, porque não os
+  implementa: o próprio Warmbly recusa se o GO durável não existir, se a
+  autoridade bounded tiver sido revogada ou vencida, se `auto_send` ou
+  `green_autorun` estiverem ligados, se o disparo estiver pausado, se o kill
+  switch de arquivo estiver acionado, e limita o lote a dez independentemente do
+  que a borda pedir. A borda também descarta a query string em escritas, então
+  nem o tamanho do lote é influenciável daqui.
+- A rota de disparo é uma só — `POST {prefix}/{cohortId}/dispatch` — exigindo
+  `admins`. Não existe disparo por candidato, e `send`, `queue`, `resume` e
+  `payment` continuam impossíveis de construir neste conector, com teste
+  negativo enumerando cada um.
 - A identidade humana nasce somente dos headers ForwardAuth entregues por hop
   confiável. O navegador não declara ator. Auditoria registra ids opacos,
   hashes, estados e reason codes; recipient, subject e body não entram em logs.

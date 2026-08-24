@@ -156,7 +156,45 @@ function gateFallbackMessage(input: WarmblyGateInput, version: number | undefine
         : "NO-GO registrado.";
     case "adjust":
       return `Ajuste aceito. O servidor criou a nova versão${v}.`;
+    case "dispatch":
+      return "Cohort entregue à fila do Warmbly. O envio acontece na janela comercial, sob o teto por hora.";
   }
+}
+
+/**
+ * The counters Warmbly returns for a bounded dispatch.
+ *
+ * Read out of the response rather than summarised into a sentence: "10
+ * enfileirados" and "3 enfileirados, 7 bloqueados" are different outcomes and
+ * the operator has to see which one happened. Anything the server did not send
+ * stays absent instead of becoming a zero.
+ */
+export function gateDispatchOf(body: Record<string, unknown>): AdapterWriteResult["dispatch"] {
+  const data = asRecord(body.data) ?? body;
+  const num = (key: string): number | undefined => gateNumber(data[key]);
+  const counts = {
+    ...(num("attempted") !== undefined ? { attempted: num("attempted")! } : {}),
+    ...(num("provider_accepted") !== undefined ? { accepted: num("provider_accepted")! } : {}),
+    ...(num("failed") !== undefined ? { failed: num("failed")! } : {}),
+    ...(num("skipped_duplicate") !== undefined ? { skippedDuplicate: num("skipped_duplicate")! } : {}),
+    ...(num("blocked") !== undefined ? { blocked: num("blocked")! } : {}),
+    ...(num("max_daily") !== undefined ? { maxDaily: num("max_daily")! } : {}),
+    ...(typeof data.kill_switch_available === "boolean"
+      ? { killSwitchAvailable: data.kill_switch_available }
+      : {}),
+  };
+  const failures = Array.isArray(data.failures)
+    ? data.failures
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => entry !== null)
+        .map((entry) => ({
+          mailbox: typeof entry.mailbox === "string" ? entry.mailbox : "",
+          reason: typeof entry.reason === "string" ? entry.reason : "",
+        }))
+        .filter((entry) => entry.mailbox !== "" || entry.reason !== "")
+    : [];
+  if (Object.keys(counts).length === 0 && failures.length === 0) return undefined;
+  return { ...counts, ...(failures.length > 0 ? { failures } : {}) };
 }
 
 export function gateResult(
@@ -226,6 +264,11 @@ export function gateResult(
     ...(receipt ? { receiptId: receipt } : {}),
     ...(correlation ? { correlationId: correlation } : {}),
     ...(diff ? { diff } : {}),
+    ...(() => {
+      if (input.action !== "dispatch" || !ok) return {};
+      const dispatch = gateDispatchOf(body);
+      return dispatch ? { dispatch } : {};
+    })(),
   };
 }
 
@@ -406,6 +449,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
       : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
       : input.action === "adjust" ? `${base}/${version}/candidates/${candidate}/adjust`
+      : input.action === "dispatch" ? `${base}/${version}/dispatch`
       : `${base}/${version}/decision`;
     // Every refusal below happens before the wire, so "nada foi aplicado" is a
     // fact this adapter can prove rather than a hope.
@@ -455,6 +499,16 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     if (input.action === "decide" && !input.confirmation?.trim()) {
       return refuse(
         "GO/NO-GO exige a confirmação digitada da versão imutável",
+        "cohort_version_confirmation_required",
+      );
+    }
+    // Dispatch is the one call in this gate whose effect leaves the building:
+    // Warmbly enqueues real messages to real companies and its worker delivers
+    // them. It therefore carries the same typed confirmation GO does, refused
+    // here before the wire rather than after.
+    if (input.action === "dispatch" && !input.confirmation?.trim()) {
+      return refuse(
+        "Disparar a cohort exige a confirmação digitada da versão imutável",
         "cohort_version_confirmation_required",
       );
     }

@@ -17,7 +17,7 @@ Chrome navigation exposes exactly these ten areas:
 9. Memória/Decisões
 10. Agentes
 
-“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one.
+“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one — the cohort dispatch that hands a GO’d cohort to Warmbly’s queue lives in Revisão, behind GO and `admins`, and it enqueues rather than sends.
 
 ### Rotas do gate humano de cohorts
 
@@ -65,6 +65,27 @@ validação não é VALID.
 Teclado: `A` aprova o card que já está sob o foco (nunca outro), `Ctrl/Cmd+Enter`
 aprova a primeira pendência. Nenhum dos dois dispara com o cursor dentro de um
 campo de texto — o editor de ajuste vive na mesma página.
+
+#### Entregar a cohort à fila
+
+GO autoriza e **não** enfileira. O controle “Entregar esta cohort à fila de
+envio” aparece na Revisão **somente depois de um GO registrado pelo servidor**,
+exige o grupo `admins` e a versão digitada, e é o que coloca as mensagens
+aprovadas na fila do Warmbly. Sem GO não existe formulário nenhum — não um
+desabilitado — e a tela diz por quê.
+
+Ele enfileira; quem envia é o worker do Warmbly, dentro da janela comercial e sob
+o teto por hora. Os contadores exibidos depois (tentados, aceitos, falharam,
+duplicados, bloqueados) são os do servidor e são de enfileiramento, não de
+entrega; um contador que o servidor não mandou aparece como ausente, nunca como
+zero. Repetir o disparo é seguro — o Warmbly pula os já enfileirados.
+
+Nenhum portão do disparo mora aqui: o Warmbly recusa sozinho se o GO foi
+revogado ou venceu, se auto-send ou autorun estão ligados, se o disparo está
+pausado ou se o kill switch está acionado, e limita o lote a dez. A rota nova é
+uma só (`POST …/cohorts/{id}/dispatch`, `admins`); `send`, `queue`, `resume` e
+`payment` continuam impossíveis de construir, com teste negativo enumerando cada
+forma.
 
 `#/comercial/cohorts` (“Comercial → Coortes”) é **outra coisa**: são coortes de
 aquisição e métricas por período. Nenhum runbook do gate humano deve apontar para
