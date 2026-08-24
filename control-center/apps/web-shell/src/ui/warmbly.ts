@@ -1723,7 +1723,7 @@ ${validateControl}
 `
     : `<p class="constraint" data-non-actionable-notice="true">Versão histórica, não enviável. Verificar o destinatário, aprovar, segurar e ajustar não são oferecidos aqui. Abra a versão corrente pelo link no topo desta página.</p>`;
 
-  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-queue-state="${escapeHtml(queue.state)}" data-queue-optimistic="${queue.optimistic ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}" data-approve-needs-validation="${gate.needsValidation && gate.allowed ? "true" : "false"}"
+  return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-queue-state="${escapeHtml(queue.state)}" data-queue-optimistic="${queue.optimistic ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}" data-approve-needs-validation="${gate.needsValidation && gate.allowed ? "true" : "false"}">
     <p class="kicker">${validationPill(candidate)}${editorial.legacy ? ` <span class="pill error" data-non-actionable="true">NÃO ACIONÁVEL</span>` : ""} · ${escapeHtml(show(candidate.source))}</p>
     <h3>${escapeHtml(show(candidate.company))}</h3>
     ${feedback.forCandidate(candidateId)}
@@ -1950,12 +1950,19 @@ function emptyQueueBlock(
   counts: ReturnType<typeof reviewQueueCounts>,
   filter: ReviewQueueFilter,
   params: URLSearchParams,
+  actionable: boolean,
 ): string {
   const everything = `<p><a class="button" data-queue-see-all="true" href="${escapeHtml(queueFilterHref(params, "todas"))}">Ver todas as ${counts.total}</a></p>`;
   if (filter === "pendentes") {
+    // A historical version offers no GO control at all, so naming GO as the
+    // next step there would point the founder at a button this screen refuses
+    // to render.
+    const next = actionable
+      ? "O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão."
+      : "Esta versão é histórica e não é enviável, então não há próximo passo aqui: decida na versão corrente.";
     return `<article class="card banner ok" role="status" data-queue-empty="pendentes">
       <h3>Fila vazia: nada pendente nesta versão.</h3>
-      <p>Os ${counts.total} candidatos desta versão já foram decididos — ${counts.aprovadas} aprovado(s) e ${counts.ajuste} em ajuste ou rejeitado(s). O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão.</p>
+      <p>Os ${counts.total} candidatos desta versão já foram decididos — ${counts.aprovadas} aprovado(s) e ${counts.ajuste} em ajuste ou rejeitado(s). ${escapeHtml(next)}</p>
       ${everything}
     </article>`;
   }
@@ -2073,7 +2080,7 @@ function reviewSurface(input: WarmblySurfaceInput): string {
     candidateCards
       || (candidates.length === 0
         ? `<p class="banner error">Cohort vazia: GO bloqueado.</p>`
-        : emptyQueueBlock(counts, queueFilter, queueParams))
+        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable))
   }
   ${decideControl}
   <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>

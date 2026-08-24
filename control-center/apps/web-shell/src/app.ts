@@ -836,13 +836,25 @@ async function approveCandidate(
     const status = await readValidationStatus(adapter, versionId, candidateId);
     if (status !== "VALID") {
       releaseFlight();
+      // "O servidor disse RISKY" and "não deu para ler o que o servidor diz"
+      // are different answers, and only the first one is about the recipient.
+      // Collapsing them would tell the reviewer a mailbox is bad when what
+      // actually failed was a GET.
       const refusal: AdapterWriteResult = {
         ok: false,
         path: validated.path,
         kind: "nota",
         outcome: "refused",
-        code: "approval_validation_not_valid",
-        message: `A verificação foi feita agora e o servidor reporta ${status ?? "nenhum estado"}, não VALID. O APPROVE não foi enviado.`,
+        ...(status === null
+          ? {
+              code: "approval_validation_unavailable",
+              message:
+                "A verificação foi pedida, mas a releitura não devolveu o estado dela, então esta tela não sabe se o destinatário está VALID. O APPROVE não foi enviado e nada foi decidido.",
+            }
+          : {
+              code: "approval_validation_not_valid",
+              message: `A verificação foi feita agora e o servidor reporta ${status}, não VALID. O APPROVE não foi enviado.`,
+            }),
         gateAction: "validate",
         gateTarget: target,
         ...(validated.receiptId ? { receiptId: validated.receiptId } : {}),
@@ -1057,7 +1069,17 @@ async function readGateCandidate(
   const cohort = gateRecord(gateRecord(gateRecord(read.page.warmbly_gate).selected).data);
   if (!cohort.id) return null;
   const candidates = Array.isArray(cohort.candidates) ? cohort.candidates.map(gateRecord) : [];
-  return candidates.find((row) => row.candidate_id === candidateId) ?? null;
+  // The intent carries the id as the markup stamped it — a string, always. A
+  // strict comparison against a payload that typed it differently finds nothing
+  // and reports the write as unconfirmed, which rolls back a decision the
+  // server actually recorded.
+  return candidates.find((row) => gateCandidateId(row) === candidateId) ?? null;
+}
+
+/** The candidate id as a string, however the payload chose to type it. */
+function gateCandidateId(candidate: Record<string, unknown>): string {
+  const raw = candidate.candidate_id;
+  return raw === undefined || raw === null || raw === "" ? "" : String(raw);
 }
 
 /**
@@ -1100,7 +1122,7 @@ async function gateReadback(
   }
   const candidates = Array.isArray(cohort.candidates) ? cohort.candidates.map(gateRecord) : [];
   const candidate = intent.candidate_id
-    ? candidates.find((row) => row.candidate_id === intent.candidate_id)
+    ? candidates.find((row) => gateCandidateId(row) === intent.candidate_id)
     : undefined;
   switch (intent.action) {
     case "create":

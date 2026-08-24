@@ -1828,13 +1828,13 @@ function statefulGate(initial: Record<string, unknown>[]): {
       gatePayload(["operators", "admins"], cohort({ candidates: rows.map((row) => ({ ...row })) })),
     respond: (input) => {
       if (input.action === "review") {
-        const row = rows.find((entry) => entry.candidate_id === input.candidate_id);
+        const row = rows.find((entry) => String(entry.candidate_id) === input.candidate_id);
         if (row) {
           row.review = { decision: input.decision, effective: input.decision === "APPROVE" };
         }
       }
       if (input.action === "validate") {
-        const row = rows.find((entry) => entry.candidate_id === input.candidate_id);
+        const row = rows.find((entry) => String(entry.candidate_id) === input.candidate_id);
         if (row) {
           row.validation = { status: "VALID", reason: "verificado no teste" };
           row.blocked_by = [];
@@ -2329,4 +2329,102 @@ test("reverter uma aprovação com HOLD leva a mensagem para o recorte de ajuste
   assert.equal(seen[0]!.decision, "HOLD");
   assert.match(dom.root.innerHTML, /data-queue-approved="0" data-queue-adjust="1"/);
   assert.match(dom.root.innerHTML, /data-gate-key="review:[^"]*:APPROVE"/, "e aprovar volta a ser oferecido");
+});
+
+test("uma releitura que não devolve o estado da verificação não vira acusação contra o destinatário", async () => {
+  reset();
+  // A verificação é aceita e a releitura não completa. "Não deu para ler" e "o
+  // servidor disse RISKY" mandam o operador para lugares diferentes: o primeiro
+  // é para tentar de novo, o segundo é para registrar HOLD.
+  let readable = true;
+  const { adapter, seen } = gateAdapter({
+    gate: () =>
+      readable
+        ? gatePayload(
+            ["operators", "admins"],
+            cohort({
+              candidates: [candidate({ validation: undefined, blocked_by: ["validation_missing"] })],
+            }),
+          )
+        : { list_status: "unreadable", selected_status: "unreadable" },
+    respond: (input) => ({
+      ok: true,
+      path: "/x",
+      kind: "nota" as const,
+      message: "verificação pedida",
+      outcome: "executed",
+      gateAction: input.action,
+    }),
+  });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  readable = false;
+  approve(dom);
+  await settle();
+  assert.deepEqual(seen.map((call) => call.action), ["validate"], "o APPROVE não pode ser tentado");
+  assert.match(dom.root.innerHTML, /data-outcome-code="approval_validation_unavailable"/);
+  assert.ok(
+    dom.root.innerHTML.includes("esta tela não sabe se o destinatário está VALID"),
+    "não pode afirmar que o destinatário é ruim",
+  );
+});
+
+test("uma versão histórica com tudo decidido não aponta para um GO que ela não oferece", () => {
+  reset();
+  const decidedLegacy = cohort({
+    editorial_state: "LEGACY",
+    actionable: false,
+    candidates: [candidate({ review: { decision: "APPROVE", effective: true } })],
+  });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], decidedLegacy) }),
+    "revisao",
+  );
+  assert.match(html, /data-queue-empty="pendentes"/);
+  assert.ok(!html.includes("O próximo passo é o GO/NO-GO"), "GO não é oferecido nesta versão");
+  assert.ok(html.includes("decida na versão corrente"));
+});
+
+test("um candidato cujo id não é string ainda sai da fila quando é aprovado", async () => {
+  reset();
+  // O renderizador carimba `data-candidate` com String(id); a fila e a
+  // releitura leem o mesmo campo do payload. Se os três discordassem sobre o
+  // que é "o id", a marca otimista nunca se aplicaria, a releitura diria
+  // not_confirmed, e a mensagem aprovada voltaria para o topo da fila.
+  const server = statefulGate([candidate({ candidate_id: 7 as never })]);
+  const { adapter } = gateAdapter({ gate: server.gate, respond: server.respond });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, `#/warmbly/revisao?resource=${COHORT_ID}`);
+  assert.match(dom.root.innerHTML, /data-queue-pending="1"/);
+  dom.find(`[data-gate-key="review:${COHORT_ID}:7:APPROVE"]`).fire();
+  await settle();
+  assert.doesNotMatch(dom.root.innerHTML, /data-readback="not_confirmed"/);
+  assert.match(dom.root.innerHTML, /data-queue-pending="0" data-queue-approved="1"/);
+});
+
+test("toda tag aberta nesta superfície é fechada antes da próxima começar", () => {
+  reset();
+  // Um `>` esquecido no fim de uma tag de abertura não quebra teste nenhum e
+  // não quebra o navegador: o parser engole a tag seguinte como se fosse
+  // atributo e a página só fica errada. Foi assim que o card de candidato
+  // passou a emitir `<article ... data-approve-needs-validation="false"` sem
+  // fechar, com 391 testes e uma jornada em navegador real todos verdes.
+  const surfaces: string[] = [
+    warmblyBlock(surfaceInput(), "revisao"),
+    warmblyBlock(surfaceInput({ query: ALL_STATES, gate: gatePayload(["operators", "admins"], mixedCohort()) }), "revisao"),
+    warmblyBlock(surfaceInput(), "cohorts"),
+    warmblyBlock(surfaceInput(), "operacao"),
+    warmblyBlock(legacyInput(), "revisao"),
+  ];
+  for (const html of surfaces) {
+    for (const match of html.matchAll(/<[a-zA-Z][a-zA-Z0-9]*\b/g)) {
+      const close = html.indexOf(">", match.index);
+      assert.ok(close >= 0, `tag sem fechamento a partir de ${html.slice(match.index, match.index + 60)}`);
+      const inside = html.slice(match.index, close);
+      assert.ok(
+        !inside.includes("<", 1),
+        `tag de abertura não fechada: ${inside.slice(0, 120)}`,
+      );
+    }
+  }
 });

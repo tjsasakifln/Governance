@@ -70,6 +70,19 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 /**
+ * The candidate id, stringified exactly the way the renderer stamps it onto the
+ * form.
+ *
+ * The mark is written from the form's `data-candidate` and read back from the
+ * payload, so the two have to agree on what "the id" is. Reading only `string`
+ * here while the form stamped `String(3)` would make the mark silently never
+ * apply — an approved message back at the top of the queue.
+ */
+function idOf(value: unknown): string {
+  return value === undefined || value === null || value === "" ? "" : String(value);
+}
+
+/**
  * The server's own verdict on this candidate, and nothing inferred.
  *
  * An APPROVE the server itself marks `effective: false` was invalidated by
@@ -149,7 +162,7 @@ export function reviewQueueState(
   cohortId: string,
   candidate: Record<string, unknown>,
 ): ReviewQueueReading {
-  const candidateId = typeof candidate.candidate_id === "string" ? candidate.candidate_id : "";
+  const candidateId = idOf(candidate.candidate_id);
   const local = candidateId ? decidedReviewState(cohortId, candidateId) : undefined;
   const server = serverReviewState(candidate);
   if (local === undefined) return { state: server, optimistic: false };
