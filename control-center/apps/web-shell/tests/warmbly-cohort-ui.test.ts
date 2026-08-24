@@ -38,8 +38,10 @@ function candidate(overrides: Record<string, unknown> = {}): Record<string, unkn
     subject: "Assunto exato congelado",
     body_text: "Corpo exato congelado da mensagem.",
     cta: "Posso enviar uma segunda leitura técnica?",
-    observed_fact_text: "Fato público de fixture",
-    evidence_source: "fixture://diario-oficial",
+    // As chaves que a API de produção manda mesmo: texto simples, não objeto,
+    // e nenhum frozen_hash no candidato.
+    observed_fact: "Fato público de fixture",
+    fact_source: "fixture://diario-oficial",
     evidence_observed_at: "2026-08-22T12:00:00Z",
     content_hash: "content-fixture-001",
     evidence_hash: "evidence-fixture-001",
@@ -406,27 +408,205 @@ test("the messages collapse only when the operator asks, through the expand/coll
   assert.match(collapsed, /Expandir todas as mensagens/);
 });
 
-test("provenance, hashes, versions, expiry and every blocker travel with the candidate", () => {
+test("o fato observado e a proveniência saem das chaves que a produção manda mesmo", () => {
+  reset();
+  // observed_fact e fact_source chegam como texto simples. Lidos como objeto,
+  // o fato real virava "não informado pelo servidor" embaixo de uma mensagem
+  // que afirmava exatamente esse fato.
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  assert.match(html, /<dt>Fato observado<\/dt><dd>Fato público de fixture<\/dd>/);
+  assert.match(html, /<dt>Proveniência do fato<\/dt><dd>fixture:\/\/diario-oficial<\/dd>/);
+  assert.doesNotMatch(html, /<dt>Fato observado<\/dt><dd>não informado pelo servidor<\/dd>/);
+  assert.doesNotMatch(html, /<dt>Proveniência do fato<\/dt><dd>não informado pelo servidor<\/dd>/);
+});
+
+test("o formato antigo de evidence em objeto continua sendo lido", () => {
+  reset();
+  const legacyShape = cohort({
+    candidates: [
+      candidate({
+        observed_fact: undefined,
+        fact_source: undefined,
+        evidence: { text: "Fato vindo do formato objeto", source: "objeto://origem" },
+      }),
+    ],
+  });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], legacyShape) }),
+    "revisao",
+  );
+  assert.match(html, /<dt>Fato observado<\/dt><dd>Fato vindo do formato objeto<\/dd>/);
+  assert.match(html, /<dt>Proveniência do fato<\/dt><dd>objeto:\/\/origem<\/dd>/);
+});
+
+test("o bloco de decisão carrega só o que muda a decisão do fundador", () => {
   reset();
   const html = warmblyBlock(surfaceInput(), "revisao");
+  const decision = html.match(/<dl class="facts" data-candidate-identity="true"[\s\S]*?<\/dl>/);
+  assert.ok(decision, "o bloco de decisão precisa existir");
+  const visible = decision[0]!;
   for (const label of [
+    "Destinatário exato",
+    "Classe de rota",
     "Fato observado",
     "Proveniência do fato",
+    "Estado editorial",
+  ]) {
+    assert.ok(visible.includes(label), `${label} sumiu do bloco de decisão`);
+  }
+  // Bloqueio e reprovação de copy QA aparecem porque travam a aprovação.
+  assert.match(html, /data-candidate-blockers="approval_missing_or_invalid"/);
+  assert.match(visible, /<dt>Reprovações de copy QA<\/dt><dd>assunto_generico<\/dd>/);
+  // Auditoria não é decisão: hash, versão e recibo não ocupam o bloco visível.
+  for (const label of [
     "Content hash",
     "Frozen hash",
+    "Evidence hash",
     "Policy version",
     "Composer version",
+    "Observado em",
+    "Motivo da validação",
     "Validação vence em",
-    "Reprovações de copy QA",
+    "Revisão registrada",
+    "Revisão efetiva",
+  ]) {
+    assert.ok(!visible.includes(label), `${label} não devia estar no bloco de decisão`);
+  }
+});
+
+test("hash, versão e recibo moram no detalhe técnico recolhido, não na tabela visível", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  const tech = html.match(/<details class="tech" data-tech="warmbly-candidate">[\s\S]*?<\/details>/);
+  assert.ok(tech, "o detalhe técnico do candidato precisa existir");
+  const audit = tech[0]!;
+  assert.match(audit, /<dt>content_hash<\/dt><dd><code>content-fixture-001<\/code><\/dd>/);
+  assert.match(audit, /<dt>evidence_hash<\/dt><dd><code>evidence-fixture-001<\/code><\/dd>/);
+  assert.match(audit, /<dt>policy_version<\/dt><dd><code>bounded-cohort-policy\.v1<\/code><\/dd>/);
+  assert.match(audit, /<dt>composer_version<\/dt><dd><code>composer\.v3<\/code><\/dd>/);
+  assert.match(audit, /<dt>validation_status<\/dt><dd><code>VALID<\/code><\/dd>/);
+  assert.match(audit, /<dt>review_decision<\/dt><dd><code>HOLD<\/code><\/dd>/);
+  assert.match(audit, /<dt>review_effective<\/dt><dd><code>false<\/code><\/dd>/);
+});
+
+test("o frozen hash exibido é o da versão, porque o candidato não tem um", () => {
+  reset();
+  // Mesma lição do PR #96 para expected_frozen_hash: frozen_hash pertence à
+  // versão. Lido do candidato, saía vazio na tela e não batia com o servidor.
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  const tech = html.match(/<details class="tech" data-tech="warmbly-candidate">[\s\S]*?<\/details>/);
+  assert.ok(tech);
+  assert.match(tech[0]!, /<dt>frozen_hash<\/dt><dd><code>frozen-fixture-001<\/code><\/dd>/);
+});
+
+test("campo ausente que não muda a decisão não vira linha nenhuma", () => {
+  reset();
+  // O candidato de produção não manda observed_at, duplicidade, hard bounce,
+  // motivo de exclusão nem recibo de revisão. Onze linhas de "não informado
+  // pelo servidor" empilhadas sob quatro linhas de e-mail escondiam o e-mail.
+  const sparse = cohort({
+    frozen_hash: undefined,
+    candidates: [
+      candidate({
+        copy_qa: undefined,
+        duplicate_of: undefined,
+        missing_provenance: undefined,
+        hard_bounce: undefined,
+        exclusion_reason: undefined,
+        evidence_observed_at: undefined,
+        review: undefined,
+        blocked_by: [],
+      }),
+    ],
+  });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], sparse) }),
+    "revisao",
+  );
+  const card = html.match(/<article class="card" data-candidate-id=[\s\S]*?<\/article>/);
+  assert.ok(card);
+  for (const label of [
+    "Observado em",
     "Duplicidade apontada pelo servidor",
     "Proveniência ausente",
     "Hard bounce registrado",
     "Excluído do preview por",
+    "Revisão registrada",
+    "Revisão efetiva",
+    "Reprovações de copy QA",
+    "Bloqueios",
   ]) {
-    assert.ok(html.includes(label), `${label} is missing from the candidate card`);
+    assert.ok(!card[0]!.includes(label), `${label} devia ter sumido, não virado "não informado"`);
   }
-  assert.match(html, /data-candidate-blockers="approval_missing_or_invalid"/);
-  assert.match(html, /assunto_generico/);
+  const decision = card[0]!.match(/<dl class="facts" data-candidate-identity="true"[\s\S]*?<\/dl>/);
+  assert.ok(decision);
+  assert.doesNotMatch(decision[0]!, /não informado pelo servidor/);
+});
+
+test("o tipo de caixa é lido em português, e UNKNOWN não ocupa linha nenhuma", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  assert.match(html, /<dt>Tipo de caixa<\/dt><dd>caixa de cargo ou departamento \(ROLE_OR_DEPARTMENT\)<\/dd>/);
+  const unknownPurpose = cohort({ candidates: [candidate({ mailbox_purpose: "UNKNOWN" })] });
+  const unclassified = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], unknownPurpose) }),
+    "revisao",
+  );
+  // O servidor dizendo "não classifiquei" não muda a decisão, e a classe de
+  // rota logo acima já responde se a caixa é genérica ou de departamento.
+  assert.ok(!unclassified.includes("Tipo de caixa"));
+  // O valor cru não some do sistema: continua no detalhe técnico.
+  assert.match(unclassified, /<dt>mailbox_purpose<\/dt><dd><code>UNKNOWN<\/code><\/dd>/);
+});
+
+test("sinalizador verdadeiro do servidor vira linha, e falso não", () => {
+  reset();
+  const flagged = cohort({
+    candidates: [
+      candidate({ missing_provenance: true, hard_bounce: false, duplicate_of: "outro-candidato" }),
+    ],
+  });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], flagged) }),
+    "revisao",
+  );
+  assert.match(html, /<dt>Proveniência ausente<\/dt><dd>sim<\/dd>/);
+  assert.match(html, /<dt>Duplicidade apontada pelo servidor<\/dt><dd>outro-candidato<\/dd>/);
+  assert.ok(!html.includes("Hard bounce registrado"));
+});
+
+test("fato faltando debaixo de uma mensagem que afirma uma observação é dito em voz alta", () => {
+  reset();
+  const noEvidence = cohort({
+    candidates: [candidate({ observed_fact: undefined, fact_source: undefined })],
+  });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], noEvidence) }),
+    "revisao",
+  );
+  assert.match(html, /data-fact-missing="true"/);
+  assert.match(html, /nem o fato observado nem a proveniência dele/);
+  assert.match(html, /<dt>Fato observado<\/dt><dd>não informado pelo servidor<\/dd>/);
+  assert.match(html, /<div data-absent="true"[^>]*><dt>Fato observado<\/dt>/);
+  assert.match(html, /<div data-absent="true"[^>]*><dt>Proveniência do fato<\/dt>/);
+});
+
+test("só a proveniência faltando também é dita, sem misturar com o fato", () => {
+  reset();
+  const noSource = cohort({ candidates: [candidate({ fact_source: undefined })] });
+  const html = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators", "admins"], noSource) }),
+    "revisao",
+  );
+  assert.match(html, /data-fact-missing="true"/);
+  assert.match(html, /não enviou a proveniência do fato/);
+  assert.match(html, /<dt>Fato observado<\/dt><dd>Fato público de fixture<\/dd>/);
+});
+
+test("com fato e proveniência no payload nenhum alerta de evidência é inventado", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  assert.doesNotMatch(html, /data-fact-missing="true"/);
 });
 
 test("preview denominators are rendered verbatim, and an absent number says so instead of being derived", () => {
@@ -787,7 +967,10 @@ test("the new version opens with validation, review and GO all pending", () => {
   );
   assert.match(html, /Revisão v2/);
   assert.match(html, /data-approve-allowed="false"/, "a fresh version cannot already be approvable");
-  assert.match(html, /<dt>Revisão registrada<\/dt><dd>não informado pelo servidor<\/dd>/);
+  // Sem revisão registrada não há linha de revisão: ausência que não muda a
+  // decisão não vira "não informado pelo servidor" na cara do fundador.
+  assert.ok(!html.includes("Revisão registrada"));
+  assert.match(html, /<dt>Validação<\/dt><dd>UNKNOWN<\/dd>/);
   assert.match(html, /<dt>Decisão final registrada<\/dt><dd>não informado pelo servidor<\/dd>/);
 });
 
@@ -1218,10 +1401,15 @@ test("a historical version stays fully readable: message, facts and hashes all r
   assert.match(html, /data-exact-body="true">Corpo exato congelado/);
   assert.match(html, /data-exact-subject="true"[^>]*><strong>Assunto:<\/strong> Assunto exato congelado/);
   assert.match(html, /compras@empresa\.invalid/);
-  for (const label of ["Content hash", "Frozen hash", "Policy version", "Composer version", "Estado editorial"]) {
-    assert.ok(html.includes(label), `${label} must survive on a historical version`);
-  }
+  assert.ok(html.includes("Estado editorial"));
   assert.ok(html.includes("Versão histórica (não enviável)"));
+  assert.match(html, /<dt>Fato observado<\/dt><dd>Fato público de fixture<\/dd>/);
+  // A auditoria de uma versão histórica é justamente o que ela ainda serve.
+  const tech = html.match(/<details class="tech" data-tech="warmbly-candidate">[\s\S]*?<\/details>/);
+  assert.ok(tech, "o detalhe técnico precisa sobreviver na versão histórica");
+  for (const term of ["content_hash", "frozen_hash", "policy_version", "composer_version", "editorial_state"]) {
+    assert.ok(tech[0]!.includes(`<dt>${term}</dt>`), `${term} must survive on a historical version`);
+  }
 });
 
 test("the frozen message never claims to be current when it is not", () => {

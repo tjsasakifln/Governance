@@ -995,7 +995,25 @@ function reviewList(value: unknown): string | null {
   return parts.length === 0 ? null : parts.join(", ");
 }
 
-/** Fato de leitura. Ausência vira palavra explícita, nunca campo escondido. */
+/** Valor cru para o bloco técnico. Ausente é "", e o bloco descarta "". */
+function reviewTech(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => typeof entry === "string" || typeof entry === "number")
+      .map(String)
+      .join(",");
+  }
+  return String(value);
+}
+
+/**
+ * Fato de leitura.
+ *
+ * Ausência vira palavra explícita nas linhas em que a ausência muda a decisão.
+ * Onde ela não muda nada, a linha simplesmente não é emitida: uma pilha de
+ * "ausente" sob uma mensagem de quatro linhas esconde a mensagem.
+ */
 function reviewFact(label: string, value: string | null, absentWord = REVIEW_ABSENT, extra = ""): string {
   return value === null
     ? fact(label, escapeHtml(absentWord), ` data-absent="true"`)
@@ -1022,13 +1040,6 @@ function reviewProvenance(row: Record<string, unknown>): string | null {
   const source = reviewText(row.fact_source);
   if (evidence === null && source === null) return null;
   return `${evidence ?? "sem identificador de evidência"} (origem: ${source ?? REVIEW_UNREPORTED})`;
-}
-
-function reviewComposer(row: Record<string, unknown>): string | null {
-  const composer = reviewText(row.composer_version);
-  const prompt = reviewText(row.prompt_version);
-  if (composer === null && prompt === null) return null;
-  return `${composer ?? REVIEW_UNREPORTED} (prompt: ${prompt ?? REVIEW_UNREPORTED})`;
 }
 
 function reviewTargetFit(value: unknown): string | null {
@@ -1081,16 +1092,49 @@ function reviewDraftCard(item: unknown): string {
     : ` data-reason-codes="${escapeHtml(editorial.reasonCodes.join(" "))}"`;
   const subjectRows = reviewRows(subject, 2, 4);
   const bodyRows = reviewRows(bodyText, 12, 40);
+  const factUsed = reviewText(row.fact_used);
+  const provenance = reviewProvenance(row);
+  const targetFit = reviewTargetFit(row.target_fit);
+  // Um corpo escrito afirma uma observação específica ao destinatário. Se o
+  // fato ou a origem dele não vieram, isso não some do card: é o motivo para
+  // não aprovar.
+  const factGap =
+    reviewText(bodyText) === null || (factUsed !== null && provenance !== null)
+      ? null
+      : factUsed === null && provenance === null
+        ? "nem o fato observado nem a proveniência dele"
+        : factUsed === null
+          ? "o fato observado"
+          : "a proveniência do fato";
+  const factGapBanner =
+    factGap === null
+      ? ""
+      : `<p class="banner error" role="alert" data-fact-missing="true">O rascunho afirma uma observação específica sobre este lead, mas o servidor não enviou ${escapeHtml(factGap)}. Não dá para conferir o que a mensagem diz ao destinatário: recupere a evidência antes de aprovar.</p>`;
   const contextFacts = `<dl class="facts" data-review-context="${escapeHtml(id)}">
-                ${reviewFact("Fato observado", reviewText(row.fact_used))}
-                ${reviewFact("Proveniência", reviewProvenance(row))}
+                ${reviewFact("Fato observado", factUsed)}
+                ${reviewFact("Proveniência", provenance)}
                 ${reviewFact("Classe de rota", reviewRouteClass(routeClass), REVIEW_UNREPORTED, routeClassAttr)}
-                ${reviewFact("Target fit", reviewTargetFit(row.target_fit), REVIEW_UNREPORTED)}
-                ${reviewFact("Composer", reviewComposer(row), REVIEW_UNREPORTED)}
-                ${reviewFact("Content hash", reviewText(row.content_hash))}
                 ${reviewFact("Estado editorial", editorialReading)}
-                ${reviewFact("Reason codes", reviewReasonCodes(editorial.reasonCodes), REVIEW_ABSENT, reasonAttr)}
+                ${targetFit === null ? "" : fact("Target fit", escapeHtml(targetFit))}
+                ${editorial.reasonCodes.length === 0 ? "" : fact("Reason codes", escapeHtml(reviewReasonCodes(editorial.reasonCodes)), reasonAttr)}
               </dl>`;
+  // Hashes, versões e códigos são prova de auditoria, não entrada da decisão.
+  const auditFacts = technicalDetails(
+    [
+      { term: "draft_id", value: id },
+      { term: "account_id", value: reviewTech(row.account_id) },
+      { term: "content_hash", value: reviewTech(row.content_hash) },
+      { term: "composer_version", value: reviewTech(row.composer_version) },
+      { term: "prompt_version", value: reviewTech(row.prompt_version) },
+      { term: "policy_version", value: reviewTech(row.policy_version) },
+      { term: "route_class", value: reviewTech(row.route_class) },
+      { term: "fact_source", value: reviewTech(row.fact_source) },
+      { term: "evidence_ids", value: reviewTech(row.evidence_ids) },
+      { term: "editorial_state", value: reviewTech(rawEditorialState) },
+      { term: "editorial_reason_codes", value: editorial.reasonCodes.join(",") },
+    ],
+    "review-draft",
+  );
   const decision = actionable
     ? `<form data-review-form="${escapeHtml(id)}" class="operator-form">
                 <input type="hidden" name="expected_content_hash" value="${escapeHtml(contentHash)}" />
@@ -1115,8 +1159,10 @@ function reviewDraftCard(item: unknown): string {
               <p>Destinatário: ${escapeHtml(String(row.recipient ?? "ausente"))}</p>
               <p>Razão: ${escapeHtml(String(row.stop_reason ?? row.generation_error ?? "pronto para revisão"))}</p>
               ${actionable ? "" : `<p class="banner stale" role="note" data-editorial-notice="true">${escapeHtml(notice)}</p>`}
+              ${factGapBanner}
               ${contextFacts}
               ${decision}
+              ${auditFacts}
             </article>`;
 }
 
