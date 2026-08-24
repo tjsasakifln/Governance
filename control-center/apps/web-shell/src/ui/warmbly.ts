@@ -1447,7 +1447,6 @@ function candidateCard(
       <summary>Mensagem exata congelada (assunto e corpo). ${editorial.legacy ? "Versão histórica, não enviar." : "Versão corrente."}</summary>
       <p data-exact-subject="true"><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p>
       <pre class="message-preview" data-exact-body="true">${escapeHtml(show(candidate.body_text))}</pre>
-      <p data-cta="true"><strong>Chamada para ação (CTA):</strong> ${escapeHtml(fromPayload(candidate.cta ?? candidate.cta_text))}</p>
     </details>
     <dl class="facts" data-observed-fact="true">
       ${fact("Fato observado", fromPayload(candidate.observed_fact_text ?? evidence.text ?? evidence.summary))}
