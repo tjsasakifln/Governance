@@ -104,9 +104,15 @@ test("review surface renders the judging context inline, with no details disclos
   assert.match(html, /<dt>Proveniência<\/dt><dd>ev-pncp-1, ev-pncp-2 \(origem: fact_to_mention\)<\/dd>/);
   assert.match(html, /<dt>Classe de rota<\/dt><dd>caixa genérica da empresa, como contato@ ou comercial@ \(GENERIC_COMPANY\)<\/dd>/);
   assert.match(html, /<dt>Target fit<\/dt><dd>FIT \(leitura atual; apurado em 2026-08-20T12:00:00Z; porte e setor compatíveis\)<\/dd>/);
-  assert.match(html, /<dt>Composer<\/dt><dd>confenge\.composer\.v5 \(prompt: confenge\.draft\.v6\)<\/dd>/);
-  assert.match(html, /<dt>Content hash<\/dt><dd>sha256:exact<\/dd>/);
   assert.match(html, /<dt>Estado editorial<\/dt><dd>atual<\/dd>/);
+  // Hash e versão são prova de auditoria, não entrada da decisão: vão para o
+  // detalhe técnico recolhido, não para a tabela visível.
+  assert.doesNotMatch(html, /<dt>Content hash<\/dt>/);
+  assert.doesNotMatch(html, /<dt>Composer<\/dt>/);
+  assert.match(html, /<dt>content_hash<\/dt><dd><code>sha256:exact<\/code><\/dd>/);
+  assert.match(html, /<dt>composer_version<\/dt><dd><code>confenge\.composer\.v5<\/code><\/dd>/);
+  assert.match(html, /<dt>prompt_version<\/dt><dd><code>confenge\.draft\.v6<\/code><\/dd>/);
+  assert.match(html, /<details class="tech" data-tech="review-draft">/);
   assert.match(html, /<dt>Reason codes<\/dt><dd>FACT_FRESH; ROUTE_OK<\/dd>/);
   assert.match(html, /data-editorial-state="CURRENT"/);
   assert.match(html, /data-composer-version="confenge\.composer\.v5"/);
@@ -148,10 +154,14 @@ test("absent editorial fields render an explicit word instead of undefined", asy
   assert.match(html, /<dt>Fato observado<\/dt><dd>ausente<\/dd>/);
   assert.match(html, /<dt>Proveniência<\/dt><dd>ausente<\/dd>/);
   assert.match(html, /<dt>Classe de rota<\/dt><dd>não informado<\/dd>/);
-  assert.match(html, /<dt>Target fit<\/dt><dd>não informado<\/dd>/);
-  assert.match(html, /<dt>Composer<\/dt><dd>não informado<\/dd>/);
-  assert.match(html, /<dt>Reason codes<\/dt><dd>nenhum<\/dd>/);
   assert.match(html, /<dt>Estado editorial<\/dt><dd>atual \(não informado pelo servidor, tratado como atual\)<\/dd>/);
+  // Ausência que não muda a decisão não vira linha: some do card.
+  assert.doesNotMatch(html, /<dt>Target fit<\/dt>/);
+  assert.doesNotMatch(html, /<dt>Composer<\/dt>/);
+  assert.doesNotMatch(html, /<dt>Reason codes<\/dt>/);
+  // Fato e proveniência faltando debaixo de um corpo escrito é dito em voz alta.
+  assert.match(html, /data-fact-missing="true"/);
+  assert.match(html, /nem o fato observado nem a proveniência dele/);
   // An older backend still yields a decidable row.
   assert.match(html, /data-editorial-state="CURRENT"/);
   assert.match(html, /data-editorial-actionable="true"/);
@@ -169,7 +179,8 @@ test("a partially reported target fit degrades field by field without crashing",
   }]);
   assert.doesNotMatch(html, /undefined/);
   assert.match(html, /<dt>Proveniência<\/dt><dd>sem identificador de evidência \(origem: fact_to_mention\)<\/dd>/);
-  assert.match(html, /<dt>Composer<\/dt><dd>confenge\.composer\.v5 \(prompt: não informado\)<\/dd>/);
+  assert.match(html, /<dt>composer_version<\/dt><dd><code>confenge\.composer\.v5<\/code><\/dd>/);
+  assert.doesNotMatch(html, /<dt>prompt_version<\/dt>/);
   assert.match(html, /<dt>Target fit<\/dt><dd>FIT \(frescor não informado; apurado em não informado\)<\/dd>/);
 });
 
@@ -289,6 +300,31 @@ test("mixed rows keep decidable and historical drafts side by side", async () =>
   assert.equal(html.match(/class="card review-draft"/g)?.length, 2);
   assert.equal(html.match(/data-review-form=/g)?.length, 1);
   assert.equal(html.match(/<button type="submit">/g)?.length, 1);
+});
+
+test("um rascunho com fato e proveniência não ganha alerta de evidência inventado", async () => {
+  const html = await reviewSurface([RICH_DRAFT]);
+  assert.doesNotMatch(html, /data-fact-missing="true"/);
+});
+
+test("só a proveniência faltando é dita sem misturar com o fato", async () => {
+  const html = await reviewSurface([{ ...RICH_DRAFT, evidence_ids: [], fact_source: "" }]);
+  assert.match(html, /data-fact-missing="true"/);
+  assert.match(html, /não enviou a proveniência do fato/);
+  assert.match(html, /<dt>Fato observado<\/dt><dd>Publicou edital de reforma do bloco B em 20\/08<\/dd>/);
+});
+
+test("um rascunho histórico mantém a auditoria recolhida e nenhuma decisão", async () => {
+  const html = await reviewSurface([{
+    ...RICH_DRAFT,
+    id: LEGACY_ID,
+    editorial_state: "LEGACY_SUPERSEDED",
+    editorial_actionable: false,
+  }]);
+  assert.match(html, /<details class="tech" data-tech="review-draft">/);
+  assert.match(html, /<dt>content_hash<\/dt><dd><code>sha256:exact<\/code><\/dd>/);
+  assert.match(html, /<dt>editorial_state<\/dt><dd><code>LEGACY_SUPERSEDED<\/code><\/dd>/);
+  assert.doesNotMatch(html, /<button type="submit">/);
 });
 
 test("the empty state survives the new context block", async () => {

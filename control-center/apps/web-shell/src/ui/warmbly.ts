@@ -43,6 +43,7 @@ import {
 import {
   operatorActionLabel,
   operatorOutcomeLabel,
+  routeClassLabel,
   technicalDetails,
 } from "./labels";
 import { provenanceBlock } from "./provenance";
@@ -1338,20 +1339,82 @@ function previewBlock(preview: Record<string, unknown>): string {
     </article>`;
 }
 
-function listFacts(label: string, value: unknown): string {
-  if (Array.isArray(value)) {
-    const rows = value.filter((entry) => typeof entry === "string" || typeof entry === "number");
-    return fact(label, rows.length > 0 ? rows.map(String).join(", ") : "nenhum");
+/** Texto observado, ou nada. Objeto, vazio e nulo não contam como leitura. */
+function textOf(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
   }
-  return fact(label, fromPayload(value));
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+/** Primeira leitura observada entre as chaves que o servidor já usou. */
+function firstText(...values: readonly unknown[]): string | null {
+  for (const value of values) {
+    const text = textOf(value);
+    if (text !== null) return text;
+  }
+  return null;
+}
+
+/** Linha que só existe quando o servidor mandou o campo. Ausência não vira linha. */
+function factWhenPresent(label: string, value: unknown, extra = ""): string {
+  const text = textOf(value);
+  return text === null ? "" : fact(label, text, extra);
 }
 
 /**
- * One candidate, message first.
+ * Linha cuja ausência muda a decisão, então a ausência fica escrita.
+ * Sumir com um fato que falta é quase afirmar que ele está lá.
+ */
+function factOrAbsent(label: string, value: string | null, extra = ""): string {
+  return value === null
+    ? fact(label, NOT_IN_PAYLOAD, ` data-absent="true"${extra}`)
+    : fact(label, value, extra);
+}
+
+/** Sinalizador do servidor: vira linha só quando é verdadeiro. false não é notícia. */
+function flagText(value: unknown): string | null {
+  if (value === true) return "sim";
+  const text = textOf(value);
+  if (text === null) return null;
+  return ["false", "não", "nao", "nenhuma", "nenhum", "0"].includes(text.toLowerCase()) ? null : text;
+}
+
+/** Lista para o bloco técnico. Vazia vira "", e o bloco descarta "". */
+function listValue(value: unknown): string {
+  return Array.isArray(value)
+    ? value
+        .filter((entry) => typeof entry === "string" || typeof entry === "number")
+        .map(String)
+        .join(",")
+    : "";
+}
+
+/** Valor cru para o bloco técnico. Ausente é "", que o bloco não renderiza. */
+function techValue(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+/**
+ * One candidate, in three tiers: the message, the decision, the audit trail.
  *
- * Recipient, exact subject and exact body are visible by default. Hiding the
- * only thing a reviewer is there to review behind a closed `<details>` labelled
- * "Ver mensagem exata congelada" turns a review gate into a rubber stamp.
+ * Tier 1 is the exact subject and body, open by default. Hiding the only thing
+ * a reviewer is there to review behind a closed `<details>` turns a review gate
+ * into a rubber stamp.
+ *
+ * Tier 2 is the short block the founder actually judges an outbound email on:
+ * recipient, kind of mailbox, route class, the observed fact and where it came
+ * from, editorial state, and anything blocking. A field the server did not send
+ * renders no row at all, with one deliberate exception: a missing fact, a
+ * missing provenance, a missing validation and every blocker stay written out,
+ * because their absence is the decision.
+ *
+ * Tier 3 is `technicalDetails`: hashes, versions, ids and the validation and
+ * review receipts. They are evidence for an audit, not input to the judgement,
+ * and stacked as visible rows they buried the message under a wall of
+ * "não informado pelo servidor".
  */
 function candidateCard(
   cohort: Record<string, unknown>,
@@ -1364,7 +1427,24 @@ function candidateCard(
   const candidateId = show(candidate.candidate_id);
   const validation = record(candidate.validation);
   const review = record(candidate.review);
+  // Produção manda `observed_fact` e `fact_source` como texto simples. Ler o
+  // texto como objeto fazia o fato real sair como "não informado pelo servidor"
+  // embaixo de uma mensagem que afirmava exatamente esse fato. O formato objeto
+  // de versões antigas continua sendo aceito como alternativa.
   const evidence = record(candidate.evidence ?? candidate.observed_fact);
+  const observedFact = firstText(
+    candidate.observed_fact,
+    candidate.observed_fact_text,
+    evidence.text,
+    evidence.summary,
+  );
+  const factSource = firstText(
+    candidate.fact_source,
+    candidate.evidence_source,
+    evidence.source,
+    evidence.locator,
+  );
+  const observedAt = firstText(candidate.evidence_observed_at, evidence.observed_at);
   const copyQa = record(candidate.copy_qa);
   const blockers = Array.isArray(candidate.blocked_by)
     ? candidate.blocked_by.filter((entry): entry is string => typeof entry === "string")
@@ -1381,6 +1461,54 @@ function candidateCard(
   const frozenHash = show(cohort.frozen_hash ?? candidate.frozen_hash ?? candidate.content_hash);
   const version = show(cohort.version);
   const draft = adjustDraft(candidateId);
+
+  const routeClassRaw = textOf(candidate.route_class);
+  const routeClassLabelText = routeClassRaw === null ? null : routeClassLabel(routeClassRaw);
+  const routeClassText =
+    routeClassRaw === null || routeClassLabelText === null
+      ? null
+      : routeClassLabelText === routeClassRaw
+        ? routeClassRaw
+        : `${routeClassLabelText} (${routeClassRaw})`;
+  const routeClassAttr =
+    routeClassRaw === null ? "" : ` data-route-class="${escapeHtml(routeClassRaw)}"`;
+
+  // mailbox_purpose usa o mesmo vocabulário da classe de rota. UNKNOWN é o
+  // servidor dizendo que não classificou: não muda a decisão e a classe de
+  // rota logo acima já responde se a caixa é genérica ou de departamento.
+  // O valor cru continua no detalhe técnico.
+  const purposeRaw = textOf(candidate.mailbox_purpose);
+  const purposeText =
+    purposeRaw === null || purposeRaw.toUpperCase() === "UNKNOWN"
+      ? null
+      : routeClassLabel(purposeRaw) === purposeRaw
+        ? purposeRaw
+        : `${routeClassLabel(purposeRaw)} (${purposeRaw})`;
+
+  // VALID já está no pill do topo. A linha existe para o que trava a decisão:
+  // um estado que não é VALID, ou nenhuma validação lida.
+  const validationStatus = textOf(validation.status);
+  const validationReason = textOf(validation.reason);
+  const validationVisible = validationStatus === null || validationStatus.toUpperCase() !== "VALID";
+  const validationLine =
+    validationStatus === null
+      ? null
+      : validationReason === null
+        ? validationStatus
+        : `${validationStatus}: ${validationReason}`;
+
+  // Um corpo escrito afirma uma observação específica ao destinatário. Se o
+  // fato ou a origem dele não vieram, isso não some do card: é o motivo para
+  // não aprovar.
+  const bodyAsserts = textOf(candidate.body_text) !== null;
+  const factGap =
+    !bodyAsserts || (observedFact !== null && factSource !== null)
+      ? null
+      : observedFact === null && factSource === null
+        ? "nem o fato observado nem a proveniência dele"
+        : observedFact === null
+          ? "o fato observado"
+          : "a proveniência do fato";
 
   const validateKey = `validate:${cohortId}:${candidateId}:`;
   const approveKey = `review:${cohortId}:${candidateId}:APPROVE`;
@@ -1435,58 +1563,70 @@ function candidateCard(
     : `<p class="constraint" data-non-actionable-notice="true">Versão histórica, não enviável. Verificar o destinatário, aprovar, segurar e ajustar não são oferecidos aqui. Abra a versão corrente pelo link no topo desta página.</p>`;
 
   return `<article class="card" data-candidate-id="${escapeHtml(candidateId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}" data-approve-allowed="${gate.allowed && editorial.actionable ? "true" : "false"}">
-    <p class="kicker">${validationPill(candidate)}${editorial.legacy ? ` <span class="pill error" data-non-actionable="true">NÃO ACIONÁVEL</span>` : ""} · ${escapeHtml(show(candidate.route_class))} · ${escapeHtml(show(candidate.source))}</p>
+    <p class="kicker">${validationPill(candidate)}${editorial.legacy ? ` <span class="pill error" data-non-actionable="true">NÃO ACIONÁVEL</span>` : ""} · ${escapeHtml(show(candidate.source))}</p>
     <h3>${escapeHtml(show(candidate.company))}</h3>
     ${feedback.forCandidate(candidateId)}
-    <dl class="facts" data-candidate-identity="true">
-      ${fact("Destinatário exato", show(candidate.mailbox))}
-      ${fact("Purpose do destinatário", show(candidate.mailbox_purpose))}
-      ${fact("Classe de rota", show(candidate.route_class))}
-    </dl>
     <details data-message-preview="true"${expandAll ? " open" : ""}>
       <summary>Mensagem exata congelada (assunto e corpo). ${editorial.legacy ? "Versão histórica, não enviar." : "Versão corrente."}</summary>
       <p data-exact-subject="true"><strong>Assunto:</strong> ${escapeHtml(show(candidate.subject))}</p>
       <pre class="message-preview" data-exact-body="true">${escapeHtml(show(candidate.body_text))}</pre>
     </details>
-    <dl class="facts" data-observed-fact="true">
-      ${fact("Fato observado", fromPayload(candidate.observed_fact_text ?? evidence.text ?? evidence.summary))}
-      ${fact("Proveniência do fato", fromPayload(candidate.evidence_source ?? evidence.source ?? evidence.locator))}
-      ${fact("Observado em", fromPayload(candidate.evidence_observed_at ?? evidence.observed_at))}
-      ${fact("Evidence hash", fromPayload(candidate.evidence_hash))}
-    </dl>
-    <dl class="facts" data-candidate-integrity="true">
-      ${fact("Content hash", fromPayload(candidate.content_hash))}
-      ${fact("Frozen hash", fromPayload(candidate.frozen_hash))}
-      ${fact("Policy version", fromPayload(cohort.policy_version))}
-      ${fact("Composer version", fromPayload(candidate.composer_version ?? cohort.composer_version))}
-      ${fact("Estado editorial", editorial.legacy ? "Versão histórica (não enviável)" : "Versão corrente")}
-      ${editorial.reasonCodes.length > 0 ? listFacts("Motivos do estado editorial", editorial.reasonCodes.map(editorialReasonLabel)) : ""}
-      ${fact("Validação", fromPayload(validation.status))}
-      ${fact("Motivo da validação", fromPayload(validation.reason))}
-      ${fact("Validação vence em", validation.expires_at ? stamp(validation.expires_at) : NOT_IN_PAYLOAD)}
-      ${fact("Revisão registrada", fromPayload(review.decision))}
-      ${fact("Revisão efetiva", fromPayload(review.effective))}
-      ${listFacts("Bloqueios", candidate.blocked_by)}
-      ${listFacts("Reprovações de copy QA", copyQaFailures.length > 0 ? copyQaFailures : copyQa.failures)}
-      ${fact("Duplicidade apontada pelo servidor", fromPayload(candidate.duplicate_of ?? candidate.duplicate))}
-      ${fact("Proveniência ausente", fromPayload(candidate.missing_provenance))}
-      ${fact("Hard bounce registrado", fromPayload(candidate.hard_bounce))}
-      ${fact("Excluído do preview por", fromPayload(candidate.exclusion_reason ?? candidate.excluded_reason))}
-    </dl>
+    ${
+      factGap
+        ? `<p class="banner error" role="alert" data-fact-missing="true">A mensagem afirma uma observação específica sobre esta empresa, mas o servidor não enviou ${escapeHtml(factGap)}. Não dá para conferir o que a mensagem diz ao destinatário: recupere a evidência antes de aprovar.</p>`
+        : ""
+    }
     ${
       blockers.length > 0
         ? `<p class="banner error" role="alert" data-candidate-blockers="${escapeHtml(blockers.join(" "))}">O servidor registrou ${blockers.length} bloqueio(s) neste candidato: ${escapeHtml(blockers.join(", "))}.</p>`
         : ""
     }
+    <dl class="facts" data-candidate-identity="true" data-candidate-decision="true">
+      ${fact("Destinatário exato", show(candidate.mailbox))}
+      ${factWhenPresent("Tipo de caixa", purposeText)}
+      ${factOrAbsent("Classe de rota", routeClassText, routeClassAttr)}
+      ${factOrAbsent("Fato observado", observedFact, ` data-observed-fact="true"`)}
+      ${factOrAbsent("Proveniência do fato", factSource, ` data-fact-source="true"`)}
+      ${fact("Estado editorial", editorial.legacy ? "Versão histórica (não enviável)" : "Versão corrente")}
+      ${editorial.reasonCodes.length > 0 ? fact("Motivos do estado editorial", editorial.reasonCodes.map(editorialReasonLabel).join(", ")) : ""}
+      ${validationVisible ? factOrAbsent("Validação", validationLine) : ""}
+      ${copyQaFailures.length > 0 ? fact("Reprovações de copy QA", copyQaFailures.join(", ")) : ""}
+      ${factWhenPresent("Duplicidade apontada pelo servidor", flagText(candidate.duplicate_of ?? candidate.duplicate))}
+      ${factWhenPresent("Proveniência ausente", flagText(candidate.missing_provenance))}
+      ${factWhenPresent("Hard bounce registrado", flagText(candidate.hard_bounce))}
+      ${factWhenPresent("Excluído do preview por", flagText(candidate.exclusion_reason ?? candidate.excluded_reason))}
+    </dl>
 
     ${controls}
     ${technicalDetails(
       [
         { term: "candidate_id", value: candidateId },
-        { term: "content_hash", value: show(candidate.content_hash) },
-        { term: "frozen_hash", value: frozenHash },
-        { term: "evidence_hash", value: show(candidate.evidence_hash) },
+        { term: "candidate_ref", value: techValue(candidate.candidate_ref) },
+        { term: "account_id", value: techValue(candidate.account_id) },
+        { term: "account_ref", value: techValue(candidate.account_ref) },
+        { term: "route_class", value: techValue(candidate.route_class) },
+        { term: "mailbox_purpose", value: techValue(candidate.mailbox_purpose) },
+        { term: "content_hash", value: techValue(candidate.content_hash) },
+        // frozen_hash é da versão, não do candidato: é o que expected_frozen_hash
+        // guarda. Ler do candidato mostrava vazio e escondia o hash real.
+        { term: "frozen_hash", value: techValue(cohort.frozen_hash ?? candidate.frozen_hash) },
+        { term: "evidence_hash", value: techValue(candidate.evidence_hash) },
+        { term: "policy_version", value: techValue(cohort.policy_version) },
+        { term: "composer_version", value: techValue(candidate.composer_version ?? cohort.composer_version) },
+        { term: "fact_observed_at", value: observedAt === null ? "" : observedAt },
+        { term: "validation_status", value: techValue(validation.status) },
+        { term: "validation_reason", value: techValue(validation.reason) },
+        { term: "validation_expires_at", value: validation.expires_at ? stamp(validation.expires_at) : "" },
+        { term: "review_decision", value: techValue(review.decision) },
+        { term: "review_effective", value: techValue(review.effective) },
         { term: "blocked_by", value: blockers.join(",") },
+        { term: "copy_qa_failures", value: copyQaFailures.length > 0 ? copyQaFailures.join(",") : listValue(copyQa.failures) },
+        { term: "admission_reasons", value: listValue(candidate.admission_reasons) },
+        { term: "route_reasons", value: listValue(candidate.route_reasons) },
+        { term: "duplicate_of", value: techValue(candidate.duplicate_of ?? candidate.duplicate) },
+        { term: "missing_provenance", value: techValue(candidate.missing_provenance) },
+        { term: "hard_bounce", value: techValue(candidate.hard_bounce) },
+        { term: "exclusion_reason", value: techValue(candidate.exclusion_reason ?? candidate.excluded_reason) },
         { term: "editorial_state", value: editorial.state },
         { term: "editorial_reason_codes", value: editorial.reasonCodes.join(",") },
       ],
