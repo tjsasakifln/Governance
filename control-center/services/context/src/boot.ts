@@ -86,7 +86,7 @@ function assembleBoot(
     storeName === "postgres"
       ? createPostgresOperatorActionService((store as PostgresStore).persistence, founderActorId)
       : createMemoryOperatorActionService(founderActorId);
-  const warmblyReview = createWarmblyReviewPortFromEnv(env, founderActorId);
+  const warmblyReview = createWarmblyReviewPortFromEnv(env);
   return { service, operational, operatorActions, warmblyReview, founderActorId, defaultScope, fixture, storeName, repoDomains };
 }
 

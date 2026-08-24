@@ -1,6 +1,6 @@
 # Warmbly connector (Control Center)
 
-Read adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline. It also defines one narrow **operator action channel** (`src/operator/`) for three operational controls and a separate founder-only human-review bridge in `control-center/services/context`.
+Read adapter that turns Warmbly's commercial runtime into a `CommercialSnapshot` plus `observations` so the cockpit can answer **o que exige atenção comercial** without owning the CRM pipeline. It also defines one narrow **operator action channel** (`src/operator/`) for three operational controls and a separate trusted-edge human-review bridge in `control-center/services/context`.
 
 Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stages as Control Center source of truth.
 
