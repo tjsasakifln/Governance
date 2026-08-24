@@ -406,13 +406,12 @@ test("the messages collapse only when the operator asks, through the expand/coll
   assert.match(collapsed, /Expandir todas as mensagens/);
 });
 
-test("provenance, CTA, hashes, versions, expiry and every blocker travel with the candidate", () => {
+test("provenance, hashes, versions, expiry and every blocker travel with the candidate", () => {
   reset();
   const html = warmblyBlock(surfaceInput(), "revisao");
   for (const label of [
     "Fato observado",
     "Proveniência do fato",
-    "Chamada para ação (CTA)",
     "Content hash",
     "Frozen hash",
     "Policy version",
@@ -1213,12 +1212,11 @@ test("a historical version emits no approve, hold, validate, adjust, reproduce o
   assert.match(html, /data-non-actionable-surface="true"/);
 });
 
-test("a historical version stays fully readable: message, CTA, facts and hashes all render", () => {
+test("a historical version stays fully readable: message, facts and hashes all render", () => {
   reset();
   const html = warmblyBlock(legacyInput(), "revisao");
   assert.match(html, /data-exact-body="true">Corpo exato congelado/);
   assert.match(html, /data-exact-subject="true"[^>]*><strong>Assunto:<\/strong> Assunto exato congelado/);
-  assert.match(html, /data-cta="true"/);
   assert.match(html, /compras@empresa\.invalid/);
   for (const label of ["Content hash", "Frozen hash", "Policy version", "Composer version", "Estado editorial"]) {
     assert.ok(html.includes(label), `${label} must survive on a historical version`);
@@ -1303,4 +1301,38 @@ test("a non-actionable candidate loses its controls even inside a current versio
   assert.doesNotMatch(html, /data-adjust-editor=/);
   assert.match(html, /data-human-gate="decide"/, "the version itself is still decidable");
   assert.ok(html.includes("sem carimbo de redator"));
+});
+
+// 13. The frozen message preview shows the message and nothing else.
+//
+// The CTA was rendered as its own paragraph directly under the body, inside the
+// same disclosure, and it repeats the body's closing paragraph verbatim. A
+// founder reading it top to bottom saw a labelled line after the sign-off and
+// could not tell whether it would be sent. It is internal annotation, the
+// recipient never sees it, and it says nothing the body has not already said.
+test("the frozen message preview carries the message only, with no annotation that could read as sent text", () => {
+  reset();
+  const html = warmblyBlock(surfaceInput(), "revisao");
+  const previews = html.match(/<details data-message-preview="true"[\s\S]*?<\/details>/g) ?? [];
+  assert.ok(previews.length > 0, "the frozen message preview must render");
+  for (const preview of previews) {
+    assert.ok(
+      !preview.includes("Chamada para ação"),
+      "no internal label may appear inside the frozen message preview",
+    );
+    assert.ok(!preview.includes("data-cta"), "the CTA annotation must not sit inside the message");
+    assert.ok(preview.includes("data-exact-subject"), "the subject stays");
+    assert.ok(preview.includes("data-exact-body"), "the body stays");
+  }
+});
+
+test("a historical version's message preview is equally free of annotation", () => {
+  reset();
+  const html = warmblyBlock(legacyInput(), "revisao");
+  const previews = html.match(/<details data-message-preview="true"[\s\S]*?<\/details>/g) ?? [];
+  assert.ok(previews.length > 0);
+  for (const preview of previews) {
+    assert.ok(!preview.includes("Chamada para ação"));
+    assert.ok(preview.includes("data-exact-body"));
+  }
 });
