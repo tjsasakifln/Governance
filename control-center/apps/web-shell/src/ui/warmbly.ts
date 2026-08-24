@@ -1717,7 +1717,9 @@ function legacyBanner(editorial: EditorialReading, cohortId: string): string {
         ? `<p><a class="button" data-open-current="true" href="#/warmbly/revisao?resource=${escapeHtml(editorial.currentVersionId)}">Abrir versão corrente</a>${
             editorial.currentVersion ? ` <span class="scope">v${escapeHtml(editorial.currentVersion)}</span>` : ""
           }</p>`
-        : `<p class="constraint" data-open-current="absent">O servidor não informou qual é a versão corrente desta cohort, então esta tela não inventa um link. Abra Cohorts para achá-la.</p>`
+        : editorial.isCurrentVersion === true
+          ? `<p class="constraint" data-open-current="none">Esta já é a versão mais recente desta cohort e mesmo assim não é enviável, então não há versão corrente para abrir. Recompor não resolve: prepare uma cohort nova para estes leads.</p>`
+          : `<p class="constraint" data-open-current="absent">O servidor não informou qual é a versão corrente desta cohort, então esta tela não inventa um link. Abra Cohorts para achá-la.</p>`
     }
   </section>`;
 }
