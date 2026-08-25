@@ -818,7 +818,7 @@ function localActionForm(action: LeadAction, resource: string, canonicalId: stri
   const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   const note = operatorActionDraft(operatorActionDraftKey(action.id, canonicalId, resource));
   return `
-    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" data-continuity-action="queue" data-continuity-next-hash="${escapeHtml(returnHash)}" class="operator-form lead-action">
+    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" data-continuity-action="queue" data-continuity-next="${escapeHtml(returnHash)}" class="operator-form lead-action">
       <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonicalId)}" />

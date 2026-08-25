@@ -584,6 +584,64 @@ try {
     console.log(`hash=${hash} filled_chars=${destFilled.filled}`);
   }
 
+  const continuitySurfaces = await page.evaluate(() => {
+    const surfaces = globalThis.__CONFENGE_CONTROL_CENTER__?.taskContinuity?.surfaces;
+    return Array.isArray(surfaces) ? surfaces : null;
+  });
+  const requiredContinuityIds = ["messages", "inbound", "exceptions", "leads", "clients", "activities"];
+  if (!continuitySurfaces
+    || JSON.stringify(continuitySurfaces.map((surface) => surface.id)) !== JSON.stringify(requiredContinuityIds)) {
+    throw new Error(`task-continuity surface contract is incomplete: ${JSON.stringify(continuitySurfaces)}`);
+  }
+  for (const viewport of [
+    { name: "mobile-390", width: 390, height: 844 },
+    { name: "desktop-1280", width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    for (const surface of continuitySurfaces) {
+      await page.goto(`${baseUrl}${surface.route}`, { waitUntil: "networkidle" });
+      await page.waitForSelector(surface.selector);
+      const state = await page.locator("[data-destination]").getAttribute("data-view-state");
+      const matches = await page.locator(surface.selector).count();
+      if (matches < 1) {
+        throw new Error(
+          `task-continuity ${surface.id} has no ${surface.selector} at ${surface.route} on ${viewport.name}`,
+        );
+      }
+      console.log(
+        `task_continuity surface=${surface.id} viewport=${viewport.name} state=${state} matches=${matches} route=${surface.route}`,
+      );
+    }
+  }
+
+  await page.goto(`${baseUrl}#/comercial/excecoes?q=owner&pagina=2`, { waitUntil: "networkidle" });
+  await page.evaluate(() => history.replaceState(history.state, "", location.pathname));
+  await page.reload({ waitUntil: "networkidle" });
+  if (page.url().split("#")[1] !== "/comercial/excecoes?q=owner&pagina=2") {
+    throw new Error(`task-continuity reload did not restore the bounded URL: ${page.url()}`);
+  }
+  console.log("task_continuity journey=reload result=restored");
+
+  await page.evaluate(() => {
+    const key = "confenge.control-center.task-continuity.v1";
+    const stored = JSON.parse(sessionStorage.getItem(key) ?? "{}");
+    sessionStorage.setItem(key, JSON.stringify({ ...stored, savedAt: Date.now() - (13 * 60 * 60 * 1000) }));
+    history.replaceState(history.state, "", location.pathname);
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector('[data-destination="hoje"]');
+  if (page.url().split("#")[1] !== "/hoje") {
+    throw new Error(`task-continuity expired state did not fall back to Hoje: ${page.url()}`);
+  }
+  console.log("task_continuity journey=expiry result=discarded");
+
+  await page.goto(`${baseUrl}#/rota-inexistente?resource=lead-fixture-aurora`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-continuity-recovered="true"]');
+  if (page.url().split("#")[1] !== "/hoje?continuity=recovered") {
+    throw new Error(`task-continuity invalid route was not recovered: ${page.url()}`);
+  }
+  console.log("task_continuity journey=invalid-route result=recovered");
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${baseUrl}#/comercial/rascunhos`, { waitUntil: "networkidle" });
   await page.waitForSelector('[data-review-workbench-count="55"]');

@@ -855,6 +855,18 @@ function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
   );
 }
 
+function queueActionAttributes(
+  position: { index: number; total: number; nextPageHash?: string },
+  nextId: string,
+): string {
+  const next = nextId
+    ? queueFocusToken(nextId, { index: position.index + 1, total: position.total })
+    : position.nextPageHash
+      ? actionContinuationHash(position.nextPageHash, CONTINUITY_FIRST_FOCUS)
+      : "";
+  return ` data-continuity-action="queue"${next ? ` data-continuity-next="${escapeHtml(next)}"` : ""}`;
+}
+
 function activityOpsCard(
   row: Record<string, unknown>,
   query: string | null,
@@ -884,14 +896,7 @@ function activityOpsCard(
   const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
   const canonical = String(row.canonical_id ?? rowId);
   const nextId = position.next ? String(position.next.row.source_id ?? position.next.row.id ?? "") : "";
-  const nextFocus = nextId && position.next
-    ? queueFocusToken(nextId, { index: position.next.index, total: position.total })
-    : "";
-  const actionContinuity = ` data-continuity-action="queue"${nextFocus
-    ? ` data-continuity-next-focus="${nextFocus}"`
-    : position.nextPageHash
-      ? ` data-continuity-next-hash="${escapeHtml(actionContinuationHash(position.nextPageHash, CONTINUITY_FIRST_FOCUS))}"`
-      : ""}`;
+  const actionContinuity = queueActionAttributes(position, nextId);
   const assignDraft = operatorActionDraft(operatorActionDraftKey("ASSIGN_TRIAGE", canonical, rowId));
   const triageDraft = operatorActionDraft(operatorActionDraftKey("MARK_TRIAGED", canonical, rowId));
   return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}" data-triage-state="${escapeHtml(triage)}">
@@ -962,14 +967,7 @@ function exceptionOpsCard(
     ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
     : "";
   const nextId = position.next ? String(position.next.row.id ?? position.next.row.source_id ?? "") : "";
-  const nextFocus = nextId && position.next
-    ? queueFocusToken(nextId, { index: position.next.index, total: position.total })
-    : "";
-  const actionContinuity = ` data-continuity-action="queue"${nextFocus
-    ? ` data-continuity-next-focus="${nextFocus}"`
-    : position.nextPageHash
-      ? ` data-continuity-next-hash="${escapeHtml(actionContinuationHash(position.nextPageHash, CONTINUITY_FIRST_FOCUS))}"`
-      : ""}`;
+  const actionContinuity = queueActionAttributes(position, nextId);
   const acknowledgeDraft = operatorActionDraft(operatorActionDraftKey("ACKNOWLEDGE_EXCEPTION", canonical, sourceId));
   const workDraft = operatorActionDraft(operatorActionDraftKey("START_EXCEPTION_WORK", canonical, sourceId));
   return `<article class="card"${focusAttributes} data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">

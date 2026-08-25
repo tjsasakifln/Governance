@@ -12,13 +12,13 @@ import type {
   WarmblyGateAction,
 } from "./adapters/contract";
 import { APPROVAL_DEFAULT_REASON, isWarmblyGateAction } from "./adapters/contract";
+import { productionActorFromDocument } from "./adapters/http";
 import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
 import { parseHash, withQueryParams } from "./destinations";
 import {
   CONTINUITY_FIRST_FOCUS,
   CONTINUITY_RECOVERY_HASH,
   actionContinuationHash,
-  continuitySubjectFromDocument,
   isRecognizedContinuityHash,
   rememberContinuity,
   restoreContinuity,
@@ -81,7 +81,8 @@ export interface ShellRuntime {
 }
 
 export function browserRuntime(): ShellRuntime {
-  const continuitySubject = continuitySubjectFromDocument();
+  const actor = productionActorFromDocument();
+  const continuitySubject = actor ? `${actor.kind}:${actor.id}` : null;
   return {
     getHash(): string {
       return window.location.hash;
@@ -614,9 +615,8 @@ export function bindOperatorActions(
         if (result) adapter.lastOperatorResult = result;
         if (result?.ok) clearOperatorActionDraft(draftKey);
         if (result?.ok && form.getAttribute("data-continuity-action") === "queue" && navigate) {
-          const explicit = form.getAttribute("data-continuity-next-hash");
-          const nextFocus = form.getAttribute("data-continuity-next-focus");
-          navigate(explicit || actionContinuationHash(currentHash, nextFocus));
+          const next = form.getAttribute("data-continuity-next");
+          navigate(next?.startsWith("#") ? next : actionContinuationHash(currentHash, next));
           return;
         }
         onDone();

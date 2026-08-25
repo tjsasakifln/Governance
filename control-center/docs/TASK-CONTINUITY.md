@@ -21,6 +21,8 @@ Nunca persistem em storage: texto de notas, motivo, assunto, corpo, confirmaçã
 
 O armazenamento é de sessão, não compartilhado entre abas e não promovido para `localStorage`. Uma nova autenticação do mesmo ator na mesma aba pode recuperar o recorte; fechar a sessão do navegador encerra essa continuidade local.
 
+O custo de entrega permanece dentro do teto agregado de 120.000 bytes gzip. O subteto de JavaScript é 113.000 bytes para comportar o contrato após deduplicação e manter margem de compressor; CSS gzip e o limite agregado não foram ampliados.
+
 ## Matriz automatizada
 
-Os testes exercitam ação → próxima, detalhe/seleção → fila, reload, expiração de sessão, rota inválida, transição de subrota e foco em próxima página/fim da fila. A lista executável `CONTINUITY_SURFACE_CONTRACTS` impede que uma das seis famílias de fila saia silenciosamente do contrato.
+Os testes exercitam ação → próxima, detalhe/seleção → fila, reload, expiração de sessão, rota inválida, transição de subrota e foco em próxima página/fim da fila. O navegador consome a lista executável `CONTINUITY_SURFACE_CONTRACTS` e exige o alvo renderizado de cada uma das seis famílias em 390 px e 1280 px; uma fila não pode sair silenciosamente do contrato.

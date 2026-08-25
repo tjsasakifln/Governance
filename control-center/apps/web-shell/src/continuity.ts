@@ -53,8 +53,8 @@ export const CONTINUITY_SURFACE_CONTRACTS = [
   { id: "messages", route: "#/comercial/rascunhos", selector: "[data-review-list-item]" },
   { id: "inbound", route: "#/comercial/atividade?condicao=unread", selector: "[data-activity-id]" },
   { id: "exceptions", route: "#/comercial/excecoes", selector: "[data-exception-id]" },
-  { id: "leads", route: "#/comercial/atividade?resource=lead", selector: "[data-lead-detail]" },
-  { id: "clients", route: "#/clientes/acme-industria", selector: "[data-client]" },
+  { id: "leads", route: "#/comercial/atividade?resource=lead-fixture-aurora", selector: "[data-lead-detail='found']" },
+  { id: "clients", route: "#/clientes/acme", selector: "[data-client='acme']" },
   { id: "activities", route: "#/comercial/atividade", selector: "[data-list='atividade']" },
 ] as const;
 
@@ -75,20 +75,6 @@ const durableParams = new Set<string>(DURABLE_CONTINUITY_PARAMS);
 
 function isValidContinuitySubject(subject: string): boolean {
   return subject.length > 0 && subject.length <= 320 && !/[\u0000-\u001f<>]/.test(subject);
-}
-
-/** Bind browser continuity to the authenticated actor represented by server-injected metadata. */
-export function continuitySubjectFromDocument(
-  doc: { querySelector(selector: string): { getAttribute(name: string): string | null } | null } | undefined =
-    typeof document !== "undefined" ? document : undefined,
-): string | null {
-  const id = doc?.querySelector('meta[name="cc-actor-id"]')?.getAttribute("content")?.trim() ?? "";
-  const kind = doc?.querySelector('meta[name="cc-actor-kind"]')?.getAttribute("content")?.trim() ?? "";
-  const subject = `${kind}:${id}`;
-  return (kind === "human" || kind === "agent" || kind === "system")
-    && isValidContinuitySubject(subject)
-    ? subject
-    : null;
 }
 
 function pathIsRecognized(path: string): boolean {

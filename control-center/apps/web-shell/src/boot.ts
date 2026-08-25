@@ -2,6 +2,7 @@ import type { ControlCenterReadAdapter } from "./adapters/contract";
 import { createProductionAdapter } from "./adapters/http";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
+import { CONTINUITY_SURFACE_CONTRACTS } from "./continuity";
 import { registeredVisualRoutes, type VisualRoute } from "./visual-matrix";
 import {
   OPERATIONAL_COMPONENT_CONTRACT,
@@ -20,6 +21,9 @@ export interface ShellGlobals {
   version: string;
   destinations: readonly string[];
   visualRoutes: readonly VisualRoute[];
+  taskContinuity: {
+    surfaces: typeof CONTINUITY_SURFACE_CONTRACTS;
+  };
   designSystem: {
     components: typeof OPERATIONAL_COMPONENT_CONTRACT;
     states: typeof OPERATIONAL_STATES;
@@ -40,6 +44,9 @@ export function installShellGlobals(win: ShellWindow): ShellGlobals {
     version: SHELL_VERSION,
     destinations: DESTINATION_IDS,
     visualRoutes: registeredVisualRoutes(),
+    taskContinuity: {
+      surfaces: CONTINUITY_SURFACE_CONTRACTS,
+    },
     designSystem: {
       components: OPERATIONAL_COMPONENT_CONTRACT,
       states: OPERATIONAL_STATES,
