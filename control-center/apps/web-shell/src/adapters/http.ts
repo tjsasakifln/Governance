@@ -77,6 +77,76 @@ function stringValue(record: Record<string, unknown>, key: string): string | und
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
+const REVIEW_PAGE_LIMIT = 100;
+
+function reviewOffsetOf(location: string | undefined): number {
+  const raw = queryParamsOf(location ?? "").offset;
+  if (typeof raw !== "string" || !/^\d+$/.test(raw)) return 0;
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed <= 100_000 ? parsed : 0;
+}
+
+function reviewPageFrom(
+  payload: Record<string, unknown> | null | undefined,
+  loadedCount: number,
+  requestedOffset: number,
+): Record<string, unknown> {
+  const fallback = {
+    limit: REVIEW_PAGE_LIMIT,
+    offset: requestedOffset,
+    loaded_count: loadedCount,
+    coverage_status: "UNPROVEN",
+  };
+  if (payload?.schema_version !== "control-center.review-draft-page.v1") return fallback;
+  const page = asRecord(payload.page);
+  if (
+    !page ||
+    page.limit !== REVIEW_PAGE_LIMIT ||
+    page.offset !== requestedOffset ||
+    page.loaded_count !== loadedCount
+  ) return fallback;
+
+  if (page.coverage_status === "TOTAL_KNOWN") {
+    const total = page.total_count;
+    const remaining = page.remaining_count;
+    const hasMore = page.has_more;
+    const pageEnd = requestedOffset + loadedCount;
+    if (
+      typeof total !== "number" || !Number.isSafeInteger(total) || total < pageEnd ||
+      typeof remaining !== "number" || remaining !== total - pageEnd ||
+      typeof hasMore !== "boolean" || hasMore !== (pageEnd < total) ||
+      (hasMore && loadedCount !== REVIEW_PAGE_LIMIT) ||
+      (hasMore && page.next_offset !== pageEnd) ||
+      (!hasMore && page.next_offset !== undefined)
+    ) return fallback;
+    return {
+      ...fallback,
+      coverage_status: "TOTAL_KNOWN",
+      total_count: total,
+      remaining_count: remaining,
+      has_more: hasMore,
+      ...(hasMore ? { next_offset: pageEnd } : {}),
+    };
+  }
+
+  if (page.coverage_status === "PAGE_ONLY") {
+    const hasMore = page.has_more;
+    const pageEnd = requestedOffset + loadedCount;
+    if (
+      typeof hasMore !== "boolean" ||
+      (hasMore && (loadedCount !== REVIEW_PAGE_LIMIT || page.next_offset !== pageEnd)) ||
+      (!hasMore && page.next_offset !== undefined)
+    ) return fallback;
+    return {
+      ...fallback,
+      coverage_status: "PAGE_ONLY",
+      has_more: hasMore,
+      ...(hasMore ? { next_offset: pageEnd } : {}),
+    };
+  }
+  return fallback;
+}
+
 function validReceiptInstant(value: string, now = Date.now()): boolean {
   if (!isUtcDateTime(value)) return false;
   const parsed = Date.parse(value);
@@ -1121,11 +1191,15 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         // During a rolling deployment the read model may precede the review
         // proxy. A 404 means the optional surface is not available yet; it
         // must not blank the rest of the commercial cockpit.
-        const reviewPayload = asRecord(await this.readReviewJson("/v1/commercial/review-drafts?limit=100&offset=0"));
+        const reviewOffset = reviewOffsetOf(location);
+        const reviewPayload = asRecord(await this.readReviewJson(
+          `/v1/commercial/review-drafts?limit=${REVIEW_PAGE_LIMIT}&offset=${reviewOffset}`,
+        ));
         const reviewRows = itemsOf(reviewPayload?.data ?? reviewPayload);
         page.commercial.operations = {
           ...(page.commercial.operations ?? {}),
           review_drafts: reviewRows,
+          review_draft_page: reviewPageFrom(reviewPayload, reviewRows.length, reviewOffset),
         };
       }
     }

@@ -266,10 +266,11 @@ test("a confirmed decision navigates to the next actionable draft", async () => 
     adapter as never,
     () => { painted += 1; },
     (hash) => { destination = hash; },
+    `#/comercial/rascunhos?offset=100&resource=${DRAFT_ID}`,
   );
   listener?.({ preventDefault(): void {} } as unknown as Event);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(destination, `#/comercial/rascunhos?resource=${nextId}&focus=review`);
+  assert.equal(destination, `#/comercial/rascunhos?offset=100&resource=${nextId}&focus=review`);
   assert.equal(submitted?.generic_recipient_acknowledged, true);
   assert.equal(painted, 0);
 });
@@ -336,20 +337,6 @@ test("unsaved edits must be persisted and reread before APPROVE", () => {
 
 const LEGACY_ID = "99999999-8888-4777-8666-555555555555";
 
-function reviewSurface(rows: unknown[], resource: string | null = null, query: string | null = null): Promise<string> {
-  const router = operationalRouter();
-  const { fetchImpl } = recordingFetch((path) => {
-    if (path.startsWith("/v1/commercial/review-drafts")) return { data: rows };
-    return router(path);
-  });
-  const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
-  return adapter.readDestination("comercial").then((result) => {
-    assert.equal(result.ok, true);
-    if (!result.ok || result.loading) throw new Error("comercial não carregou");
-    return commercialBlock(result.page.commercial!, "rascunhos", resource, query);
-  });
-}
-
 const RICH_DRAFT = {
   id: DRAFT_ID,
   account_id: "account-1",
@@ -373,6 +360,100 @@ const RICH_DRAFT = {
   editorial_reason_codes: ["FACT_FRESH", "ROUTE_OK"],
   target_fit: { state: "FIT", reason: "porte e setor compatíveis", fresh: true, as_of: "2026-08-20T12:00:00Z" },
 };
+
+function reviewSurface(rows: unknown[], resource: string | null = null, query: string | null = null): Promise<string> {
+  const router = operationalRouter();
+  const { fetchImpl } = recordingFetch((path) => {
+    if (path.startsWith("/v1/commercial/review-drafts")) return { data: rows };
+    return router(path);
+  });
+  const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
+  return adapter.readDestination("comercial").then((result) => {
+    assert.equal(result.ok, true);
+    if (!result.ok || result.loading) throw new Error("comercial não carregou");
+    return commercialBlock(result.page.commercial!, "rascunhos", resource, query);
+  });
+}
+
+test("review adapter preserves an authoritative server total and offset navigation", async () => {
+  const rows = Array.from({ length: 100 }, (_, index) => ({
+    ...RICH_DRAFT,
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  }));
+  const router = operationalRouter();
+  const { fetchImpl, calls } = recordingFetch((path) => {
+    if (path.startsWith("/v1/commercial/review-drafts")) {
+      return {
+        schema_version: "control-center.review-draft-page.v1",
+        data: rows,
+        page: {
+          limit: 100,
+          offset: 100,
+          loaded_count: 100,
+          coverage_status: "TOTAL_KNOWN",
+          total_count: 250,
+          remaining_count: 50,
+          has_more: true,
+          next_offset: 200,
+        },
+      };
+    }
+    return router(path);
+  });
+  const hash = "#/comercial/rascunhos?offset=100";
+  const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
+  const result = await adapter.readDestination("comercial", hash);
+  assert.equal(result.ok, true);
+  if (!result.ok || result.loading) return;
+  assert.ok(calls.some((call) => call.endsWith("/v1/commercial/review-drafts?limit=100&offset=100")));
+  assert.deepEqual(result.page.commercial?.operations?.review_draft_page, {
+    limit: 100,
+    offset: 100,
+    loaded_count: 100,
+    coverage_status: "TOTAL_KNOWN",
+    total_count: 250,
+    remaining_count: 50,
+    has_more: true,
+    next_offset: 200,
+  });
+  const html = commercialBlock(result.page.commercial!, "rascunhos", null, "offset=100", hash);
+  assert.match(html, /data-review-coverage="TOTAL_KNOWN"><strong>100<\/strong> carregados de <strong>250<\/strong> no servidor; <strong>50<\/strong> restantes/);
+  assert.match(html, /data-review-page="previous" href="#\/comercial\/rascunhos"/);
+  assert.match(html, /data-review-page="next" href="#\/comercial\/rascunhos\?offset=200"/);
+  assert.match(html, /data-review-row="[^"]+" href="#\/comercial\/rascunhos\?offset=100&amp;resource=/);
+});
+
+test("missing or contradictory pagination stays unproven and cannot mint a next page", async () => {
+  const router = operationalRouter();
+  const { fetchImpl } = recordingFetch((path) => {
+    if (path.startsWith("/v1/commercial/review-drafts")) {
+      return {
+        schema_version: "control-center.review-draft-page.v1",
+        data: [RICH_DRAFT],
+        page: {
+          limit: 100,
+          offset: 0,
+          loaded_count: 1,
+          coverage_status: "TOTAL_KNOWN",
+          total_count: 0,
+          remaining_count: 0,
+          has_more: true,
+          next_offset: 1,
+        },
+      };
+    }
+    return router(path);
+  });
+  const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
+  const result = await adapter.readDestination("comercial", "#/comercial/rascunhos");
+  assert.equal(result.ok, true);
+  if (!result.ok || result.loading) return;
+  const html = commercialBlock(result.page.commercial!, "rascunhos", null, null, "#/comercial/rascunhos");
+  assert.match(html, /data-review-coverage="UNPROVEN"/);
+  assert.match(html, /total do servidor não informado/);
+  assert.doesNotMatch(html, /data-review-page="next"/);
+  assert.match(html, /Próxima página não provada/);
+});
 
 test("review surface renders the judging context inline, with no details disclosure to open", async () => {
   const html = await reviewSurface([RICH_DRAFT]);

@@ -1,5 +1,6 @@
 import { escapeHtml } from "../escape";
 import { formatLocal, isUtcDateTime } from "../datetime";
+import { withQueryParams } from "../destinations";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import { ownMapValue } from "../own-map";
@@ -1071,6 +1072,17 @@ function reviewRows(text: string, min: number, max: number): number {
 
 type ReviewInspectorMode = "inspect" | "edit" | "reject";
 
+interface ReviewPageView {
+  limit: number;
+  offset: number;
+  loadedCount: number;
+  coverageStatus: "TOTAL_KNOWN" | "PAGE_ONLY" | "UNPROVEN";
+  totalCount?: number;
+  remainingCount?: number;
+  hasMore?: boolean;
+  nextOffset?: number;
+}
+
 function reviewInspectorMode(query: string | null): ReviewInspectorMode {
   const mode = new URLSearchParams(query ?? "").get("mode");
   return mode === "edit" || mode === "reject" ? mode : "inspect";
@@ -1089,10 +1101,103 @@ function reviewDraftActionable(item: unknown): boolean {
   return readEditorialState({ ...row, actionable: row.editorial_actionable }).actionable;
 }
 
-function reviewDraftHref(id: string, mode: ReviewInspectorMode = "inspect"): string {
-  const params = new URLSearchParams({ resource: id });
-  if (mode !== "inspect") params.set("mode", mode);
-  return `#/comercial/rascunhos?${params.toString()}`;
+function reviewRouteHash(hash: string): string {
+  const query = hash.split("?")[1];
+  return query ? `#/comercial/rascunhos?${query}` : "#/comercial/rascunhos";
+}
+
+function reviewDraftHref(
+  id: string,
+  mode: ReviewInspectorMode = "inspect",
+  hash = "#/comercial/rascunhos",
+): string {
+  return withQueryParams(reviewRouteHash(hash), {
+    resource: id,
+    mode: mode === "inspect" ? null : mode,
+    focus: null,
+  });
+}
+
+function reviewPageView(value: unknown, loadedCount: number): ReviewPageView {
+  const row = reviewDraftRow(value);
+  const limit = typeof row.limit === "number" && Number.isSafeInteger(row.limit) && row.limit > 0 && row.limit <= 200
+    ? row.limit
+    : 100;
+  const offset = typeof row.offset === "number" && Number.isSafeInteger(row.offset) && row.offset >= 0
+    ? row.offset
+    : 0;
+  const fallback: ReviewPageView = { limit, offset, loadedCount, coverageStatus: "UNPROVEN" };
+  if (row.loaded_count !== loadedCount) return fallback;
+  const pageEnd = offset + loadedCount;
+  if (
+    row.coverage_status === "TOTAL_KNOWN" &&
+    typeof row.total_count === "number" && Number.isSafeInteger(row.total_count) && row.total_count >= pageEnd &&
+    typeof row.remaining_count === "number" && row.remaining_count === row.total_count - pageEnd &&
+    typeof row.has_more === "boolean" && row.has_more === (pageEnd < row.total_count) &&
+    (!row.has_more || (loadedCount === limit && row.next_offset === pageEnd)) &&
+    (row.has_more || row.next_offset === undefined)
+  ) {
+    return {
+      ...fallback,
+      coverageStatus: "TOTAL_KNOWN",
+      totalCount: row.total_count,
+      remainingCount: row.remaining_count,
+      hasMore: row.has_more,
+      ...(row.has_more ? { nextOffset: pageEnd } : {}),
+    };
+  }
+  if (
+    row.coverage_status === "PAGE_ONLY" &&
+    typeof row.has_more === "boolean" &&
+    (!row.has_more || (loadedCount === limit && row.next_offset === pageEnd)) &&
+    (row.has_more || row.next_offset === undefined)
+  ) {
+    return {
+      ...fallback,
+      coverageStatus: "PAGE_ONLY",
+      hasMore: row.has_more,
+      ...(row.has_more ? { nextOffset: pageEnd } : {}),
+    };
+  }
+  return fallback;
+}
+
+function reviewCoverage(page: ReviewPageView): string {
+  if (page.coverageStatus === "TOTAL_KNOWN") {
+    return `<p data-review-coverage="TOTAL_KNOWN"><strong>${page.loadedCount}</strong> carregados de <strong>${page.totalCount}</strong> no servidor; <strong>${page.remainingCount}</strong> restantes após este recorte.</p>`;
+  }
+  if (page.coverageStatus === "PAGE_ONLY") {
+    const continuation = page.hasMore
+      ? "O servidor confirmou outra página, mas não informou o total."
+      : "O servidor confirmou o fim da lista, mas não informou o total.";
+    return `<p data-review-coverage="PAGE_ONLY"><strong>${page.loadedCount}</strong> carregados neste recorte. ${continuation}</p>`;
+  }
+  return `<p data-review-coverage="UNPROVEN"><strong>${page.loadedCount}</strong> carregados neste recorte; total do servidor não informado.</p>`;
+}
+
+function reviewPagination(page: ReviewPageView, hash: string): string {
+  const previousOffset = page.offset > 0 ? Math.max(0, page.offset - page.limit) : null;
+  const previous = previousOffset === null
+    ? `<span class="page-step" aria-disabled="true">Página anterior</span>`
+    : `<a class="page-step" data-review-page="previous" href="${escapeHtml(withQueryParams(reviewRouteHash(hash), {
+        offset: previousOffset === 0 ? null : String(previousOffset),
+        resource: null,
+        mode: null,
+        focus: null,
+      }))}">Página anterior</a>`;
+  const next = page.hasMore === true && page.nextOffset !== undefined
+    ? `<a class="page-step" data-review-page="next" href="${escapeHtml(withQueryParams(reviewRouteHash(hash), {
+        offset: String(page.nextOffset),
+        resource: null,
+        mode: null,
+        focus: null,
+      }))}">Próxima página</a>`
+    : `<span class="page-step" aria-disabled="true">Próxima página não provada</span>`;
+  const first = page.loadedCount === 0 ? 0 : page.offset + 1;
+  const last = page.offset + page.loadedCount;
+  return `<nav class="pagination review-pagination" aria-label="Paginação da fila de revisão" data-review-pagination="${escapeHtml(page.coverageStatus)}">
+      ${previous}<span class="page-position">Itens ${first}–${last}</span>${next}
+    </nav>`;
 }
 
 function selectedReviewIndex(items: readonly unknown[], resource: string | null): number {
@@ -1110,7 +1215,7 @@ function nextActionableReviewId(items: readonly unknown[], selected: number): st
   return null;
 }
 
-function reviewDraftListItem(item: unknown, selected: boolean): string {
+function reviewDraftListItem(item: unknown, selected: boolean, hash: string): string {
   const row = reviewDraftRow(item);
   const account = reviewDraftRow(row.account);
   const id = reviewDraftId(item);
@@ -1121,7 +1226,7 @@ function reviewDraftListItem(item: unknown, selected: boolean): string {
   const recipient = String(row.recipient ?? "destinatário ausente");
   const route = reviewRouteClass(routeClass) ?? REVIEW_UNREPORTED;
   return `<li class="review-queue-item" data-review-list-item="${escapeHtml(id)}" data-editorial-actionable="${editorial.actionable ? "true" : "false"}">
-            <a data-review-row="${escapeHtml(id)}" href="${escapeHtml(reviewDraftHref(id))}" aria-current="${selected ? "page" : "false"}">
+            <a data-review-row="${escapeHtml(id)}" href="${escapeHtml(reviewDraftHref(id, "inspect", hash))}" aria-current="${selected ? "page" : "false"}">
               <strong>${escapeHtml(company)}</strong>
               <span>${escapeHtml(recipient)}</span>
               <span>${escapeHtml(route)}</span>
@@ -1135,6 +1240,7 @@ function reviewDraftInspector(
   item: unknown,
   nextReviewId: string | null,
   mode: ReviewInspectorMode,
+  hash: string,
 ): string {
   const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
   const account = row.account && typeof row.account === "object" ? (row.account as Record<string, unknown>) : {};
@@ -1219,7 +1325,7 @@ function reviewDraftInspector(
                 <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(bodyText)}</textarea></label>
                 <div class="review-actions">
                   <button type="submit" data-review-save="true">Salvar ajuste</button>
-                  <a class="button" href="${escapeHtml(reviewDraftHref(id))}">Cancelar edição</a>
+                  <a class="button" href="${escapeHtml(reviewDraftHref(id, "inspect", hash))}">Cancelar edição</a>
                 </div>
               </form>`
       : mode === "reject"
@@ -1231,7 +1337,7 @@ function reviewDraftInspector(
                 <label>Motivo para reescrita <textarea name="reason" rows="4" required></textarea></label>
                 <div class="review-actions">
                   <button type="submit" data-review-reject="true">Rejeitar e solicitar reescrita</button>
-                  <a class="button" href="${escapeHtml(reviewDraftHref(id))}">Cancelar rejeição</a>
+                  <a class="button" href="${escapeHtml(reviewDraftHref(id, "inspect", hash))}">Cancelar rejeição</a>
                 </div>
               </form>`
         : `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="approve" class="operator-form review-decision-form approve-form">
@@ -1241,8 +1347,8 @@ function reviewDraftInspector(
                 <textarea name="body_text" hidden>${escapeHtml(bodyText)}</textarea>
                 <div class="review-actions">
                   <button type="submit" data-approve-submit="true">Aprovar e agendar para ${escapeHtml(String(row.recipient ?? "destinatário ausente"))}</button>
-                  <a class="button" data-review-edit="true" href="${escapeHtml(reviewDraftHref(id, "edit"))}">Editar</a>
-                  <a class="button" data-review-reject="true" href="${escapeHtml(reviewDraftHref(id, "reject"))}">Rejeitar/segurar</a>
+                  <a class="button" data-review-edit="true" href="${escapeHtml(reviewDraftHref(id, "edit", hash))}">Editar</a>
+                  <a class="button" data-review-reject="true" href="${escapeHtml(reviewDraftHref(id, "reject", hash))}">Rejeitar/segurar</a>
                 </div>
               </form>`;
   return `<article class="card review-draft review-inspector" tabindex="-1" data-review-inspector="${escapeHtml(id)}" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}" data-editorial-state="${escapeHtml(editorial.state)}" data-editorial-actionable="${actionable ? "true" : "false"}" data-composer-version="${escapeHtml(composerVersion ?? "")}">
@@ -1279,6 +1385,7 @@ function commercialOps(
   const pipeline = Array.isArray(ops.pipeline) ? ops.pipeline : [];
   const exceptions = Array.isArray(ops.exceptions) ? ops.exceptions : [];
   const reviewDrafts = Array.isArray(ops.review_drafts) ? ops.review_drafts : [];
+  const reviewPage = reviewPageView(ops.review_draft_page, reviewDrafts.length);
   const availability = snapshot.availability ?? "UNKNOWN";
   let body = "";
   if (current === "rascunhos") {
@@ -1290,16 +1397,17 @@ function commercialOps(
     const mode = reviewInspectorMode(query);
     body = `<section aria-labelledby="rascunhos-title" data-review-workbench-count="${reviewDrafts.length}"><h2 id="rascunhos-title">Revisão editorial</h2>
       <p class="constraint">Aprovar vincula o hash exato e agenda a próxima janela útil. Nenhum botão envia imediatamente.</p>
-      <p><strong>${reviewDrafts.length}</strong> mensagem(ns) carregada(s) neste recorte. A lista não afirma o total do servidor.</p>
+      ${reviewCoverage(reviewPage)}
       ${selectionFellBack ? `<p class="banner stale" role="status" data-review-selection-fallback="true">A mensagem solicitada não está neste recorte; mostrando a próxima mensagem disponível.</p>` : ""}
       ${reviewDrafts.length === 0
         ? `<p class="banner empty">Nenhum rascunho aguardando revisão.</p>`
         : `<div class="review-workbench">
             <nav class="review-queue-panel" aria-label="Mensagens aguardando revisão">
-              <ol class="review-queue">${reviewDrafts.map((item, index) => reviewDraftListItem(item, index === selectedIndex)).join("")}</ol>
+              <ol class="review-queue">${reviewDrafts.map((item, index) => reviewDraftListItem(item, index === selectedIndex, hash)).join("")}</ol>
             </nav>
-            ${selectedDraft === undefined ? "" : reviewDraftInspector(selectedDraft, nextReviewId, mode)}
+            ${selectedDraft === undefined ? "" : reviewDraftInspector(selectedDraft, nextReviewId, mode, hash)}
           </div>`}
+      ${reviewPagination(reviewPage, hash)}
     </section>`;
   } else if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];

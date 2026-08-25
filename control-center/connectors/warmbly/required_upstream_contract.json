@@ -86,7 +86,7 @@
         "method": "GET",
         "path": "/v1/confenge/review/drafts",
         "permission": "PermViewContacts / APIPermReadContacts",
-        "notes": "bounded review list with exact content_hash, recipient risk and editorial state"
+        "notes": "bounded review list with exact content_hash, recipient risk and editorial state; pagination is forwarded only when total/has_more are present and consistent"
       },
       {
         "method": "GET",
@@ -131,6 +131,25 @@
     "Any POST outside operator_actions.mapped_writes and human_review_bridge.mapped_writes"
   ],
   "gaps": [
+    {
+      "id": "review draft list lacks authoritative pagination",
+      "method": "GET",
+      "path": "/v1/confenge/review/drafts",
+      "reason": "Warmbly currently returns only data for this offset-bounded list. Control Center therefore reports coverage_status=UNPROVEN and never promotes the loaded row count to the server total. Adding the standard pagination envelope unlocks truthful remaining/next navigation without a new authority.",
+      "min_request": {
+        "method": "GET",
+        "path": "/v1/confenge/review/drafts",
+        "query": { "limit": "100", "offset": "0" },
+        "headers": ["Authorization", "API-Version"]
+      },
+      "min_response": {
+        "status": 200,
+        "body": {
+          "data": [],
+          "pagination": { "total": 0, "has_more": false }
+        }
+      }
+    },
     {
       "id": "dispatch status lacks paused_by / paused_at",
       "method": "GET",

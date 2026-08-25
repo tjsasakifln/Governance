@@ -129,9 +129,14 @@ que abrem modos explícitos do mesmo inspector; não existe dropdown genérico
 próxima mensagem e o foco acompanha o inspector. No mobile o inspector vem antes
 da lista completa, e no desktop os dois formam colunas sem um segundo scroll.
 
-Este recorte não afirma total do servidor: mostra somente quantas mensagens estão
-carregadas. Total/cursor, carregamento incremental, filtros e batch pertencem aos
-incrementos seguintes da fila escalável.
+O hash também preserva `offset`. A resposta versionada
+`control-center.review-draft-page.v1` mantém a página e a cobertura separadas dos
+itens: quando o Warmbly prova `pagination.total`, a tela diz **N carregados de M
+no servidor**, mostra o restante e habilita Anterior/Próxima conforme a prova.
+Sem total, ela diz literalmente que o total não foi informado; `has_more` válido
+pode provar apenas a continuidade, nunca o denominador. Metadado contraditório
+falha fechado como `UNPROVEN`. Filtros, batch e um cursor opaco novo continuam
+fora deste recorte.
 
 ## Cards de alerta
 

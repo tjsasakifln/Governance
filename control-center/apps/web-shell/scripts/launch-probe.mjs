@@ -160,7 +160,19 @@ await page.route(/\/v1\/commercial\/review-drafts(?:\?|$)/, async (route) => {
   await route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ data: reviewRows }),
+    body: JSON.stringify({
+      schema_version: "control-center.review-draft-page.v1",
+      data: reviewRows,
+      page: {
+        limit: 100,
+        offset: 0,
+        loaded_count: 55,
+        coverage_status: "TOTAL_KNOWN",
+        total_count: 55,
+        remaining_count: 0,
+        has_more: false,
+      },
+    }),
   });
 });
 
@@ -445,6 +457,13 @@ try {
     throw new Error(
       `review workbench multiplied controls: rows=${reviewListCount} inspectors=${reviewInspectorCount} forms=${reviewFormCount}`,
     );
+  }
+  const reviewCoverage = await page.locator('[data-review-coverage="TOTAL_KNOWN"]').innerText();
+  if (!reviewCoverage.includes("55 carregados de 55 no servidor") || !reviewCoverage.includes("0 restantes")) {
+    throw new Error(`review coverage lost authoritative pagination: ${reviewCoverage}`);
+  }
+  if (await page.locator('[data-review-page="next"]').count() !== 0) {
+    throw new Error("review workbench invented a next page after an authoritative end");
   }
   const approveLabel = await page.locator("[data-approve-submit]").innerText();
   if (!approveLabel.includes("Aprovar e agendar para contato-0@empresa-exemplo.test")) {
