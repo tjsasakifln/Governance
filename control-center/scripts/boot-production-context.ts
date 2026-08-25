@@ -15,6 +15,7 @@ import {
   createRequestListener,
   cryptoIds,
   frozenClock,
+  runtimeIdentityFromEnv,
   silentLogger,
 } from "../services/context/src/index.ts";
 import { FOUNDER, LIVE_NOW, seedLiveCockpit, seedOperationalCockpit } from "../tests/convergence/live-runtime/seed.ts";
@@ -62,6 +63,7 @@ const server = createServer(
     // Isolated E2E harness identity. Production startServer resolves this only
     // from trusted Authelia Remote-* headers; the browser cannot set the actor.
     operatorActor: () => FOUNDER,
+    runtimeIdentity: runtimeIdentityFromEnv(process.env, "control-center-context"),
     logger: silentLogger,
   }),
 );

@@ -160,6 +160,13 @@ docker compose -p confenge-control-center \
   -f docker-compose.production-edge.yml \
   -f docker-compose.warmbly-human-gate.override.yml \
   up -d context web
+
+# Mandatory identity gate: proves baseline ancestry and reconciles repository
+# SHA -> image label/ID -> container env -> each live HTTP response. Save this
+# output beside the release record; health alone is not release evidence.
+set -o pipefail
+./verify-release.sh "$CC_RELEASE_SHA" context web | tee \
+  "release-attestation-${CC_RELEASE_SHA}.log"
 ```
 
 For a first installation only, use the full bootstrap sequence instead of the
@@ -195,6 +202,9 @@ curl -sS -H 'Host: ops.confenge.com.br' http://127.0.0.1:18080/healthz
 curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: ops.confenge.com.br' http://127.0.0.1:18080/ready
 # internal:
 # context /healthz /ready, collector /healthz /ready, mcp /healthz /ready
+# authenticated cockpit footer: exact full release SHA
+# internal context: GET /v1/runtime-identity
+# internal web: GET /runtime-identity
 ```
 
 Public cockpit: `https://ops.confenge.com.br/` → Authelia 302 until authenticated + 2FA.

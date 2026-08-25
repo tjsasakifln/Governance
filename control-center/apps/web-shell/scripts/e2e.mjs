@@ -10,6 +10,7 @@ import { isOsLibLauncherFailure } from "../src/playwright-env.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const app = join(here, "..");
 const ccRoot = join(app, "../..");
+const E2E_RELEASE_SHA = "8a2eb1f012345678901234567890123456789012";
 
 async function freePort() {
   const probe = createServer();
@@ -91,6 +92,8 @@ const context = spawn("npx", ["tsx", "scripts/boot-production-context.ts"], {
     HOST: "127.0.0.1",
     PORT: String(contextPort),
     NODE_ENV: "test",
+    CONTROL_CENTER_ENV: "production",
+    CC_RELEASE_SHA: E2E_RELEASE_SHA,
     CONTROL_CENTER_FOUNDER_ACTOR_ID: "founder-local",
   },
   stdio: "ignore",
@@ -104,6 +107,8 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
     CC_CONTEXT_UPSTREAM: contextBase,
     CC_ACTOR_ID: "founder-local",
     CC_ACTOR_KIND: "human",
+    CONTROL_CENTER_ENV: "production",
+    CC_RELEASE_SHA: E2E_RELEASE_SHA,
   },
   stdio: "ignore",
 });
@@ -112,6 +117,18 @@ let exitCode = 1;
 try {
   await waitHttp(`${contextBase}/healthz`, 45_000);
   await waitHttp(`${webBase}/healthz`, 15_000);
+  await waitHttp(`${contextBase}/ready`, 15_000);
+  await waitHttp(`${webBase}/ready`, 15_000);
+  const contextIdentity = await fetch(`${contextBase}/v1/runtime-identity`).then((response) => response.json());
+  const webIdentity = await fetch(`${webBase}/runtime-identity`).then((response) => response.json());
+  if (contextIdentity.release_sha !== E2E_RELEASE_SHA || webIdentity.release_sha !== E2E_RELEASE_SHA) {
+    throw new Error(`runtime identity diverged: context=${contextIdentity.release_sha} web=${webIdentity.release_sha}`);
+  }
+  const cockpitHtml = await fetch(`${webBase}/`).then((response) => response.text());
+  if (!cockpitHtml.includes(`data-release-sha="${E2E_RELEASE_SHA}"`)
+    || !cockpitHtml.includes(`data-runtime-release-sha="true">${E2E_RELEASE_SHA}`)) {
+    throw new Error("authenticated cockpit does not render the immutable release SHA");
+  }
   const proxied = await fetch(`${webBase}/v1/context?scope=company`, {
     headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },
   });

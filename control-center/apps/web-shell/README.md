@@ -19,6 +19,11 @@ Chrome navigation exposes exactly these ten areas:
 
 “Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no immediate-send or cohort-dispatch control. In Revisão, candidate APPROVE is the complete per-message scheduling authority: it writes `auto_send=true`, `QUEUED` and `due_at`; the Warmbly worker transports later.
 
+The authenticated cockpit footer shows the full immutable `CC_RELEASE_SHA`.
+`GET /runtime-identity` exposes the same read-only value to the release verifier;
+production `/ready` fails closed when that value is absent, abbreviated or a
+mutable label such as `local`.
+
 ### Rotas do gate humano de cohorts
 
 O gate humano vive **inteiramente** sob “Operação Warmbly”, em três sub-rotas:

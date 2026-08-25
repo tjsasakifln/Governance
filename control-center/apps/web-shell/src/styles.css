@@ -1490,3 +1490,11 @@ button[data-toggle-messages] {
   font-size: 0.9rem;
   opacity: 0.8;
 }
+
+.runtime-identity {
+  margin: 1rem auto 2rem;
+  width: min(100% - 2rem, 1200px);
+  color: var(--muted);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}

@@ -38,6 +38,8 @@ HTTP (privado, bind default `127.0.0.1`):
 
 ```
 GET  /healthz
+GET  /ready
+GET  /v1/runtime-identity
 GET  /v1/context?scope=
 GET  /v1/active-directives?scope=
 GET  /v1/priorities
@@ -69,7 +71,11 @@ o tamanho da página nunca é promovido a total do servidor.
 
 A resposta 2xx do write não é prova de efeito. Para uma decisão individual, a ponte parseia o envelope do Warmbly, executa `GET /v1/confenge/review/drafts/:id` e devolve `control-center.review-decision-receipt.v1`. `APPROVE` só sai como `confirmed` quando write e readback concordam em ID, hash/approved hash, operador, instante e `QUEUED|SENT`, com `due_at == scheduled_for` em `QUEUED`. Corpo vazio, divergência ou readback indisponível vira `not_confirmed` e orienta a não repetir antes de reler com a mesma `Idempotency-Key`.
 
-Headers obrigatórios em tudo exceto `/healthz`: `X-Actor-Id`, `X-Actor-Kind` (`human` | `agent` | `system`).
+Headers obrigatórios nas rotas de dados, exceto `/healthz`, `/ready` e
+`/v1/runtime-identity`: `X-Actor-Id`, `X-Actor-Kind` (`human` | `agent` |
+`system`). A borda continua exigindo autenticação para `/v1/runtime-identity`;
+a exceção interna permite que a prova do container leia a identidade sem
+forjar um operador.
 
 ## Como rodar
 

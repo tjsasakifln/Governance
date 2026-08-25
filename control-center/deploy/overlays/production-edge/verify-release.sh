@@ -8,6 +8,19 @@ set -euo pipefail
 
 EXPECTED="${1:?usage: verify-release.sh <expected-sha> [service...]}"
 shift || true
+BASELINE="64ece7d38abacd3adeaa02735b4f22af66caab0f"
+if [[ ! "$EXPECTED" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "FAIL release: expected SHA must be the full lowercase 40-character commit identity"
+  exit 1
+fi
+if ! git cat-file -e "${EXPECTED}^{commit}" 2>/dev/null; then
+  echo "FAIL release: expected SHA is not a commit in this repository"
+  exit 1
+fi
+if ! git merge-base --is-ancestor "$BASELINE" "$EXPECTED"; then
+  echo "FAIL release: ${EXPECTED} does not descend from required baseline ${BASELINE}"
+  exit 1
+fi
 SERVICES=("$@")
 if [ ${#SERVICES[@]} -eq 0 ]; then
   SERVICES=(web context)
@@ -27,6 +40,23 @@ for svc in "${SERVICES[@]}"; do
   label=$(docker inspect "$image_id" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || echo "")
   envsha=$(docker inspect "$container" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^CC_RELEASE_SHA=//p' | head -1)
   running=$(docker inspect "$container" --format '{{.State.Running}}')
+  runtime_http=""
+  case "$svc" in
+    context) runtime_endpoint="http://127.0.0.1:8080/v1/runtime-identity" ;;
+    web) runtime_endpoint="http://127.0.0.1:8080/runtime-identity" ;;
+    *) runtime_endpoint="" ;;
+  esac
+  if [ -n "$runtime_endpoint" ]; then
+    runtime_http=$(docker exec "$container" node -e '
+      const endpoint = process.argv[1];
+      fetch(endpoint).then(async (response) => {
+        if (!response.ok) throw new Error(`status_${response.status}`);
+        const body = await response.json();
+        if (body.release_status !== "PINNED") throw new Error("release_not_pinned");
+        process.stdout.write(String(body.release_sha ?? ""));
+      }).catch(() => process.exit(2));
+    ' "$runtime_endpoint" 2>/dev/null || true)
+  fi
 
   echo "--- ${svc}"
   echo "    container   : ${container} (running=${running})"
@@ -34,6 +64,7 @@ for svc in "${SERVICES[@]}"; do
   echo "    image id    : ${image_id}"
   echo "    image label : ${label:-<none>}"
   echo "    runtime env : ${envsha:-<none>}"
+  echo "    runtime HTTP: ${runtime_http:-<none>}"
 
   if [ "$running" != "true" ]; then
     echo "    -> FAIL: container is not running"
@@ -45,16 +76,32 @@ for svc in "${SERVICES[@]}"; do
     fail=1
     continue
   fi
-  # Accept a short SHA prefix so a 12-character tag reconciles with a full SHA.
-  case "$EXPECTED" in
-    "$label"*) ;;
-    *) echo "    -> FAIL: image label ${label} does not match expected ${EXPECTED}"; fail=1; continue ;;
-  esac
-  if [ -n "$envsha" ]; then
-    case "$EXPECTED" in
-      "$envsha"*) ;;
-      *) echo "    -> FAIL: runtime CC_RELEASE_SHA ${envsha} does not match expected ${EXPECTED}"; fail=1; continue ;;
-    esac
+  if [ "$label" != "$EXPECTED" ]; then
+    echo "    -> FAIL: image label ${label} does not exactly match expected ${EXPECTED}"
+    fail=1
+    continue
+  fi
+  if [ "$svc" = "context" ] || [ "$svc" = "web" ]; then
+    if [ -z "$envsha" ]; then
+      echo "    -> FAIL: runtime has no CC_RELEASE_SHA"
+      fail=1
+      continue
+    fi
+    if [ "$envsha" != "$EXPECTED" ]; then
+      echo "    -> FAIL: runtime CC_RELEASE_SHA ${envsha} does not exactly match expected ${EXPECTED}"
+      fail=1
+      continue
+    fi
+    if [ -z "$runtime_http" ]; then
+      echo "    -> FAIL: runtime HTTP identity is absent or unpinned"
+      fail=1
+      continue
+    fi
+    if [ "$runtime_http" != "$EXPECTED" ]; then
+      echo "    -> FAIL: runtime HTTP identity ${runtime_http:-<none>} does not exactly match expected ${EXPECTED}"
+      fail=1
+      continue
+    fi
   fi
   echo "    -> OK: repo ${EXPECTED} reconciles with image label and runtime"
 done

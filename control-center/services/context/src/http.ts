@@ -11,6 +11,11 @@ import type { OperationalService } from "./operational/service.ts";
 import { COMMERCIAL_LIST_IDS, type CommercialListId } from "./operational/commercial-list.ts";
 import type { WarmblyReviewPort } from "./operational/warmbly-review.ts";
 import type { ContextService } from "./service.ts";
+import {
+  runtimeIdentityAllowsReady,
+  runtimeIdentityFromEnv,
+  type RuntimeIdentity,
+} from "./runtime-identity.ts";
 import { LIMITS, type ActorRef, type Scope } from "./types.ts";
 
 export interface HttpDeps {
@@ -31,6 +36,8 @@ export interface HttpDeps {
    */
   warmblyOperator?: (req: WarmblyOperatorHttpRequest) => Promise<WarmblyOperatorHttpResponse>;
   warmblyReview?: WarmblyReviewPort;
+  /** Build identity injected by the trusted deployment boundary. */
+  runtimeIdentity?: RuntimeIdentity;
 }
 
 export interface WarmblyOperatorHttpRequest {
@@ -193,9 +200,24 @@ async function handle(
       send(res, 200, { ok: true, service: "control-center-context" });
       return;
     }
+    const runtimeIdentity = deps.runtimeIdentity
+      ?? runtimeIdentityFromEnv({}, "control-center-context");
+    // Caddy keeps /v1 behind authenticated access. This route intentionally
+    // precedes actor parsing so release verification can run inside the image
+    // without manufacturing an operator identity.
+    if (method === "GET" && url.pathname === "/v1/runtime-identity") {
+      send(res, 200, runtimeIdentity);
+      return;
+    }
     if (method === "GET" && url.pathname === "/ready") {
-      const ready = await deps.service.ready();
-      send(res, ready ? 200 : 503, { ready, service: "control-center-context" });
+      const serviceReady = await deps.service.ready();
+      const ready = serviceReady && runtimeIdentityAllowsReady(runtimeIdentity);
+      send(res, ready ? 200 : 503, {
+        ready,
+        service: "control-center-context",
+        release_sha: runtimeIdentity.release_sha,
+        release_status: runtimeIdentity.release_status,
+      });
       return;
     }
     // Mounted before actorFromRequest on purpose. The operator channel resolves

@@ -5,6 +5,7 @@ import { createWarmblyOperatorHandlerFromEnv } from "./warmbly-operator/from-env
 import { createOperatorActorResolverFromEnv } from "./security/operator-identity.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { isServiceError } from "./errors.ts";
+import { runtimeIdentityFromEnv } from "./runtime-identity.ts";
 
 function listenPort(env: NodeJS.ProcessEnv): number {
   const raw = env.PORT ?? "8787";
@@ -41,6 +42,7 @@ export async function startServer(
     operatorActions: boot.operatorActions,
     warmblyReview: boot.warmblyReview,
     logger,
+    runtimeIdentity: runtimeIdentityFromEnv(env, "control-center-context"),
     ...(operatorActor ? { operatorActor } : {}),
     ...(warmblyOperator ? { warmblyOperator } : {}),
   });

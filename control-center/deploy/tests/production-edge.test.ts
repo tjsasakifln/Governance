@@ -144,9 +144,21 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   const web = doc.services.web;
   assert.ok(isRecord(web));
   const webEnv = isRecord(web.environment) ? web.environment : {};
+  assert.match(String(webEnv.CC_RELEASE_SHA ?? ""), /CC_RELEASE_SHA/);
+  assert.equal(webEnv.CONTROL_CENTER_ENV, "production");
   assert.equal(String(webEnv.CC_ACTOR_KIND ?? ""), "human");
   assert.match(String(webEnv.CC_ACTOR_ID ?? ""), /CONTROL_CENTER_FOUNDER_ACTOR_ID/);
   assert.doesNotMatch(String(webEnv.CC_ACTOR_ID ?? ""), /human:operator/);
+  const context = doc.services.context;
+  assert.ok(isRecord(context));
+  const contextEnv = isRecord(context.environment) ? context.environment : {};
+  assert.equal(contextEnv.CC_RELEASE_SHA, webEnv.CC_RELEASE_SHA);
+  assert.equal(contextEnv.CONTROL_CENTER_ENV, "production");
+  for (const service of [context, web]) {
+    const build = isRecord(service.build) ? service.build : {};
+    const labels = isRecord(build.labels) ? build.labels : {};
+    assert.equal(labels["org.opencontainers.image.revision"], webEnv.CC_RELEASE_SHA);
+  }
 });
 
 test("Warmbly collector override adds only an external network and no datastore volumes", () => {

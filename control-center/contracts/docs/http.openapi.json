@@ -18,9 +18,28 @@
     { "name": "cockpit", "description": "Exceptions and top priorities" },
     { "name": "snapshots", "description": "Aggregated read models" },
     { "name": "delivery", "description": "Read-only Work Order authority and event stream" },
-    { "name": "collectors", "description": "Read-only collector runs" }
+    { "name": "collectors", "description": "Read-only collector runs" },
+    { "name": "runtime", "description": "Immutable identity of the running release" }
   ],
   "paths": {
+    "/v1/runtime-identity": {
+      "get": {
+        "tags": ["runtime"],
+        "operationId": "getRuntimeIdentity",
+        "summary": "Read the immutable release SHA presented by the Context runtime",
+        "description": "Authenticated read-only evidence. Deployment verification must reconcile this SHA with repository ancestry, the OCI image revision label and the active container. Health alone is not release evidence.",
+        "responses": {
+          "200": {
+            "description": "Pinned or explicitly unverified runtime identity",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RuntimeIdentity" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/context": {
       "get": {
         "tags": ["context"],
@@ -590,6 +609,27 @@
         "minLength": 2,
         "description": "Comma-separated scopes. Empty list is 400. Each token must match Scope.",
         "pattern": "^(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:(?!(?:anonimo|anonymous|client|cliente|default|desconhecido|na|n-a|nao-identificado|nao-informado|no-name|none|null|placeholder|sem-identidade|sem-nome|tbd|undefined|unidentified|unknown)(?:,|$))[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+)(?:,(?:company|commercial|finance|clients|infrastructure|inbound|repo:[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?|client:(?!(?:anonimo|anonymous|client|cliente|default|desconhecido|na|n-a|nao-identificado|nao-informado|no-name|none|null|placeholder|sem-identidade|sem-nome|tbd|undefined|unidentified|unknown)(?:,|$))[a-z0-9]+(?:-[a-z0-9]+)*|(?!company:|commercial:|finance:|clients:|infrastructure:|inbound:|repo:|client:)[a-z][a-z0-9-]*:[A-Za-z0-9._:~-]+))*$"
+      },
+      "RuntimeIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version", "service", "release_sha", "required_baseline_sha",
+          "release_status", "production_required"
+        ],
+        "properties": {
+          "schema_version": { "const": "control-center.runtime-identity.v1" },
+          "service": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "release_sha": {
+            "oneOf": [
+              { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              { "type": "null" }
+            ]
+          },
+          "required_baseline_sha": { "const": "64ece7d38abacd3adeaa02735b4f22af66caab0f" },
+          "release_status": { "enum": ["PINNED", "UNVERIFIED"] },
+          "production_required": { "type": "boolean" }
+        }
       },
       "ErrorBody": {
         "type": "object",
