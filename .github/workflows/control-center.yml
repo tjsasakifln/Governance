@@ -124,11 +124,13 @@ jobs:
           grep -E "nav_changed_to=comercial" /tmp/cc-e2e.log
           grep -E "launch-probe ok" /tmp/cc-e2e.log
           grep -E "view_state_driven=empty" /tmp/cc-e2e.log
-      - name: Upload Playwright screenshots
+          grep -E "visual_routes=[1-9][0-9]* source=browser_registry" /tmp/cc-e2e.log
+          grep -E "visual_gate=PASS routes=[1-9][0-9]* axe_checks=[1-9]" /tmp/cc-e2e.log
+      - name: Upload visual gate artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: control-center-e2e-screenshots
+          name: control-center-visual-gate
           path: ${{ runner.temp }}/cc-e2e-screenshots
           if-no-files-found: warn
 

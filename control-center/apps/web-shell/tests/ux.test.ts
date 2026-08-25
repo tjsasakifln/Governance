@@ -118,6 +118,11 @@ test("global and contextual navigation need no horizontal discovery", () => {
   assert.match(css, /\.task-nav\s*\{[^}]*grid-template-columns:\s*repeat\(5,/s);
   assert.match(css, /\.subnav\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
   assert.match(css, /min-height:\s*44px/);
+  assert.match(
+    css,
+    /@media \(max-width:\s*520px\)[\s\S]*?\.facts div,[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+  );
+  assert.match(css, /\.table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/s);
 });
 
 /**

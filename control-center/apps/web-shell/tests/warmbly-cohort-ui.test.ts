@@ -704,6 +704,8 @@ test("cohorts exposes disjoint next-page progress and fresh-source recovery", ()
   assert.match(html, new RegExp(`name="recover_version_ids" value="${COHORT_ID}"`));
   assert.match(html, /empresa fornecedora\/contratada/);
   assert.doesNotMatch(html, /name="offset"/);
+  assert.match(html, /id="cohorts-table-hint">Tabela larga:/);
+  assert.match(html, /class="table-wrap" role="region" tabindex="0"[^>]*aria-describedby="cohorts-table-hint"/);
 });
 
 /* ------------------------------------------------------------------ *

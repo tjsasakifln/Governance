@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
 import { isOsLibLauncherFailure } from "../src/playwright-env.ts";
+import { assertVisualGateManifest } from "./visual-gate-manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const app = join(here, "..");
@@ -166,7 +167,12 @@ try {
   const screenshot = join(shotDir, "web-shell.png");
   const probe = await tryPlaywright(`${webBase}/`, screenshot);
   if (probe.ok) {
+    const manifest = JSON.parse(readFileSync(join(shotDir, "visual-gate-manifest.json"), "utf8"));
+    const visual = assertVisualGateManifest(manifest, E2E_RELEASE_SHA);
     process.stdout.write(`screenshot=${screenshot}\n`);
+    process.stdout.write(
+      `visual_gate=PASS routes=${visual.routes} axe_checks=${visual.axe} geometry_checks=${visual.geometry}\n`,
+    );
     exitCode = 0;
   } else if (probe.launcher) {
     process.stdout.write("playwright launcher unavailable; adapter unit tests remain the e2e fallback\n");
