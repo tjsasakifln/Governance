@@ -62,6 +62,7 @@
     "closeout_evidence_ref": {"type": "string", "minLength": 1},
     "readiness_state": {"enum": ["PRODUCTION_READY", "DELIVERY_VALIDATED"]},
     "readiness_ref": {"type": "string", "minLength": 1},
+    "readiness_evidence_ref": {"type": "string", "minLength": 1},
     "capacity_commitment_id": {"type": "string", "minLength": 1},
     "onboarding_ref": {"type": "string", "minLength": 1},
     "version": {"type": "integer", "minimum": 1},

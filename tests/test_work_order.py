@@ -27,6 +27,7 @@ def admission(**overrides) -> dict:
         "capacity_hold_id": "hold:diag-canary-001",
         "capacity_snapshot_id": "capacity:synthetic-one-unit-001",
         "calendar_version": "calendar:business-days-v1",
+        "due_at": "2026-09-09T21:00:00.000Z",
     }
     value.update(overrides)
     return value
@@ -161,7 +162,7 @@ def test_optimistic_concurrency_and_idempotent_command(service: WorkOrderService
 def test_due_at_is_evented_and_deterministic_on_replay(service: WorkOrderService):
     wid, _ = ready(service)
     before = service.store.get(wid)
-    assert before["due_at"] == "2026-08-27T12:03:00.000Z"
+    assert before["due_at"] == "2026-09-09T21:00:00.000Z"
     events = list(reversed(service.store.events(wid)))
     rebuilt = rebuild_work_order(events + [deepcopy(events[-1])])
     assert rebuilt == before

@@ -156,6 +156,7 @@ class WorkOrderService:
     ) -> dict[str, Any]:
         clean_request = validate_delivery_order_requested(request)
         clean_admission = validate_admission(admission)
+        _parse_utc(clean_admission["due_at"])
         decision_input = {
             "request": clean_request,
             "admission": clean_admission,
@@ -228,7 +229,7 @@ class WorkOrderService:
             "received_inputs": {},
             "created_at": clean_request["occurred_at"],
             "started_at": None,
-            "due_at": None,
+            "due_at": clean_admission["due_at"],
             "sla_business_days": sla_business_days,
             "calendar_version": clean_admission["calendar_version"],
             "clock_state": "NOT_STARTED",
@@ -331,7 +332,6 @@ class WorkOrderService:
             payload["blockers"] = blockers
             if not blockers:
                 payload["current_stage"] = "READY"
-                payload["due_at"] = add_business_days(meta["occurred_at"], state["sla_business_days"])
             next_state = _apply_delta(state, payload)
             return payload, next_state
 
@@ -545,6 +545,30 @@ class WorkOrderService:
             work_order_id,
             event_type="WORK_ORDER_CLOSED",
             command={"evidence_ref": evidence_ref, "actual_effort_units": actual_effort_units},
+            transition=transition,
+            **meta,
+        )
+
+    def record_readiness_validated(
+        self, work_order_id: str, readiness_ref: str, evidence_ref: str, **meta: Any
+    ) -> dict[str, Any]:
+        readiness_ref = _nonempty(readiness_ref, "readiness_ref")
+        evidence_ref = _nonempty(evidence_ref, "evidence_ref")
+
+        def transition(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+            if state["current_stage"] != "CLOSED":
+                raise IllegalTransitionError("delivery validation requires a closed Work Order")
+            payload = {
+                "readiness_state": "DELIVERY_VALIDATED",
+                "readiness_ref": readiness_ref,
+                "readiness_evidence_ref": evidence_ref,
+            }
+            return payload, _apply_delta(state, payload)
+
+        return self._command(
+            work_order_id,
+            event_type="READINESS_VALIDATED",
+            command={"readiness_ref": readiness_ref, "evidence_ref": evidence_ref},
             transition=transition,
             **meta,
         )

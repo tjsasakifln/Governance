@@ -153,6 +153,7 @@ def validate_admission(raw: Any) -> dict[str, Any]:
         "capacity_hold_id",
         "capacity_snapshot_id",
         "calendar_version",
+        "due_at",
     }
     missing = sorted(required - raw.keys())
     if missing:

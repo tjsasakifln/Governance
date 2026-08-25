@@ -9,7 +9,7 @@
     "event_id": {"type": "string", "minLength": 1},
     "schema_version": {"const": "confenge.work_order_event.v1"},
     "work_order_id": {"type": "string", "minLength": 1},
-    "event_type": {"enum": ["WORK_ORDER_CREATED", "OWNER_ASSIGNED", "INPUT_RECEIVED", "WORK_STARTED", "WORK_BLOCKED", "WORK_RESUMED", "ARTIFACT_RECORDED", "QA_STARTED", "QA_FAILED", "QA_PASSED", "DELIVERED", "DELIVERY_ACCEPTED", "WORK_ORDER_CLOSED"]},
+    "event_type": {"enum": ["WORK_ORDER_CREATED", "OWNER_ASSIGNED", "INPUT_RECEIVED", "WORK_STARTED", "WORK_BLOCKED", "WORK_RESUMED", "ARTIFACT_RECORDED", "QA_STARTED", "QA_FAILED", "QA_PASSED", "DELIVERED", "DELIVERY_ACCEPTED", "WORK_ORDER_CLOSED", "READINESS_VALIDATED"]},
     "version": {"type": "integer", "minimum": 1},
     "expected_version": {"type": "integer", "minimum": 0},
     "idempotency_key": {"type": "string", "minLength": 1},

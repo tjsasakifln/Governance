@@ -24,8 +24,8 @@ def request() -> dict:
 
 def test_handoff_contract_preserves_cross_repo_identity_and_stable_work_order_id():
     clean = validate_delivery_order_requested(request())
-    assert clean["proposal_id"] == "proposal-diag-synthetic-001"
-    assert clean["qco_id"] == "qco-diag-synthetic-001"
+    assert clean["proposal_id"] == "220f817a-5b2b-5799-b403-2ce8c731e4bf"
+    assert clean["qco_id"] == "qco-synthetic-cfg-diag-exp-001"
     assert clean["offer_id"] == "CFG-DIAG-EXP-v1"
     assert clean["deliverable_id"] == "CFG-DIAG-EXP-v1"
     assert work_order_business_key(clean).count("|") == 4
