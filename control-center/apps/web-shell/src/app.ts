@@ -111,8 +111,19 @@ export interface MountableRoot {
   querySelectorAll?(selector: string): ArrayLike<{
     addEventListener(type: string, listener: (event: Event) => void): void;
     getAttribute(name: string): string | null;
-    querySelector(selector: string): { value: string; checked?: boolean } | null;
-    querySelectorAll?(selector: string): ArrayLike<{ value: string; checked?: boolean }>;
+    setAttribute?(name: string, value: string): void;
+    querySelector(selector: string): {
+      value: string;
+      checked?: boolean;
+      disabled?: boolean;
+      textContent?: string | null;
+    } | null;
+    querySelectorAll?(selector: string): ArrayLike<{
+      value: string;
+      checked?: boolean;
+      disabled?: boolean;
+      textContent?: string | null;
+    }>;
     focus?(options?: { preventScroll?: boolean }): void;
     scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
   }>;
@@ -385,7 +396,7 @@ function restoreListFocus(painted: boolean): void {
   if (element instanceof HTMLSelectElement) element.focus();
 }
 
-function bindReviewActions(
+export function bindReviewActions(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
@@ -395,24 +406,62 @@ function bindReviewActions(
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inFlight) return;
       const id = form.getAttribute("data-review-form") ?? "";
       const action = form.querySelector('[name="action"]')?.value as "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT" | undefined;
       const expected = form.querySelector('[name="expected_content_hash"]')?.value ?? "";
       if (!id || !action || !expected) return;
-      void Promise.resolve(adapter.reviewDraftAction?.({
+      const subject = form.querySelector('[name="subject"]')?.value ?? "";
+      const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
+      const originalSubject = form.querySelector('[name="original_subject"]')?.value ?? subject;
+      const originalBodyText = form.querySelector('[name="original_body_text"]')?.value ?? bodyText;
+      if (action !== "SAVE_ADJUSTMENT" && (subject !== originalSubject || bodyText !== originalBodyText)) {
+        adapter.lastOperatorResult = {
+          ok: false,
+          path: `/v1/commercial/review-drafts/${encodeURIComponent(id)}`,
+          kind: "nota",
+          message: "Há ajustes ainda não salvos. Salve o ajuste e releia o novo hash antes de aprovar ou rejeitar.",
+          outcome: "refused",
+          code: "review_adjustment_not_saved",
+        };
+        onDone();
+        return;
+      }
+      inFlight = true;
+      form.setAttribute?.("aria-busy", "true");
+      const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
+      for (let controlIndex = 0; controlIndex < controls.length; controlIndex += 1) {
+        const control = controls[controlIndex];
+        if (control) control.disabled = true;
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.textContent = "Confirmando no servidor…";
+      const request = {
         id,
         action,
         expected_content_hash: expected,
-        subject: form.querySelector('[name="subject"]')?.value ?? "",
-        body_text: form.querySelector('[name="body_text"]')?.value ?? "",
+        ...(action === "SAVE_ADJUSTMENT" ? { subject, body_text: bodyText } : {}),
         reason: form.querySelector('[name="reason"]')?.value ?? "",
         generic_recipient_acknowledged: form.querySelector('[name="generic_ack"]')?.value === "true",
-      })).then((result) => {
-        if (result) adapter.lastOperatorResult = result;
-        onDone();
-      });
+      };
+      void Promise.resolve(adapter.reviewDraftAction?.(request))
+        .then((result) => {
+          if (result) adapter.lastOperatorResult = result;
+        })
+        .catch((err: unknown) => {
+          adapter.lastOperatorResult = {
+            ok: false,
+            path: `/v1/commercial/review-drafts/${encodeURIComponent(id)}`,
+            kind: "nota",
+            message: `Resultado não confirmado. Não repita ainda: ${err instanceof Error ? err.message : "falha inesperada"}.`,
+            outcome: "unknown",
+            code: "browser_transport",
+          };
+        })
+        .finally(onDone);
     });
   }
 }

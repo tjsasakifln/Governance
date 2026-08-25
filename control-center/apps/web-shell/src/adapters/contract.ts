@@ -103,6 +103,27 @@ export interface GateReconcileCounts {
   failures?: readonly { cohortId?: string; candidateId?: string; reason: string }[];
 }
 
+/**
+ * Server-observed result of one commercial draft decision.
+ *
+ * This is deliberately distinct from an optimistic UI state. The Context
+ * Service emits it only after comparing Warmbly's write response with a
+ * canonical GET of the same touchpoint.
+ */
+export interface ReviewDecisionEvidence {
+  action: "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT";
+  touchpointId: string;
+  expectedContentHash: string;
+  contentHash?: string;
+  approvedContentHash?: string;
+  state?: string;
+  dueAt?: string;
+  scheduledFor?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  observedAt: string;
+}
+
 export interface AdapterWriteResult {
   ok: boolean;
   path: string;
@@ -169,6 +190,8 @@ export interface AdapterWriteResult {
   reconcile?: GateReconcileCounts;
   /** Result of the GET readback performed after a definitive response. */
   readback?: GateReadback;
+  /** Canonical receipt/readback for a Comercial → Rascunhos decision. */
+  reviewDecision?: ReviewDecisionEvidence;
 }
 
 /**
