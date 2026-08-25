@@ -6,9 +6,10 @@
  * control here and there must never be one — this surface can stop outbound and
  * let it flow again, and that is the whole of its authority.
  *
- * Candidate APPROVE lives in Revisão and is the complete per-message scheduling
- * authority. It queues with auto_send=true for that message; only Warmbly's
- * worker transports later, under the controls shown here.
+ * Eligible first touches can be approved by CFG-FIRST-TOUCH-ROUTING-v1. Human
+ * APPROVE remains the per-message authority for exceptions and out-of-policy
+ * work. Both paths reuse Warmbly's scheduler; only its worker transports later,
+ * under the controls shown here.
  *
  * Everything an operator needs to decide is rendered *before* the controls:
  * dispatch state, why it is in that state, the commercial window, the approved
@@ -673,6 +674,21 @@ function stamp(value: unknown): string {
   return typeof value === "string" && value !== "" ? formatLocal(value) : "—";
 }
 
+function delegatedStatus(input: WarmblySurfaceInput): Record<string, unknown> {
+  return record(record(input.snapshot?.operations).delegated_first_touch);
+}
+
+function delegatedFirstTouchBlock(input: WarmblySurfaceInput): string {
+  const status = delegatedStatus(input);
+  const observed = status.observed === true;
+  const active = status.policy_active === true;
+  const counts = record(status.counts);
+  const items = array(status.items);
+  const state = observed ? (active ? "active" : "inactive") : "unknown";
+  const copy = !observed ? "Estado desconhecido não é aprovação" : active ? "POLICY ATIVA" : "Nenhum item deve ser tratado como aprovado por policy";
+  return `<section class="stack" data-first-touch-policy="${state}"><h2>Primeiro toque · ${escapeHtml(show(status.policy_version))}</h2><p class="banner ${active ? "ok" : "stale"}" role="status">${copy}. DELEGATED_POLICY_APPROVE/QUEUED: ${escapeHtml(show(counts.QUEUED))}; Readback QUEUED: ${escapeHtml(show(status.queued_readback))}; HOLD: ${escapeHtml(show(counts.HOLD))}; HUMAN_APPROVE: ${escapeHtml(show(status.human_approved))}.</p>${items.length ? `<details class="tech" data-first-touch-evidence="true"><summary>Abrir evidence e reason codes (${items.length})</summary><pre>${escapeHtml(JSON.stringify(items))}</pre></details>` : ""}</section>`;
+}
+
 interface DispatchReading {
   state: string;
   stateLabel: string;
@@ -1199,7 +1215,7 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
       detail:
         !hasCohort || candidates.length === 0
           ? "O payload desta versão não trouxe candidatos."
-          : `${approved.length} de ${candidates.length} com APPROVE efetivo segundo o servidor. Aprovar é autoridade para enfileirar.`,
+          : `${approved.length} de ${candidates.length} com HUMAN_APPROVE efetivo.`,
     },
     {
       id: "agendamento",
@@ -1213,7 +1229,7 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
             : "current",
       detail: !hasCohort
         ? "Sem cohort não há mensagens para agendar."
-        : `${scheduled.length} de ${approved.length} aprovação(ões) efetiva(s) têm auto_send por mensagem, due_at e estado QUEUED/SENT.`,
+        : `${scheduled.length} de ${approved.length} têm due_at e QUEUED/SENT.`,
     },
   ];
 }
@@ -1241,16 +1257,20 @@ function pilotSummary(input: WarmblySurfaceInput): string {
   const list = gateSection(input, "list");
   const latest = latestCohort(input);
   const authority = operatorAuthority(input);
+  const policyActive = delegatedStatus(input).observed === true && delegatedStatus(input).policy_active === true;
   const open = latest
     ? `<p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(latest.id))}">Abrir revisão da v${escapeHtml(show(latest.version))}</a></p>`
     : `<p><a class="button" data-open-cohorts="true" href="#/warmbly/cohorts">Abrir Cohorts para criar a primeira versão</a></p>`;
   return `
     <section class="stack" aria-labelledby="warmbly-piloto" data-pilot-summary="true">
-      <h2 id="warmbly-piloto">Onde o piloto está</h2>
-      <p class="constraint">Fonte → Cohort → Validação → Revisão → Agendamento. APPROVE já enfileira a mensagem com auto_send=true para ela; a automação global continua desligada. Cada passo abaixo repete o servidor.</p>
+      <h2 id="warmbly-piloto">${policyActive ? "Primeiro toque e exceções" : "Onde o piloto está"}</h2>
+      <p class="constraint">${policyActive
+        ? "Itens elegíveis seguem a policy ao scheduler; revisão é fila de exceção e não é pedágio."
+        : "Fonte → Cohort → Validação → HUMAN_APPROVE → Agendamento."}</p>
       ${gateUnreadableBanner(list, "a lista de cohorts")}
       ${identityBlock(input, true)}
-      ${stepperBlock(input)}
+      ${delegatedFirstTouchBlock(input)}
+      ${policyActive ? "" : stepperBlock(input)}
       ${
         latest
           ? `<article class="card" data-latest-cohort="${escapeHtml(show(latest.id))}">
@@ -1273,7 +1293,7 @@ function pilotSummary(input: WarmblySurfaceInput): string {
           ? ""
           : `<p class="constraint" data-reconcile-authority="absent">O reparo “Reprocessar aprovações” exige <code>admins</code>. Sua sessão ${
               authority.known ? "não tem esse grupo" : "não teve os grupos confirmados pelo canal"
-            }: o fluxo normal continua sendo APPROVE por <code>operators</code>, sem passo extra.</p>`
+            }: exceções continuam podendo receber HUMAN_APPROVE por <code>operators</code>; itens elegíveis seguem a policy sem esse reparo.</p>`
       }
     </section>`;
 }
@@ -1527,7 +1547,7 @@ function cohortSurface(input: WarmblySurfaceInput): string {
   const createLimit = interactionDraftValue(`gate:${createKey}`, "limit", "10");
   const createPending = gateInFlight(createKey);
   const recoverPending = gateInFlight(recoverKey);
-  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. A automação global permanece desligada; cada APPROVE agenda somente sua mensagem com <code>auto_send=true</code>.</p>
+  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">O preview Warmbly é a autoridade dos denominadores e destinatários.</p>
   ${gateUnreadableBanner(list, "a lista de cohorts")}
   ${feedback.remainder()}
   ${identityBlock(input, true)}
@@ -1805,7 +1825,7 @@ function candidateCard(
     ${gateInFlight(approveKey) ? pendingBlock("Registrando a aprovação") : ""}
     <form class="operator-form approve-form" data-human-gate="review" data-interaction="gate.approve" data-one-decision="true" data-explicit-submit="true" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}"${gate.needsValidation ? ` data-auto-validate="true"` : ""}>
       <h4>Aprovar e enfileirar este candidato</h4>
-      <p class="constraint" data-approve-meaning="true">Clicar em Aprovar e enfileirar é a ciência e a autoridade de agendamento: a trilha grava sua identidade do Authelia, o instante, esta versão v${escapeHtml(version)}, o hash congelado, o destinatário exato e a decisão; a mesma operação cria a mensagem com <code>auto_send=true</code> e <code>due_at</code> na próxima janela comercial. Não há GO, segunda caixa ou passo de entrega.</p>
+      <p class="constraint" data-approve-meaning="true">HUMAN_APPROVE vincula a identidade do Authelia, v${escapeHtml(version)}, hash e destinatário; a mesma operação agenda com <code>due_at</code>.</p>
       ${
         gate.needsValidation
           ? `<p class="constraint" data-approve-autovalidate="true">Este destinatário ainda não tem verificação vigente. Aprovar pede a verificação ao Warmbly primeiro e só registra o APPROVE se ela voltar VALID — você não precisa acionar nada antes.</p>`
@@ -1829,12 +1849,12 @@ function candidateCard(
     ? schedulingConfirmed
       ? `<article class="banner ok" role="status" data-approval-scheduling="true" data-scheduling-confirmed="true" data-scheduling-state="${escapeHtml(schedulingState ?? "")}">
           <h4>Agendamento confirmado pelo servidor</h4>
-          <p>APPROVE agenda a mensagem: ela está ${schedulingState === "SENT" ? "marcada como enviada" : "na fila do worker"}, com <code>auto_send=true</code>${schedulingState === "QUEUED" ? " e saída prevista para a próxima janela permitida" : ""}. Pausa, kill switch, janela comercial, teto por hora e validação de última milha ainda governam o transporte.</p>
+          <p>HUMAN_APPROVE agenda a mensagem ${schedulingState === "SENT" ? "como enviada" : "na fila do worker"}; os gates de transporte continuam valendo.</p>
           <dl class="facts">${fact("Estado", schedulingState ?? NOT_IN_PAYLOAD)}${fact("due_at", schedulingDueAt === null ? NOT_IN_PAYLOAD : stamp(schedulingDueAt))}${fact("auto_send da mensagem", "true")}</dl>
         </article>`
       : `<article class="banner error" role="alert" data-approval-scheduling="true" data-scheduling-confirmed="false">
           <h4>Defeito: APPROVE efetivo sem agendamento confirmado</h4>
-          <p>Uma aprovação válida deve sair da mesma operação em <code>QUEUED</code>, com <code>due_at</code> e <code>auto_send=true</code>. Não reaprove. Um admin deve executar “Reprocessar aprovações já registradas” e reler este candidato.</p>
+          <p>A aprovação deveria estar em <code>QUEUED</code> com <code>due_at</code>. Não reaprove; peça o reparo admin.</p>
           <dl class="facts">${fact("Estado", schedulingState ?? NOT_IN_PAYLOAD)}${fact("due_at", schedulingDueAt === null ? NOT_IN_PAYLOAD : stamp(schedulingDueAt))}${fact("auto_send da mensagem", scheduling.auto_send === undefined ? NOT_IN_PAYLOAD : String(scheduling.auto_send))}</dl>
         </article>`
     : "";
@@ -1977,7 +1997,7 @@ function adjustBlock(args: {
           <div data-diff-field="body_text"><dt>Corpo</dt><dd><del><pre class="message-preview">${escapeHtml(draft.before_body_text)}</pre></del><ins><pre class="message-preview">${escapeHtml(draft.body_text)}</pre></ins></dd></div>
           <div data-diff-field="reason"><dt>Motivo</dt><dd>${escapeHtml(draft.reason)}</dd></div>
         </dl>
-        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação e revisão da nova versão começam pendentes. Cada APPROVE nela fará o próprio agendamento.</p>
+        <p class="constraint">Confirmar cria outra versão; v${escapeHtml(version)} permanece legível e cada HUMAN_APPROVE agenda só seu item.</p>
       </div>`
     : "";
   return `
@@ -2084,7 +2104,7 @@ function queueBlock(
     <p class="kicker"><span class="pill">FILA</span></p>
     <h3 data-queue-progress-text="true">${counts.pendentes} pendente(s) · ${counts.aprovadas} aprovada(s) · ${counts.ajuste} em ajuste · ${counts.total} no total</h3>
     <nav class="subnav queue-filters" data-review-filters="true" aria-label="Estado da revisão">${tabs}</nav>
-    <p class="constraint">A fila abre em Pendentes. Uma mensagem aprovada sai deste recorte e, na mesma operação, entra na fila do worker com <code>auto_send=true</code>; as concluídas continuam legíveis nos outros recortes.</p>
+    <p class="constraint">Pendentes abre primeiro; decisões continuam legíveis nos demais recortes.</p>
   </article>`;
 }
 
@@ -2128,8 +2148,8 @@ function reconcileBlock(authority: OperatorAuthority): string {
   <article class="card" data-approval-reconcile="true">
     <p class="kicker"><span class="pill">REPARO · ADMINS</span></p>
     <h3>Reprocessar aprovações já registradas</h3>
-    <p data-reconcile-meaning="true">Este não é um passo normal depois da revisão. APPROVE já agenda sozinho. Use o reparo somente para aprovações antigas ou para um APPROVE cujo card mostre “sem agendamento confirmado”.</p>
-    <p class="constraint" data-reconcile-repeat="true">A operação percorre o histórico pelo mesmo caminho de código do APPROVE, deduplica candidatos repetidos entre cohorts e é idempotente: executar de novo não cria outra mensagem nem reenvia o que já saiu.</p>
+    <p data-reconcile-meaning="true">Este não é um passo normal depois da revisão; use só quando faltar agendamento confirmado.</p>
+    <p class="constraint" data-reconcile-repeat="true">É idempotente, deduplica candidatos repetidos entre cohorts e não reenvia.</p>
     <p class="constraint">O resultado mostra quantos registros, vínculos e candidatos únicos foram encontrados e quantos ficaram agendados. Isto não transporta e-mail; o worker continua sob janela comercial, teto por hora, pausa e kill switch.</p>
     <form class="operator-form" data-human-gate="reconcile" data-interaction="gate.reconcile" data-one-decision="true" data-explicit-submit="true" data-gate-key="${escapeHtml(reconcileKey)}">
       <button type="submit" data-reconcile-submit="true"${authority.canReconcile && !pending ? "" : " disabled"}>${pending ? "Enviando…" : "Reprocessar aprovações já registradas"}</button>
@@ -2214,7 +2234,8 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   <form class="operator-form" data-human-gate="reproduce" data-interaction="gate.reproduce" data-one-decision="true" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
 `
     : "";
-  return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>
+  return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}"><h2 id="review-title">Revisão v${escapeHtml(version)} · fila de exceções</h2>
+  ${delegatedFirstTouchBlock(input)}
   ${outboundStatusBlock(input)}
   ${legacyBanner(editorial, cohortId)}
   ${leftover}${cohortFeedback}
@@ -2242,7 +2263,7 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   }
   <details class="card" data-historical-go-audit="true"><summary>Auditoria histórica de GO/NO-GO (sem efeito operacional)</summary><dl class="facts"><div><dt>Último valor histórico</dt><dd>${escapeHtml(historicalDecision)}</dd></div></dl><p class="constraint">O controle foi removido da Revisão. Este dado antigo permanece apenas para auditoria: não autoriza, bloqueia, enfileira nem desenfileira mensagens.</p></details>
   ${reconcileBlock(authority)}
-  <p class="constraint">APPROVE é o único ato humano necessário para agendar a mensagem. O envio em si continua sendo do worker do Warmbly, na janela comercial e sob o teto por hora; esta tela não expõe send, queue ou resume.</p></section>`;
+  <p class="constraint">HUMAN_APPROVE agenda exceções; a policy agenda first touches elegíveis no mesmo scheduler. Pausa, kill switch, janela e teto continuam dominantes.</p></section>`;
 }
 
 function warmblySubnav(current: WarmblySurface, input: WarmblySurfaceInput): string {

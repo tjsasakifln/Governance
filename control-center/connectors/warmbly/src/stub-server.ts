@@ -88,6 +88,10 @@ function routeBody(payload: WarmblyPayload, pathname: string): unknown | undefin
       return payload.unibox_overview ?? { unread: 0, awaiting_reply: 0 };
     case "/v1/confenge/status":
       return payload.confenge_status ?? { enabled: false };
+    case "/v1/confenge/dispatch/status":
+      return payload.confenge_dispatch_status;
+    case "/v1/confenge/first-touch/status":
+      return payload.confenge_first_touch_status;
     case "/v1/confenge/ops/health":
       return payload.confenge_ops_health ?? { data: { computed_at: new Date().toISOString() } };
     case "/v1/confenge/attention":

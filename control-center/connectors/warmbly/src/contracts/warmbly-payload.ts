@@ -262,6 +262,48 @@ export type WarmblyDispatchStatus = {
   active_leases?: number;
 };
 
+/**
+ * GET /v1/confenge/first-touch/status. This is an audit/read model only: the
+ * connector never evaluates the policy and never infers an approval locally.
+ */
+export type WarmblyDelegatedFirstTouchItem = {
+  batch_id?: string;
+  account_id?: string;
+  cnpj14?: string;
+  supplier_cnpj14?: string;
+  buyer_cnpj14?: string;
+  recipient?: string;
+  route_class?: string;
+  decision?: string;
+  approval_source?: string;
+  state?: string;
+  evidence_reference?: string;
+  evidence_hash?: string;
+  source_run_id?: string;
+  source_snapshot_hash?: string;
+  reason_codes?: string[];
+  blocker_codes?: string[];
+  content_hash?: string;
+  runtime_release_sha?: string;
+  due_at?: string | null;
+  readback_at?: string | null;
+  decided_at?: string;
+};
+
+export type WarmblyDelegatedFirstTouchStatus = {
+  batch_id?: string;
+  policy_id?: string;
+  policy_version?: string;
+  policy_hash?: string;
+  policy_active?: boolean;
+  counts?: Record<string, number>;
+  human_approved?: number;
+  queued_readback?: number;
+  duplicate_live_account?: number;
+  duplicate_live_root?: number;
+  items?: WarmblyDelegatedFirstTouchItem[];
+};
+
 export type WarmblyObservedText = {
   availability?: "OBSERVED" | "UNKNOWN";
   value?: string;
@@ -327,6 +369,7 @@ export type WarmblyPayload = {
   confenge_today?: WarmblyTodayView | { data: WarmblyTodayView };
   confenge_inbound?: WarmblyInboundItem[] | WarmblyList<WarmblyInboundItem>;
   confenge_dispatch_status?: WarmblyDispatchStatus | { data: WarmblyDispatchStatus };
+  confenge_first_touch_status?: WarmblyDelegatedFirstTouchStatus | { data: WarmblyDelegatedFirstTouchStatus };
   confenge_intel_scoreboard?: Record<string, unknown>;
   confenge_intel_executive?: WarmblyIntelExecutive;
   confenge_intel_report?: Record<string, unknown>;

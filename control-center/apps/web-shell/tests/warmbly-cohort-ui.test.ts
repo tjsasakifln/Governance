@@ -135,6 +135,88 @@ function surfaceInput(overrides: Record<string, unknown> = {}): Parameters<typeo
   } as Parameters<typeof warmblyBlock>[0];
 }
 
+function delegatedSnapshot(policyActive = true): Record<string, unknown> {
+  return {
+    operations: {
+      delegated_first_touch: {
+        observed: true,
+        policy_id: "CFG-FIRST-TOUCH-ROUTING-v1",
+        policy_version: "CFG-FIRST-TOUCH-ROUTING-v1",
+        policy_hash: "3ea77bb047d9db19c061d96c62ae302768f25dbd075db7cccac5fe56d3fe3b99",
+        policy_active: policyActive,
+        counts: { QUEUED: 1, HOLD: 1 },
+        human_approved: 2,
+        queued_readback: 1,
+        duplicate_live_account: 0,
+        duplicate_live_root: 0,
+        items: [
+          {
+            batch_id: "batch-fixture-001",
+            cnpj14: "12345678000190",
+            supplier_cnpj14: "12345678000190",
+            buyer_cnpj14: "98765432000110",
+            recipient: "compras@fornecedora.invalid",
+            route_class: "ROLE_OR_DEPARTMENT",
+            approval_source: "DELEGATED_POLICY_APPROVE",
+            state: "QUEUED",
+            evidence_reference: "extra-cli:v_contracts_canonical_v2:contract-fixture",
+            evidence_hash: "evidence-fixture-hash",
+            source_run_id: "run-current",
+            source_snapshot_hash: "snapshot-current",
+            content_hash: "content-fixture-hash",
+            reason_codes: ["ALL_HARD_GATES_PASS"],
+            due_at: "2026-08-25T15:00:00Z",
+            readback_at: "2026-08-25T14:59:01Z",
+            decided_at: "2026-08-25T14:59:00Z",
+          },
+          {
+            cnpj14: "22345678000190",
+            route_class: "GENERIC_COMPANY",
+            approval_source: "POLICY_EVALUATION_HOLD",
+            state: "HOLD",
+            reason_codes: ["PARTY_ROLE_UNKNOWN"],
+            blocker_codes: ["PARTY_ROLE_UNKNOWN"],
+            source_run_id: "run-current",
+          },
+        ],
+      },
+    },
+  };
+}
+
+test("Control Center distinguishes delegated approval, human approval and fail-closed exceptions", () => {
+  const input = surfaceInput({ snapshot: delegatedSnapshot() });
+  const operation = warmblyBlock(input, "operacao");
+  const review = warmblyBlock(input, "revisao");
+
+  for (const html of [operation, review]) {
+    assert.match(html, /data-first-touch-policy="active"/);
+    assert.match(html, /CFG-FIRST-TOUCH-ROUTING-v1/);
+    assert.match(html, /DELEGATED_POLICY_APPROVE/);
+    assert.match(html, /HUMAN_APPROVE/);
+    assert.match(html, /POLICY_EVALUATION_HOLD/);
+    assert.match(html, /PARTY_ROLE_UNKNOWN/);
+    assert.match(html, /data-first-touch-evidence="true"/);
+    assert.match(html, /Readback QUEUED/);
+  }
+  assert.match(operation, /não é pedágio/);
+  assert.match(review, /fila de exceções/);
+  assert.doesNotMatch(review, /APPROVE é o único ato humano necessário/);
+});
+
+test("unobserved or inactive delegated authority never looks approved", () => {
+  const inactive = warmblyBlock(
+    surfaceInput({ snapshot: delegatedSnapshot(false) }),
+    "operacao",
+  );
+  assert.match(inactive, /data-first-touch-policy="inactive"/);
+  assert.match(inactive, /Nenhum item deve ser tratado como aprovado por policy/);
+
+  const unknown = warmblyBlock(surfaceInput(), "operacao");
+  assert.match(unknown, /data-first-touch-policy="unknown"/);
+  assert.match(unknown, /Estado desconhecido não é aprovação/);
+});
+
 /* ------------------------------------------------------------------ *
  * A root that really parses the markup it was handed.
  *
@@ -1152,7 +1234,7 @@ test("the new version opens with validation, review and scheduling pending", () 
   assert.ok(!html.includes("Revisão registrada"));
   assert.match(html, /<dt>Validação<\/dt><dd>UNKNOWN<\/dd>/);
   assert.doesNotMatch(html, /data-human-gate="decide"|data-human-gate="dispatch"/);
-  assert.match(html, /data-step="agendamento"|APPROVE é o único ato humano necessário/);
+  assert.match(html, /data-step="agendamento"|HUMAN_APPROVE agenda exceções/);
 });
 
 test("every adjust refusal code renders its own actionable sentence", () => {

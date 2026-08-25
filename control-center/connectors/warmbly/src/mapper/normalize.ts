@@ -513,6 +513,7 @@ export function collectFromWarmblyPayload(
     authority: "warmbly",
     this_document: "read_model",
     dispatch: dispatchOf(payload),
+    delegated_first_touch: delegatedFirstTouchOf(payload),
     cap: OPERATIONS_CAP,
     deals: fullOperations.deals.slice(0, OPERATIONS_CAP),
     tasks: fullOperations.tasks.slice(0, OPERATIONS_CAP),
@@ -580,6 +581,22 @@ function dispatchOf(payload: WarmblyPayload): Record<string, unknown> {
   if (typeof st.queued_approved === "number") out.queued_approved = st.queued_approved;
   if (typeof st.active_leases === "number") out.active_leases = st.active_leases;
   return out;
+}
+
+/**
+ * Preserve Warmbly's typed delegated-decision read model without re-deciding
+ * any gate in Governance. Missing/malformed data is explicitly unobserved.
+ */
+function delegatedFirstTouchOf(payload: WarmblyPayload): Record<string, unknown> {
+  const raw = unwrapData(payload.confenge_first_touch_status);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      observed: false,
+      state: "UNKNOWN",
+      why: "GET /v1/confenge/first-touch/status não respondeu; a autoridade delegada e as exceções não foram observadas",
+    };
+  }
+  return { ...(raw as Record<string, unknown>), observed: true };
 }
 
 /** Stable attention slice for idempotency comparisons (ignores observed_at). */

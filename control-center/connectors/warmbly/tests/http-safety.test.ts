@@ -17,6 +17,7 @@ describe("HTTP allowlist", () => {
   it("allows GET commercial reads and documented search/summary POST", () => {
     assert.equal(classifyRequest("GET", "/health").allowed, true);
     assert.equal(classifyRequest("GET", "/v1/crm/deals?limit=100").allowed, true);
+    assert.equal(classifyRequest("GET", "/v1/confenge/first-touch/status").allowed, true);
     assert.equal(classifyRequest("POST", "/v1/contacts/search").allowed, true);
     assert.equal(classifyRequest("POST", "/v1/crm/deals/search").allowed, true);
     assert.equal(classifyRequest("POST", "/v1/crm/deals/summary").allowed, true);
@@ -30,6 +31,7 @@ describe("HTTP allowlist", () => {
     assert.equal(classifyRequest("POST", "/v1/contacts").allowed, false);
     assert.equal(classifyRequest("POST", "/v1/campaigns/abc/start").allowed, false);
     assert.equal(classifyRequest("POST", "/v1/confenge/import").allowed, false);
+    assert.equal(classifyRequest("POST", "/v1/confenge/first-touch/status").allowed, false);
     assert.equal(classifyRequest("POST", "/v1/confenge/crm/bootstrap").allowed, false);
     assert.equal(classifyRequest("POST", "/v1/unibox/reply").allowed, false);
     assert.equal(classifyRequest("PATCH", "/v1/crm/deals/x").allowed, false);

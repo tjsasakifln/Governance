@@ -22,6 +22,16 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     assert.equal(snapshot.health.status, "ok");
     assert.equal(snapshot.health.api_version, "v1");
 
+    const delegated = snapshot.operations?.delegated_first_touch as Record<string, unknown>;
+    assert.equal(delegated.observed, true);
+    assert.equal(delegated.policy_id, "CFG-FIRST-TOUCH-ROUTING-v1");
+    assert.equal(delegated.policy_active, true);
+    assert.equal(delegated.queued_readback, 1);
+    assert.deepEqual(delegated.counts, { QUEUED: 1, HOLD: 1 });
+    const decisions = delegated.items as Array<Record<string, unknown>>;
+    assert.equal(decisions[0]?.approval_source, "DELEGATED_POLICY_APPROVE");
+    assert.equal(decisions[1]?.approval_source, "POLICY_EVALUATION_HOLD");
+
     for (const row of snapshot.attention) {
       assert.equal(row.provenance.source, "warmbly");
       assert.equal(row.provenance.observed_at, NOW.toISOString());
@@ -161,6 +171,14 @@ describe("collect() against a local Warmbly-shaped stub", () => {
       assert.equal(run1.schema, COMMERCIAL_SNAPSHOT_SCHEMA);
       assert.ok(run1.attention.length > 0);
       assert.deepEqual(attentionSlice(run1), attentionSlice(run2));
+      assert.equal(
+        (run1.operations?.delegated_first_touch as Record<string, unknown>).observed,
+        true,
+      );
+      assert.equal(
+        stub.calls.some((c) => c.method === "GET" && c.path === "/v1/confenge/first-touch/status"),
+        true,
+      );
       assert.equal(
         stub.calls.some((c) => c.method === "PATCH" || c.method === "PUT" || c.method === "DELETE"),
         false,

@@ -1,6 +1,11 @@
-# Runbook — gate humano Warmbly
+# Runbook — gate humano de exceções Warmbly
 
-## Revisão normal
+Este runbook preserva o caminho humano para `UNKNOWN`, conflito, drift,
+reprovação ou mensagem fora da policy. Desde 2026-08-25, um first touch que
+passa integralmente `CFG-FIRST-TOUCH-ROUTING-v1` usa
+`DELEGATED_POLICY_APPROVE` e não entra nesta fila como trabalho humano pendente.
+
+## Revisão de exceções
 
 1. Autentique em `ops.confenge.com.br` pelo Authelia. `operators` revisam e
    aprovam; `admins` somente reprocessam aprovações já registradas.
@@ -17,8 +22,10 @@
 3. Antes de qualquer trabalho, leia o banner de outbound no topo. Se o kill
    switch ou a pausa estiver ativo, APPROVE ainda agenda, mas nenhuma mensagem
    sairá enquanto o bloqueio durar. Estado ausente/desconhecido não é liberado.
-4. Leia destinatário, fato/proveniência, assunto e corpo exatos. O botão
-   **Aprovar e enfileirar para envio** é o único ato humano do caminho feliz.
+4. Para uma exceção que recebeu correção/evidência humana suficiente, leia
+   destinatário, fato/proveniência, assunto e corpo exatos. O botão
+   **Aprovar e enfileirar para envio** registra `HUMAN_APPROVE`; ele não deve ser
+   aplicado em massa aos first touches que a policy já aprovou.
    Ele:
    - obtém uma validation quando necessário e só continua se voltar `VALID`;
    - envia `acknowledged=true` e um comentário opcional (ou
@@ -99,8 +106,11 @@ continuam obrigatoriamente desligadas:
 CONFENGE_AUTO_SEND_ENABLED=false
 GREEN_AUTORUN=false
 CONFENGE_REQUIRE_HUMAN_APPROVAL=true
+CONFENGE_DELEGATED_FIRST_TOUCH_ENABLED=true  # somente após grant founder ativo e policy/hash exatos
 ```
 
+`CONFENGE_REQUIRE_HUMAN_APPROVAL=true` mantém a automação global irrestrita
+proibida; ele não anula a exceção estreita, versionada e auditável da policy.
 Ligar auto-send/autorun global derruba o boot e não é procedimento operacional.
 Não remova o kill switch durante deploy ou backfill. Não rode POST de smoke em
 produção além da reconciliação planejada.
@@ -156,7 +166,7 @@ agendamento, touchpoints por estado, `due_at`, falhas de reconciliação, pausa,
 kill switch e envios por hora. GO/NO_GO pode aparecer somente como auditoria
 histórica, nunca como gate atual.
 
-Alerta imediato para: APPROVE efetivo sem scheduling, `effective` ausente
+Alerta imediato para: HUMAN_APPROVE ou DELEGATED_POLICY_APPROVE efetivo sem scheduling, `effective` ausente
 tratado como aprovado, `auto_send` da mensagem diferente de true, drift depois
 do agendamento, write `UNKNOWN`, reconciliação com falha, flags globais ligadas,
 ou outbound mostrado como liberado sem leitura completa do servidor.

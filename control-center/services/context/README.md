@@ -60,7 +60,7 @@ POST /v1/commercial/review-drafts/:id
 POST /v1/commercial/review-batches
 ```
 
-As quatro rotas comerciais são uma ponte server-side protegida pela identidade operacional autenticada no edge para o human gate do Warmbly. `APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte.
+As quatro rotas comerciais são uma ponte server-side protegida pela identidade operacional autenticada no edge para o gate humano de exceções do Warmbly. `HUMAN_APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte. First touches que já receberam `DELEGATED_POLICY_APPROVE` sob `CFG-FIRST-TOUCH-ROUTING-v1` não dependem desta ponte e não são apresentados como cliques do founder.
 
 A listagem devolve `control-center.review-draft-page.v1`: `limit`, `offset` e
 `loaded_count` descrevem o recorte solicitado. `total_count`,
