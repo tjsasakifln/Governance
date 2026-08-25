@@ -23,7 +23,7 @@ This workstream does not chat, does not replace origin systems, and does not mut
 
 ## Layout
 
-- `sql/migrations/` — reversible `001_init` and `002_current_state`
+- `sql/migrations/` — reversible migrations through `006_work_orders`; Work Order events/holds are append-only and their current projection is rebuildable
 - `sql/queries/principal.sql` — principal scoped queries
 - `seeds/synthetic.sql` — PII-free fixtures
 - `src/` — migrator, transactional repositories, contracts for collectors / MCP / UI

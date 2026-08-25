@@ -35,6 +35,8 @@ const SCHEMA_FILES = [
   "schemas/agent-session.v1.schema.json",
   "schemas/agent-activity.v1.schema.json",
   "schemas/client-status.v1.schema.json",
+  "schemas/work-order.v1.schema.json",
+  "schemas/work-order-event.v1.schema.json",
   "schemas/commercial-snapshot.v1.schema.json",
   "schemas/finance-snapshot.v1.schema.json",
   "schemas/engineering-snapshot.v1.schema.json",

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/work-order.v1.schema.json",
+  "title": "CONFENGE Work Order v1",
+  "description": "Append-only-reconstructable delivery execution aggregate. It contains references, never private documents or binary artifacts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "work_order_id", "client_id", "account_id", "opportunity_id", "qco_id",
+    "proposal_id", "proposal_version", "order_id", "provider_refs", "accepted_snapshot_hash",
+    "offer_id", "offer_version", "deliverable_id", "deliverable_version", "scope_version",
+    "price_version", "terms_version", "inputs_required", "inputs_received", "created_at", "started_at",
+    "due_at", "business_calendar_version", "clock_state", "clock_reason_version", "blockers",
+    "current_stage", "responsible_owner", "estimated_effort_minutes", "actual_effort_minutes",
+    "QA_state", "QA_checklist_version", "delivery_artifact_refs", "delivered_at",
+    "client_acceptance_state", "nonconformities", "change_requests", "outcome", "expansion_candidate",
+    "version", "last_event_id", "synthetic", "provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": "confenge.work_order.v1" },
+    "work_order_id": { "type": "string", "pattern": "^cc:work-order:[A-Za-z0-9._~-]+$" },
+    "client_id": { "$ref": "#/$defs/stable_id" },
+    "account_id": { "$ref": "#/$defs/stable_id" },
+    "opportunity_id": { "$ref": "#/$defs/stable_id" },
+    "qco_id": { "$ref": "#/$defs/stable_id" },
+    "proposal_id": { "$ref": "#/$defs/stable_id" },
+    "proposal_version": { "$ref": "#/$defs/version_ref" },
+    "order_id": { "$ref": "#/$defs/stable_id" },
+    "provider_refs": { "type": "array", "uniqueItems": true, "maxItems": 32, "items": { "$ref": "#/$defs/evidence_ref" } },
+    "accepted_snapshot_hash": { "$ref": "#/$defs/sha256" },
+    "offer_id": { "$ref": "#/$defs/stable_id" },
+    "offer_version": { "$ref": "#/$defs/version_ref" },
+    "deliverable_id": { "$ref": "#/$defs/stable_id" },
+    "deliverable_version": { "$ref": "#/$defs/version_ref" },
+    "scope_version": { "$ref": "#/$defs/version_ref" },
+    "price_version": { "$ref": "#/$defs/version_ref" },
+    "terms_version": { "$ref": "#/$defs/version_ref" },
+    "inputs_required": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/input" } },
+    "inputs_received": { "type": "array", "uniqueItems": true, "maxItems": 256, "items": { "$ref": "#/$defs/stable_id" } },
+    "created_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" },
+    "started_at": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }, { "type": "null" }] },
+    "due_at": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }, { "type": "null" }] },
+    "business_calendar_version": { "$ref": "#/$defs/version_ref" },
+    "clock_state": { "enum": ["NOT_STARTED", "RUNNING", "PAUSED_CLIENT", "PAUSED_INTERNAL", "PAUSED_FORCE_MAJEURE", "STOPPED"] },
+    "clock_reason_version": { "oneOf": [{ "$ref": "#/$defs/version_ref" }, { "type": "null" }] },
+    "blockers": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/blocker" } },
+    "current_stage": { "$ref": "#/$defs/stage" },
+    "responsible_owner": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+    "estimated_effort_minutes": { "type": ["integer", "null"], "minimum": 0, "maximum": 10000000 },
+    "actual_effort_minutes": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+    "QA_state": { "enum": ["NOT_STARTED", "IN_REVIEW", "PASSED", "FAILED"] },
+    "QA_checklist_version": { "oneOf": [{ "$ref": "#/$defs/version_ref" }, { "type": "null" }] },
+    "delivery_artifact_refs": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/artifact" } },
+    "delivered_at": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }, { "type": "null" }] },
+    "client_acceptance_state": { "enum": ["PENDING", "ACCEPTED", "REWORK_REQUIRED", "REJECTED", "CANCELLED"] },
+    "nonconformities": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/nonconformity" } },
+    "change_requests": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/change_request" } },
+    "outcome": { "enum": ["UNKNOWN", "ACHIEVED", "PARTIAL", "NOT_ACHIEVED"] },
+    "expansion_candidate": { "type": ["boolean", "null"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "last_event_id": { "type": "string", "pattern": "^cc:work-order-event:[A-Za-z0-9._~-]+$" },
+    "synthetic": { "type": "boolean" },
+    "provenance": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance" }
+  },
+  "$defs": {
+    "stable_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,255}$" },
+    "version_ref": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]{0,127}$" },
+    "evidence_ref": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/#~-]{0,511}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "stage": { "enum": ["AWAITING_INPUTS", "READY", "IN_PROGRESS", "BLOCKED", "QA", "READY_TO_DELIVER", "DELIVERED", "ACCEPTED", "REWORK_REQUIRED", "CLOSED", "CANCELLED"] },
+    "input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_id", "status", "evidence_ref", "verified_at", "verified_by"],
+      "properties": {
+        "input_id": { "$ref": "#/$defs/stable_id" },
+        "status": { "enum": ["REQUIRED", "RECEIVED", "WAIVED"] },
+        "evidence_ref": { "oneOf": [{ "$ref": "#/$defs/evidence_ref" }, { "type": "null" }] },
+        "verified_at": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }, { "type": "null" }] },
+        "verified_by": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/actor_ref" }, { "type": "null" }] }
+      }
+    },
+    "blocker": {
+      "type": "object", "additionalProperties": false,
+      "required": ["blocker_id", "reason_code", "owner", "evidence_ref", "opened_at", "resolved_at"],
+      "properties": {
+        "blocker_id": { "$ref": "#/$defs/stable_id" },
+        "reason_code": { "$ref": "#/$defs/version_ref" },
+        "owner": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+        "evidence_ref": { "$ref": "#/$defs/evidence_ref" },
+        "opened_at": { "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" },
+        "resolved_at": { "oneOf": [{ "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/utc_datetime" }, { "type": "null" }] }
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["artifact_id", "sha256", "evidence_ref"],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/stable_id" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "evidence_ref": { "$ref": "#/$defs/evidence_ref" }
+      }
+    },
+    "nonconformity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nonconformity_id", "status", "reason_code", "evidence_ref"],
+      "properties": {
+        "nonconformity_id": { "$ref": "#/$defs/stable_id" },
+        "status": { "enum": ["OPEN", "RESOLVED"] },
+        "reason_code": { "$ref": "#/$defs/version_ref" },
+        "evidence_ref": { "$ref": "#/$defs/evidence_ref" }
+      }
+    },
+    "change_request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["change_request_id", "status", "proposed_snapshot_hash", "evidence_ref"],
+      "properties": {
+        "change_request_id": { "$ref": "#/$defs/stable_id" },
+        "status": { "enum": ["PROPOSED", "ACCEPTED", "REJECTED", "APPLIED"] },
+        "proposed_snapshot_hash": { "$ref": "#/$defs/sha256" },
+        "evidence_ref": { "$ref": "#/$defs/evidence_ref" }
+      }
+    }
+  }
+}

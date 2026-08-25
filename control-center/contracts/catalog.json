@@ -71,6 +71,22 @@
       "invalid_fixture": "fixtures/invalid/client-status.json"
     },
     {
+      "name": "WorkOrder",
+      "schema_version": "confenge.work_order.v1",
+      "id_type": "work-order",
+      "schema": "schemas/work-order.v1.schema.json",
+      "valid_fixture": "fixtures/valid/work-order.json",
+      "invalid_fixture": "fixtures/invalid/work-order.json"
+    },
+    {
+      "name": "WorkOrderEvent",
+      "schema_version": "confenge.work_order_event.v1",
+      "id_type": "work-order-event",
+      "schema": "schemas/work-order-event.v1.schema.json",
+      "valid_fixture": "fixtures/valid/work-order-event.json",
+      "invalid_fixture": "fixtures/invalid/work-order-event.json"
+    },
+    {
       "name": "CommercialSnapshot",
       "schema_version": "control-center.commercial-snapshot.v1",
       "id_type": "commercial-snapshot",

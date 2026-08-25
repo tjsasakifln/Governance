@@ -17,6 +17,7 @@
     { "name": "memory", "description": "Directives and audit" },
     { "name": "cockpit", "description": "Exceptions and top priorities" },
     { "name": "snapshots", "description": "Aggregated read models" },
+    { "name": "delivery", "description": "Read-only Work Order authority and event stream" },
     { "name": "collectors", "description": "Read-only collector runs" }
   ],
   "paths": {
@@ -283,6 +284,65 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "../schemas/client-status.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/work-orders/{work_order_id}": {
+      "get": {
+        "tags": ["delivery"],
+        "operationId": "getWorkOrder",
+        "description": "Read-only current WorkOrder projection. Commands are internal human-gated operations, not part of this HTTP contract.",
+        "parameters": [
+          {
+            "name": "work_order_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^cc:work-order:[A-Za-z0-9._~-]+$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WorkOrder",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/work-order.v1.schema.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/work-orders/{work_order_id}/events": {
+      "get": {
+        "tags": ["delivery"],
+        "operationId": "listWorkOrderEvents",
+        "description": "Read-only append order for WorkOrderEvent replay.",
+        "parameters": [
+          {
+            "name": "work_order_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^cc:work-order:[A-Za-z0-9._~-]+$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WorkOrderEvent list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["items"],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "../schemas/work-order-event.v1.schema.json" }
+                    }
+                  }
+                }
               }
             }
           }

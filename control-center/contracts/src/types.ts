@@ -183,6 +183,166 @@ export interface ClientStatus {
   notes?: string;
 }
 
+export const WORK_ORDER_STAGES = [
+  "AWAITING_INPUTS",
+  "READY",
+  "IN_PROGRESS",
+  "BLOCKED",
+  "QA",
+  "READY_TO_DELIVER",
+  "DELIVERED",
+  "ACCEPTED",
+  "REWORK_REQUIRED",
+  "CLOSED",
+  "CANCELLED",
+] as const;
+export type WorkOrderStage = (typeof WORK_ORDER_STAGES)[number];
+
+export const WORK_ORDER_CLOCK_STATES = [
+  "NOT_STARTED",
+  "RUNNING",
+  "PAUSED_CLIENT",
+  "PAUSED_INTERNAL",
+  "PAUSED_FORCE_MAJEURE",
+  "STOPPED",
+] as const;
+export type WorkOrderClockState = (typeof WORK_ORDER_CLOCK_STATES)[number];
+
+export interface WorkOrderInput {
+  input_id: string;
+  status: "REQUIRED" | "RECEIVED" | "WAIVED";
+  evidence_ref: string | null;
+  verified_at: UtcDateTime | null;
+  verified_by: ActorRef | null;
+}
+
+export interface WorkOrderBlocker {
+  blocker_id: string;
+  reason_code: string;
+  owner: string | null;
+  evidence_ref: string;
+  opened_at: UtcDateTime;
+  resolved_at: UtcDateTime | null;
+}
+
+export interface WorkOrderArtifactRef {
+  artifact_id: string;
+  sha256: string;
+  evidence_ref: string;
+}
+
+export interface WorkOrderNonconformity {
+  nonconformity_id: string;
+  status: "OPEN" | "RESOLVED";
+  reason_code: string;
+  evidence_ref: string;
+}
+
+export interface WorkOrderChangeRequest {
+  change_request_id: string;
+  status: "PROPOSED" | "ACCEPTED" | "REJECTED" | "APPLIED";
+  proposed_snapshot_hash: string;
+  evidence_ref: string;
+}
+
+/** Delivery execution authority. CRM, billing, catalog and binary artifacts stay outside it. */
+export interface WorkOrder {
+  schema_version: "confenge.work_order.v1";
+  work_order_id: ResourceId;
+  client_id: string;
+  account_id: string;
+  opportunity_id: string;
+  qco_id: string;
+  proposal_id: string;
+  proposal_version: string;
+  order_id: string;
+  provider_refs: string[];
+  accepted_snapshot_hash: string;
+  offer_id: string;
+  offer_version: string;
+  deliverable_id: string;
+  deliverable_version: string;
+  scope_version: string;
+  price_version: string;
+  terms_version: string;
+  inputs_required: WorkOrderInput[];
+  inputs_received: string[];
+  created_at: UtcDateTime;
+  started_at: UtcDateTime | null;
+  due_at: UtcDateTime | null;
+  business_calendar_version: string;
+  clock_state: WorkOrderClockState;
+  clock_reason_version: string | null;
+  blockers: WorkOrderBlocker[];
+  current_stage: WorkOrderStage;
+  responsible_owner: string | null;
+  estimated_effort_minutes: number | null;
+  actual_effort_minutes: number;
+  QA_state: "NOT_STARTED" | "IN_REVIEW" | "PASSED" | "FAILED";
+  QA_checklist_version: string | null;
+  delivery_artifact_refs: WorkOrderArtifactRef[];
+  delivered_at: UtcDateTime | null;
+  client_acceptance_state: "PENDING" | "ACCEPTED" | "REWORK_REQUIRED" | "REJECTED" | "CANCELLED";
+  nonconformities: WorkOrderNonconformity[];
+  change_requests: WorkOrderChangeRequest[];
+  outcome: "UNKNOWN" | "ACHIEVED" | "PARTIAL" | "NOT_ACHIEVED";
+  expansion_candidate: boolean | null;
+  version: number;
+  last_event_id: ResourceId;
+  synthetic: boolean;
+  provenance: Provenance;
+}
+
+export const WORK_ORDER_EVENT_TYPES = [
+  "WORK_ORDER_CREATED",
+  "INPUT_RECEIVED",
+  "INPUT_WAIVED",
+  "OWNER_ASSIGNED",
+  "PRODUCTION_STARTED",
+  "WORK_BLOCKED",
+  "WORK_RESUMED",
+  "EFFORT_RECORDED",
+  "QA_SUBMITTED",
+  "QA_PASSED",
+  "QA_FAILED",
+  "DELIVERY_RECORDED",
+  "CLIENT_ACCEPTED",
+  "CLIENT_REWORK_REQUESTED",
+  "REWORK_STARTED",
+  "NONCONFORMITY_OPENED",
+  "NONCONFORMITY_RESOLVED",
+  "CHANGE_REQUEST_OPENED",
+  "CHANGE_REQUEST_ACCEPTED",
+  "CHANGE_REQUEST_REJECTED",
+  "CLOCK_PAUSED_CLIENT",
+  "CLOCK_PAUSED_INTERNAL",
+  "CLOCK_PAUSED_FORCE_MAJEURE",
+  "CLOCK_RESUMED",
+  "WORK_ORDER_CANCELLED",
+  "WORK_ORDER_CLOSED",
+] as const;
+export type WorkOrderEventType = (typeof WORK_ORDER_EVENT_TYPES)[number];
+
+export interface WorkOrderEvent {
+  schema_version: "confenge.work_order_event.v1";
+  event_id: ResourceId;
+  event_version: number;
+  work_order_id: ResourceId;
+  expected_version: number;
+  event_type: WorkOrderEventType;
+  actor: ActorRef;
+  reason_code: string;
+  literal_reason_ref: string;
+  occurred_at: UtcDateTime;
+  idempotency_key: string;
+  correlation_id: string;
+  causation_id: string | null;
+  source_system: string;
+  evidence_refs: string[];
+  transition: { from_stage: WorkOrderStage; to_stage: WorkOrderStage } | null;
+  data: Record<string, unknown>;
+}
+
 export interface CommercialAuthorityStamp {
   catalog_authority: "governance";
   commercial_runtime: "warmbly";

@@ -56,4 +56,9 @@ export {
 } from "./docs.js";
 export * from "./taxonomy.js";
 export * from "./operational-truth.js";
+export {
+  WORK_ORDER_CLOCK_STATES,
+  WORK_ORDER_EVENT_TYPES,
+  WORK_ORDER_STAGES,
+} from "./types.js";
 export type * from "./types.js";

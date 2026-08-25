@@ -1,0 +1,19 @@
+{
+  "schema_version": "confenge.work_order_event.v1",
+  "event_id": "cc:work-order-event:bad",
+  "event_version": 1,
+  "work_order_id": "cc:work-order:diag-sbx-001",
+  "expected_version": 7,
+  "event_type": "SENT_TO_CUSTOMER",
+  "actor": { "kind": "robot", "id": "unknown" },
+  "reason_code": "bad reason",
+  "literal_reason_ref": "",
+  "occurred_at": "tomorrow",
+  "idempotency_key": "x",
+  "correlation_id": "",
+  "causation_id": null,
+  "source_system": "Governance",
+  "evidence_refs": [],
+  "transition": null,
+  "data": {}
+}

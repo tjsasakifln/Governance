@@ -1,0 +1,8 @@
+{
+  "schema_version": "confenge.work_order.v1",
+  "work_order_id": "cc:work-order:missing-authority",
+  "proposal_id": "proposal_sbx_001",
+  "accepted_snapshot_hash": "not-a-hash",
+  "current_stage": "DONE",
+  "version": 0
+}

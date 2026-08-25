@@ -26,6 +26,11 @@ export const MIGRATIONS = [
     up: 'sql/migrations/005_operational_workflow_actions.up.sql',
     down: 'sql/migrations/005_operational_workflow_actions.down.sql',
   },
+  {
+    id: '006_work_orders',
+    up: 'sql/migrations/006_work_orders.up.sql',
+    down: 'sql/migrations/006_work_orders.down.sql',
+  },
 ] as const;
 
 export const REQUIRED_TABLES = [
@@ -47,6 +52,9 @@ export const REQUIRED_TABLES = [
   'collector_run_revisions',
   'operational_snapshot_revisions',
   'operator_actions',
+  'work_orders',
+  'work_order_events',
+  'work_order_event_holds',
 ] as const;
 
 export const REQUIRED_MATERIALIZED_VIEWS = ['mv_open_attention'] as const;
@@ -55,6 +63,7 @@ export const REQUIRED_VIEWS = [
   'v_latest_collector_runs',
   'v_latest_source_observations',
   'v_latest_operational_snapshots',
+  'v_work_order_projection',
 ] as const;
 
 export const FROZEN_VIEW_COLUMNS = {
@@ -92,6 +101,20 @@ export const FROZEN_VIEW_COLUMNS = {
     'source_kind',
     'source_locator',
     'snapshot_json',
+  ],
+  v_work_order_projection: [
+    'work_order_id',
+    'version',
+    'stage',
+    'clock_state',
+    'responsible_owner',
+    'due_at',
+    'qa_state',
+    'acceptance_state',
+    'blocker_count',
+    'synthetic',
+    'observed_at',
+    'projection_json',
   ],
 } as const;
 
