@@ -506,7 +506,21 @@ class CapacityLedger:
             raise CapacityError("hold correlation diverges from admission")
         effort_units = decision.get("requested_effort_units")
         capacity_limit = decision.get("capacity_limit_after_wip_units")
-        if not isinstance(effort_units, int) or effort_units <= 0 or not isinstance(capacity_limit, int):
+        staffed_units = decision.get("staffed_capacity_units")
+        active_wip_units = decision.get("active_wip_units")
+        reserved_units = decision.get("reserved_effort_units")
+        available_units = decision.get("available_effort_units")
+        if (
+            not isinstance(effort_units, int)
+            or effort_units <= 0
+            or not all(
+                isinstance(item, int) and not isinstance(item, bool) and item >= 0
+                for item in (capacity_limit, staffed_units, active_wip_units, reserved_units, available_units)
+            )
+            or capacity_limit != max(0, staffed_units - active_wip_units)
+            or available_units != max(0, staffed_units - active_wip_units - reserved_units)
+            or effort_units > available_units
+        ):
             raise CapacityError("admission lacks effort/capacity basis")
         command = {
             "decision": dict(decision),

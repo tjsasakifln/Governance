@@ -101,6 +101,20 @@ def test_hold_replay_and_concurrency_10x_consume_one(tmp_path: Path):
     ledger.close()
 
 
+def test_hold_rejects_tampered_capacity_arithmetic(tmp_path: Path):
+    decision = decide()
+    decision["capacity_limit_after_wip_units"] = 50
+    with CapacityLedger(tmp_path / "capacity.sqlite3") as ledger:
+        with pytest.raises(CapacityError, match="capacity basis"):
+            ledger.acquire_hold(
+                decision=decision,
+                idempotency_key="tampered-capacity:hold",
+                correlation_id="corr_confenge_diag_canary_001",
+                created_at=EVALUATED_AT,
+                expires_at="2026-08-28T12:00:00Z",
+            )
+
+
 def test_commit_and_close_release_update_projection_without_double_count(tmp_path: Path):
     decision = decide()
     with CapacityLedger(tmp_path / "capacity.sqlite3") as ledger:
