@@ -1,6 +1,12 @@
 import { escapeHtml } from "../escape";
+import { operatorActionDraft, operatorActionDraftKey } from "../action-draft";
 import { formatLocal, isUtcDateTime } from "../datetime";
 import { withQueryParams } from "../destinations";
+import {
+  CONTINUITY_FIRST_FOCUS,
+  actionContinuationHash,
+  continuitySubrouteHref,
+} from "../continuity";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
 import { formatMoney } from "../money";
 import { ownMapValue } from "../own-map";
@@ -762,7 +768,7 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
   </section>`;
 }
 
-export function commercialSubnav(surface: string | null): string {
+export function commercialSubnav(surface: string | null, currentHash = "#/comercial/visao"): string {
   const items = [
     ["visao", "Visão"],
     ["rascunhos", "Rascunhos"],
@@ -775,7 +781,7 @@ export function commercialSubnav(surface: string | null): string {
   return `<nav class="subnav" aria-label="Superfícies comerciais">${items
     .map(
       ([id, label]) =>
-        `<a href="#/comercial/${id}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${label}</a>`,
+        `<a href="${escapeHtml(continuitySubrouteHref(currentHash, `#/comercial/${id}`))}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${label}</a>`,
     )
     .join("")}</nav>`;
 }
@@ -833,7 +839,7 @@ export function commercialBlock(
       ${provenanceBlock(snapshot.provenance)}
     </section>`;
   return `
-    ${commercialSubnav(current)}
+    ${commercialSubnav(current, hash)}
     ${current === "visao" ? recorte : ""}
     ${commercialOps(snapshot, current, resource, query, hash)}
   `;
@@ -852,7 +858,13 @@ function rowsOf(items: readonly unknown[]): Record<string, unknown>[] {
 function activityOpsCard(
   row: Record<string, unknown>,
   query: string | null,
-  position: { index: number; total: number; writesAllowed: boolean },
+  position: {
+    index: number;
+    total: number;
+    writesAllowed: boolean;
+    next?: { row: Record<string, unknown>; index: number };
+    nextPageHash?: string;
+  },
 ): string {
   const rowId = String(row.source_id ?? row.id ?? "");
   const title = escapeHtml(leadTitleOf(row) ?? "Organização não identificada pela origem");
@@ -871,6 +883,17 @@ function activityOpsCard(
   const sync = String(row.sync_status ?? "observed");
   const syncLabels: Record<string, string> = { observed: "observado na origem", synced: "sincronizado", pending: "sincronização pendente", failed: "falha de sincronização", unknown: "sincronização desconhecida" };
   const canonical = String(row.canonical_id ?? rowId);
+  const nextId = position.next ? String(position.next.row.source_id ?? position.next.row.id ?? "") : "";
+  const nextFocus = nextId && position.next
+    ? queueFocusToken(nextId, { index: position.next.index, total: position.total })
+    : "";
+  const actionContinuity = ` data-continuity-action="queue"${nextFocus
+    ? ` data-continuity-next-focus="${nextFocus}"`
+    : position.nextPageHash
+      ? ` data-continuity-next-hash="${escapeHtml(actionContinuationHash(position.nextPageHash, CONTINUITY_FIRST_FOCUS))}"`
+      : ""}`;
+  const assignDraft = operatorActionDraft(operatorActionDraftKey("ASSIGN_TRIAGE", canonical, rowId));
+  const triageDraft = operatorActionDraft(operatorActionDraftKey("MARK_TRIAGED", canonical, rowId));
   return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}" data-triage-state="${escapeHtml(triage)}">
     <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(event, commercialEventLabel(event))}${state && state !== triage ? ` · ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
     <h3>${heading}</h3>
@@ -892,16 +915,16 @@ function activityOpsCard(
       { term: "sync_status", value: sync },
     ], "daily-triage")}
     ${position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
-    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form">
+    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form"${actionContinuity}>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota de atribuição <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <label>Nota de atribuição <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(assignDraft)}</textarea></label>
       <button type="submit">Atribuir a mim</button>
     </form>
-    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" class="operator-form">
+    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" class="operator-form"${actionContinuity}>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota de triagem <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <label>Nota de triagem <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(triageDraft)}</textarea></label>
       <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que isto registra a triagem no Control Center e não altera o Warmbly.</label>
       <button type="submit">Marcar como triado</button>
     </form>
@@ -909,7 +932,16 @@ function activityOpsCard(
   </article>`;
 }
 
-function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean): string {
+function exceptionOpsCard(
+  row: Record<string, unknown>,
+  position: {
+    index: number;
+    total: number;
+    writesAllowed: boolean;
+    next?: { row: Record<string, unknown>; index: number };
+    nextPageHash?: string;
+  },
+): string {
   const id = String(row.id ?? "");
   const canonical = String(row.canonical_id ?? id);
   const sourceId = String(row.source_id ?? id);
@@ -925,7 +957,22 @@ function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean):
     resolution = `<p class="constraint">Correção upstream não suportada pelo allowlist atual. Próxima ação: use a orientação abaixo e registre o desfecho; não marque como resolvida só por reconhecer.</p>`;
   }
   const open = workflow !== "resolved" && workflow !== "discarded";
-  return `<article class="card" data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
+  const focusToken = queueFocusToken(id, position);
+  const focusAttributes = id
+    ? ` id="${queueFocusDomId(focusToken)}" data-queue-focus="${focusToken}" tabindex="-1"`
+    : "";
+  const nextId = position.next ? String(position.next.row.id ?? position.next.row.source_id ?? "") : "";
+  const nextFocus = nextId && position.next
+    ? queueFocusToken(nextId, { index: position.next.index, total: position.total })
+    : "";
+  const actionContinuity = ` data-continuity-action="queue"${nextFocus
+    ? ` data-continuity-next-focus="${nextFocus}"`
+    : position.nextPageHash
+      ? ` data-continuity-next-hash="${escapeHtml(actionContinuationHash(position.nextPageHash, CONTINUITY_FIRST_FOCUS))}"`
+      : ""}`;
+  const acknowledgeDraft = operatorActionDraft(operatorActionDraftKey("ACKNOWLEDGE_EXCEPTION", canonical, sourceId));
+  const workDraft = operatorActionDraft(operatorActionDraftKey("START_EXCEPTION_WORK", canonical, sourceId));
+  return `<article class="card"${focusAttributes} data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
     <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
     <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
     <dl class="facts">
@@ -946,18 +993,18 @@ function exceptionOpsCard(row: Record<string, unknown>, writesAllowed: boolean):
       { term: "group_key", value: String(row.group_key ?? "") },
       { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
     ], "resolvable-exception")}
-    ${open && writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
-      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form">
+    ${open && position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
+      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form"${actionContinuity}>
         <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
         <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
-        <label>Nota <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <label>Nota <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(acknowledgeDraft)}</textarea></label>
         <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que reconhecer não resolve nem remove a exceção.</label>
         <button type="submit">Reconhecer sem resolver</button>
       </form>
-      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" class="operator-form">
+      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" class="operator-form"${actionContinuity}>
         <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
         <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
-        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(workDraft)}</textarea></label>
         <button type="submit">Iniciar tratamento</button>
       </form>
     </div>` : !open ? `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>` : ""}
@@ -1530,7 +1577,7 @@ function commercialOps(
       noun: "exceção(ões) observada(s)",
       emptyData: "Nenhuma exceção observada.",
       intro: `<p class="constraint" data-operator-scope="control-center-only">Reconhecer no Control Center é um registro de auditoria local. Isto não resolve a exceção no Warmbly.</p>`,
-      card: (row, position) => exceptionOpsCard(row, position.writesAllowed),
+      card: (row, position) => exceptionOpsCard(row, position),
       remote: listViews.excecoes,
       declaredTotal: typeof overview.exceptions === "number" ? overview.exceptions : exceptions.length,
       complete: typeof overview.exceptions === "number" ? overview.exceptions === exceptions.length : true,

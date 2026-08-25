@@ -21,6 +21,7 @@
 import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
 import { ownMapValue } from "../own-map";
+import { continuitySubrouteHref } from "../continuity";
 import {
   DEFAULT_WARMBLY_SURFACE,
   WARMBLY_SURFACES,
@@ -2242,14 +2243,17 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   <p class="constraint">APPROVE é o único ato humano necessário para agendar a mensagem. O envio em si continua sendo do worker do Warmbly, na janela comercial e sob o teto por hora; esta tela não expõe send, queue ou resume.</p></section>`;
 }
 
-function warmblySubnav(current: WarmblySurface, resource: string | null | undefined): string {
+function warmblySubnav(current: WarmblySurface, input: WarmblySurfaceInput): string {
   // The resource travels with the operator. A subnav that drops it lands the
   // reviewer on an empty Revisão and makes the selection they just made look
   // like it never happened.
-  const suffix = resource ? `?resource=${encodeURIComponent(resource)}` : "";
+  const query = new URLSearchParams(input.query ?? "");
+  if (!query.get("resource") && input.resource) query.set("resource", input.resource);
+  const rendered = query.toString();
+  const currentHash = `#/warmbly/${current}${rendered ? `?${rendered}` : ""}`;
   return `<nav class="subnav" aria-label="Superfícies de operação Warmbly">${WARMBLY_SURFACES.map(
     (id) =>
-      `<a href="#/warmbly/${id}${suffix}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
+      `<a href="${escapeHtml(continuitySubrouteHref(currentHash, `#/warmbly/${id}`))}" data-surface="${id}" aria-current="${current === id ? "page" : "false"}">${escapeHtml(
         ownMapValue(WARMBLY_SURFACE_LABELS, id) ?? "Operação",
       )}</a>`,
   ).join("")}</nav>`;
@@ -2262,5 +2266,5 @@ export function resolveWarmblySurface(surface: string | null | undefined): Warmb
 export function warmblyBlock(input: WarmblySurfaceInput, surface: string | null | undefined): string {
   const current = resolveWarmblySurface(surface);
   const render = ownMapValue(WARMBLY_SURFACE_RENDERERS, current) ?? operationSurface;
-  return `${warmblySubnav(current, input.resource)}${render(input)}`;
+  return `${warmblySubnav(current, input)}${render(input)}`;
 }

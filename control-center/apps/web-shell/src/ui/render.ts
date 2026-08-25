@@ -159,6 +159,11 @@ function viewBanner(view: ViewState<DestinationPage>): string {
   return "";
 }
 
+function continuityRecoveryBanner(query: string | null | undefined): string {
+  if (new URLSearchParams(query ?? "").get("continuity") !== "recovered") return "";
+  return `<div class="banner stale" role="status" data-continuity-recovered="true"><strong>Local anterior indisponível.</strong> A rota não era válida e o Control Center recuperou Hoje. Use a navegação abaixo para retomar uma tarefa segura.</div>`;
+}
+
 export function operatorBanner(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const cls = result.ok ? "ok" : "error";
@@ -436,6 +441,7 @@ export function renderShell(model: ShellModel): string {
         ${operationalPageHeader(label, headline)}
         ${renderOrientationSummary(orientation)}
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
+        ${continuityRecoveryBanner(model.query)}
         ${viewBanner(model.view)}
         ${model.destination === "warmbly" ? "" : operatorBanner(model.operatorResult)}
         <div id="orientacao-conteudo">${body}</div>

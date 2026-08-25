@@ -1,4 +1,9 @@
 import type { MockScenario } from "./adapters/mock";
+import {
+  clearOperatorActionDraft,
+  operatorActionDraftKey,
+  rememberOperatorActionDraft,
+} from "./action-draft";
 import type {
   AdapterWriteResult,
   ControlCenterReadAdapter,
@@ -9,6 +14,14 @@ import type {
 import { APPROVAL_DEFAULT_REASON, isWarmblyGateAction } from "./adapters/contract";
 import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
 import { parseHash, withQueryParams } from "./destinations";
+import {
+  CONTINUITY_FIRST_FOCUS,
+  CONTINUITY_RECOVERY_HASH,
+  actionContinuationHash,
+  isRecognizedContinuityHash,
+  rememberContinuity,
+  restoreContinuity,
+} from "./continuity";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
 import {
   beginGateFlight,
@@ -59,6 +72,10 @@ export interface ShellRuntime {
   setHash(hash: string): void;
   /** Replace URL state without firing a navigation/repaint. */
   replaceHash(hash: string): void;
+  /** Restore only bounded URL state; form fields and decisions are excluded. */
+  restoreHash?(): string | null;
+  /** Persist the bounded URL projection for reload/reauthentication. */
+  rememberHash?(hash: string): void;
   onHashChange(handler: () => void): () => void;
 }
 
@@ -72,6 +89,20 @@ export function browserRuntime(): ShellRuntime {
     },
     replaceHash(hash: string): void {
       window.history.replaceState(window.history.state, "", hash);
+    },
+    restoreHash(): string | null {
+      try {
+        return restoreContinuity(window.sessionStorage);
+      } catch {
+        return null;
+      }
+    },
+    rememberHash(hash: string): void {
+      try {
+        rememberContinuity(window.sessionStorage, hash);
+      } catch {
+        // A browser that blocks sessionStorage still has full URL continuity.
+      }
     },
     onHashChange(handler: () => void): () => void {
       window.addEventListener("hashchange", handler);
@@ -188,7 +219,7 @@ function applyPaint(
     paintShell(root, adapter, renderHash, 0, () => true, navigate, replaceLocation);
   };
   bindWriteShortcuts(root, adapter, repaint);
-  bindOperatorActions(root, adapter, repaint);
+  bindOperatorActions(root, adapter, repaint, navigate, renderHash);
   bindWarmblyDispatch(
     root,
     adapter,
@@ -333,6 +364,16 @@ export function consumeQueueFocus(
     fallback?.focus?.({ preventScroll: true });
     fallback?.scrollIntoView?.({ block: "center", inline: "nearest" });
   };
+  if (token === CONTINUITY_FIRST_FOCUS) {
+    const first = root.querySelectorAll("[data-queue-focus]")[0];
+    if (first) {
+      first.focus?.({ preventScroll: true });
+      first.scrollIntoView?.({ block: "center", inline: "nearest" });
+      return true;
+    }
+    focusFallback();
+    return false;
+  }
   if (!QUEUE_FOCUS_TOKEN_PATTERN.test(token)) {
     focusFallback();
     return false;
@@ -526,23 +567,38 @@ export function bindReviewActions(
   }
 }
 
-function bindOperatorActions(
+export function bindOperatorActions(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
+  navigate?: Navigate,
+  currentHash = "#/hoje",
 ): void {
   if (!adapter.operatorAction || typeof root.querySelectorAll !== "function") return;
   const forms = root.querySelectorAll("[data-operator-form]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inFlight) return;
       const actionType = form.getAttribute("data-operator-form");
       if (!actionType) return;
       const targetCanonical = form.querySelector('[name="target_canonical_id"]')?.value ?? "";
       const targetSource = form.querySelector('[name="target_source_id"]')?.value ?? "";
       const note = form.querySelector('[name="note"]')?.value ?? "";
+      const draftKey = operatorActionDraftKey(actionType, targetCanonical, targetSource);
+      rememberOperatorActionDraft(draftKey, note);
+      inFlight = true;
+      form.setAttribute?.("aria-busy", "true");
+      const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
+      for (let controlIndex = 0; controlIndex < controls.length; controlIndex += 1) {
+        const control = controls[controlIndex];
+        if (control) control.disabled = true;
+      }
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.textContent = "Registrando…";
       void Promise.resolve(
         adapter.operatorAction?.({
           action_type: actionType,
@@ -552,6 +608,23 @@ function bindOperatorActions(
         }),
       ).then((result) => {
         if (result) adapter.lastOperatorResult = result;
+        if (result?.ok) clearOperatorActionDraft(draftKey);
+        if (result?.ok && form.getAttribute("data-continuity-action") === "queue" && navigate) {
+          const explicit = form.getAttribute("data-continuity-next-hash");
+          const nextFocus = form.getAttribute("data-continuity-next-focus");
+          navigate(explicit || actionContinuationHash(currentHash, nextFocus));
+          return;
+        }
+        onDone();
+      }).catch((err: unknown) => {
+        adapter.lastOperatorResult = {
+          ok: false,
+          path: "/v1/operator-actions",
+          kind: "nota",
+          message: err instanceof Error ? err.message : "falha inesperada sem resposta",
+          outcome: "unknown",
+          code: "browser_transport",
+        };
         onDone();
       });
     });
@@ -1527,6 +1600,7 @@ export function mount(
 ): { unmount: () => void } {
   let generation = 0;
   const paint = (): void => {
+    runtime.rememberHash?.(runtime.getHash());
     generation += 1;
     const current = generation;
     paintShell(
@@ -1540,8 +1614,11 @@ export function mount(
     );
   };
   const stop = runtime.onHashChange(paint);
-  if (!runtime.getHash()) {
-    runtime.setHash("#/hoje");
+  const initialHash = runtime.getHash();
+  if (!initialHash) {
+    runtime.setHash(runtime.restoreHash?.() ?? "#/hoje");
+  } else if (!isRecognizedContinuityHash(initialHash)) {
+    runtime.replaceHash(CONTINUITY_RECOVERY_HASH);
   }
   paint();
   return {
