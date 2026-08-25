@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const root = resolve(fileURLToPath(new URL("../dist", import.meta.url)));
 const host = process.env.HOST ?? "0.0.0.0";
@@ -19,6 +20,15 @@ const TYPES = {
   ".png": "image/png",
   ".webmanifest": "application/manifest+json",
 };
+
+const COMPRESSIBLE_TYPES = /^(?:text\/|application\/(?:json|javascript|manifest\+json))/;
+
+export function encodeStaticResponse(body, contentType, acceptEncoding = "") {
+  if (body.byteLength < 1024 || !COMPRESSIBLE_TYPES.test(contentType) || !/(?:^|,|\s)gzip(?:\s|,|;|$)/i.test(acceptEncoding)) {
+    return { body, encoding: null };
+  }
+  return { body: gzipSync(body, { level: 6 }), encoding: "gzip" };
+}
 
 export const SECURITY_HEADERS = {
   "Content-Security-Policy":
@@ -129,9 +139,13 @@ export function createProductionServer(env = process.env) {
         }))
         .then(async (upstream) => {
           const body = Buffer.from(await upstream.arrayBuffer());
+          const contentType = upstream.headers.get("content-type") ?? "application/json";
+          const encoded = encodeStaticResponse(body, contentType, String(req.headers["accept-encoding"] ?? ""));
           res.statusCode = upstream.status;
-          res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
-          res.end(body);
+          res.setHeader("content-type", contentType);
+          res.setHeader("vary", "Accept-Encoding");
+          if (encoded.encoding) res.setHeader("content-encoding", encoded.encoding);
+          res.end(encoded.body);
         })
         .catch((err) => {
           const tooLarge = err instanceof Error && err.message === "proxy_request_too_large";
@@ -181,9 +195,12 @@ export function createProductionServer(env = process.env) {
       if (extname(file) === ".html" || file.endsWith("index.html")) {
         body = Buffer.from(injectIdentity(body.toString("utf8"), config));
       }
+      const encoded = encodeStaticResponse(body, type, String(req.headers["accept-encoding"] ?? ""));
       res.statusCode = 200;
       res.setHeader("content-type", type);
-      res.end(body);
+      res.setHeader("vary", "Accept-Encoding");
+      if (encoded.encoding) res.setHeader("content-encoding", encoded.encoding);
+      res.end(encoded.body);
     } catch {
       res.statusCode = 404;
       res.end("not found");

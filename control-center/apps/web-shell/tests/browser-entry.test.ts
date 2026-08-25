@@ -9,6 +9,7 @@ import {
   FILE_PROTOCOL_PREVIEW,
   installShellGlobals,
   isFileProtocol,
+  resolveBrowserAdapter,
   startBrowser,
   type ShellWindow,
 } from "../src/boot";
@@ -64,4 +65,16 @@ test("startBrowser is a no-op without window (safe Node import) and mounts when 
   startBrowser(win, { getElementById: (id: string) => (id === "root" ? root : null) });
   assert.match(root.innerHTML, /npm run dev/);
   assert.ok(win.__CONFENGE_CONTROL_CENTER__);
+});
+
+test("production boot keeps fixture catalog out of its eager path", async () => {
+  const adapter = await resolveBrowserAdapter(undefined, undefined);
+  assert.equal(adapter.mode, "http");
+  const mock = await resolveBrowserAdapter(undefined, {
+    querySelector: () => ({ getAttribute: () => "1" }),
+  });
+  assert.equal(mock.mode, "mock");
+  const boot = readFileSync(join(srcDir, "boot.ts"), "utf8");
+  assert.doesNotMatch(boot, /^import .*adapters\/mock/m);
+  assert.match(boot, /import\("\.\/adapters\/mock"\)/);
 });

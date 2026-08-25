@@ -4,10 +4,12 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import {
   SECURITY_HEADERS,
   applySecurityHeaders,
   createProductionServer,
+  encodeStaticResponse,
   injectIdentity,
   runtimeIdentityFromEnv,
 } from "../../apps/web-shell/scripts/serve-prod.mjs";
@@ -56,6 +58,19 @@ test("serve-prod applies CSP on a real HTTP response", async () => {
   assert.match(res.headers.get("content-security-policy") ?? "", /script-src 'self'/);
   assert.equal(res.headers.get("x-content-type-options"), "nosniff");
   server.close();
+});
+
+test("serve-prod compresses substantial static text and leaves small/binary bodies alone", () => {
+  const source = Buffer.from("const operational = true;\n".repeat(200));
+  const encoded = encodeStaticResponse(source, "text/javascript; charset=utf-8", "br, gzip");
+  assert.equal(encoded.encoding, "gzip");
+  assert.ok(encoded.body.byteLength < source.byteLength);
+  assert.deepEqual(gunzipSync(encoded.body), source);
+
+  const small = Buffer.from("small");
+  assert.deepEqual(encodeStaticResponse(small, "text/css", "gzip"), { body: small, encoding: null });
+  const png = Buffer.alloc(2_000, 1);
+  assert.deepEqual(encodeStaticResponse(png, "image/png", "gzip"), { body: png, encoding: null });
 });
 
 test("web sources do not bake env secrets into client code", () => {
