@@ -254,8 +254,12 @@ test("a confirmed decision navigates to the next actionable draft", async () => 
   };
   let painted = 0;
   let destination = "";
+  let submitted: { generic_recipient_acknowledged?: boolean } | undefined;
   const adapter = {
-    reviewDraftAction: async () => ({ ok: true, path: "/review", kind: "nota" as const, message: "confirmado" }),
+    reviewDraftAction: async (input: { generic_recipient_acknowledged?: boolean }) => {
+      submitted = input;
+      return { ok: true, path: "/review", kind: "nota" as const, message: "confirmado" };
+    },
   };
   bindReviewActions(
     { innerHTML: "", querySelectorAll: () => [form] } as never,
@@ -266,6 +270,7 @@ test("a confirmed decision navigates to the next actionable draft", async () => 
   listener?.({ preventDefault(): void {} } as unknown as Event);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(destination, `#/comercial/rascunhos?resource=${nextId}&focus=review`);
+  assert.equal(submitted?.generic_recipient_acknowledged, true);
   assert.equal(painted, 0);
 });
 

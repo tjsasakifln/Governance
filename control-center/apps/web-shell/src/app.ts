@@ -478,7 +478,10 @@ export function bindReviewActions(
         expected_content_hash: expected,
         ...(action === "SAVE_ADJUSTMENT" ? { subject, body_text: bodyText } : {}),
         reason: form.querySelector('[name="reason"]')?.value ?? "",
-        generic_recipient_acknowledged: form.querySelector('[name="generic_ack"]')?.value === "true",
+        // The primary CTA names the exact recipient. Per the review contract,
+        // clicking it is the acknowledgement; requiring another checkbox or
+        // select would reintroduce the friction this inspector removes.
+        ...(action === "APPROVE" ? { generic_recipient_acknowledged: true } : {}),
       };
       let completionHash: string | null = null;
       void Promise.resolve(adapter.reviewDraftAction?.(request))
