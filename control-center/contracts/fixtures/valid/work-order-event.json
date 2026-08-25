@@ -1,0 +1,19 @@
+{
+  "schema_version": "confenge.work_order_event.v1",
+  "event_id": "cc:work-order-event:diag-sbx-001-created",
+  "event_version": 1,
+  "work_order_id": "cc:work-order:diag-sbx-001",
+  "expected_version": 0,
+  "event_type": "WORK_ORDER_CREATED",
+  "actor": { "kind": "human", "id": "delivery-owner-sbx" },
+  "reason_code": "SANDBOX_CANARY",
+  "literal_reason_ref": "evidence:sandbox:accepted-proposal",
+  "occurred_at": "2026-08-25T12:00:00Z",
+  "idempotency_key": "work-order:diag-sbx-001:create:v1",
+  "correlation_id": "corr-diag-sbx-001",
+  "causation_id": "proposal_sbx_001",
+  "source_system": "governance",
+  "evidence_refs": ["evidence:sandbox:accepted-proposal", "evidence:sandbox:financial-gate"],
+  "transition": null,
+  "data": { "synthetic": true, "financial_gate": "RECONCILED", "readiness": "READY" }
+}

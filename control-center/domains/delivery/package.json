@@ -1,0 +1,30 @@
+{
+  "name": "@confenge/control-center-delivery",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event-sourced CONFENGE Work Order authority and read-only delivery projections.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md", "fixtures"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts"
+  },
+  "dependencies": {
+    "@confenge/control-center-contracts": "*",
+    "@confenge/control-center-persistence": "*",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@embedded-postgres/linux-x64": "16.14.0-beta.17",
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "embedded-postgres": "16.14.0-beta.17",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

@@ -19,6 +19,7 @@
     "connectors/infrastructure",
     "connectors/runner",
     "domains/clients",
+    "domains/delivery",
     "domains/commercial",
     "domains/finance",
     "domains/engineering",
