@@ -1,6 +1,7 @@
 import {
   DESTINATIONS,
   hashFor,
+  withQueryParams,
   type DestinationId,
 } from "../destinations";
 import { escapeHtml } from "../escape";
@@ -9,6 +10,8 @@ import type { ViewKind } from "../view-state";
 export interface NavigationLocation {
   readonly destination: DestinationId;
   readonly surface?: string | null;
+  /** Exact current hash, including deep resource and list-filter context. */
+  readonly currentHref?: string;
 }
 
 export interface MobileTaskTarget {
@@ -60,7 +63,7 @@ export const MOBILE_MORE_TASKS: readonly MobileTaskTarget[] = [
   },
   {
     key: "outbound",
-    label: "Pausar outbound",
+    label: "Abrir pausa outbound",
     context: "estado e controles seguros",
     destination: "warmbly",
     path: hashFor("warmbly", null, { surface: "operacao" }),
@@ -121,10 +124,17 @@ export const MOBILE_TASKS: readonly MobileTaskTarget[] = [
   ...MOBILE_MORE_TASKS,
 ];
 
-function withView(path: string, viewKind: ViewKind): string {
-  if (viewKind === "ready") return path;
-  const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}view=${encodeURIComponent(viewKind)}`;
+function navigationHref(
+  canonicalPath: string,
+  current: boolean,
+  location: NavigationLocation,
+  viewKind: ViewKind,
+  preserveViewState: boolean,
+): string {
+  const path = current && location.currentHref ? location.currentHref : canonicalPath;
+  return withQueryParams(path, {
+    view: preserveViewState && viewKind !== "ready" ? viewKind : null,
+  });
 }
 
 /**
@@ -162,10 +172,13 @@ export function currentMobileTaskKey(location: NavigationLocation): string {
 function mobileTaskLink(
   task: MobileTaskTarget,
   currentKey: string,
+  location: NavigationLocation,
   viewKind: ViewKind,
+  preserveViewState: boolean,
 ): string {
   const current = task.key === currentKey;
-  return `<a href="${escapeHtml(withView(task.path, viewKind))}" data-task-nav="${escapeHtml(task.key)}" aria-current="${current ? "page" : "false"}">
+  const href = navigationHref(task.path, current, location, viewKind, preserveViewState);
+  return `<a href="${escapeHtml(href)}" data-task-nav="${escapeHtml(task.key)}" aria-current="${current ? "page" : "false"}">
     <span class="task-nav-label">${escapeHtml(task.label)}</span>
     <span class="task-nav-context">${escapeHtml(task.context)}</span>
     ${current ? '<span class="sr-only"> — tarefa atual</span>' : ""}
@@ -175,23 +188,29 @@ function mobileTaskLink(
 export function renderMobileTaskNavigation(
   location: NavigationLocation,
   viewKind: ViewKind,
+  preserveViewState = false,
 ): string {
   const currentKey = currentMobileTaskKey(location);
   const primaryKeys = new Set(MOBILE_PRIMARY_TASKS.map((task) => task.key));
   const moreCurrent = !primaryKeys.has(currentKey);
+  const currentMoreTask = MOBILE_MORE_TASKS.find((task) => task.key === currentKey);
   const primary = MOBILE_PRIMARY_TASKS.map((task) =>
-    mobileTaskLink(task, currentKey, viewKind),
+    mobileTaskLink(task, currentKey, location, viewKind, preserveViewState),
   ).join("");
   const more = MOBILE_MORE_TASKS.map((task) =>
-    mobileTaskLink(task, currentKey, viewKind),
+    mobileTaskLink(task, currentKey, location, viewKind, preserveViewState),
   ).join("");
+  const moreSummaryLabel = currentMoreTask
+    ? `Abrir mais tarefas; tarefa atual: ${currentMoreTask.label}`
+    : "Abrir mais tarefas";
+  const moreSummaryContext = currentMoreTask?.label ?? "tarefas";
 
   return `<nav class="task-nav" aria-label="Tarefas principais">
     ${primary}
-    <details class="task-nav-more"${moreCurrent ? " open" : ""}>
-      <summary aria-label="Abrir mais tarefas" data-contains-current="${moreCurrent ? "true" : "false"}">
+    <details class="task-nav-more">
+      <summary aria-label="${escapeHtml(moreSummaryLabel)}" data-contains-current="${moreCurrent ? "true" : "false"}">
         <span class="task-nav-label">Mais</span>
-        <span class="task-nav-context">tarefas</span>
+        <span class="task-nav-context">${escapeHtml(moreSummaryContext)}</span>
         ${moreCurrent ? '<span class="sr-only"> — contém a tarefa atual</span>' : ""}
       </summary>
       <div class="task-nav-more-panel" aria-label="Mais tarefas do Control Center">
@@ -205,11 +224,19 @@ export function renderMobileTaskNavigation(
 export function renderDesktopNavigation(
   location: NavigationLocation,
   viewKind: ViewKind,
+  preserveViewState = false,
 ): string {
   const links = DESTINATIONS.map((item) => {
     const current = item.id === location.destination;
+    const href = navigationHref(
+      hashFor(item.id),
+      current,
+      location,
+      viewKind,
+      preserveViewState,
+    );
     return `<a
-      href="${escapeHtml(withView(hashFor(item.id), viewKind))}"
+      href="${escapeHtml(href)}"
       data-nav="${item.id}"
       aria-current="${current ? "page" : "false"}"
     >${escapeHtml(item.label)}</a>`;

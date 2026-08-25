@@ -342,6 +342,18 @@ a {
   font-size: 0.72rem;
 }
 
+/* At 200% zoom a 360px phone exposes roughly 180 CSS px. Five columns would
+   shrink below the 44px target contract, so the launcher wraps into two rows. */
+@media (max-width: 300px) {
+  .task-nav {
+    grid-template-columns: repeat(3, minmax(44px, 1fr));
+  }
+
+  .task-nav-more-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .operator-form {
   display: grid;
   gap: 0.45rem;

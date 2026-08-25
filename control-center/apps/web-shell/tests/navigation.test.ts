@@ -64,7 +64,7 @@ test("deep routes map to one conceptual current task", () => {
   assert.equal(currentMobileTaskKey({ destination: "clientes" }), "clients");
 });
 
-test("the current task is unique and secondary routes open the panel that contains it", () => {
+test("the current task is unique and a closed secondary panel names the task it contains", () => {
   const primary = renderMobileTaskNavigation(
     { destination: "warmbly", surface: "revisao" },
     "ready",
@@ -75,16 +75,36 @@ test("the current task is unique and secondary routes open the panel that contai
 
   const secondary = renderMobileTaskNavigation({ destination: "financeiro" }, "ready");
   assert.equal([...secondary.matchAll(/aria-current="page"/g)].length, 1);
-  assert.match(secondary, /<details class="task-nav-more" open>/);
+  assert.doesNotMatch(secondary, /<details class="task-nav-more" open>/);
   assert.match(secondary, /data-contains-current="true"/);
+  assert.match(secondary, /aria-label="Abrir mais tarefas; tarefa atual: Consultar financeiro"/);
+  assert.match(secondary, /<span class="task-nav-context">Consultar financeiro<\/span>/);
   assert.match(secondary, /data-task-nav="finance" aria-current="page"/);
 });
 
 test("mock view state survives every task link without weakening deep URLs", () => {
-  const html = renderMobileTaskNavigation({ destination: "hoje" }, "error");
+  const html = renderMobileTaskNavigation({ destination: "hoje" }, "error", true);
   assert.equal([...html.matchAll(/data-task-nav=/g)].length, MOBILE_TASKS.length);
   assert.equal([...html.matchAll(/\?view=error/g)].length, MOBILE_TASKS.length);
   assert.match(html, /href="#\/warmbly\/revisao\?view=error"/);
+});
+
+test("production navigation drops synthetic view state and preserves exact current context", () => {
+  const location = {
+    destination: "clientes" as const,
+    currentHref: "#/clientes/cli-1?status=open&sort=name&view=error",
+  };
+  const mobile = renderMobileTaskNavigation(location, "error", false);
+  assert.doesNotMatch(mobile, /view=error/);
+  assert.match(
+    mobile,
+    /href="#\/clientes\/cli-1\?status=open&amp;sort=name" data-task-nav="clients" aria-current="page"/,
+  );
+  assert.doesNotMatch(mobile, /#\/hoje\?status=open/);
+
+  const desktop = renderDesktopNavigation(location, "error", false);
+  assert.doesNotMatch(desktop, /view=error/);
+  assert.match(desktop, /href="#\/clientes\/cli-1\?status=open&amp;sort=name"[\s\S]*data-nav="clientes"/);
 });
 
 test("desktop keeps the complete registry and one current area", () => {
@@ -103,6 +123,14 @@ test("mobile task targets, contextual tabs and long labels wrap instead of scrol
   assert.match(css, /\.task-nav-label,[\s\S]*overflow-wrap:\s*anywhere/);
   assert.match(css, /\.subnav a\s*\{[^}]*white-space:\s*normal/s);
   assert.match(css, /\.task-nav-more-panel\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(
+    css,
+    /@media \(max-width:\s*300px\)[\s\S]*\.task-nav\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(44px,\s*1fr\)\)/s,
+  );
+  assert.match(
+    css,
+    /@media \(max-width:\s*300px\)[\s\S]*\.task-nav-more-panel\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/s,
+  );
 });
 
 test("safe-area padding and vertical task panel avoid the system gesture edge", () => {

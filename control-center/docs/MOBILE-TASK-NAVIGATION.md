@@ -10,9 +10,9 @@ Quatro tarefas ficam sempre visíveis:
 
 `Mais tarefas` é um painel nativo `details/summary`, identificado por texto e
 operável sem JavaScript. Ele torna diretamente alcançáveis tratar inbound,
-pausar outbound e checar incidente de infraestrutura, além das demais áreas do
-produto. Não é um menu hambúrguer indiferenciado: cada entrada usa verbo,
-objeto e contexto operacional.
+abrir os controles de pausa outbound e checar incidente de infraestrutura,
+além das demais áreas do produto. Não é um menu hambúrguer indiferenciado:
+cada entrada usa verbo, objeto e contexto operacional.
 
 O desktop continua mostrando o registro completo de áreas. Ambos os modos usam
 links hash reais, portanto preservam deep links, histórico, back/forward,
@@ -23,17 +23,22 @@ teclado e semântica de `aria-current`.
 - Existem exatamente quatro destinos primários móveis e uma entrada explícita
   para as demais tarefas.
 - A rota atual corresponde a uma única tarefa global. Quando ela está no painel
-  secundário, o painel inicia aberto e a entrada atual fica visível.
+  secundário, `Mais` identifica pelo nome a tarefa atual sem abrir e cobrir o
+  conteúdo; ao abrir, a entrada atual fica marcada.
 - Toda área em `DESTINATIONS` possui ao menos uma entrada móvel; nenhuma depende
   de swipe, hover ou memória.
 - Alvos de toque têm no mínimo 44 CSS px e a barra respeita
-  `safe-area-inset-bottom`.
+  `safe-area-inset-bottom`. Abaixo de 300 CSS px (incluindo um telefone a 200%
+  de zoom), os cinco lançadores quebram em duas linhas para manter esse mínimo.
 - Textos longos quebram linha. O painel secundário rola verticalmente dentro de
   um limite, nunca lateralmente.
 - Subnavegações contextuais usam grid no mobile e `flex-wrap` no desktop. Um
   segundo trilho horizontal não é permitido.
 - O painel apenas navega. Não envia email, não emite GO, não retoma outbound e
   não executa mutação.
+- Em produção, a navegação nunca propaga o parâmetro sintético `view`; na
+  fixture mock ele é preservado para permitir percorrer o mesmo cenário.
+- O link da tarefa/área atual preserva subrota, recurso e filtros da URL atual.
 
 ## Validação pendente
 

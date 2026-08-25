@@ -367,7 +367,9 @@ export function renderShell(model: ShellModel): string {
   const navigationLocation = {
     destination: model.destination,
     ...(model.surface !== undefined ? { surface: model.surface } : {}),
+    ...(model.hash !== undefined ? { currentHref: model.hash } : {}),
   };
+  const preserveNavigationViewState = model.adapterMode !== "http";
 
   const page =
     model.view.kind === "ready" || model.view.kind === "stale" ? model.view.data : null;
@@ -416,8 +418,8 @@ export function renderShell(model: ShellModel): string {
         </a>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
       </header>
-      ${renderMobileTaskNavigation(navigationLocation, model.viewKind)}
-      ${renderDesktopNavigation(navigationLocation, model.viewKind)}
+      ${renderMobileTaskNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
+      ${renderDesktopNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
       <main id="conteudo" tabindex="-1">
         <header class="page-head">
           <h1>${escapeHtml(label)}</h1>
