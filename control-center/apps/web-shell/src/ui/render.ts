@@ -5,7 +5,7 @@ import {
   BRAND_LOGO_SRC,
   BRAND_LOGO_WIDTH,
 } from "../brand";
-import { DESTINATIONS, hashFor, type DestinationId } from "../destinations";
+import { DESTINATIONS, hashFor, withQueryParams, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { ownMapValue } from "../own-map";
 import { AUTH_URL, PRODUCTIVE_URL } from "../topology";
@@ -395,6 +395,13 @@ export function renderShell(model: ShellModel): string {
   const orientation = buildOrientationSummary({
     destination: model.destination,
     view: model.view,
+    ...(model.surface !== undefined ? { surface: model.surface } : {}),
+    currentHref: model.hash
+      ? withQueryParams(model.hash, { view: null })
+      : hashFor(model.destination, null, {
+          ...(model.surface ? { surface: model.surface } : {}),
+          ...(model.resource ? { resource: model.resource } : {}),
+        }),
   });
 
   return `

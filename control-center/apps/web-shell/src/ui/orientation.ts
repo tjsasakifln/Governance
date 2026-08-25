@@ -1,6 +1,6 @@
 import type { DestinationPage } from "../adapters/contract";
 import { formatLocal, isUtcDateTime } from "../datetime";
-import type { DestinationId } from "../destinations";
+import { getDestination, type DestinationId } from "../destinations";
 import { escapeHtml } from "../escape";
 import { collectProvenance } from "../page";
 import type { AttentionItem, FreshnessStatus, PriorityRecommendation } from "../types";
@@ -28,6 +28,7 @@ export interface OrientationAction {
 
 export interface OrientationSummary {
   readonly destination: DestinationId;
+  readonly locationLabel: string;
   readonly viewKind: ViewKind;
   readonly state: OrientationStatement;
   readonly risk: OrientationStatement;
@@ -39,6 +40,46 @@ export interface OrientationSummary {
 interface OrientationInput {
   readonly destination: DestinationId;
   readonly view: ViewState<DestinationPage>;
+  readonly surface?: string | null;
+  readonly currentHref?: string;
+}
+
+const commercialSurfaceLabels: Readonly<Record<string, string>> = {
+  visao: "Visão",
+  rascunhos: "Revisão editorial",
+  cohorts: "Coortes",
+  atividade: "Atividade",
+  pipeline: "Pipeline",
+  excecoes: "Exceções",
+};
+
+const warmblySurfaceLabels: Readonly<Record<string, string>> = {
+  operacao: "Operação",
+  cohorts: "Coortes",
+  revisao: "Revisão",
+};
+
+function locationLabel(destination: DestinationId, surface: string | null | undefined): string {
+  const root = getDestination(destination).label;
+  const labels = destination === "comercial"
+    ? commercialSurfaceLabels
+    : destination === "warmbly"
+      ? warmblySurfaceLabels
+      : null;
+  const child = labels && surface ? labels[surface] : undefined;
+  return child ? `${root} / ${child}` : root;
+}
+
+function safeCurrentHref(destination: DestinationId, value: string | undefined): string {
+  return value?.startsWith("#/") ? value : `#/${destination}`;
+}
+
+function conciseText(value: string, maxCharacters: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const characters = [...normalized];
+  return characters.length <= maxCharacters
+    ? normalized
+    : `${characters.slice(0, maxCharacters - 1).join("")}…`;
 }
 
 const freshnessRank: Readonly<Record<FreshnessStatus, number>> = {
@@ -80,12 +121,14 @@ function firstPriority(page: DestinationPage): PriorityRecommendation | null {
 function errorOrientation(
   destination: DestinationId,
   view: Extract<ViewState<DestinationPage>, { kind: "error" }>,
+  location: string,
+  currentHref: string,
 ): OrientationSummary {
-  const denied = /(?:permission|forbidden|unauthori[sz]ed|access_denied|auth)/i.test(
-    `${view.code} ${view.message}`,
-  );
+  const denied = ["PERMISSION_DENIED", "FORBIDDEN", "UNAUTHORIZED", "HTTP_401", "HTTP_403"]
+    .includes(view.code.toUpperCase());
   return {
     destination,
+    locationLabel: location,
     viewKind: view.kind,
     state: denied
       ? {
@@ -114,7 +157,7 @@ function errorOrientation(
           label: "Recarregar este endereço",
           detail: "O recarregamento preserva a rota; confirme o estado antes de repetir uma ação.",
           kind: "recover",
-          href: "",
+          href: currentHref,
         },
     observedAt: null,
     observedAtLabel: "Atualização não disponível",
@@ -225,10 +268,13 @@ function reliabilityOrientation(
 
 export function buildOrientationSummary(input: OrientationInput): OrientationSummary {
   const { destination, view } = input;
+  const location = locationLabel(destination, input.surface);
+  const currentHref = safeCurrentHref(destination, input.currentHref);
 
   if (view.kind === "loading") {
     return {
       destination,
+      locationLabel: location,
       viewKind: view.kind,
       state: {
         label: "Carregando esta área",
@@ -251,11 +297,12 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
     };
   }
 
-  if (view.kind === "error") return errorOrientation(destination, view);
+  if (view.kind === "error") return errorOrientation(destination, view, location, currentHref);
 
   if (view.kind === "empty") {
     return {
       destination,
+      locationLabel: location,
       viewKind: view.kind,
       state: {
         label: "Recorte vazio",
@@ -289,20 +336,23 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
   if (attention) {
     return {
       destination,
+      locationLabel: location,
       viewKind: view.kind,
       state: reliability.state,
       risk: {
-        label: `Risco ${severityLabel(attention.severity)}: ${attention.title}`,
+        label: `Risco ${severityLabel(attention.severity)}: ${conciseText(attention.title, 96)}`,
         detail:
           attention.status === "acknowledged"
             ? "O alerta foi reconhecido, mas ainda não está resolvido."
-            : attention.summary,
+            : conciseText(attention.summary, 180),
         tone: attention.severity === "critical" ? "critical" : "attention",
       },
       action: mayOfferDomainAction
         ? {
-            label: attention.recommended_action?.trim() || "Revisar esta exceção antes de agir",
-            detail: "A ação abre o conteúdo operacional; autorização e confirmação continuam valendo.",
+            label: "Revisar esta exceção no conteúdo",
+            detail: attention.recommended_action?.trim()
+              ? `Recomendação observada: ${conciseText(attention.recommended_action, 140)} O link apenas abre o conteúdo; autorização e confirmação continuam valendo.`
+              : "O link apenas abre o conteúdo; autorização e confirmação continuam valendo.",
             kind: "act",
             href: "#orientacao-conteudo",
           }
@@ -317,17 +367,20 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
   if (priority) {
     return {
       destination,
+      locationLabel: location,
       viewKind: view.kind,
       state: reliability.state,
       risk: {
-        label: `Prioridade ${priority.rank}: ${priority.title}`,
-        detail: priority.rationale,
+        label: `Prioridade ${priority.rank}: ${conciseText(priority.title, 96)}`,
+        detail: conciseText(priority.rationale, 180),
         tone: "attention",
       },
       action: mayOfferDomainAction
         ? {
-            label: priority.recommended_action?.trim() || "Revisar esta prioridade",
-            detail: "A ação abre o conteúdo operacional sem executar mutação.",
+            label: "Revisar esta prioridade no conteúdo",
+            detail: priority.recommended_action?.trim()
+              ? `Recomendação observada: ${conciseText(priority.recommended_action, 140)} O link não executa mutação.`
+              : "O link apenas abre o conteúdo operacional e não executa mutação.",
             kind: "act",
             href: "#orientacao-conteudo",
           }
@@ -341,6 +394,7 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
 
   return {
     destination,
+    locationLabel: location,
     viewKind: view.kind,
     state: reliability.state,
     risk: reliability.risk,
@@ -374,7 +428,7 @@ export function renderOrientationSummary(summary: OrientationSummary): string {
 
   return `<section class="orientation-summary" aria-labelledby="orientation-title" data-orientation-contract="v1" data-orientation-destination="${escapeHtml(summary.destination)}" data-orientation-view="${summary.viewKind}">
     <header class="orientation-heading">
-      <h2 id="orientation-title">Orientação rápida</h2>
+      <h2 id="orientation-title">Orientação rápida — ${escapeHtml(summary.locationLabel)}</h2>
       <p>${observedAt}</p>
     </header>
     <div class="orientation-grid">

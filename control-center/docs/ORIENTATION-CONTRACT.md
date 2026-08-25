@@ -12,7 +12,9 @@ do domínio. Em leitura corrida, ele responde:
 
 O contrato é calculado em `ui/orientation.ts` a partir do mesmo `ViewState` e do
 mesmo `DestinationPage` que compõem a tela. Nenhum domínio mantém uma cópia
-manual do resumo.
+manual do resumo. O título também nomeia a subrota Comercial/Warmbly atual em
+linguagem operacional, para que “onde estou” não dependa de uma subnav abaixo da
+primeira viewport.
 
 ## Regras de verdade
 
@@ -27,11 +29,20 @@ manual do resumo.
 - Loading, vazio, erro e falta de permissão têm estado, risco e recuperação
   próprios. Uma negação de acesso nunca convida o operador a contorná-la.
 - O resumo cria no máximo uma ação primária. Ela apenas leva ao conteúdo ou
-  recarrega a rota; não altera autorização, não escreve e não pula confirmação.
+  recarrega a rota atual, preservando subrota, recurso e filtros; não altera
+  autorização, não escreve e não pula confirmação. Texto `recommended_action`
+  vindo da origem aparece como recomendação observada no detalhe, nunca como se
+  o link fosse executar a mutação descrita.
+- Falta de permissão só é declarada para códigos exatos de autorização. O
+  adaptador preserva 401/403 como `PERMISSION_DENIED`; palavras incidentais como
+  “authoritative” não viram uma falsa negação de acesso.
 - Uma recomendação do domínio só vira ação primária quando todas as fontes do
   recorte estão `FRESH`. Em `STALE`, `UNKNOWN` ou `ERROR`, recuperar a evidência
   sempre vence a recomendação.
 - Texto de alerta, prioridade e ação é tratado como não confiável e escapado.
+  Título, justificativa e recomendação também têm limites explícitos no resumo,
+  para que prosa longa da origem não expulse a decisão da primeira viewport; o
+  conteúdo integral continua disponível nos cartões do domínio.
 
 ## Validação humana ainda necessária
 

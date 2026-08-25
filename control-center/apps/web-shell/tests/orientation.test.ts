@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import type { DestinationPage } from "../src/adapters/contract";
+import { createHttpAdapter } from "../src/adapters/http";
 import {
   COMMERCIAL_SURFACES,
   DESTINATION_IDS,
@@ -68,6 +69,12 @@ test("every registered destination renders state, risk and next action before it
       });
       assert.match(html, /data-orientation-contract="v1"/);
       assert.equal([...html.matchAll(/data-orientation-field=/g)].length, 3);
+      if (destination === "comercial" && surface === "excecoes") {
+        assert.match(html, /Orientação rápida — Comercial \/ Exceções/);
+      }
+      if (destination === "warmbly" && surface === "revisao") {
+        assert.match(html, /Orientação rápida — Operação Warmbly \/ Revisão/);
+      }
     }
   }
 });
@@ -92,7 +99,8 @@ test("the most severe unresolved alert owns one unambiguous primary action", () 
     view: { kind: "ready", data },
   });
   assert.match(summary.risk.label, /^Risco crítico:/);
-  assert.equal(summary.action.label, "Inspecionar a coleta");
+  assert.equal(summary.action.label, "Revisar esta exceção no conteúdo");
+  assert.match(summary.action.detail, /Recomendação observada: Inspecionar a coleta/);
   assert.equal(summary.action.kind, "act");
 
   const html = renderOrientationSummary(summary);
@@ -209,11 +217,52 @@ test("loading, empty, generic error and permission denial have distinct recovery
 
   assert.equal(loading.action.kind, "wait");
   assert.equal(empty.action.kind, "none");
-  assert.equal(error.action.href, "");
+  assert.equal(error.action.href, "#/clientes");
   assert.match(error.action.label, /recarregar/i);
   assert.match(denied.state.label, /sem permissão/i);
   assert.equal(denied.action.href, null);
   assert.match(denied.action.detail, /não tente contornar/i);
+});
+
+test("permission state comes from an exact adapter code and generic authority prose is not misclassified", async () => {
+  const adapter = createHttpAdapter(
+    "https://ops.confenge.com.br",
+    async () => new Response("forbidden", { status: 403 }),
+  );
+  const read = await adapter.readDestination("memoria");
+  assert.equal(read.ok, false);
+  if (read.ok) return;
+  assert.equal(read.error.code, "PERMISSION_DENIED");
+
+  const denied = buildOrientationSummary({
+    destination: "memoria",
+    view: { kind: "error", code: read.error.code, message: read.error.message },
+  });
+  const unrelated = buildOrientationSummary({
+    destination: "memoria",
+    view: {
+      kind: "error",
+      code: "AUTHORITATIVE_SOURCE_ERROR",
+      message: "authoritative source failed",
+    },
+  });
+  assert.match(denied.state.label, /sem permissão/i);
+  assert.equal(unrelated.state.label, "Leitura indisponível");
+});
+
+test("error recovery preserves the current subroute and drops a synthetic view override", () => {
+  const html = renderShell({
+    destination: "warmbly",
+    surface: "revisao",
+    resource: "fixture-version",
+    hash: "#/warmbly/revisao?resource=fixture-version&view=error",
+    viewKind: "error",
+    adapterMode: "http",
+    mockScenario: "http",
+    view: { kind: "error", code: "CONTEXT_UNAVAILABLE", message: "falhou" },
+  });
+  assert.match(html, /href="#\/warmbly\/revisao\?resource=fixture-version"/);
+  assert.doesNotMatch(html, /orientation-primary-action[^>]+view=error/);
 });
 
 test("missing provenance remains unknown instead of becoming a healthy zero", () => {
@@ -236,7 +285,8 @@ test("priority is used only when no unresolved alert exists", () => {
     view: { kind: "ready", data },
   });
   assert.match(summary.risk.label, /^Prioridade 1:/);
-  assert.equal(summary.action.label, "Abrir a prioridade");
+  assert.equal(summary.action.label, "Revisar esta prioridade no conteúdo");
+  assert.match(summary.action.detail, /Recomendação observada: Abrir a prioridade/);
 });
 
 test("human update time is visible while the exact instant remains machine-readable", () => {
@@ -275,6 +325,30 @@ test("untrusted alert and action text is escaped in the first viewport", () => {
   assert.doesNotMatch(html, /<img/);
   assert.doesNotMatch(html, /onerror="/);
   assert.match(html, /&lt;img/);
+});
+
+test("untrusted domain prose is bounded so it cannot consume the first viewport", () => {
+  const data = page("hoje");
+  data.attention = [{
+    ...ATTENTION_FIXTURES[0]!,
+    title: `Título ${"muito longo ".repeat(80)}`,
+    summary: `Resumo ${"sem limite ".repeat(120)}`,
+    recommended_action: `Ação ${"enganosamente longa ".repeat(80)}`,
+    provenance: {
+      ...ATTENTION_FIXTURES[0]!.provenance,
+      freshness_status: "FRESH",
+    },
+  }];
+
+  const summary = buildOrientationSummary({
+    destination: "hoje",
+    view: { kind: "ready", data },
+  });
+  assert.ok([...summary.risk.label].length <= "Risco crítico: ".length + 96);
+  assert.ok([...summary.risk.detail].length <= 180);
+  assert.ok(summary.action.detail.length < 400);
+  assert.match(summary.risk.label, /…$/);
+  assert.match(summary.risk.detail, /…$/);
 });
 
 test("non-fresh evidence suppresses a domain action even when the source recommends it", () => {
