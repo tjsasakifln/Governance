@@ -1,0 +1,105 @@
+{
+  "schema_version": "confenge.agent-outreach-batch-proof.v1",
+  "agent_batch_id": "agent-batch-fixture-001",
+  "source_run_id": "supplier-run-2026-08-25",
+  "source_run_hash": "sha256:b7b4d8c60defdd4c0183bc8e94c4fd0701d5f4eebcd8037600a2731278cbb7ac",
+  "lead_ref_scheme": "HMAC_SHA256_V1",
+  "lead_ref_key_version": "outreach-lead-ref.v1",
+  "executor_ref": "agent-fixture-01",
+  "started_at": "2026-08-25T10:00:00Z",
+  "completed_at": "2026-08-25T10:15:00Z",
+  "reservation_expires_at": "2026-08-25T11:00:00Z",
+  "policy_version": "outreach-agent-policy.v1",
+  "template_version": "first-touch-forwarding.v1",
+  "evidence_version": "web-datalake-bundle.v1",
+  "universe": {
+    "target_confirmed_total": 8245,
+    "batch_reserved": 2,
+    "unique_processed_total_before_batch": 0,
+    "unique_processed_total_after_batch": 2,
+    "remaining_after_batch": 8243
+  },
+  "safety": {
+    "llm_api_calls": 0,
+    "runtime_generation": false,
+    "provider_mutations": 0,
+    "approvals": 0,
+    "scheduled": 0,
+    "sent": 0,
+    "auto_send_changed": false,
+    "kill_switch_changed": false,
+    "operational_data_included": false
+  },
+  "summary": {
+    "reserved_count": 2,
+    "completed_count": 2,
+    "newly_processed": 2,
+    "datalake_attempted": 2,
+    "web_attempted": 2,
+    "reconciled_count": 2,
+    "draft_generated": 1,
+    "imported_needs_review": 1,
+    "blocked": 1,
+    "duplicate": 0,
+    "invalid": 0,
+    "retry_required": 0
+  },
+  "members": [
+    {
+      "lead_ref": "hmac-sha256:1d3f39947f5df5ccd0ada5099320ead76c296d7ae6b89025275bad9e6772f545",
+      "denominator_effect": "NEWLY_PROCESSED",
+      "lanes": {
+        "datalake": {
+          "status": "OBSERVED",
+          "observed_at": "2026-08-25T10:03:00Z",
+          "attempt_hash": "sha256:4306ee076f605585ade6f2841576014b32ab24f92d830e23ed861b224cffb57b",
+          "evidence_count": 2
+        },
+        "web": {
+          "status": "OBSERVED",
+          "observed_at": "2026-08-25T10:07:00Z",
+          "attempt_hash": "sha256:140cd99c677d58c6e645ba05cce235eb6213c630f621b59014651f93d92418b8",
+          "evidence_count": 1
+        }
+      },
+      "reconciliation_status": "DATALAKE_WEB_CORROBORATED",
+      "critical_conflict": false,
+      "outcome": "IMPORTED_NEEDS_REVIEW",
+      "idempotency_key": "sha256:2740d18be49e2c2a32749fd57bf7b558d66cdba6fe81ff844fbc281489dd13f1",
+      "draft": {
+        "state": "NEEDS_REVIEW",
+        "recipient_class": "GENERIC_COMPANY",
+        "content_hash": "sha256:6629370797aaf37357bf51c8670771076b446c0d5ffa410e00a111e1051be197",
+        "evidence_bundle_hash": "sha256:7fe7429b2dd71050c680db6ee387ead79c03ee3ae85db3d6331c58f0e5cd946f",
+        "import_receipt_hash": "sha256:2b98f68963e3fcaec73f70ee5c7489c55748025f2b8299e2c25951299a57e549"
+      }
+    },
+    {
+      "lead_ref": "hmac-sha256:1dd80a9160c04c4e00a18414c7b1bb69bd1adb4f2f80907eeb3566e5184944f3",
+      "denominator_effect": "NEWLY_PROCESSED",
+      "lanes": {
+        "datalake": {
+          "status": "OBSERVED",
+          "observed_at": "2026-08-25T10:09:00Z",
+          "attempt_hash": "sha256:0ff11302f0240308e2b2ed0298555d46b7d1355475f408c93100b8b9b9e35a2f",
+          "evidence_count": 1
+        },
+        "web": {
+          "status": "NO_MATCH",
+          "observed_at": "2026-08-25T10:13:00Z",
+          "attempt_hash": "sha256:5e59f93a0699749d0912ed6efe09efa0af5a3abaf818402824092f87400ca271",
+          "evidence_count": 0
+        }
+      },
+      "reconciliation_status": "DATALAKE_ONLY",
+      "critical_conflict": false,
+      "outcome": "BLOCKED",
+      "idempotency_key": "sha256:6336b2161eb0bc6994bedc34bf4b51731971bc72c69ba9ddc4ace5acfa3591ee",
+      "blocker": {
+        "code": "NO_PUBLIC_EMAIL_FOUND",
+        "next_action_code": "RESEARCH_ALTERNATE_PUBLIC_SOURCE",
+        "evidence_hash": "sha256:e9c89d6007811d439ca40afd57ada641ac79e9287d83a3324bccd206855a1d99"
+      }
+    }
+  ]
+}
