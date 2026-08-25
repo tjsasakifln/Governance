@@ -110,6 +110,17 @@ export interface GateDispatchCounts {
   failures?: readonly { mailbox: string; reason: string }[];
 }
 
+/** Backend reconciliation of durable APPROVEs into scheduled queue work. */
+export interface GateReconcileCounts {
+  approvalRecords?: number;
+  latestApprovedBindings?: number;
+  uniqueApprovedCandidates?: number;
+  scheduled?: number;
+  alreadyScheduled?: number;
+  failed?: number;
+  failures?: readonly { cohortVersionId: string; candidateId: string; reason: string }[];
+}
+
 export interface AdapterWriteResult {
   ok: boolean;
   path: string;
@@ -174,6 +185,8 @@ export interface AdapterWriteResult {
   diff?: readonly GateDiffEntry[];
   /** Counters Warmbly returned for an accepted cohort dispatch. */
   dispatch?: GateDispatchCounts;
+  /** Counters Warmbly returned while reconciling approvals that predate scheduling. */
+  reconcile?: GateReconcileCounts;
   /** Result of the GET readback performed after a definitive response. */
   readback?: GateReadback;
 }
@@ -230,6 +243,7 @@ export const WARMBLY_GATE_ACTIONS = [
   "reproduce",
   "validate",
   "review",
+  "reconcile",
   "decide",
   "adjust",
   // Hands an already-GO'd cohort to Warmbly's queue. It is not a send: Warmbly
@@ -261,6 +275,8 @@ export interface WarmblyGateInput {
   version_id?: string;
   candidate_id?: string;
   limit?: number;
+  selection_mode?: "NEXT_UNCLAIMED" | "RECOVER_PRIOR";
+  recover_version_ids?: string[];
   decision?: "APPROVE" | "REJECT" | "HOLD" | "GO" | "NO_GO";
   reason?: string;
   acknowledged?: boolean;

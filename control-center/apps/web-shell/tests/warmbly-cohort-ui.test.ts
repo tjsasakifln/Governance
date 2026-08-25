@@ -26,7 +26,7 @@ import {
   decidedReviewState,
   resetReviewQueue,
 } from "../src/review-queue";
-import { warmblyBlock, writeResultBlock } from "../src/ui/warmbly";
+import { pilotSteps, warmblyBlock, writeResultBlock } from "../src/ui/warmbly";
 import { clearPendingResumeConfirmation } from "../src/warmbly-confirmation";
 
 /* ------------------------------------------------------------------ *
@@ -667,6 +667,36 @@ test("preview denominators are rendered verbatim, and an absent number says so i
   assert.match(sparse, /não informado pelo servidor/);
   // 7 considered with nothing else must not become "7 - 0 = 7 eligible".
   assert.doesNotMatch(sparse, /<dt>Elegíveis<\/dt><dd>7<\/dd>/);
+});
+
+test("cohorts exposes disjoint next-page progress and fresh-source recovery", () => {
+  reset();
+  const stale = cohort({
+    cohort_id: "33333333-3333-4333-8333-333333333333",
+    freshness: "STALE",
+    selection: {
+      mode: "NEXT_UNCLAIMED",
+      source_run_id: "supplier-run-fixture",
+      claimed_count: 10,
+      unique_claimed_total: 40,
+      eligible_remaining: 120,
+    },
+  });
+  const html = warmblyBlock(surfaceInput({
+    gate: {
+      list: { data: [stale], edge_actor: { id: "fixture-user", groups: ["operators"] } },
+      list_status: "read",
+    },
+  }), "cohorts");
+  assert.match(html, /data-selection-progress="true"/);
+  assert.match(html, /Fornecedores únicos reservados<\/dt><dd>40/);
+  assert.match(html, /Elegíveis ainda não reservados<\/dt><dd>120/);
+  assert.match(html, /name="selection_mode" value="NEXT_UNCLAIMED"/);
+  assert.match(html, /Criar próxima cohort sem repetição/);
+  assert.match(html, /name="selection_mode" value="RECOVER_PRIOR"/);
+  assert.match(html, new RegExp(`name="recover_version_ids" value="${COHORT_ID}"`));
+  assert.match(html, /empresa fornecedora\/contratada/);
+  assert.doesNotMatch(html, /name="offset"/);
 });
 
 /* ------------------------------------------------------------------ *
@@ -1328,6 +1358,126 @@ test("no gate write ever carries a browser-set actor header", async () => {
     assert.equal(header["x-actor-id"], undefined);
     assert.equal(header["x-actor-kind"], undefined);
   }
+});
+
+test("the create wire carries the server-managed selection contract", async () => {
+  reset();
+  const bodies: Record<string, unknown>[] = [];
+  const adapter = new HttpControlCenterAdapter({
+    baseUrl: "http://control-center.fixture",
+    fetchImpl: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ id: COHORT_ID, version: 1 }), { status: 201 });
+    }) as typeof fetch,
+  });
+  await adapter.warmblyGate({
+    action: "create",
+    limit: 10,
+    selection_mode: "NEXT_UNCLAIMED",
+    idempotency_key: "cc-human-gate:v1:next:0",
+  });
+  await adapter.warmblyGate({
+    action: "create",
+    limit: 10,
+    selection_mode: "RECOVER_PRIOR",
+    recover_version_ids: [NEXT_COHORT_ID, COHORT_ID],
+    idempotency_key: "cc-human-gate:v1:recover:0",
+  });
+  assert.deepEqual(bodies[0], {
+    idempotency_key: "cc-human-gate:v1:next:0",
+    limit: 10,
+    selection_mode: "NEXT_UNCLAIMED",
+  });
+  assert.deepEqual(bodies[1], {
+    idempotency_key: "cc-human-gate:v1:recover:0",
+    limit: 10,
+    selection_mode: "RECOVER_PRIOR",
+    recover_version_ids: [COHORT_ID, NEXT_COHORT_ID].sort(),
+  });
+});
+
+test("admins can reconcile old approvals and the UI renders the server denominators", async () => {
+  reset();
+  const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+  const adapter = new HttpControlCenterAdapter({
+    baseUrl: "http://control-center.fixture",
+    fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({
+        data: {
+          approval_records: 13,
+          latest_approved_bindings: 11,
+          unique_approved_candidates: 11,
+          scheduled: 4,
+          already_scheduled: 7,
+          failed: 0,
+          failures: [],
+        },
+        receipt: "reconcile-approved:fixture",
+      }), { status: 200 });
+    }) as typeof fetch,
+  });
+  const result = await adapter.warmblyGate({
+    action: "reconcile",
+    idempotency_key: "cc-human-gate:v1:reconcile:0",
+  });
+  assert.equal(calls[0]!.url, "http://control-center.fixture/v1/warmbly/operator/cohorts/reconcile-approved");
+  assert.deepEqual(calls[0]!.body, { idempotency_key: "cc-human-gate:v1:reconcile:0" });
+  assert.deepEqual(result.reconcile, {
+    approvalRecords: 13,
+    latestApprovedBindings: 11,
+    uniqueApprovedCandidates: 11,
+    scheduled: 4,
+    alreadyScheduled: 7,
+    failed: 0,
+  });
+  const rendered = writeResultBlock(result);
+  assert.match(rendered, /data-reconcile-counts="true"/);
+  assert.match(rendered, /Agendados agora/);
+  assert.match(rendered, /Reconciliação cria ou confirma trabalho na fila; não envia/);
+
+  const admin = warmblyBlock(surfaceInput(), "cohorts");
+  const adminForm = admin.match(/data-human-gate="reconcile"[\s\S]*?<\/form>/)?.[0] ?? "";
+  assert.doesNotMatch(adminForm, /<button type="submit" disabled>/);
+  const operator = warmblyBlock(
+    surfaceInput({ gate: gatePayload(["operators"]) }),
+    "cohorts",
+  );
+  const operatorForm = operator.match(/data-human-gate="reconcile"[\s\S]*?<\/form>/)?.[0] ?? "";
+  assert.match(operatorForm, /<button type="submit" disabled>/);
+});
+
+test("the current scheduling contract hides obsolete GO and dispatch controls", () => {
+  reset();
+  const current = cohort({
+    candidates: [candidate({
+      review: { decision: "APPROVE", effective: true },
+      blocked_by: [],
+      scheduling: {
+        touchpoint_id: "33333333-3333-4333-8333-333333333333",
+        state: "QUEUED",
+        auto_send: true,
+        due_at: "2026-08-25T12:00:00Z",
+        scheduled_at: "2026-08-24T23:00:00Z",
+      },
+    })],
+  });
+  const html = warmblyBlock(
+    surfaceInput({
+      gate: gatePayload(["operators", "admins"], current),
+      query: `${REVIEW_QUEUE_PARAM}=todas`,
+    }),
+    "revisao",
+  );
+  assert.match(html, /data-approval-scheduling="true"/);
+  assert.match(html, /APPROVE agenda a mensagem/);
+  assert.match(html, /<dt>Agendamento<\/dt><dd>QUEUED<\/dd>/);
+  assert.doesNotMatch(html, /data-human-gate="decide"/);
+  assert.doesNotMatch(html, /data-human-gate="dispatch"/);
+  assert.doesNotMatch(html, /data-dispatch-gate=/);
+  assert.deepEqual(pilotSteps(surfaceInput({ gate: gatePayload(["operators", "admins"], current) })).map((step) => step.id), [
+    "fonte", "cohort", "validacao", "revisao", "fila",
+  ]);
 });
 
 test("the gate never exposes a queue, send, resume or payment control, with or without GO", () => {

@@ -2,10 +2,22 @@
 
 ## Operação segura
 
-1. Autentique em `ops.confenge.com.br` pelo Authelia. `operators` revisam;
-   `admins` registram GO/NO-GO.
+1. Autentique em `ops.confenge.com.br` pelo Authelia. `operators` revisam e
+   aprovam mensagens; `admins` podem reconciliar aprovações antigas em lote.
 2. Abra **Warmbly → Cohorts**. Confirme source/as_of/freshness e os quatro
    denominadores (considerados, elegíveis, excluídos, finais). Crie no máximo 10.
+   - Leads são empresas contratadas/fornecedoras. A identidade canônica vem de
+     `fornecedor_cnpj`/`ni_fornecedor`, reduzida a um CNPJ-raiz. Nunca trate
+     `orgao_cnpj` ou outra entidade contratante como lead.
+   - Antes de gerar novas mensagens, selecione as versões vencidas em
+     **Recuperar versões anteriores**. A recuperação relê a fonte atual,
+     deduplica fornecedores e cria texto e hashes novos; não carrega APPROVE ou
+     agendamento antigos.
+   - Para ampliar o backlog, use **Criar próxima cohort sem repetição**. Cada
+     clique reserva até dez CNPJs-raiz e destinatários ainda não usados. Confira
+     `fornecedores únicos reservados` e pare no total adicional pretendido.
+   - Não existe offset digitável. Paginação e claims pertencem ao servidor para
+     que duas abas ou dois operadores não escolham a mesma empresa.
 3. Abra a versão em **Revisão**. A tela abre no recorte **Pendentes** e diz
    quanto falta (`N pendentes · N aprovadas · N em ajuste · N no total`). Leia o
    destinatário, o fato observado e a proveniência, e leia o assunto e o corpo
@@ -35,26 +47,18 @@
    escrito**, que continua obrigatório. Se recipient, copy, policy, evidence ou
    suppression mudar depois, a aprovação aparece inválida (`effective=false`),
    volta para Pendentes e deve ser refeita.
-6. GO exige todos decididos, source fresh e a confirmação digitada da versão.
-   O Warmbly compara o valor (por exemplo `v3`) à versão imutável; o proxy não
-   consegue remover ou fabricar essa confirmação.
-   Use NO_GO para interromper/revogar. GO cria a autoridade bounded exata em
-   `READY_FOR_LIVE_PREFLIGHT`; não enfileira, não envia e não liga auto-send.
-7. **Entregar a cohort à fila.** GO autoriza e não enfileira: o controle
-   "Entregar esta cohort à fila de envio" aparece na Revisão **somente depois de
-   um GO registrado**, exige `admins` e a versão digitada, e é o passo que
-   coloca as mensagens aprovadas na fila do Warmbly. O envio em si é do worker
-   do Warmbly, dentro da janela comercial (`09:00–18:00 America/Sao_Paulo`, dias
-   úteis) e sob o teto de 10/hora; no máximo 10 por disparo.
-   - A tela mostra os números que o Warmbly devolveu — tentados, aceitos,
-     falharam, duplicados, bloqueados. São números de **enfileiramento**, não de
-     entrega.
-   - Repetir o disparo é seguro: o Warmbly pula os já enfileirados e os conta
-     como duplicados.
-   - O Warmbly recusa por conta própria, e a tela nomeia cada caso: GO revogado
-     ou vencido, auto-send ou autorun ligados, disparo pausado, kill switch
-     acionado. Nenhum desses portões é contornável pelo Control Center.
-   - Não existe disparo agendado e nenhuma aprovação enfileira nada sozinha.
+6. Um `APPROVE` efetivo registra a decisão e agenda a mensagem exata para a
+   próxima janela comercial elegível na mesma operação. Não existe GO nem
+   entrega manual da cohort no contrato vigente. Agendar não é enviar: o worker
+   continua sob pausa, kill switch, janela útil (`09:00–18:00
+   America/Sao_Paulo`) e teto de 10/hora.
+7. **Antes de ampliar o backlog**, um `admin` executa **Reconciliar aprovações
+   antigas com a fila**. A operação é naturalmente idempotente e mostra:
+   registros APPROVE, bindings vigentes, candidatos únicos, agendados agora, já
+   agendados e falhas. Ela existe para que aprovações anteriores à implantação
+   do agendamento sejam atendidas primeiro. Ela não envia e não retoma o
+   disparo. Se houver falhas, não crie as 100 novas mensagens até classificar
+   cada motivo.
 8. Em timeout, não repita às cegas. Recarregue a mesma versão e compare receipt
    e correlation id. O frontend preserva a idempotency key da intenção incerta;
    só depois repita a mesma intenção.
@@ -70,42 +74,42 @@ custo humano; nenhuma salvaguarda material foi removida.
 | Digitar um motivo para APPROVE | `approved_by_human_reviewer` automático, comentário opcional | O motivo digitado era sempre a mesma palavra; a trilha já tinha ator, instante, versão e hash |
 | Marcar "revisei destinatário" | O clique em Aprovar é a ciência | Um segundo clique declarando o primeiro não acrescenta nada à auditoria |
 | Lista com aprovadas no topo | Recorte **Pendentes** por padrão, com contador | Rolar a própria produção para achar o próximo trabalho não escala |
-| Disparo só por API/CLI do Warmbly | Controle "Entregar à fila" na Revisão, após GO, `admins` + versão digitada | GO autorizava e nada acontecia depois; a cohort aprovada nunca chegava à fila |
+| Criar repetia os primeiros fornecedores | Próxima cohort usa claims transacionais por fornecedor e destinatário | Dez cohorts formam um backlog disjunto sem relaxar o limite de dez por autorização |
+| Versões vencidas eram apenas históricas | Recuperação relê os mesmos fornecedores na fonte atual | Fatos, texto e hashes vencidos não podem ser reaproveitados como se fossem atuais |
+| APPROVE antigo podia ficar sem fila | APPROVE agenda a mensagem; reconciliação cobre o histórico | A decisão humana e o efeito operacional ficam convergentes e idempotentes |
 
 O que **não** mudou: `acknowledged=true` continua viajando no corpo do APPROVE e
 o adaptador recusa antes do fio um APPROVE sem ele; o Warmbly continua recusando
-APPROVE fora de uma validação VALID vigente; GO continua exigindo `admins` e a
-confirmação digitada da versão; HOLD/REJECT continuam exigindo motivo escrito; e
-o Control Center continua sem qualquer rota de **send**, **queue** ou **resume**
-de cohort — a única rota nova é `POST {prefix}/{cohortId}/dispatch`, que
-enfileira e não envia.
+APPROVE fora de uma validação VALID vigente; HOLD/REJECT continuam exigindo
+motivo escrito; e o Control Center continua sem qualquer rota de **send**. A
+reconciliação chama somente `POST {prefix}/reconcile-approved`, sem destinatário
+ou conteúdo controlável pelo navegador.
 
-**Auto-send continua proibido por construção.** `CONFENGE_AUTO_SEND_ENABLED=true`
-derruba o boot do Warmbly (invariante testada, não é flag para ligar), e o
-próprio endpoint de disparo recusa quando auto-send ou green autorun estão
-ligados. Não existe, e não deve passar a existir, disparo agendado: a cohort
-entra na fila porque um humano com `admins` pediu.
+**Auto-send global continua proibido por construção.**
+`CONFENGE_AUTO_SEND_ENABLED=true` derruba o boot do Warmbly (invariante testada,
+não é flag para ligar). O `auto_send=true` do agendamento é por mensagem e nasce
+somente de um APPROVE humano efetivo; não habilita autorun global.
 
 ## Métricas e alertas
 
 Use os denominadores do próprio snapshot, nunca contagem de linhas da tela:
 `accounts_considered`, `accounts_eligible`, `accounts_excluded`,
 `recipients_final`, exclusões por reason, validations por estado, reviews
-efetivos/invalidados e decisões GO/NO_GO. A trilha estruturada
+efetivos/invalidados e agendamentos efetivos/invalidados. A trilha estruturada
 `warmbly.human_gate.before/after` mede tentativas, recusas, 401/403, 409,
 timeouts e latência por upstream status sem recipient, subject ou body.
 
-Alertar e manter NO_GO quando: freshness STALE, validação UNKNOWN por timeout,
+Alertar e manter o disparo pausado quando: freshness STALE, validação UNKNOWN por timeout,
 qualquer late suppression/opt-out, conflito repetido, 5xx, divergência de
 denominadores, ou qualquer indício de auto-send/green autorun habilitado.
 
 ## Smoke e rollback
 
-- Produção: somente GET de lista/detalhe com conta autorizada; não execute POST.
+- Smoke de produção: somente GET de lista/detalhe com conta autorizada. POST é
+  reservado à operação comercial explicitamente autorizada neste runbook.
 - Escritas: sandbox/fixtures, mailbox `.invalid`/Mailpit e kill switch ativo.
-- Nunca use o endpoint de dispatch para validar uma entrega e nunca envie mail
-  como parte de um smoke: o disparo é uma decisão comercial do fundador, não um
-  passo de verificação. Exercite-o em sandbox/Mailpit.
+- Nunca use reconciliação ou APPROVE para validar uma entrega e nunca envie mail
+  como parte de um smoke: são decisões comerciais, não passos de verificação.
 - Rollback app: reverta primeiro Governance, depois Warmbly; versões persistidas
   continuam inertes e legíveis.
 - Rollback schema: somente após rollback dos dois apps, execute a migration
@@ -122,7 +126,7 @@ denominadores, ou qualquer indício de auto-send/green autorun habilitado.
    Depende do contrato Warmbly já implantado; até lá o canal falha fechado.
    Preserve o hash existente e acrescente `admins` ao operador autorizado em
    `users.yml`, com backup e validação; jamais rode `generate-local.sh` para isso.
-   `operators` sozinho continua podendo revisar, mas recebe 403 em GO/NO-GO.
+   `operators` continua podendo revisar; a reconciliação em lote exige `admins`.
 3. Crie pelo endpoint auditado `/v1/api-keys` uma credencial separada com máscara
    decimal exata `196` (`read_contacts|write_contacts|write_campaigns`), prazo de
    rotação e sem `send_campaigns`. Instale-a atomicamente com

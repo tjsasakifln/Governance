@@ -1,14 +1,22 @@
 # ADR-CC-001 — Control Center architecture boundaries
 
-## Amendment: versioned outbound human gate (2026-08-23)
+## Amendment: approval-time scheduling and disjoint supplier cohorts (2026-08-24)
 
 Control Center may record the bounded control-plane decisions defined by
 `confenge.human-gate.v1`: create/reproduce an immutable Warmbly cohort version,
 request/read validation, record candidate APPROVE/REJECT/HOLD, and record
-version-exact GO/NO-GO. This authority is narrower than transport authority:
-Control Center still MUST NOT calculate eligibility, edit the frozen preview,
-queue a touchpoint, dispatch a cohort, or send email. Warmbly remains the
-versioned contract and last-mile policy authority; auto-send remains off.
+copy adjustments. An effective APPROVE authorizes Warmbly to create or confirm
+the exact candidate's touchpoint for the next eligible business window. Control
+Center may also ask Warmbly, as an `admins` action with no caller-selected
+target, to reconcile durable approvals that predate approval-time scheduling.
+There is no live GO or cohort-dispatch action in the current edge allowlist.
+
+This authority is narrower than transport authority: Control Center still MUST
+NOT calculate eligibility, select contracting authorities as leads, mutate a
+recipient, directly queue arbitrary content, resume dispatch, or send email.
+Warmbly owns disjoint supplier claims, immutable previews, scheduling and every
+last-mile gate. Global auto-send and green autorun remain off; per-message
+`auto_send=true` may exist only as the result of an effective human APPROVE.
 
 - **Status:** Accepted for campaign `CONFENGE-CONTROL-CENTER-FANOUT-2026-08-20`
 - **Date:** 2026-08-20

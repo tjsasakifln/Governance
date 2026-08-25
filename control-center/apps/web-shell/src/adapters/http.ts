@@ -146,10 +146,12 @@ function gateFallbackMessage(input: WarmblyGateInput, version: number | undefine
       return "Verificação do destinatário solicitada ao Warmbly.";
     case "review":
       return input.decision === "APPROVE"
-        ? "Aprovação registrada para este candidato."
+        ? "Aprovação registrada e mensagem agendada para a próxima janela comercial elegível."
         : input.decision === "HOLD"
           ? "HOLD registrado para este candidato."
           : "Rejeição registrada para este candidato.";
+    case "reconcile":
+      return "Aprovações duráveis reconciliadas com a fila do Warmbly.";
     case "decide":
       return input.decision === "GO"
         ? "GO registrado. Nenhum e-mail foi enfileirado nem enviado."
@@ -192,6 +194,37 @@ export function gateDispatchOf(body: Record<string, unknown>): AdapterWriteResul
           reason: typeof entry.reason === "string" ? entry.reason : "",
         }))
         .filter((entry) => entry.mailbox !== "" || entry.reason !== "")
+    : [];
+  if (Object.keys(counts).length === 0 && failures.length === 0) return undefined;
+  return { ...counts, ...(failures.length > 0 ? { failures } : {}) };
+}
+
+/** Read the backend's naturally idempotent approval-reconciliation report. */
+export function gateReconcileOf(body: Record<string, unknown>): AdapterWriteResult["reconcile"] {
+  const data = asRecord(body.data) ?? body;
+  const num = (key: string): number | undefined => gateNumber(data[key]);
+  const counts = {
+    ...(num("approval_records") !== undefined ? { approvalRecords: num("approval_records")! } : {}),
+    ...(num("latest_approved_bindings") !== undefined
+      ? { latestApprovedBindings: num("latest_approved_bindings")! }
+      : {}),
+    ...(num("unique_approved_candidates") !== undefined
+      ? { uniqueApprovedCandidates: num("unique_approved_candidates")! }
+      : {}),
+    ...(num("scheduled") !== undefined ? { scheduled: num("scheduled")! } : {}),
+    ...(num("already_scheduled") !== undefined ? { alreadyScheduled: num("already_scheduled")! } : {}),
+    ...(num("failed") !== undefined ? { failed: num("failed")! } : {}),
+  };
+  const failures = Array.isArray(data.failures)
+    ? data.failures
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => entry !== null)
+        .map((entry) => ({
+          cohortVersionId: typeof entry.cohort_version_id === "string" ? entry.cohort_version_id : "",
+          candidateId: typeof entry.candidate_id === "string" ? entry.candidate_id : "",
+          reason: typeof entry.reason === "string" ? entry.reason : "",
+        }))
+        .filter((entry) => entry.cohortVersionId !== "" || entry.candidateId !== "" || entry.reason !== "")
     : [];
   if (Object.keys(counts).length === 0 && failures.length === 0) return undefined;
   return { ...counts, ...(failures.length > 0 ? { failures } : {}) };
@@ -268,6 +301,11 @@ export function gateResult(
       if (input.action !== "dispatch" || !ok) return {};
       const dispatch = gateDispatchOf(body);
       return dispatch ? { dispatch } : {};
+    })(),
+    ...(() => {
+      if (input.action !== "reconcile" || !ok) return {};
+      const reconcile = gateReconcileOf(body);
+      return reconcile ? { reconcile } : {};
     })(),
   };
 }
@@ -445,6 +483,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     const version = input.version_id ?? "";
     const candidate = input.candidate_id ?? "";
     const path = input.action === "create" ? base
+      : input.action === "reconcile" ? `${base}/reconcile-approved`
       : input.action === "reproduce" ? `${base}/${version}/reproduce`
       : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
       : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
@@ -472,10 +511,17 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       return refusal;
     };
     if (
-      (input.action !== "create" && !version)
+      (input.action !== "create" && input.action !== "reconcile" && !version)
       || (["validate", "review", "adjust"].includes(input.action) && !candidate)
     ) {
       return refuse("alvo do gate incompleto", "gate_precondition");
+    }
+    if (
+      input.action === "create"
+      && input.selection_mode === "RECOVER_PRIOR"
+      && (!input.recover_version_ids || input.recover_version_ids.length === 0)
+    ) {
+      return refuse("selecione ao menos uma versão anterior para recuperar", "recover_versions_required");
     }
     // The acknowledgement stays on the wire and stays mandatory here. What
     // changed is where it comes from: the reviewer's click on Aprovar is the
@@ -548,6 +594,10 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         body: JSON.stringify({
           idempotency_key: input.idempotency_key,
           ...(input.limit ? { limit: input.limit } : {}),
+          ...(input.selection_mode ? { selection_mode: input.selection_mode } : {}),
+          ...(input.recover_version_ids && input.recover_version_ids.length > 0
+            ? { recover_version_ids: [...input.recover_version_ids].sort() }
+            : {}),
           ...(input.decision ? { decision: input.decision } : {}),
           ...(reason ? { reason } : {}),
           ...(input.acknowledged === true ? { acknowledged: true } : {}),

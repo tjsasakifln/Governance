@@ -16,7 +16,7 @@ export const HUMAN_GATE_CONTRACT = "confenge.human-gate.v1";
 
 /**
  * Single source for the upstream cohort route prefix. Every human-gate route is
- * composed from this constant, so the six operations can never drift apart from
+ * composed from this constant, so the operations can never drift apart from
  * one another, and a prefix change is one edit plus one failing contract pin.
  */
 export const WARMBLY_COHORTS_PREFIX = "/v1/confenge/cohorts";
@@ -26,15 +26,12 @@ export const WARMBLY_COHORTS_PREFIX = "/v1/confenge/cohorts";
  * proxy entry and no `send`, `queue`, `resume` or `payment` member: the type
  * itself is part of the security boundary.
  *
- * `dispatch` is the one deliberate widening, and it is narrow on purpose. It
- * names exactly one upstream route — `POST {prefix}/{cohortId}/dispatch` — which
- * is the call that hands an already-GO'd cohort to Warmbly's own queue. It does
- * not send: Warmbly enqueues each member and its worker delivers inside the
- * send window under the rolling-hour governor. Every gate that matters stays
- * upstream and none of them is expressible from here: Warmbly re-checks the
- * durable human-gate GO, the grant's revocation and expiry, `auto_send` and
- * `green_autorun` being off, the pause state and the file kill switch, and caps
- * the batch at ten regardless of what this connector asks for.
+ * `reconcile_approved` is the admin-only bridge for approvals that predate
+ * approval-time scheduling. It names exactly one fixed route and does not
+ * accept a caller-selected cohort or candidate. On the current contract
+ * APPROVE itself asks Warmbly to create the queued touchpoint, and the worker
+ * alone may deliver it inside the allowed window and governor while dispatch
+ * remains paused. There is no GO or cohort-dispatch operation in this surface.
  */
 export const HUMAN_GATE_OPERATIONS = [
   "list_cohorts",
@@ -45,8 +42,7 @@ export const HUMAN_GATE_OPERATIONS = [
   "validation",
   "review",
   "adjust",
-  "decision",
-  "dispatch",
+  "reconcile_approved",
 ] as const;
 export type HumanGateOperation = (typeof HUMAN_GATE_OPERATIONS)[number];
 
@@ -57,8 +53,7 @@ export const HUMAN_GATE_WRITE_OPERATIONS = [
   "validation",
   "review",
   "adjust",
-  "decision",
-  "dispatch",
+  "reconcile_approved",
 ] as const;
 
 /**
@@ -66,11 +61,9 @@ export const HUMAN_GATE_WRITE_OPERATIONS = [
  * Kept as data so `tests/human-gate-negative-allowlist.test.ts` can enumerate
  * them instead of a reviewer having to remember the list.
  *
- * `dispatch` left this list when the cockpit gained the control that hands a
- * GO'd cohort to Warmbly's queue. Nothing else did, and the removal buys exactly
- * one fixed route: the negative tests still prove that `dispatch` is
- * unreachable at every other shape — under `/candidates/`, at the bare prefix,
- * through traversal, and on every method except POST.
+ * Approval-time scheduling is the only way the current gate can put reviewed
+ * content into Warmbly's queue. GO and cohort dispatch are intentionally
+ * unconstructable here.
  */
 export const FORBIDDEN_HUMAN_GATE_SEGMENTS = [
   "send",
@@ -83,6 +76,8 @@ export const FORBIDDEN_HUMAN_GATE_SEGMENTS = [
   "charge",
   "enroll",
   "deliver",
+  "decision",
+  "dispatch",
 ] as const;
 
 /** How a call ended. `UNKNOWN` is never collapsed into `REFUSED`. */
@@ -112,7 +107,7 @@ export type AdjustRequestField = (typeof ADJUST_REQUEST_FIELDS)[number];
 /**
  * Edge-only fields the gate consumes and never forwards in the body. The
  * idempotency key travels as the `Idempotency-Key` header, exactly as the other
- * five writes do.
+ * writes do.
  */
 export const ADJUST_EDGE_ONLY_FIELDS = ["idempotency_key"] as const;
 

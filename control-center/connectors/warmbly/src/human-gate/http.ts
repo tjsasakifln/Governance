@@ -47,13 +47,10 @@ const routes: readonly HumanGateRoute[] = [
   // a new immutable version and revokes the authorization bound to the old one;
   // it is not a GO, so it is deliberately NOT behind the admins gate.
   { method: "POST", operation: "adjust", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/candidates/(${UUID})/adjust$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/candidates/${m[2]}/adjust`, role: "operators", validate: validateAdjustRequest },
-  { method: "POST", operation: "decision", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/decision$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/decision`, role: "admins" },
-  // Hands a cohort that already carries a durable GO to Warmbly's own queue.
-  // `admins`, like the GO it depends on: authorising the send and performing it
-  // are the same authority, and neither is `operators`. There is no candidate
-  // form of this route — a dispatch is of the whole authorised cohort or of
-  // nothing — and Warmbly caps the batch at ten whatever arrives here.
-  { method: "POST", operation: "dispatch", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/dispatch$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/dispatch`, role: "admins" },
+  // Replays the backend's idempotent scheduler for durable APPROVEs created
+  // before scheduling landed. It does not send or resume anything; admins use
+  // it once while dispatch remains paused, then inspect the returned counts.
+  { method: "POST", operation: "reconcile_approved", local: new RegExp(`^${HUMAN_GATE_PREFIX}/reconcile-approved$`), upstream: () => `${WARMBLY_COHORTS_PREFIX}/reconcile-approved`, role: "admins" },
 ];
 
 /** Exposed for tests and for the cockpit: the complete reachable surface. */
@@ -172,9 +169,9 @@ export interface HumanGateHttpOptions {
 }
 
 /**
- * Fixed-route authenticated proxy. It has no `send`, `queue` or `resume` route
- * by construction, and its one dispatch route hands an already-GO'd cohort to
- * Warmbly's queue rather than sending anything.
+ * Fixed-route authenticated proxy. It has no `send`, `queue`, `resume`, GO or
+ * cohort-dispatch route by construction. Only an effective APPROVE may ask the
+ * current Warmbly contract to schedule its exact reviewed message.
  */
 export function createHumanGateHttpHandler(options: HumanGateHttpOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -251,7 +248,7 @@ export function createHumanGateHttpHandler(options: HumanGateHttpOptions) {
       }
       body = { ...validated.value };
     } else {
-      for (const field of ["limit", "source_run_id", "decision", "reason", "acknowledged", "confirmation"] as const) {
+      for (const field of ["limit", "source_run_id", "selection_mode", "recover_version_ids", "decision", "reason", "acknowledged", "confirmation"] as const) {
         if (submitted[field] !== undefined) body[field] = submitted[field];
       }
     }

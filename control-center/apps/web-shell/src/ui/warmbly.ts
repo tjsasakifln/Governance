@@ -525,6 +525,7 @@ const GATE_ACTION_LABELS: Record<string, string> = {
   reproduce: "reproduzir versão imutável",
   validate: "verificar destinatário",
   review: "registrar decisão de revisão",
+  reconcile: "reconciliar aprovações com a fila",
   decide: "registrar GO/NO-GO",
   adjust: "ajustar assunto e corpo",
   dispatch: "entregar a cohort à fila de envio",
@@ -608,6 +609,7 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
           : ""
       }
       ${dispatchCounters(result.dispatch)}
+      ${reconcileCounters(result.reconcile)}
       ${technicalDetails(
         [
           { term: "path", value: result.path },
@@ -623,6 +625,23 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
         "warmbly-operator-result",
       )}
     </article>`;
+}
+
+function reconcileCounters(counts: AdapterWriteResult["reconcile"]): string {
+  if (!counts) return "";
+  const row = (label: string, value: number | undefined): string =>
+    value === undefined ? fact(label, NOT_IN_PAYLOAD) : fact(label, String(value));
+  const failures = (counts.failures ?? [])
+    .map((entry) => `<div data-reconcile-failure="${escapeHtml(entry.reason)}"><dt>${escapeHtml(entry.cohortVersionId || entry.candidateId || "registro não identificado")}</dt><dd>${escapeHtml(entry.reason || "motivo não informado pelo servidor")}</dd></div>`)
+    .join("");
+  return `<dl class="facts" data-reconcile-counts="true">
+    ${row("Registros APPROVE", counts.approvalRecords)}
+    ${row("Bindings APPROVE vigentes", counts.latestApprovedBindings)}
+    ${row("Candidatos aprovados únicos", counts.uniqueApprovedCandidates)}
+    ${row("Agendados agora", counts.scheduled)}
+    ${row("Já agendados", counts.alreadyScheduled)}
+    ${row("Falharam", counts.failed)}
+  </dl><p class="constraint" data-reconcile-not-sent="true">Reconciliação cria ou confirma trabalho na fila; não envia e não retoma o disparo.</p>${failures ? `<dl class="facts" data-reconcile-failures="true">${failures}</dl>` : ""}`;
 }
 
 /**
@@ -1067,13 +1086,22 @@ export function operatorAuthority(input: WarmblySurfaceInput): OperatorAuthority
  * needed to match an audit row, and it is not what an operator should have to
  * read to know who they are and what they may do.
  */
-function identityBlock(input: WarmblySurfaceInput): string {
+function identityBlock(input: WarmblySurfaceInput, directScheduling = false): string {
   const authority = operatorAuthority(input);
   const name = input.operator.display_name ?? "Sessão autenticada no Authelia";
   const capabilities = authority.known
     ? authority.groups.length > 0
       ? authority.groups
-          .map((group) => `${group}: ${ownMapValue(CAPABILITY_LABELS, group) ?? "capacidade não catalogada nesta tela"}`)
+          .map((group) => {
+            const currentLabel = directScheduling
+              ? group === "operators"
+                ? "revisar e aprovar candidatos, criar e reproduzir cohorts, pedir verificação"
+                : group === "admins"
+                  ? "reconciliar aprovações antigas com a fila"
+                  : undefined
+              : undefined;
+            return `${group}: ${currentLabel ?? ownMapValue(CAPABILITY_LABELS, group) ?? "capacidade não catalogada nesta tela"}`;
+          })
           .join(" · ")
       : "nenhum grupo efetivo — esta sessão não pode escrever no gate"
     : NOT_IN_PAYLOAD;
@@ -1156,6 +1184,59 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
   const decided = decision === "GO" || decision === "NO_GO";
   const validationPending = validations.filter((status) => status !== "VALID").length;
   const reviewPending = reviews.filter((decisionValue) => decisionValue !== "APPROVE").length;
+  const directScheduling = candidates.some((candidate) =>
+    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
+  );
+  const scheduled = candidates.filter((candidate) => {
+    const scheduling = record(candidate.scheduling);
+    return typeof scheduling.touchpoint_id === "string"
+      && scheduling.auto_send === true
+      && !scheduling.invalidated_at;
+  }).length;
+  if (directScheduling) {
+    return [
+      {
+        id: "fonte",
+        label: "Fonte",
+        state: hasCohort ? "done" : "pending",
+        detail: hasCohort
+          ? `Origem ${source}, freshness ${freshness}, as_of ${show(cohort.as_of)}.`
+          : "Nenhuma cohort listada pelo servidor.",
+      },
+      {
+        id: "cohort",
+        label: "Cohort",
+        state: hasCohort ? "done" : "current",
+        detail: hasCohort
+          ? `v${show(cohort.version)} congelada com ${candidates.length} candidato(s) no payload.`
+          : "Crie uma cohort pequena (1–10) em Cohorts para começar.",
+      },
+      {
+        id: "validacao",
+        label: "Validação",
+        state: candidates.length === 0 ? "unknown" : validationPending === 0 ? "done" : "current",
+        detail: candidates.length === 0
+          ? "O payload desta versão não trouxe candidatos."
+          : `${validations.filter((status) => status === "VALID").length} de ${candidates.length} com validação VALID segundo o servidor.`,
+      },
+      {
+        id: "revisao",
+        label: "Revisão e agendamento",
+        state: candidates.length === 0 ? "unknown" : reviewPending === 0 ? "done" : "current",
+        detail: candidates.length === 0
+          ? "O payload desta versão não trouxe candidatos."
+          : `${reviews.filter((value) => value === "APPROVE").length} de ${candidates.length} aprovados; ${scheduled} com agendamento efetivo segundo o servidor.`,
+      },
+      {
+        id: "fila",
+        label: "Fila do Warmbly",
+        state: candidates.length === 0 ? "unknown" : scheduled === candidates.length ? "done" : "pending",
+        detail: candidates.length === 0
+          ? "O payload desta versão não trouxe candidatos."
+          : `${scheduled} de ${candidates.length} estão na fila. O worker respeita pausa, janela comercial e teto por hora.`,
+      },
+    ];
+  }
   return [
     {
       id: "fonte",
@@ -1248,15 +1329,18 @@ function pilotSummary(input: WarmblySurfaceInput): string {
   const list = gateSection(input, "list");
   const latest = latestCohort(input);
   const authority = operatorAuthority(input);
+  const directScheduling = array(latest?.candidates).some((candidate) =>
+    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
+  );
   const open = latest
     ? `<p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(latest.id))}">Abrir revisão da v${escapeHtml(show(latest.version))}</a></p>`
     : `<p><a class="button" data-open-cohorts="true" href="#/warmbly/cohorts">Abrir Cohorts para criar a primeira versão</a></p>`;
   return `
     <section class="stack" aria-labelledby="warmbly-piloto" data-pilot-summary="true">
       <h2 id="warmbly-piloto">Onde o piloto está</h2>
-      <p class="constraint">Fonte → Cohort → Validação → Revisão → GO → Handoff. Cada passo abaixo repete o que o servidor devolveu; nada é recontado nesta tela. GO não envia e-mail e auto-send permanece desligado.</p>
+      <p class="constraint">${directScheduling ? "Fonte → Cohort → Validação → APPROVE → fila. O APPROVE agenda a mensagem; o worker respeita pausa, janela comercial e teto por hora." : "Fonte → Cohort → Validação → Revisão → GO → Handoff. Cada passo abaixo repete o que o servidor devolveu; nada é recontado nesta tela. GO não envia e-mail e auto-send permanece desligado."}</p>
       ${gateUnreadableBanner(list, "a lista de cohorts")}
-      ${identityBlock(input)}
+      ${identityBlock(input, directScheduling)}
       ${stepperBlock(input)}
       ${
         latest
@@ -1266,7 +1350,7 @@ function pilotSummary(input: WarmblySurfaceInput): string {
               <dl class="facts">
                 ${fact("Identificador da versão", show(latest.id))}
                 ${fact("as_of", show(latest.as_of))}
-                ${fact("Decisão final", fromPayload(record(latest.decision).decision))}
+                ${directScheduling ? "" : fact("Decisão final", fromPayload(record(latest.decision).decision))}
                 ${fact("Destinatários finais no preview", fromPayload(record(record(latest.manifest).preview).recipients_final))}
               </dl>
               ${open}
@@ -1276,7 +1360,7 @@ function pilotSummary(input: WarmblySurfaceInput): string {
             : open
       }
       ${
-        authority.canDecide
+        authority.canDecide || directScheduling
           ? ""
           : `<p class="constraint" data-go-authority="absent">Registrar GO/NO-GO exige o grupo <code>admins</code> no Authelia. Sua sessão ${
               authority.known ? "não tem esse grupo" : "não teve os grupos confirmados pelo canal"
@@ -1501,7 +1585,13 @@ function cohortSurface(input: WarmblySurfaceInput): string {
   const list = gateSection(input, "list");
   const authority = operatorAuthority(input);
   const feedback = feedbackRouter(input.operatorResult);
-  const cohorts = cohortRows(input).filter((cohort) => {
+  const allCohorts = cohortRows(input);
+  const directScheduling = allCohorts.some((cohort) =>
+    array(cohort.candidates).some((candidate) =>
+      Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
+    ),
+  );
+  const cohorts = allCohorts.filter((cohort) => {
     const decision = show(record(cohort.decision).decision);
     return (freshness === "all" || show(cohort.freshness) === freshness)
       && (decisionFilter === "all" || decision === decisionFilter);
@@ -1512,19 +1602,46 @@ function cohortSurface(input: WarmblySurfaceInput): string {
     const id = show(cohort.id);
     return `<tr data-cohort-row="${escapeHtml(id)}"><td><a href="#/warmbly/revisao?resource=${escapeHtml(id)}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(fromPayload(preview.accounts_considered))}</td><td>${escapeHtml(fromPayload(preview.accounts_eligible))}</td><td>${escapeHtml(fromPayload(preview.accounts_excluded))}</td><td>${escapeHtml(fromPayload(preview.recipients_final))}</td><td>${escapeHtml(fromPayload(decision.decision))}</td><td><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(id)}">Abrir revisão</a></td></tr>`;
   }).join("");
-  const createKey = "create::::";
+  const currentSelection = record(allCohorts[0]?.selection);
+  const selectionProgress = Object.keys(currentSelection).length > 0
+    ? `<article class="card" data-selection-progress="true"><h3>Progresso desta fonte de fornecedores</h3><dl class="facts">${fact("Modo", fromPayload(currentSelection.mode))}${fact("Reservados nesta cohort", fromPayload(currentSelection.claimed_count))}${fact("Fornecedores únicos reservados", fromPayload(currentSelection.unique_claimed_total))}${fact("Elegíveis ainda não reservados", fromPayload(currentSelection.eligible_remaining))}${fact("Fonte", fromPayload(currentSelection.source_run_id))}</dl><p class="constraint">Um lead equivale a um CNPJ-raiz de empresa fornecedora/contratada e a um destinatário único. Órgãos contratantes não entram nesta contagem.</p></article>`
+    : "";
+  const seenRoots = new Set<string>();
+  const recoverable = allCohorts.filter((cohort) => {
+    const root = textOf(cohort.cohort_id) ?? "";
+    if (!root || seenRoots.has(root) || show(cohort.freshness) !== "STALE") return false;
+    seenRoots.add(root);
+    return textOf(cohort.id) !== null;
+  });
+  const recoveryChoices = recoverable.map((cohort) => {
+    const id = textOf(cohort.id) ?? "";
+    return `<label class="check-row"><input type="checkbox" name="recover_version_ids" value="${escapeHtml(id)}"><span>v${escapeHtml(show(cohort.version))} · ${escapeHtml(show(cohort.created_at))}</span></label>`;
+  }).join("");
+  const createKey = "create:next-unclaimed";
+  const recoverKey = "create:recover-prior";
+  const reconcileKey = "reconcile:approved";
   const createPending = gateInFlight(createKey);
-  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. Auto-send permanece OFF.</p>
+  const recoverPending = gateInFlight(recoverKey);
+  const reconcilePending = gateInFlight(reconcileKey);
+  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. O auto-send global permanece OFF; somente uma aprovação humana efetiva pode agendar o próprio touchpoint.</p>
   ${gateUnreadableBanner(list, "a lista de cohorts")}
   ${feedback.remainder()}
-  ${identityBlock(input)}
+  ${identityBlock(input, directScheduling)}
+  ${selectionProgress}
+  ${reconcilePending ? pendingBlock("Reconciliando aprovações já registradas") : ""}
+  <form class="operator-form" data-human-gate="reconcile" data-gate-key="${escapeHtml(reconcileKey)}"><button type="submit"${reconcilePending || !authority.canDecide ? " disabled" : ""}>${reconcilePending ? "Enviando…" : "Reconciliar aprovações antigas com a fila"}</button><p class="constraint">Execute antes de ampliar o backlog. O Warmbly agenda de forma idempotente os APPROVEs duráveis ainda sem fila; não envia nada e não retoma o disparo.</p>${
+    authority.canDecide
+      ? ""
+      : `<p class="constraint" data-blocked-reason="reconcile">Reconciliar em lote exige o grupo <code>admins</code> no Authelia.</p>`
+  }</form>
   <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label><label>Decisão<select name="decision"><option value="all">Todas</option><option value="GO"${decisionFilter === "GO" ? " selected" : ""}>GO</option><option value="NO_GO"${decisionFilter === "NO_GO" ? " selected" : ""}>NO_GO</option></select></label></form>
   ${createPending ? pendingBlock("Criando a cohort congelada") : ""}
-  <form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(createKey)}"><label>Tamanho pequeno (1–10)<input name="limit" type="number" min="1" max="10" value="5" required></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar cohort congelada"}</button>${
+  <form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(createKey)}"><input type="hidden" name="selection_mode" value="NEXT_UNCLAIMED"><label>Próxima cohort (1–10)<input name="limit" type="number" min="1" max="10" value="10" required></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar próxima cohort sem repetição"}</button>${
     authority.canReview
-      ? ""
+      ? `<p class="constraint">O servidor reserva os próximos fornecedores elegíveis de forma transacional. Repetições de CNPJ-raiz, destinatário ou histórico anterior são excluídas.</p>`
       : `<p class="constraint" data-blocked-reason="create">Criar cohort exige o grupo <code>operators</code> no Authelia.</p>`
   }</form>
+  ${recoverable.length > 0 ? `${recoverPending ? pendingBlock("Recuperando fornecedores anteriores na fonte atual") : ""}<form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(recoverKey)}"><input type="hidden" name="selection_mode" value="RECOVER_PRIOR"><input type="hidden" name="limit" value="10"><fieldset><legend>Recuperar versões anteriores</legend>${recoveryChoices}</fieldset><button type="submit"${recoverPending || !authority.canReview ? " disabled" : ""}>${recoverPending ? "Enviando…" : "Recompor fornecedores selecionados com a fonte atual"}</button><p class="constraint">A recuperação deduplica fornecedores, relê a fonte vigente e cria textos e hashes novos. Aprovação ou agendamento anteriores não são herdados.</p></form>` : ""}
   <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Decisão</th><th>Revisão</th></tr></thead><tbody>${rows || `<tr><td colspan="8">Nenhuma cohort ${list.status === "read" ? "listada pelo servidor" : "pôde ser lida"}. Uma cohort vazia nunca pode receber GO.</td></tr>`}</tbody></table></div></section>`;
 }
 
@@ -1649,6 +1766,10 @@ function candidateCard(
   const queue = reviewQueueState(cohortId, candidate);
   const validation = record(candidate.validation);
   const review = record(candidate.review);
+  const schedulingKnown = Object.prototype.hasOwnProperty.call(candidate, "scheduling");
+  const scheduling = record(candidate.scheduling);
+  const schedulingState = textOf(scheduling.state);
+  const schedulingInvalidated = textOf(scheduling.invalidated_at);
   // Produção manda `observed_fact` e `fact_source` como texto simples. Ler o
   // texto como objeto fazia o fato real sair como "não informado pelo servidor"
   // embaixo de uma mensagem que afirmava exatamente esse fato. O formato objeto
@@ -1844,6 +1965,16 @@ ${validateControl}
       ${fact("Estado editorial", editorial.legacy ? "Versão histórica (não enviável)" : "Versão corrente")}
       ${editorial.reasonCodes.length > 0 ? fact("Motivos do estado editorial", editorial.reasonCodes.map(editorialReasonLabel).join(", ")) : ""}
       ${validationVisible ? factOrAbsent("Validação", validationLine) : ""}
+      ${
+        schedulingKnown
+          ? fact(
+              "Agendamento",
+              schedulingInvalidated
+                ? `invalidado: ${textOf(scheduling.invalidation_reason) ?? "motivo não informado"}`
+                : schedulingState ?? "ainda não agendada",
+            )
+          : ""
+      }
       ${copyQaFailures.length > 0 ? fact("Reprovações de copy QA", copyQaFailures.join(", ")) : ""}
       ${factWhenPresent("Duplicidade apontada pelo servidor", flagText(candidate.duplicate_of ?? candidate.duplicate))}
       ${factWhenPresent("Proveniência ausente", flagText(candidate.missing_provenance))}
@@ -1873,6 +2004,11 @@ ${validateControl}
         { term: "validation_expires_at", value: validation.expires_at ? stamp(validation.expires_at) : "" },
         { term: "review_decision", value: techValue(review.decision) },
         { term: "review_effective", value: techValue(review.effective) },
+        { term: "scheduling_state", value: techValue(scheduling.state) },
+        { term: "scheduling_due_at", value: scheduling.due_at ? stamp(scheduling.due_at) : "" },
+        { term: "scheduling_auto_send", value: techValue(scheduling.auto_send) },
+        { term: "scheduling_invalidated_at", value: techValue(scheduling.invalidated_at) },
+        { term: "scheduling_invalidation_reason", value: techValue(scheduling.invalidation_reason) },
         { term: "blocked_by", value: blockers.join(",") },
         { term: "copy_qa_failures", value: copyQaFailures.length > 0 ? copyQaFailures.join(",") : listValue(copyQa.failures) },
         { term: "admission_reasons", value: listValue(candidate.admission_reasons) },
@@ -1920,7 +2056,7 @@ function adjustBlock(args: {
           <div data-diff-field="body_text"><dt>Corpo</dt><dd><del><pre class="message-preview">${escapeHtml(draft.before_body_text)}</pre></del><ins><pre class="message-preview">${escapeHtml(draft.body_text)}</pre></ins></dd></div>
           <div data-diff-field="reason"><dt>Motivo</dt><dd>${escapeHtml(draft.reason)}</dd></div>
         </dl>
-        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação, revisão e GO da nova versão começam pendentes.</p>
+        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação, revisão e agendamento da nova versão começam pendentes.</p>
       </div>`
     : "";
   return `
@@ -2044,6 +2180,7 @@ function emptyQueueBlock(
   filter: ReviewQueueFilter,
   params: URLSearchParams,
   actionable: boolean,
+  directScheduling: boolean,
 ): string {
   const everything = `<p><a class="button" data-queue-see-all="true" href="${escapeHtml(queueFilterHref(params, "todas"))}">Ver todas as ${counts.total}</a></p>`;
   if (filter === "pendentes") {
@@ -2051,7 +2188,9 @@ function emptyQueueBlock(
     // next step there would point the founder at a button this screen refuses
     // to render.
     const next = actionable
-      ? "O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão."
+      ? directScheduling
+        ? "Os APPROVEs efetivos já criaram ou confirmaram seus agendamentos na fila do Warmbly."
+        : "O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão."
       : "Esta versão é histórica e não é enviável, então não há próximo passo aqui: decida na versão corrente.";
     return `<article class="card banner ok" role="status" data-queue-empty="pendentes">
       <h3>Fila vazia: nada pendente nesta versão.</h3>
@@ -2153,6 +2292,9 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   const manifest = record(cohort.manifest);
   const preview = record(manifest.preview);
   const candidates = array(cohort.candidates);
+  const directScheduling = candidates.some((candidate) =>
+    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
+  );
   const params = new URLSearchParams(input.query ?? "");
   const expandAll = params.get("mensagens") !== "recolhidas";
   const cohortId = show(cohort.id);
@@ -2196,7 +2338,7 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
 `
     : "";
-  const dispatchControl = dispatchBlock({
+  const dispatchControl = directScheduling ? "" : dispatchBlock({
     cohortId,
     version,
     decisionValue,
@@ -2204,7 +2346,11 @@ function reviewSurface(input: WarmblySurfaceInput): string {
     authority,
     actionable: editorial.actionable,
   });
-  const decideControl = editorial.actionable
+  const decideControl = directScheduling
+    ? editorial.actionable
+      ? `<article class="card" data-approval-scheduling="true"><h3>APPROVE agenda a mensagem</h3><p>Cada APPROVE efetivo cria ou confirma o trabalho na fila do Warmbly para a próxima janela comercial elegível. Não existe GO nem entrega manual da cohort neste contrato.</p><p class="constraint">O worker continua submetido à pausa operacional, ao kill switch, à janela de dias úteis e ao teto por hora.</p></article>`
+      : `<p class="constraint" data-non-actionable-surface="true">Versão histórica, não enviável. Revisão, agendamento e reprodução não são oferecidos aqui. Decida na versão corrente.</p>`
+    : editorial.actionable
     ? `
   ${gateInFlight(decideKey) ? pendingBlock("Registrando GO/NO-GO") : ""}
   <form class="operator-form" data-human-gate="decide" data-gate-key="${escapeHtml(decideKey)}" data-version="${escapeHtml(cohortId)}"><label>Decisão final<select name="decision"><option value="NO_GO">NO_GO</option><option value="GO">GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label><button type="submit"${authority.canDecide && !gateInFlight(decideKey) ? "" : " disabled"}>${gateInFlight(decideKey) ? "Enviando…" : "Registrar GO/NO-GO"}</button>${
@@ -2219,7 +2365,7 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   ${leftover}${cohortFeedback}
   ${gateUnreadableBanner(selected, "a versão selecionada")}
   <p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
-  ${identityBlock(input)}
+  ${identityBlock(input, directScheduling)}
   ${previewBlock(preview)}
   <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
   ${reproduceControl}
@@ -2236,13 +2382,13 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   ${
     candidateCards
       || (candidates.length === 0
-        ? `<p class="banner error">Cohort vazia: GO bloqueado.</p>`
-        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable))
+        ? `<p class="banner error">${directScheduling ? "Cohort vazia: nenhuma mensagem pode ser revisada ou agendada." : "Cohort vazia: GO bloqueado."}</p>`
+        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable, directScheduling))
   }
   ${decideControl}
-  <dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>
+  ${directScheduling ? "" : `<dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>`}
   ${dispatchControl}
-  <p class="constraint">GO autoriza e não envia. Entregar a cohort à fila é o passo seguinte e separado; o envio em si é do worker do Warmbly, dentro da janela comercial e sob o teto por hora. Esta tela continua sem qualquer controle de send, queue ou resume.</p></section>`;
+  <p class="constraint">${directScheduling ? "Aprovar agenda; não envia imediatamente. O envio é do worker do Warmbly na janela comercial e sob o teto por hora. Esta tela não retoma o disparo." : "GO autoriza e não envia. Entregar a cohort à fila é o passo seguinte e separado; o envio em si é do worker do Warmbly, dentro da janela comercial e sob o teto por hora. Esta tela continua sem qualquer controle de send, queue ou resume."}</p></section>`;
 }
 
 function warmblySubnav(current: WarmblySurface, resource: string | null | undefined): string {
