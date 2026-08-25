@@ -71,6 +71,14 @@ test("serve-prod compresses substantial static text and leaves small/binary bodi
   assert.deepEqual(encodeStaticResponse(small, "text/css", "gzip"), { body: small, encoding: null });
   const png = Buffer.alloc(2_000, 1);
   assert.deepEqual(encodeStaticResponse(png, "image/png", "gzip"), { body: png, encoding: null });
+  assert.deepEqual(encodeStaticResponse(source, "text/javascript", "gzip;q=0, br"), {
+    body: source,
+    encoding: null,
+  });
+  assert.deepEqual(encodeStaticResponse(source, "text/javascript", "*;q=1, gzip;q=0"), {
+    body: source,
+    encoding: null,
+  });
 });
 
 test("web sources do not bake env secrets into client code", () => {

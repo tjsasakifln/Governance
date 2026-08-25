@@ -13,7 +13,11 @@ import {
 class Target {
   attributes = new Map<string, string>();
 
-  constructor(private readonly actionable: boolean) {}
+  constructor(
+    private readonly actionable: boolean,
+    readonly tagName = "BUTTON",
+    readonly type = "button",
+  ) {}
 
   closest(): Target | null {
     return this.actionable ? this : null;
@@ -41,7 +45,7 @@ test("pointer receipt is synchronous and remains visible for a paint window", ()
   assert.equal(target.attributes.has("data-interaction-received"), false);
 });
 
-test("feedback listens to pointer and keyboard but ignores typing", () => {
+test("feedback listens to pointer and keyboard but ignores text entry", () => {
   const listeners = new Map<string, (event: { target: unknown; key?: string }) => void>();
   const doc = {
     addEventListener(type: string, listener: (event: { target: unknown; key?: string }) => void): void {
@@ -56,6 +60,14 @@ test("feedback listens to pointer and keyboard but ignores typing", () => {
   assert.equal(target.attributes.size, 0);
   listeners.get("keydown")?.({ target, key: "Enter" });
   assert.equal(target.attributes.get("data-interaction-received"), "true");
+
+  for (const editable of [new Target(true, "INPUT", "text"), new Target(true, "TEXTAREA", "")]) {
+    listeners.get("keydown")?.({ target: editable, key: " " });
+    listeners.get("keydown")?.({ target: editable, key: "Enter" });
+    assert.equal(editable.attributes.size, 0);
+    listeners.get("pointerdown")?.({ target: editable });
+    assert.equal(editable.attributes.get("data-interaction-received"), "true");
+  }
 });
 
 test("initial HTML carries useful loading hierarchy before JavaScript", () => {

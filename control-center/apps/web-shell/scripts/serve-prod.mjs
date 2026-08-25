@@ -23,8 +23,22 @@ const TYPES = {
 
 const COMPRESSIBLE_TYPES = /^(?:text\/|application\/(?:json|javascript|manifest\+json))/;
 
+function acceptsGzip(acceptEncoding) {
+  let wildcardQuality = null;
+  for (const item of acceptEncoding.split(",")) {
+    const [name, ...parameters] = item.trim().toLowerCase().split(";").map((part) => part.trim());
+    if (name !== "gzip" && name !== "*") continue;
+    const quality = parameters.find((parameter) => parameter.startsWith("q="));
+    const parsed = quality ? Number.parseFloat(quality.slice(2)) : 1;
+    const value = Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 0;
+    if (name === "gzip") return value > 0;
+    wildcardQuality = value;
+  }
+  return wildcardQuality !== null && wildcardQuality > 0;
+}
+
 export function encodeStaticResponse(body, contentType, acceptEncoding = "") {
-  if (body.byteLength < 1024 || !COMPRESSIBLE_TYPES.test(contentType) || !/(?:^|,|\s)gzip(?:\s|,|;|$)/i.test(acceptEncoding)) {
+  if (body.byteLength < 1024 || !COMPRESSIBLE_TYPES.test(contentType) || !acceptsGzip(acceptEncoding)) {
     return { body, encoding: null };
   }
   return { body: gzipSync(body, { level: 6 }), encoding: "gzip" };

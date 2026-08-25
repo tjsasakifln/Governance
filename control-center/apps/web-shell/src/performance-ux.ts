@@ -1,8 +1,21 @@
 const ACTIONABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary";
 const FEEDBACK_ATTRIBUTE = "data-interaction-received";
 export const INTERACTION_FEEDBACK_HOLD_MS = 120;
+const NON_TEXT_INPUT_TYPES = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
 
 interface FeedbackElement {
+  readonly tagName?: string;
+  readonly type?: string;
   closest(selector: string): FeedbackElement | null;
   setAttribute(name: string, value: string): void;
   removeAttribute(name: string): void;
@@ -33,14 +46,25 @@ function isFeedbackElement(value: unknown): value is FeedbackElement {
     && typeof candidate.removeAttribute === "function";
 }
 
+function isTextEntry(element: FeedbackElement): boolean {
+  const tagName = element.tagName?.toLowerCase();
+  if (tagName === "textarea") return true;
+  if (tagName !== "input") return false;
+  const type = element.type?.toLowerCase() || "text";
+  return !NON_TEXT_INPUT_TYPES.has(type);
+}
+
 export function acknowledgeInteraction(
   event: FeedbackEvent,
   scheduler: FeedbackScheduler,
 ): boolean {
   if (!isFeedbackElement(event.target)) return false;
-  if (event.key !== undefined && event.key !== "Enter" && event.key !== " ") return false;
   const actionable = event.target.closest(ACTIONABLE_SELECTOR);
   if (!actionable) return false;
+  if (event.key !== undefined) {
+    if (event.key !== "Enter" && event.key !== " ") return false;
+    if (isTextEntry(actionable)) return false;
+  }
   actionable.setAttribute(FEEDBACK_ATTRIBUTE, "true");
   scheduler.after(INTERACTION_FEEDBACK_HOLD_MS, () => {
     actionable.removeAttribute(FEEDBACK_ATTRIBUTE);

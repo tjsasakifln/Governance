@@ -168,11 +168,19 @@ try {
         if (!actionable) throw new Error("no actionable element for feedback measurement");
         return await new Promise((resolve, reject) => {
           const started = performance.now();
+          const before = getComputedStyle(actionable);
+          const beforePaint = { filter: before.filter, boxShadow: before.boxShadow };
           const observer = new MutationObserver(() => {
             if (actionable.getAttribute("data-interaction-received") !== "true") return;
             observer.disconnect();
-            const style = getComputedStyle(actionable);
-            resolve({ ms: performance.now() - started, painted: style.filter !== "none" || style.boxShadow !== "none" });
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+              const style = getComputedStyle(actionable);
+              resolve({
+                ms: performance.now() - started,
+                painted: actionable.getAttribute("data-interaction-received") === "true"
+                  && (style.filter !== beforePaint.filter || style.boxShadow !== beforePaint.boxShadow),
+              });
+            }));
           });
           observer.observe(actionable, { attributes: true, attributeFilter: ["data-interaction-received"] });
           actionable.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
