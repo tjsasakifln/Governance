@@ -44,6 +44,8 @@ O catálogo é exportado pelo mesmo global do shell e renderizado pelos mesmos h
 
 O E2E injeta o catálogo dentro do shell real em `390 × 844` e `1440 × 1000`, executa axe WCAG 2.2 AA, overflow e contexto de scroll, e salva screenshots no artefato visual. O CI exige `component_catalog=PASS components=10 viewports=2 axe_checks=2`.
 
+A integração com o gate de performance reutiliza as classes existentes de card, fila e orientação. O custo deliberado dos tokens e estados semânticos eleva o teto de CSS cru de 24.000 para 26.000 bytes; os tetos comprimidos permanecem 7.000 bytes para CSS e 120.000 bytes para o bundle total. Assim, o contrato novo cabe no orçamento publicado sem esconder o custo de fonte nem afrouxar a entrega efetiva pela rede.
+
 ## Migração e exceções
 
 A adoção é progressiva: este primeiro recorte consolida cabeçalho, orientação, ação e feedback globais. Formulários, fila, detalhe e confirmação já têm seletores reais documentados; superfícies de domínio migram para os helpers quando forem alteradas, sem refatoração big bang.

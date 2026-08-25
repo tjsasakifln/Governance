@@ -123,10 +123,10 @@ export function renderOperationalComponentCatalog(): string {
       <h2 id="catalog-summary-title">Resumo de estado</h2>
       <p><strong>Estado:</strong> leitura parcial. <strong>Risco:</strong> desconhecido. <strong>Próxima ação:</strong> confirmar a origem.</p>
     </section>
-    <section aria-labelledby="catalog-feedback-title"><h2 id="catalog-feedback-title">Feedback e estados</h2><div class="component-catalog-grid" data-view-state="loading">${feedback}</div></section>
+    <section aria-labelledby="catalog-feedback-title"><h2 id="catalog-feedback-title">Feedback e estados</h2><div class="component-catalog-grid cards" data-view-state="loading">${feedback}</div></section>
     <section aria-labelledby="catalog-priority-title"><h2 id="catalog-priority-title">Prioridade e fila</h2>
       <article class="card priority" data-operational-component="priority"><p class="kicker"><span class="pill">Prioridade 1</span></p><h3>Resolver identidade ausente sem inventar cliente</h3><p>${longText}</p></article>
-      <ul class="review-queue" aria-label="Fila de revisão extrema"><li class="review-queue-item" data-review-list-item="catalog-long"><strong>Mensagem com destinatário ausente</strong><p>${longText}</p></li></ul>
+      <ul class="review-queue" aria-label="Fila de revisão extrema"><li class="review-queue-item card" data-review-list-item="catalog-long"><strong>Mensagem com destinatário ausente</strong><p>${longText}</p></li></ul>
     </section>
     <section aria-labelledby="catalog-action-title"><h2 id="catalog-action-title">Ação, formulário e confirmação</h2>
       ${operationalActionBar({ label: "Ações da fixture", primary: { label: "Confirmar leitura", href: "#catalog-form" }, secondary: [{ label: "Voltar à evidência", href: "#catalog-detail" }] })}

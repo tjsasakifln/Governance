@@ -24,7 +24,7 @@
     "initial_request_count": 16,
     "javascript_raw_bytes": 375000,
     "javascript_gzip_bytes": 110000,
-    "css_raw_bytes": 24000,
+    "css_raw_bytes": 26000,
     "css_gzip_bytes": 7000,
     "bundle_gzip_bytes": 120000
   }
