@@ -38,6 +38,7 @@ const AUTHELIA = {
   "Remote-Name": "Founder Confenge",
   "Remote-Email": "founder@confenge.invalid",
 };
+const AUTHELIA_ADMIN = { ...AUTHELIA, "Remote-Groups": "admins,operators" };
 
 function adjustBody(extra: Record<string, unknown> = {}): string {
   return JSON.stringify({
@@ -346,7 +347,7 @@ test("adjust accepts no client-settable actor and no identity from an untrusted 
   }
 });
 
-test("the current mount exposes no GO, cohort dispatch, send or queue route", async () => {
+test("the mount forbids cohort dispatch and exposes only admin reconciliation plus operator status", async () => {
   const upstream = await stubWarmbly();
   const { dir, path } = credentialFile();
   try {
@@ -361,8 +362,6 @@ test("the current mount exposes no GO, cohort dispatch, send or queue route", as
         const hostile = [
           `/v1/warmbly/operator/cohorts/${COHORT}/send`,
           `/v1/warmbly/operator/cohorts/${COHORT}/queue`,
-          `/v1/warmbly/operator/cohorts/${COHORT}/decision`,
-          `/v1/warmbly/operator/cohorts/${COHORT}/dispatch`,
           `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/send`,
           `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/dispatch`,
           `/v1/warmbly/operator/cohorts/${COHORT}/candidates/${CANDIDATE}/adjust/send`,
@@ -376,6 +375,52 @@ test("the current mount exposes no GO, cohort dispatch, send or queue route", as
           assert.ok(res.status === 404, `${route} answered ${res.status}`);
           await res.text();
         }
+
+        // The old cohort dispatch and GO routes are absent even for admins.
+        const asOperators = await fetch(`${base}/v1/warmbly/operator/cohorts/${COHORT}/dispatch`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...AUTHELIA },
+          body: adjustBody(),
+        });
+        assert.equal(asOperators.status, 404, "cohort dispatch is outside the human-gate allowlist");
+        await asOperators.text();
+        const oldGo = await fetch(`${base}/v1/warmbly/operator/cohorts/${COHORT}/decision`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...AUTHELIA_ADMIN },
+          body: JSON.stringify({ decision: "GO", reason: "fixture", idempotency_key: "idem-old-go" }),
+        });
+        assert.equal(oldGo.status, 404, "GO is no longer a live route");
+        await oldGo.text();
+
+        // Repair is the one admin-only global write. The role refusal happens
+        // at the edge, and the accepted call forwards an empty body and fixed path.
+        const reconcilePath = "/v1/warmbly/operator/cohorts/reconcile-approved";
+        const deniedRepair = await fetch(`${base}${reconcilePath}`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...AUTHELIA },
+          body: JSON.stringify({ idempotency_key: "idem-reconcile-denied" }),
+        });
+        assert.equal(deniedRepair.status, 403);
+        const deniedBody = (await deniedRepair.json()) as Record<string, unknown>;
+        assert.equal(deniedBody.code, "insufficient_human_gate_role");
+
+        const repaired = await fetch(`${base}${reconcilePath}?redirect=/v1/confenge/send`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...AUTHELIA_ADMIN },
+          body: JSON.stringify({ idempotency_key: "idem-reconcile-accepted", limit: 999 }),
+        });
+        assert.equal(repaired.status, 201);
+        await repaired.text();
+        const repairHit = upstream.hits.at(-1)!;
+        assert.equal(repairHit.url, "/v1/confenge/cohorts/reconcile-approved");
+        assert.equal(repairHit.body, "{}", "write query and caller payload are discarded");
+
+        const status = await fetch(`${base}/v1/warmbly/operator/outbound-status`, {
+          headers: AUTHELIA,
+        });
+        assert.equal(status.status, 201);
+        await status.text();
+        assert.equal(upstream.hits.at(-1)?.url, "/v1/confenge/status");
 
         // `fetch` collapses `..` before the request line is written, so a raw
         // socket is the only way to make the server itself see the traversal.
@@ -396,7 +441,11 @@ test("the current mount exposes no GO, cohort dispatch, send or queue route", as
         assert.doesNotMatch(raw, /adjust:r1/, "traversal must not reach the cohort surface");
       },
     );
-    assert.deepEqual(upstream.hits, [], "no hostile cohort route may reach Warmbly");
+    assert.deepEqual(
+      upstream.hits.map((hit) => hit.url),
+      ["/v1/confenge/cohorts/reconcile-approved", "/v1/confenge/status"],
+      "only the two fixed allowed calls may reach Warmbly",
+    );
   } finally {
     await upstream.close();
     rmSync(dir, { recursive: true, force: true });

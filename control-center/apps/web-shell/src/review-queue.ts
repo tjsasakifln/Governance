@@ -88,7 +88,7 @@ function idOf(value: unknown): string {
  * An APPROVE the server itself marks `effective: false` was invalidated by
  * drift — recipient, copy, policy or evidence moved under it — so it is work
  * again, and hiding it from the pending recorte would hide exactly the message
- * that has to be re-decided before GO. HOLD and REJECT carry no `effective`
+ * that has to be reviewed again before it can be scheduled. HOLD and REJECT carry no `effective`
  * flag of their own: they are decisions, not authorisations.
  */
 export function serverReviewState(candidate: Record<string, unknown>): ReviewQueueState {

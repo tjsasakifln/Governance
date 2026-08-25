@@ -44,7 +44,8 @@ async function loadChromium() {
 const chromium = await loadChromium();
 
 const BASE = process.argv[2];
-// Same stack, forward-auth identity carrying `admins`. GO and dispatch live there.
+// Same stack, forward-auth identity carrying both groups. APPROVE remains with
+// operators; only idempotent approval repair is admins-only.
 const ADMIN_BASE = process.argv[3] ?? BASE;
 const exe = process.env.CC_CHROMIUM ?? (process.env.HOME + "/.cache/ms-playwright/chromium-1237/chrome-linux64/chrome");
 
@@ -87,6 +88,15 @@ if (await openReview.count() > 0) {
   await page.waitForTimeout(1200);
 }
 check("clicking through reaches a review with a resource", /#\/warmbly\/revisao/.test(page.url()) && /[0-9a-f-]{36}/.test(page.url()), page.url().split("#")[1] || "");
+
+// ---- 2b. Server-owned outbound block is visible before review work
+const outbound = page.locator("[data-outbound-status='blocked']").first();
+check("the server-owned outbound block is visible at the top", await outbound.count() === 1);
+const outboundText = await outbound.innerText().catch(() => "");
+check("the kill switch warning says APPROVE still queues but cannot leave",
+  /APPROVE enfileira/.test(outboundText) && /nenhuma mensagem sai/.test(outboundText)
+  && /Kill switch reportado\s+acionado/.test(outboundText.replace(/\n+/g, " ")),
+  outboundText.replace(/\s+/g, " ").slice(0, 120));
 
 // ---- 3. The message is readable by default
 // data-candidate sits on each per-candidate FORM (validate, approve, hold,
@@ -142,6 +152,8 @@ const cardBefore = await page.locator("[data-candidate-id]").count();
 check("the approve control carries no required motive and no acknowledgement checkbox",
   await page.locator("form.approve-form [name='ack']").count() === 0
   && await page.locator("form.approve-form [name='reason'][required]").count() === 0);
+check("the button says approval queues for sending",
+  /Aprovar e enfileirar para envio/.test(await firstApprove.innerText().catch(() => "")));
 await firstApprove.focus();
 const pendingBeforeShortcutGuards = await page.locator("[data-queue-progress-text]").first().innerText();
 await page.evaluate(() => {
@@ -216,7 +228,14 @@ check("HOLD/REJECT still demand a written motive",
 
 // ---- 10. RBAC is visible
 check("effective operator capability is shown", await page.locator("[data-can-review]").count() > 0);
-check("GO authority is stated explicitly", await page.locator("[data-go-authority], [data-can-decide]").count() > 0);
+check("operators can approve and the screen states that it enqueues",
+  await page.locator("[data-can-review='true']").count() > 0
+  && /APPROVE enfileira/.test(await page.locator("[data-operator-identity]").first().innerText().catch(() => "")));
+check("operators cannot run the admin repair",
+  await page.locator("[data-can-reconcile='false']").count() > 0
+  && await page.locator("[data-reconcile-submit][disabled]").count() === 1);
+check("GO and cohort dispatch controls are absent",
+  await page.locator("form[data-human-gate='decide'], form[data-human-gate='dispatch']").count() === 0);
 
 // ---- 11. Adjust: two-step, diff before write, then vN+1
 const adjustEditor = page.locator("[data-adjust-editor]").first();
@@ -277,32 +296,63 @@ await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(1000);
 check("a reload keeps the same resource", page.url() === before, page.url().split("#")[1] || "");
 
-// ---- 11b. On the new version: decide everything, GO, then hand it to the queue
+// ---- 11b. On the new version: APPROVE itself schedules; admin repair is exceptional
 //
-// This is where the founder actually ends. v2 was frozen with every validation
-// reset, so approving here also exercises the auto-verification path, and the
-// one recipient that never verifies has to be held by hand before GO is
-// possible at all. GO and dispatch are admins-only, so this runs against the
-// forward-auth identity that carries that group — and the operators-only page
-// is checked first, to prove the refusal is real and not merely cosmetic.
+// v2 was frozen with every validation reset. The two forward-auth identities
+// prove the deliberate RBAC split: operators approve-and-queue, while admins
+// may only replay the same path for already-recorded approvals.
 if (adjusted) {
   const v2 = (page.url().split("resource=")[1] || "").slice(0, 36);
 
-  // The operators-only identity must not be able to decide or dispatch.
-  check("an operators-only session cannot register GO", 
-    await page.locator("form[data-human-gate='decide'] button[disabled]").count() > 0);
-  check("and is told which group it is missing",
-    await page.locator("[data-go-authority='absent']").count() > 0);
+  check("the operators-only identity has enabled approve-and-queue controls",
+    await page.locator("[data-approve-submit]:not([disabled])").count() > 0);
+  check("the operators-only identity cannot run reconciliation",
+    await page.locator("[data-reconcile-submit][disabled]").count() === 1);
+  const deniedRepairResponse = await fetch(`${BASE}/v1/warmbly/operator/cohorts/reconcile-approved`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ idempotency_key: "journey-operator-repair-denied" }),
+  });
+  const deniedRepair = deniedRepairResponse.status;
+  await deniedRepairResponse.text();
+  check("operators are refused at the edge before admin repair reaches Warmbly", deniedRepair === 403,
+    `HTTP ${deniedRepair}`);
 
   const admin = await newPage();
   await admin.goto(`${ADMIN_BASE}/#/warmbly/revisao?resource=${v2}&estado=todas`, { waitUntil: "networkidle" });
   await admin.waitForTimeout(1400);
   const title = await admin.locator("#review-title").innerText().catch(() => "");
-  check("the admins session opens the same version", /v2/i.test(title), title);
+  check("the admins+operators session opens the same version", /v2/i.test(title), title);
+  check("that identity can run the explicit repair",
+    await admin.locator("[data-reconcile-submit]:not([disabled])").count() === 1);
 
-  // Approve everything except the mailbox the stand-in refuses to verify.
-  // Always taking `.first()` would spend every round re-clicking that one: its
-  // approval correctly stops before APPROVE, so it never leaves the queue.
+  // Two tabs approve the same candidate from the same initial server state.
+  // Warmbly projects one scheduling record on the candidate, so neither a
+  // double write nor two browser views can create a second queued message.
+  const racingTab = await newPage();
+  await racingTab.goto(`${ADMIN_BASE}/#/warmbly/revisao?resource=${v2}&estado=todas`, { waitUntil: "networkidle" });
+  await racingTab.waitForTimeout(1200);
+  const raceCard = admin
+    .locator("[data-candidate-id]")
+    .filter({ hasNotText: "empresa-quatro" })
+    .locator("[data-approve-submit]:not([disabled])")
+    .first();
+  const raceId = await raceCard.evaluate((button) =>
+    button.closest("[data-candidate-id]")?.getAttribute("data-candidate-id") || "",
+  ).catch(() => "");
+  const otherRace = racingTab
+    .locator(`[data-candidate-id="${raceId}"] [data-approve-submit]:not([disabled])`)
+    .first();
+  if (raceId && await otherRace.count() > 0) {
+    await Promise.all([raceCard.click(), otherRace.click()]);
+    await Promise.all([admin.waitForTimeout(2200), racingTab.waitForTimeout(2200)]);
+  }
+  check("two tabs approving the same candidate leave one queued scheduling record",
+    raceId !== ""
+    && await admin.locator(`[data-candidate-id="${raceId}"][data-queue-state='aprovado'] [data-scheduling-confirmed='true']`).count() === 1);
+  await racingTab.close();
+
+  // Approve everything else except the mailbox the stand-in refuses to verify.
   for (let round = 0; round < 6; round += 1) {
     const btn = admin
       .locator("[data-candidate-id]")
@@ -314,13 +364,9 @@ if (adjusted) {
     await admin.waitForTimeout(2200);
   }
   const stillPending = await admin.locator("[data-queue-pending]").first().getAttribute("data-queue-pending");
-  check("approving drains v2 down to the recipient that cannot be verified", stillPending === "1",
+  check("approve-and-queue drains v2 down to the recipient that cannot verify", stillPending === "1",
     `${stillPending} pending`);
 
-  // The stubborn one is held by hand, with a written motive.
-  // Scoped to the card that is actually stuck. `.first()` on the whole page
-  // would land on an already-approved candidate and flip it out of Aprovadas —
-  // which is exactly what it did the first time this journey ran.
   const hold = admin
     .locator("[data-candidate-id]")
     .filter({ hasText: "empresa-quatro" })
@@ -334,50 +380,34 @@ if (adjusted) {
   const progress2 = await admin.locator("[data-queue-progress-text]").first().innerText().catch(() => "");
   check("nothing is left pending on v2", /0 pendente/.test(progress2), progress2.replace(/\s+/g, " "));
 
-  // Dispatch must not be on the page before GO.
-  check("no dispatch control exists before GO", await admin.locator("form[data-human-gate='dispatch']").count() === 0);
-  check("and the page says why", await admin.locator("[data-dispatch-gate='no-go']").count() > 0);
+  const scheduledCards = admin.locator("[data-queue-state='aprovado'] [data-scheduling-confirmed='true']");
+  check("all four approvals are QUEUED with due_at and auto_send=true, without GO",
+    await scheduledCards.count() === 4
+    && await admin.locator("[data-scheduling-state='QUEUED']").count() === 4
+    && await admin.locator("[data-scheduling-confirmed='true']").filter({ hasText: "auto_send da mensagem" }).count() === 4,
+    `${await scheduledCards.count()} scheduled cards`);
+  check("kill switch remains visible after approval and says queued mail cannot leave",
+    await admin.locator("[data-outbound-status='blocked']").count() === 1
+    && /nenhuma mensagem sai/.test(await admin.locator("[data-outbound-status='blocked']").innerText().catch(() => "")));
+  check("there is still no GO or cohort dispatch after every decision",
+    await admin.locator("form[data-human-gate='decide'], form[data-human-gate='dispatch']").count() === 0);
 
-  // GO.
-  const go = admin.locator("form[data-human-gate='decide']").first();
-  await go.locator("select[name='decision']").selectOption("GO");
-  await go.locator("[name='reason']").first().fill("cohort revisada e aprovada pelo fundador");
-  await go.locator("[name='confirmation']").first().fill("v2");
-  await go.locator("button[type=submit]").first().click();
-  await admin.waitForTimeout(2200);
-  const goOutcome = await admin.locator("[data-write-result]").first().innerText().catch(() => "");
-  check("GO is registered on the version", /EXECUTADA/.test(goOutcome), goOutcome.replace(/\s+/g, " ").slice(0, 70));
-
-  // Only now does the dispatch control exist.
-  const dispatchForm = admin.locator("form[data-human-gate='dispatch']");
-  const hasDispatch = await dispatchForm.count() === 1;
-  check("the dispatch control appears only after GO", hasDispatch);
-  if (!hasDispatch) { await admin.close(); throw new Error("dispatch control absent after GO"); }
-  check("it states that it queues and does not send",
-    (await admin.locator("[data-dispatch-meaning]").first().innerText().catch(() => "")).includes("não envia e-mail"));
-  check("it names the gates Warmbly still enforces",
-    (await admin.locator("[data-dispatch-gates]").first().innerText().catch(() => "")).includes("kill switch"));
-
-  // The cohort reaches the queue only with the typed version.
-  await dispatchForm.locator("[name='confirmation']").first().fill("v2");
-  await dispatchForm.locator("button[type=submit]").first().click();
-  await admin.waitForTimeout(2600);
-  const counts = await admin.locator("[data-dispatch-counts]").first().innerText().catch(() => "");
-  check("the cohort reached the queue and the numbers come from the server",
-    /Tentados/.test(counts) && /Aceitos pelo provedor/.test(counts), counts.replace(/\s+/g, " ").slice(0, 90));
-  check("the outcome says queued, not delivered",
-    (await admin.locator("[data-dispatch-not-sent]").first().innerText().catch(() => "")).includes("não de entrega"));
-  check("the dispatch carried a receipt",
-    /receipt|recibo/i.test(await admin.locator("[data-write-evidence]").first().innerText().catch(() => "")));
-
-  // Repeating is safe, and the server is what says so.
-  await admin.locator("form[data-human-gate='dispatch'] [name='confirmation']").first().fill("v2");
-  await admin.locator("form[data-human-gate='dispatch'] button[type=submit]").first().click();
-  await admin.waitForTimeout(2600);
-  const again = await admin.locator("[data-dispatch-counts]").first().innerText().catch(() => "");
-  const dup = (again.match(/Pulados por duplicidade\s*(\d+)/) || [])[1];
-  check("a repeated dispatch queues nothing new and counts the duplicates", dup !== undefined && Number(dup) > 0,
-    again.replace(/\s+/g, " ").slice(0, 90));
+  // Admin repair runs twice. The first and second calls both find the same
+  // already-scheduled bindings; the second cannot duplicate anything.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await admin.locator("[data-reconcile-submit]:not([disabled])").click();
+    await admin.waitForTimeout(2200);
+  }
+  const reconciliation = await admin.locator("[data-reconcile-counts]").first().innerText().catch(() => "");
+  check("reconciliation reports server counts after a second execution",
+    /Registros APPROVE no histórico/.test(reconciliation)
+    && /Candidatos únicos aprovados/.test(reconciliation)
+    && /Agendados agora\s*0/.test(reconciliation)
+    && /Já agendados\s*[1-9]/.test(reconciliation),
+    reconciliation.replace(/\s+/g, " ").slice(0, 160));
+  check("the second repair is confirmed by server reread and carries a receipt",
+    await admin.locator("[data-readback='confirmed']").count() > 0
+    && /receipt|recibo/i.test(await admin.locator("[data-write-evidence]").first().innerText().catch(() => "")));
   await admin.close();
 }
 
@@ -402,6 +432,8 @@ const approvedCards = await reviewed.locator("[data-queue-state='aprovado']").co
 check("the approved recorte holds exactly the two decided messages, with no second APPROVE offered",
   approvedCards === 2 && await reviewed.locator("[data-gate-key$=':APPROVE']").count() === 0,
   `${approvedCards} approved cards`);
+check("both pre-adjustment approvals were scheduled by the same APPROVE call",
+  await reviewed.locator("[data-scheduling-confirmed='true'][data-scheduling-state='QUEUED']").count() === 2);
 
 // ---- 12c. The queue works on a phone
 await reviewed.setViewportSize({ width: 390, height: 844 });

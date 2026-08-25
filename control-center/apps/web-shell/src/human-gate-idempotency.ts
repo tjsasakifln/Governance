@@ -5,13 +5,13 @@
  */
 
 export interface HumanGateIntent {
-  action: "create" | "reproduce" | "validate" | "review" | "reconcile" | "decide" | "adjust" | "dispatch";
+  action: "create" | "reproduce" | "validate" | "review" | "adjust" | "reconcile";
   version_id?: string;
   candidate_id?: string;
   limit?: number;
   selection_mode?: "NEXT_UNCLAIMED" | "RECOVER_PRIOR";
   recover_version_ids?: string[];
-  decision?: "GO" | "NO_GO" | "APPROVE" | "REJECT" | "HOLD";
+  decision?: "APPROVE" | "REJECT" | "HOLD";
   reason?: string;
   acknowledged?: boolean;
   confirmation?: string;

@@ -146,60 +146,23 @@ function gateFallbackMessage(input: WarmblyGateInput, version: number | undefine
       return "Verificação do destinatário solicitada ao Warmbly.";
     case "review":
       return input.decision === "APPROVE"
-        ? "Aprovação registrada e mensagem agendada para a próxima janela comercial elegível."
+        ? "Aprovação registrada e mensagem agendada para a próxima janela comercial."
         : input.decision === "HOLD"
           ? "HOLD registrado para este candidato."
           : "Rejeição registrada para este candidato.";
-    case "reconcile":
-      return "Aprovações duráveis reconciliadas com a fila do Warmbly.";
-    case "decide":
-      return input.decision === "GO"
-        ? "GO registrado. Nenhum e-mail foi enfileirado nem enviado."
-        : "NO-GO registrado.";
     case "adjust":
       return `Ajuste aceito. O servidor criou a nova versão${v}.`;
-    case "dispatch":
-      return "Cohort entregue à fila do Warmbly. O envio acontece na janela comercial, sob o teto por hora.";
+    case "reconcile":
+      return "Reconciliação concluída pelo mesmo caminho de agendamento do APPROVE.";
   }
 }
 
 /**
- * The counters Warmbly returns for a bounded dispatch.
+ * The counters Warmbly returns for approval reconciliation.
  *
- * Read out of the response rather than summarised into a sentence: "10
- * enfileirados" and "3 enfileirados, 7 bloqueados" are different outcomes and
- * the operator has to see which one happened. Anything the server did not send
- * stays absent instead of becoming a zero.
+ * Read out of the response rather than guessed from the approval history.
+ * Anything the server did not send stays absent instead of becoming a zero.
  */
-export function gateDispatchOf(body: Record<string, unknown>): AdapterWriteResult["dispatch"] {
-  const data = asRecord(body.data) ?? body;
-  const num = (key: string): number | undefined => gateNumber(data[key]);
-  const counts = {
-    ...(num("attempted") !== undefined ? { attempted: num("attempted")! } : {}),
-    ...(num("provider_accepted") !== undefined ? { accepted: num("provider_accepted")! } : {}),
-    ...(num("failed") !== undefined ? { failed: num("failed")! } : {}),
-    ...(num("skipped_duplicate") !== undefined ? { skippedDuplicate: num("skipped_duplicate")! } : {}),
-    ...(num("blocked") !== undefined ? { blocked: num("blocked")! } : {}),
-    ...(num("max_daily") !== undefined ? { maxDaily: num("max_daily")! } : {}),
-    ...(typeof data.kill_switch_available === "boolean"
-      ? { killSwitchAvailable: data.kill_switch_available }
-      : {}),
-  };
-  const failures = Array.isArray(data.failures)
-    ? data.failures
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is Record<string, unknown> => entry !== null)
-        .map((entry) => ({
-          mailbox: typeof entry.mailbox === "string" ? entry.mailbox : "",
-          reason: typeof entry.reason === "string" ? entry.reason : "",
-        }))
-        .filter((entry) => entry.mailbox !== "" || entry.reason !== "")
-    : [];
-  if (Object.keys(counts).length === 0 && failures.length === 0) return undefined;
-  return { ...counts, ...(failures.length > 0 ? { failures } : {}) };
-}
-
-/** Read the backend's naturally idempotent approval-reconciliation report. */
 export function gateReconcileOf(body: Record<string, unknown>): AdapterWriteResult["reconcile"] {
   const data = asRecord(body.data) ?? body;
   const num = (key: string): number | undefined => gateNumber(data[key]);
@@ -212,7 +175,9 @@ export function gateReconcileOf(body: Record<string, unknown>): AdapterWriteResu
       ? { uniqueApprovedCandidates: num("unique_approved_candidates")! }
       : {}),
     ...(num("scheduled") !== undefined ? { scheduled: num("scheduled")! } : {}),
-    ...(num("already_scheduled") !== undefined ? { alreadyScheduled: num("already_scheduled")! } : {}),
+    ...(num("already_scheduled") !== undefined
+      ? { alreadyScheduled: num("already_scheduled")! }
+      : {}),
     ...(num("failed") !== undefined ? { failed: num("failed")! } : {}),
   };
   const failures = Array.isArray(data.failures)
@@ -220,11 +185,11 @@ export function gateReconcileOf(body: Record<string, unknown>): AdapterWriteResu
         .map((entry) => asRecord(entry))
         .filter((entry): entry is Record<string, unknown> => entry !== null)
         .map((entry) => ({
-          cohortVersionId: typeof entry.cohort_version_id === "string" ? entry.cohort_version_id : "",
-          candidateId: typeof entry.candidate_id === "string" ? entry.candidate_id : "",
+          ...(typeof entry.cohort_version_id === "string" ? { cohortId: entry.cohort_version_id } : {}),
+          ...(typeof entry.candidate_id === "string" ? { candidateId: entry.candidate_id } : {}),
           reason: typeof entry.reason === "string" ? entry.reason : "",
         }))
-        .filter((entry) => entry.cohortVersionId !== "" || entry.candidateId !== "" || entry.reason !== "")
+        .filter((entry) => entry.cohortId !== undefined || entry.candidateId !== undefined || entry.reason !== "")
     : [];
   if (Object.keys(counts).length === 0 && failures.length === 0) return undefined;
   return { ...counts, ...(failures.length > 0 ? { failures } : {}) };
@@ -269,16 +234,28 @@ export function gateResult(
     gateText(adjustment ?? {}, "correlation_id")
     ?? gateText(body, "correlation_id")
     ?? gateText(body, "edge_correlation_id");
+  const upstreamOutcome = gateText(body, "outcome")?.toUpperCase();
+  const outcome = upstreamOutcome === "UNKNOWN"
+    ? "unknown"
+    : upstreamOutcome === "REFUSED"
+      ? "refused"
+      : upstreamOutcome === "APPLIED"
+        ? "executed"
+        : ok
+          ? "executed"
+          : status >= 500
+            ? "unknown"
+            : "refused";
   return {
     ok,
     path,
     kind: "nota",
     status,
-    outcome: ok ? "executed" : status === 503 ? "unknown" : "refused",
+    outcome,
     message: serverMessage ?? gateFallbackMessage(input, version),
     gateAction: input.action,
     ...(code ? { code } : {}),
-    ...(input.version_id || input.candidate_id
+    ...(input.action !== "reconcile" && (input.version_id || input.candidate_id)
       ? {
           gateTarget: {
             ...(input.version_id ? { cohort_id: input.version_id } : {}),
@@ -297,11 +274,6 @@ export function gateResult(
     ...(receipt ? { receiptId: receipt } : {}),
     ...(correlation ? { correlationId: correlation } : {}),
     ...(diff ? { diff } : {}),
-    ...(() => {
-      if (input.action !== "dispatch" || !ok) return {};
-      const dispatch = gateDispatchOf(body);
-      return dispatch ? { dispatch } : {};
-    })(),
     ...(() => {
       if (input.action !== "reconcile" || !ok) return {};
       const reconcile = gateReconcileOf(body);
@@ -487,15 +459,15 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       : input.action === "reproduce" ? `${base}/${version}/reproduce`
       : input.action === "validate" ? `${base}/${version}/candidates/${candidate}/validation`
       : input.action === "review" ? `${base}/${version}/candidates/${candidate}/review`
-      : input.action === "adjust" ? `${base}/${version}/candidates/${candidate}/adjust`
-      : input.action === "dispatch" ? `${base}/${version}/dispatch`
-      : `${base}/${version}/decision`;
+      : `${base}/${version}/candidates/${candidate}/adjust`;
     // Every refusal below happens before the wire, so "nada foi aplicado" is a
     // fact this adapter can prove rather than a hope.
-    const target = {
-      ...(version ? { cohort_id: version } : {}),
-      ...(candidate ? { candidate_id: candidate } : {}),
-    };
+    const target = input.action === "reconcile"
+      ? {}
+      : {
+          ...(version ? { cohort_id: version } : {}),
+          ...(candidate ? { candidate_id: candidate } : {}),
+        };
     const refuse = (message: string, code: string): AdapterWriteResult => {
       const refusal: AdapterWriteResult = {
         ok: false,
@@ -541,22 +513,6 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       && !input.reason?.trim()
     ) {
       return refuse("HOLD/REJECT exige motivo escrito", "gate_precondition");
-    }
-    if (input.action === "decide" && !input.confirmation?.trim()) {
-      return refuse(
-        "GO/NO-GO exige a confirmação digitada da versão imutável",
-        "cohort_version_confirmation_required",
-      );
-    }
-    // Dispatch is the one call in this gate whose effect leaves the building:
-    // Warmbly enqueues real messages to real companies and its worker delivers
-    // them. It therefore carries the same typed confirmation GO does, refused
-    // here before the wire rather than after.
-    if (input.action === "dispatch" && !input.confirmation?.trim()) {
-      return refuse(
-        "Disparar a cohort exige a confirmação digitada da versão imutável",
-        "cohort_version_confirmation_required",
-      );
     }
     if (input.action === "adjust") {
       // The three editable fields plus the two anti-clobber tokens. An adjust
@@ -1034,7 +990,10 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       // opens on a stepper that has to say where the pilot actually stands. A
       // gate the channel cannot serve must not take the whole destination down
       // with it, so these reads are soft and report their own status.
-      const list = await this.readGate("/v1/warmbly/operator/cohorts?limit=50");
+      const [list, outboundStatus] = await Promise.all([
+        this.readGate("/v1/warmbly/operator/cohorts?limit=50"),
+        this.readGate("/v1/warmbly/operator/outbound-status"),
+      ]);
       const selected = parsed.resource
         ? await this.readGate(`/v1/warmbly/operator/cohorts/${encodeURIComponent(parsed.resource)}`)
         : undefined;
@@ -1042,6 +1001,9 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         list: list.data ?? {},
         list_status: list.status,
         ...(list.detail ? { list_detail: list.detail } : {}),
+        outbound_status: outboundStatus.data ?? {},
+        outbound_status_status: outboundStatus.status,
+        ...(outboundStatus.detail ? { outbound_status_detail: outboundStatus.detail } : {}),
         ...(selected
           ? {
               selected: selected.data ?? {},

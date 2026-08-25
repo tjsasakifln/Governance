@@ -23,10 +23,10 @@ export const WARMBLY_COHORTS_PREFIX = "/v1/confenge/cohorts";
 
 /**
  * Every operation the human gate can name. There is deliberately no generic
- * proxy entry and no `send`, `queue`, `resume` or `payment` member: the type
+ * proxy entry and no `send`, `dispatch`, `queue`, `resume` or `payment` member: the type
  * itself is part of the security boundary.
  *
- * `reconcile_approved` is the admin-only bridge for approvals that predate
+ * `reconcile` is the admin-only bridge for approvals that predate
  * approval-time scheduling. It names exactly one fixed route and does not
  * accept a caller-selected cohort or candidate. On the current contract
  * APPROVE itself asks Warmbly to create the queued touchpoint, and the worker
@@ -34,6 +34,7 @@ export const WARMBLY_COHORTS_PREFIX = "/v1/confenge/cohorts";
  * remains paused. There is no GO or cohort-dispatch operation in this surface.
  */
 export const HUMAN_GATE_OPERATIONS = [
+  "read_status",
   "list_cohorts",
   "read_cohort",
   "read_candidate",
@@ -42,7 +43,7 @@ export const HUMAN_GATE_OPERATIONS = [
   "validation",
   "review",
   "adjust",
-  "reconcile_approved",
+  "reconcile",
 ] as const;
 export type HumanGateOperation = (typeof HUMAN_GATE_OPERATIONS)[number];
 
@@ -53,7 +54,7 @@ export const HUMAN_GATE_WRITE_OPERATIONS = [
   "validation",
   "review",
   "adjust",
-  "reconcile_approved",
+  "reconcile",
 ] as const;
 
 /**
@@ -61,12 +62,13 @@ export const HUMAN_GATE_WRITE_OPERATIONS = [
  * Kept as data so `tests/human-gate-negative-allowlist.test.ts` can enumerate
  * them instead of a reviewer having to remember the list.
  *
- * Approval-time scheduling is the only way the current gate can put reviewed
- * content into Warmbly's queue. GO and cohort dispatch are intentionally
- * unconstructable here.
+ * `APPROVE` is the only ordinary path to queue work. Reconciliation is a fixed
+ * admin repair route that replays that same server path; it is not a generic
+ * dispatch capability.
  */
 export const FORBIDDEN_HUMAN_GATE_SEGMENTS = [
   "send",
+  "dispatch",
   "queue",
   "resume",
   "auto-send",
@@ -77,7 +79,6 @@ export const FORBIDDEN_HUMAN_GATE_SEGMENTS = [
   "enroll",
   "deliver",
   "decision",
-  "dispatch",
 ] as const;
 
 /** How a call ended. `UNKNOWN` is never collapsed into `REFUSED`. */

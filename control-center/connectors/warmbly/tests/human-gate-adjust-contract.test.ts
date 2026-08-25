@@ -53,20 +53,24 @@ test("adjust is one POST route under the operators role and nothing else", () =>
   assert.equal(
     adjust[0]?.role,
     "operators",
-    "adjust carries the same permission as review, never the admins-only GO permission",
+    "adjust carries the same permission as review, never the admins-only repair permission",
   );
+  const reconcile = HUMAN_GATE_ROUTES.filter((route) => route.operation === "reconcile");
+  assert.equal(reconcile.length, 1, "reconciliation must have exactly one route");
+  assert.equal(reconcile[0]?.method, "POST");
+  assert.equal(reconcile[0]?.role, "admins", "repair stays admins-only");
+  const status = HUMAN_GATE_ROUTES.filter((route) => route.operation === "read_status");
+  assert.equal(status.length, 1, "outbound status must have exactly one route");
+  assert.equal(status[0]?.method, "GET");
+  assert.equal(status[0]?.role, "operators");
   assert.deepEqual(
     HUMAN_GATE_ROUTES.filter((r) => r.method === "POST").map((r) => r.operation).sort(),
     [...HUMAN_GATE_WRITE_OPERATIONS].sort(),
     "the write surface is exactly the six declared operations",
   );
-  assert.equal(HUMAN_GATE_OPERATIONS.length, 9, "three reads plus six writes; nothing else exists");
-  const reconcile = HUMAN_GATE_ROUTES.filter((route) => route.operation === "reconcile_approved");
-  assert.equal(reconcile.length, 1, "approval reconciliation must have exactly one route");
-  assert.equal(reconcile[0]?.method, "POST");
-  assert.equal(reconcile[0]?.role, "admins", "approval reconciliation is admins-only");
-  assert.equal(HUMAN_GATE_ROUTES.some((route) => (route.operation as string) === "decision"), false);
-  assert.equal(HUMAN_GATE_ROUTES.some((route) => (route.operation as string) === "dispatch"), false);
+  assert.equal(HUMAN_GATE_OPERATIONS.length, 10, "four reads plus six writes; nothing else exists");
+  assert.equal(HUMAN_GATE_ROUTES.some((route) => route.operation === ("decision" as never)), false);
+  assert.equal(HUMAN_GATE_ROUTES.some((route) => route.operation === ("dispatch" as never)), false);
 });
 
 test("the adjust request shape is exactly the five contract fields", () => {

@@ -1320,7 +1320,7 @@ details.alert-why > summary {
 
 [data-approve-blocked],
 [data-blocked-reason],
-[data-go-authority="absent"] {
+[data-reconcile-authority="absent"] {
   border-left: 3px solid var(--high);
   padding-left: 0.6rem;
 }

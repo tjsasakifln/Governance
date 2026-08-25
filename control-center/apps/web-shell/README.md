@@ -17,7 +17,7 @@ Chrome navigation exposes exactly these ten areas:
 9. Memória/Decisões
 10. Agentes
 
-“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no send control there and there must never be one. In the current human-gate contract an effective APPROVE schedules only its exact reviewed message; the Warmbly worker remains governed by pause, window and hourly cap.
+“Operação Warmbly” is the safe-operation cockpit for the outbound kill switch: dispatch state, pause reason, commercial window, approved queue, hourly cap and the recent audit trail are rendered **before** the three controls (pause in one step, resume in two, acknowledge an inbound alert). There is no immediate-send or cohort-dispatch control. In Revisão, candidate APPROVE is the complete per-message scheduling authority: it writes `auto_send=true`, `QUEUED` and `due_at`; the Warmbly worker transports later.
 
 ### Rotas do gate humano de cohorts
 
@@ -25,13 +25,18 @@ O gate humano vive **inteiramente** sob “Operação Warmbly”, em três sub-r
 
 | Rota | O que é |
 | --- | --- |
-| `#/warmbly` (`operacao`) | Resumo do piloto — Fonte → Cohort → Validação → Revisão/APPROVE → Fila — mais a versão recente e o acesso à revisão. |
-| `#/warmbly/cohorts` | Lista de cohorts versionadas, denominadores, recuperação, próxima seleção sem repetição e reconciliação administrativa de aprovações antigas. |
-| `#/warmbly/revisao?resource=<id>` | Revisão candidato a candidato; APPROVE efetivo agenda a mensagem exata para a próxima janela elegível. |
+| `#/warmbly` (`operacao`) | Resumo do piloto — Fonte → Cohort → Validação → Revisão → Agendamento — mais a versão mais recente, o botão “Abrir revisão” e os controles seguros de pausa/retomada/reconhecimento. |
+| `#/warmbly/cohorts` | Lista de cohorts versionadas, denominadores, recuperação e próxima seleção sem repetição (1–10). |
+| `#/warmbly/revisao?resource=<id>` | Revisão candidato a candidato; APPROVE agenda a mensagem e o reparo administrativo reprocessa aprovações antigas. |
 
 O `resource` viaja na subnav: abrir “Revisão” a partir de “Cohorts” **não** perde a
 versão selecionada, e uma Revisão sem `resource` oferece a lista de versões em vez
 de uma página vazia.
+
+Criar usa `NEXT_UNCLAIMED`: claims transacionais por conta, fonte, fornecedor e
+destinatário formam cohorts disjuntas sem offset controlável pelo navegador.
+`RECOVER_PRIOR` relê os fornecedores de versões vencidas na fonte atual e cria
+texto, evidência e hashes novos; não herda APPROVE ou agendamento antigos.
 
 #### Revisão é uma fila de decisões, não um formulário
 
@@ -41,18 +46,20 @@ padrão e por isso não aparece na URL) e diz quanto falta:
 `aprovadas`, `ajuste` e `todas` continuam legíveis e preservam `resource` e o
 estado de expansão das mensagens.
 
-No caminho feliz, **uma mensagem válida é aprovada com uma única ação**: sem
+No caminho feliz, **uma mensagem válida é aprovada e enfileirada com uma única ação**: sem
 motivo digitado, sem caixa de ciência e sem acionar a verificação do destinatário
 antes. O clique em Aprovar é a ciência e viaja como `acknowledged=true`; um
 APPROVE sem comentário registra `approved_by_human_reviewer` e o comentário
 opcional vence esse padrão. Quando o candidato não tem validação vigente, a
 própria aprovação pede a verificação ao Warmbly, relê o estado e só registra o
 APPROVE se ele voltar `VALID` — caso contrário nada é decidido e a tela diz o
-estado observado.
+estado observado. O botão é “Aprovar e enfileirar para envio”: a mesma operação
+deixa a mensagem com `auto_send=true`, `QUEUED` e `due_at`. Não há GO ou handoff.
 
-A aprovação sai da fila na hora (otimista) e volta para ela em qualquer desfecho
+A aprovação sai da fila de revisão na hora (otimista) e volta para ela em qualquer desfecho
 que não seja aplicação confirmada: recusa, falha, desconhecido, ou releitura que
-não confirma o efeito. Nada disso é durável — um reload lê a fila do servidor.
+não confirma APPROVE efetivo e o agendamento. Nada disso é durável — um reload
+lê a fila do servidor.
 
 APPROVE continua bloqueado onde verificar de novo não resolve: sem destinatário,
 destinatário que não é endereço, veredito já resolvido como `INVALID`/`RISKY`, e
@@ -66,22 +73,28 @@ Teclado: `A` aprova o card que já está sob o foco (nunca outro), `Ctrl/Cmd+Ent
 aprova a primeira pendência. Nenhum dos dois dispara com o cursor dentro de um
 campo de texto — o editor de ajuste vive na mesma página.
 
-#### Agendamento e reconciliação
+#### Agendamento e reparo
 
-APPROVE registra a decisão e cria ou confirma o touchpoint da mensagem exata na
-mesma operação. Não existe GO nem entrega manual da cohort no contrato vigente.
-Agendar não envia imediatamente: somente o worker do Warmbly entrega, quando a
-pausa operacional permitir, na janela comercial e sob o teto por hora.
+A Revisão lê o status outbound do servidor e mostra kill switch/pausa antes de
+qualquer trabalho. Com bloqueio ativo, APPROVE continua criando `QUEUED` e
+`due_at`, mas a tela diz que nada sairá.
 
-Antes de ampliar o backlog, `admins` executa “Reconciliar aprovações antigas com
-a fila”. A chamada é global, idempotente e não recebe cohort ou candidato do
-navegador. Os contadores de registros APPROVE, bindings vigentes, candidatos
-únicos, agendados, já agendados e falhas são os do servidor; ausência nunca vira
-zero. Qualquer falha deve ser classificada antes de criar novas cohorts.
+GO/NO-GO e “Entregar à fila” foram removidos do fluxo vivo. Registros antigos
+aparecem somente em um disclosure de auditoria, sem efeito operacional. O worker
+é quem envia, dentro da janela comercial e sob o teto por hora; o Control Center
+não oferece `send`, `dispatch`, `queue` ou `resume` de cohort.
 
-O auto-send global continua proibido. O `auto_send=true` de um agendamento é por
-mensagem e só nasce de um APPROVE humano efetivo. `send`, `queue`, `resume`, GO,
-cohort dispatch e `payment` continuam impossíveis de construir no proxy do gate.
+“Reprocessar aprovações já registradas” é um reparo global de `admins`, não um
+próximo passo. Ele chama a rota fixa `POST …/cohorts/reconcile-approved`, usa o
+mesmo agendador do APPROVE, deduplica candidatos e é idempotente. Os contadores
+são os do servidor; campo ausente aparece como ausente, nunca zero. A borda
+descarta query string e envia corpo upstream vazio. O teste negativo continua
+enumerando `send`, `dispatch`, `queue`, `resume`, `payment`, `charge`, `enroll`
+e `deliver` em todas as formas.
+
+A automação global permanece desligada: `CONFENGE_AUTO_SEND_ENABLED=false` e
+`GREEN_AUTORUN=false`. O `auto_send=true` mostrado no card pertence somente à
+mensagem aprovada.
 
 `#/comercial/cohorts` (“Comercial → Coortes”) é **outra coisa**: são coortes de
 aquisição e métricas por período. Nenhum runbook do gate humano deve apontar para
@@ -89,10 +102,11 @@ lá — o caminho correto é **Operação Warmbly → Cohorts**. Pausar, retomar
 reconhecer também já não vivem em Comercial; a aba de lá só carrega o ponteiro
 para `#/warmbly`.
 
-Autoridade: `operators` cria, reproduz, pede verificação, ajusta e registra
-APPROVE/HOLD/REJECT. `admins` é exigido somente para reconciliar as aprovações
-antigas em lote. A identidade é resolvida pelo Authelia na borda; esta tela não
-envia cabeçalho de ator em nenhuma escrita do gate.
+Autoridade deliberada: `operators` cria, reproduz, pede verificação, ajusta e
+registra APPROVE/HOLD/REJECT; APPROVE pode provocar envio futuro e o botão diz
+que enfileira. `admins` executa somente o reparo de aprovações já registradas —
+sem esse grupo o controle aparece desabilitado e a borda devolve 403 antes do
+upstream. A identidade é resolvida pelo Authelia; o navegador não envia ator.
 
 Ajustar assunto/corpo cria uma **nova versão** (`POST …/candidates/{id}/adjust`).
 Enquanto essa rota não estiver implantada, a UI trata o 404 como estado esperado,

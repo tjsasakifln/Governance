@@ -184,7 +184,9 @@ export async function createWarmblyOperatorHandlerFromEnv(
       : {}),
   });
   return ((req) =>
-    (req.url ?? "").split("?")[0]?.startsWith("/v1/warmbly/operator/cohorts")
+    ["/v1/warmbly/operator/cohorts", "/v1/warmbly/operator/outbound-status"].some((prefix) =>
+      (req.url ?? "").split("?")[0]?.startsWith(prefix),
+    )
       ? humanGate(req as never)
       : operator(req as never)) as WarmblyOperatorHandler;
 }

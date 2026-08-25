@@ -50,6 +50,7 @@ export * from "./operator/index.ts";
 export {
   HUMAN_GATE_CONTRACT,
   HUMAN_GATE_PREFIX,
+  HUMAN_GATE_STATUS_PATH,
   HUMAN_GATE_ROUTES,
   createHumanGateHttpHandler,
 } from "./human-gate/http.ts";

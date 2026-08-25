@@ -638,7 +638,7 @@ function bindWarmblyHumanGate(
           ? { selection_mode: selectionMode }
           : {}),
         ...(recoverVersionIds.length > 0 ? { recover_version_ids: recoverVersionIds } : {}),
-        ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
+        ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" ? { decision } : {}),
         // An ordinary approval types nothing, and the trail must still say what
         // happened. The default is folded in here, not only at the wire, so the
         // idempotency identity and the recorded motive are the same string.
@@ -652,10 +652,9 @@ function bindWarmblyHumanGate(
         // to the trail: actor, instant, version, frozen hash and recipient are
         // all recorded already.
         ...(isApprove ? { acknowledged: true } : {}),
-        // GO, adjust and dispatch each cost a typed version confirmation. The
-        // adapter refuses all three before the wire without it, so a missing
-        // one here would be a refusal the operator never asked for.
-        ...((raw === "decide" || raw === "adjust" || raw === "dispatch") && confirmation
+        // Adjust costs a typed version confirmation so an edit cannot clobber
+        // a version the operator was not looking at.
+        ...(raw === "adjust" && confirmation
           ? { confirmation }
           : {}),
         ...(raw === "adjust"
@@ -794,14 +793,17 @@ async function settleGateIntent(
   // definitive after the resource readback confirms it. If that GET fails or
   // disagrees, retaining the same idempotency key is what lets a later retry
   // reconcile the original write instead of creating a second intent.
-  const settledOutcome =
-    result.outcome === "refused"
-      ? "refused"
-      : result.outcome === "executed" && readback.status === "confirmed"
-        ? "executed"
-        : undefined;
+  const settledOutcome = result.outcome === "refused"
+    ? "refused"
+    : readback.status === "confirmed"
+      ? "executed"
+      : undefined;
   settleHumanGateIntent(intent, settledOutcome);
-  const settled: AdapterWriteResult = { ...result, readback };
+  const settled: AdapterWriteResult = {
+    ...result,
+    ...(settledOutcome === "executed" ? { ok: true, outcome: "executed" } : {}),
+    readback,
+  };
   adapter.lastOperatorResult = settled;
   return settled;
 }
@@ -1139,19 +1141,66 @@ async function gateReadback(
   intent: HumanGateIntent,
   result: AdapterWriteResult,
 ): Promise<GateReadback> {
-  if (result.outcome !== "executed" || !result.ok) {
+  if (result.outcome === "refused") {
     return {
       status: "skipped",
       detail: "Nenhuma releitura é devida: o canal não relatou uma escrita aplicada.",
     };
   }
   if (intent.action === "reconcile") {
-    return {
-      status: "confirmed",
-      detail: result.reconcile
-        ? "A resposta trouxe os denominadores da reconciliação; nenhuma mensagem foi enviada por esta ação."
-        : "A reconciliação foi aceita, mas a resposta não trouxe denominadores.",
-    };
+    let reconcileRead: import("./adapters/contract").AdapterReadResult;
+    try {
+      reconcileRead = await Promise.resolve(adapter.readDestination("warmbly", "#/warmbly/cohorts"));
+    } catch {
+      return { status: "unavailable", detail: "A releitura das cohorts não completou." };
+    }
+    if (!reconcileRead.ok || reconcileRead.loading || !reconcileRead.page) {
+      return { status: "unavailable", detail: "A releitura das cohorts não completou." };
+    }
+    const rows = Array.isArray(gateRecord(gateRecord(reconcileRead.page.warmbly_gate).list).data)
+      ? (gateRecord(gateRecord(reconcileRead.page.warmbly_gate).list).data as unknown[]).map(gateRecord)
+      : [];
+    const effectiveApprovals = rows.flatMap((row) =>
+      (Array.isArray(row.candidates) ? row.candidates : []).map(gateRecord),
+    ).filter((row) => {
+      const review = gateRecord(row.review);
+      return review.decision === "APPROVE" && review.effective === true;
+    });
+    const unscheduled = effectiveApprovals.filter((row) => {
+      const scheduling = gateRecord(row.scheduling);
+      return scheduling.auto_send !== true
+        || !["QUEUED", "SENT"].includes(String(scheduling.state ?? ""))
+        || !scheduling.due_at;
+    });
+    const latestApprovedBindings = result.reconcile?.latestApprovedBindings;
+    const failed = result.reconcile?.failed;
+    if (latestApprovedBindings === undefined || failed === undefined) {
+      return {
+        status: "not_confirmed",
+        detail: "A resposta não informou os totais de vínculos aprovados e falhas; ausência não é zero e o reparo não pode ser confirmado.",
+      };
+    }
+    if (failed > 0) {
+      return {
+        status: "not_confirmed",
+        detail: `A resposta registra ${failed} falha(s) de reconciliação.`,
+      };
+    }
+    if (effectiveApprovals.length !== latestApprovedBindings) {
+      return {
+        status: "not_confirmed",
+        detail: `A resposta contou ${latestApprovedBindings} vínculo(s) aprovado(s), mas a releitura devolveu ${effectiveApprovals.length}; o conjunto completo não foi confirmado.`,
+      };
+    }
+    return unscheduled.length === 0
+      ? {
+          status: "confirmed",
+          detail: `A releitura confirma ${effectiveApprovals.length} vínculo(s) aprovado(s) com auto_send por mensagem e estado QUEUED ou SENT.`,
+        }
+      : {
+          status: "not_confirmed",
+          detail: `A releitura ainda mostra ${unscheduled.length} aprovação(ões) efetiva(s) sem agendamento confirmado.`,
+        };
   }
   const cohortId = result.gateResource?.cohort_id ?? intent.version_id;
   if (!cohortId) {
@@ -1210,49 +1259,22 @@ async function gateReadback(
             "O servidor registra APPROVE, mas não confirma que a aprovação está efetiva para o destinatário, conteúdo, policy e evidência atuais.",
         };
       }
-      if (
-        intent.decision === "APPROVE"
-        && Object.prototype.hasOwnProperty.call(candidate, "scheduling")
-      ) {
+      if (intent.decision === "APPROVE") {
         const scheduling = gateRecord(candidate.scheduling);
-        if (
-          typeof scheduling.touchpoint_id !== "string"
-          || scheduling.auto_send !== true
-          || scheduling.invalidated_at
-        ) {
+        const state = String(scheduling.state ?? "");
+        if (scheduling.auto_send !== true || !["QUEUED", "SENT"].includes(state) || !scheduling.due_at) {
           return {
             status: "not_confirmed",
-            detail: "O APPROVE está registrado, mas o servidor não confirmou um agendamento efetivo para esta mensagem.",
+            detail:
+              "O servidor confirma APPROVE efetivo, mas não confirma auto_send por mensagem, estado QUEUED/SENT e due_at. Aprovação sem agendamento é defeito e continua visível.",
           };
         }
+        return {
+          status: "confirmed",
+          detail: `O servidor registra APPROVE efetivo e ${state} para ${String(scheduling.due_at)}.`,
+        };
       }
       return { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` };
-    }
-    case "decide": {
-      const recorded = gateRecord(cohort.decision).decision;
-      return recorded === intent.decision
-        ? { status: "confirmed", detail: `O servidor registra a decisão final ${String(recorded)}.` }
-        : {
-            status: "not_confirmed",
-            detail: `O servidor ainda registra "${String(recorded ?? "nada")}" como decisão final.`,
-          };
-    }
-    case "dispatch": {
-      // There is nothing on the cohort resource that proves a queue depth, so
-      // this readback deliberately does not claim one. What it can say is that
-      // the version still reads GO — i.e. the authority the dispatch consumed
-      // is the one the operator was looking at. The counters Warmbly returned
-      // are the evidence of what was queued, and they are rendered verbatim.
-      const recorded = gateRecord(cohort.decision).decision;
-      return recorded === "GO"
-        ? {
-            status: "confirmed",
-            detail: "O servidor devolve esta versão ainda com GO registrado; os números enfileirados vêm da resposta do disparo.",
-          }
-        : {
-            status: "not_confirmed",
-            detail: `O servidor registra "${String(recorded ?? "nada")}" como decisão final desta versão, não GO.`,
-          };
     }
     case "validate": {
       if (!candidate) {

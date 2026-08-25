@@ -2,7 +2,7 @@
  * What the human gate must never be able to construct.
  *
  * The load-bearing property of this connector is negative: there is no generic
- * proxy route, and no route that can send, dispatch, decide, queue, resume, auto-send or
+ * proxy route, and no route that can send, dispatch, queue, resume, auto-send or
  * charge. Adding `adjust` is the first widening of this surface in a while, so
  * these tests hold the boundary from the outside — by enumerating the routes an
  * attacker would want and proving each one is unreachable, at every prefix and
@@ -125,11 +125,82 @@ describe("the human gate cannot construct an outbound-send route", () => {
         `${forbidden} must never become an operation`,
       );
     }
-    // Exactly the six typed writes, plus three reads.
+    // Exactly six fixed writes and four fixed reads. Dispatch is forbidden.
     assert.deepEqual([...declared].sort(), [
-      "adjust", "create", "list_cohorts", "read_candidate",
-      "read_cohort", "reconcile_approved", "reproduce", "review", "validation",
+      "adjust", "create", "list_cohorts", "read_candidate", "read_cohort", "read_status",
+      "reconcile", "reproduce", "review", "validation",
     ]);
+  });
+});
+
+/**
+ * Reconciliation repairs already-recorded approvals. It is reachable at one
+ * exact admin-only path and cannot be shaped into a dispatch or generic proxy.
+ */
+describe("reconciliation is reachable at exactly one shape and nowhere else", () => {
+  const only = `${HUMAN_GATE_PREFIX}/reconcile-approved`;
+
+  it("forwards the global approval reconciliation and no caller payload", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(request("POST", only, "admins,operators", WRITE_BODY));
+    assert.equal(res.status, 200);
+    assert.deepEqual(attempts, ["https://warmbly.invalid/v1/confenge/cohorts/reconcile-approved"]);
+  });
+
+  it("has no cohort-level, candidate-level or alternate reconciliation route", async () => {
+    const { attempts, handler } = trap();
+    for (const path of [
+      `${HUMAN_GATE_PREFIX}/${COHORT}/reconcile-approved`,
+      `${HUMAN_GATE_PREFIX}/${COHORT}/candidates/${CANDIDATE}/reconcile-approved`,
+      `${HUMAN_GATE_PREFIX}/reconcile`,
+      "/v1/warmbly/operator/reconcile-approved",
+      "/v1/confenge/cohorts/reconcile-approved",
+    ]) {
+      const res = await handler(request("POST", path, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, `${path} must be outside the allowlist`);
+      assert.equal(res.body.code, "human_gate_route_not_allowed");
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("refuses every method on reconciliation except POST", async () => {
+    const { attempts, handler } = trap();
+    for (const method of ["GET", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
+      const res = await handler(request(method, only, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, method);
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("requires admins: operators alone cannot reconcile, and the refusal never reaches Warmbly", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(request("POST", only, "operators", WRITE_BODY));
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, "insufficient_human_gate_role");
+    assert.deepEqual(attempts, []);
+  });
+
+  it("cannot reach send, queue or dispatch through reconciliation", async () => {
+    const { attempts, handler } = trap();
+    for (const path of [
+      `${only}/send`,
+      `${only}/queue`,
+      `${only}/dispatch`,
+      `${only}%2Fsend`,
+    ]) {
+      const res = await handler(request("POST", path, "admins,operators", WRITE_BODY));
+      assert.equal(res.status, 404, path);
+    }
+    assert.deepEqual(attempts, []);
+  });
+
+  it("drops every query string on the reconciliation write", async () => {
+    const { attempts, handler } = trap();
+    const res = await handler(
+      request("POST", `${only}?limit=5000&redirect=/v1/confenge/send`, "admins,operators", WRITE_BODY),
+    );
+    assert.equal(res.status, 200);
+    assert.deepEqual(attempts, ["https://warmbly.invalid/v1/confenge/cohorts/reconcile-approved"]);
   });
 });
 

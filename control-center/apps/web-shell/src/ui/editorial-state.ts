@@ -3,8 +3,8 @@
  *
  * A version composed by a superseded composer still has to be readable for
  * audit, but it is not sendable. The founder saw defective legacy copy offered
- * with APPROVE and GO beside it, so this reading exists to tell the surface
- * which of the two it is looking at.
+ * with live approval controls beside it, so this reading exists to tell the
+ * surface which of the two it is looking at.
  *
  * Defaulting rule: an absent `editorial_state` is an older backend, not a
  * legacy version. Absent reads as CURRENT and actionable so the working flow
