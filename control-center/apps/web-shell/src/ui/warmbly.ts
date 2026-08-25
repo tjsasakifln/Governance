@@ -22,13 +22,14 @@ import { escapeHtml } from "../escape";
 import { formatLocal } from "../datetime";
 import { ownMapValue } from "../own-map";
 import { continuitySubrouteHref } from "../continuity";
+import { interactionDraft, interactionDraftValue } from "../interaction-draft";
 import {
   DEFAULT_WARMBLY_SURFACE,
   WARMBLY_SURFACES,
   isWarmblySurface,
   type WarmblySurface,
 } from "../destinations";
-import { APPROVAL_DEFAULT_REASON, type AdapterWriteResult } from "../adapters/contract";
+import type { AdapterWriteResult } from "../adapters/contract";
 import {
   adjustDraft,
   adjustRouteMissing,
@@ -845,6 +846,8 @@ function controlsBlock(
   confirmation: PendingResumeConfirmation | undefined,
 ): string {
   const confirmationArmed = confirmation !== undefined;
+  const resumeDraftKey = "dispatch:resume";
+  const resumeReason = confirmation?.reason ?? interactionDraftValue(resumeDraftKey, "reason");
   return `
     <section class="stack" aria-labelledby="warmbly-controles" data-resume-armed="${confirmationArmed ? "true" : "false"}">
       <h2 id="warmbly-controles">Controles</h2>
@@ -853,8 +856,8 @@ function controlsBlock(
       <article class="card">
         <h3>Pausar o outbound</h3>
         <p>Um passo. Interrompe o disparo; nada é enviado enquanto durar a pausa.</p>
-        <form data-warmbly-dispatch="pause" class="operator-form">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está pausando" /></label>
+        <form data-warmbly-dispatch="pause" data-interaction="dispatch.pause" data-one-decision="true" class="operator-form">
+          <input type="hidden" name="reason" value="Pausa solicitada manualmente no Control Center" />
           <button type="submit">Pausar disparos</button>
         </form>
       </article>
@@ -867,19 +870,15 @@ function controlsBlock(
             ? `<p class="banner stale" role="status" data-confirmation-pending="true">Confirmação pendente e ainda não executada. O próximo envio deste formulário executa a retomada. O token é de uso único, vence sozinho e vale só para quem o pediu; recarregar a página o descarta.</p>`
             : `<p class="constraint">Enviar uma vez pede a confirmação; enviar de novo, com o mesmo motivo, executa.</p>`
         }
-        <form data-warmbly-dispatch="resume" class="operator-form" data-two-step="true">
-          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando"${confirmation ? ` value="${escapeHtml(confirmation.reason)}" readonly` : ""} /></label>
+        <form data-warmbly-dispatch="resume" data-draft-key="${escapeHtml(resumeDraftKey)}" data-interaction="dispatch.resume" data-explicit-submit="true" class="operator-form" data-two-step="true">
+          <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está retomando" value="${escapeHtml(resumeReason)}"${confirmation ? " readonly" : ""} /></label>
           <button type="submit">${confirmationArmed ? "Confirmar retomada (passo 2 de 2)" : "Retomar disparos (passo 1 de 2)"}</button>
         </form>
       </article>
       <article class="card">
         <h3>Reconhecer alerta de inbound</h3>
-        <p>Um passo. Escreve o reconhecimento no Warmbly; não resolve a exceção no Control Center.</p>
-        <form data-warmbly-dispatch="acknowledge" class="operator-form">
-          <label>Alerta <input name="target_id" required minlength="1" maxlength="128" placeholder="id do lead" /></label>
-          <label>Motivo <input name="reason" maxlength="200" placeholder="opcional" /></label>
-          <button type="submit">Reconhecer alerta</button>
-        </form>
+        <p>Escolha primeiro o alerta na fila. O detalhe prova o alvo e então oferece uma única ação de reconhecimento; esta tela não pede que você copie um identificador.</p>
+        <p><a class="button" href="#/comercial/atividade?condicao=unread">Abrir alertas de inbound não lidos</a></p>
       </article>
     </section>`;
 }
@@ -1514,12 +1513,18 @@ function cohortSurface(input: WarmblySurfaceInput): string {
     seenRoots.add(root);
     return textOf(cohort.id) !== null;
   });
+  const recoverKey = "create:recover-prior";
+  const recoveredSelection = new Set(
+    (interactionDraft(`gate:${recoverKey}`)?.recover_version_ids ?? "")
+      .split("|")
+      .filter(Boolean),
+  );
   const recoveryChoices = recoverable.map((cohort) => {
     const id = textOf(cohort.id) ?? "";
-    return `<label class="check-row"><input type="checkbox" name="recover_version_ids" value="${escapeHtml(id)}"><span>v${escapeHtml(show(cohort.version))} · ${escapeHtml(show(cohort.created_at))}</span></label>`;
+    return `<label class="check-row"><input type="checkbox" name="recover_version_ids" value="${escapeHtml(id)}"${recoveredSelection.has(id) ? " checked" : ""}><span>v${escapeHtml(show(cohort.version))} · ${escapeHtml(show(cohort.created_at))}</span></label>`;
   }).join("");
   const createKey = "create:next-unclaimed";
-  const recoverKey = "create:recover-prior";
+  const createLimit = interactionDraftValue(`gate:${createKey}`, "limit", "10");
   const createPending = gateInFlight(createKey);
   const recoverPending = gateInFlight(recoverKey);
   return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. A automação global permanece desligada; cada APPROVE agenda somente sua mensagem com <code>auto_send=true</code>.</p>
@@ -1529,12 +1534,12 @@ function cohortSurface(input: WarmblySurfaceInput): string {
   ${selectionProgress}
   <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label></form>
   ${createPending ? pendingBlock("Criando a cohort congelada") : ""}
-  <form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(createKey)}"><input type="hidden" name="selection_mode" value="NEXT_UNCLAIMED"><label>Próxima cohort (1–10)<input name="limit" type="number" min="1" max="10" value="10" required></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar próxima cohort sem repetição"}</button>${
+  <form class="operator-form" data-human-gate="create" data-draft-key="gate:${escapeHtml(createKey)}" data-interaction="gate.create" data-gate-key="${escapeHtml(createKey)}"><input type="hidden" name="selection_mode" value="NEXT_UNCLAIMED"><label>Quantidade de fornecedores<input name="limit" type="number" min="1" max="10" step="1" required value="${escapeHtml(createLimit)}"></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar próxima cohort sem repetição"}</button>${
     authority.canReview
-      ? `<p class="constraint">O servidor reserva os próximos fornecedores elegíveis de forma transacional. Repetições de CNPJ-raiz, destinatário ou histórico anterior são excluídas.</p>`
+      ? `<p class="constraint">Escolha entre 1 e 10. O servidor reserva essa quantidade dos próximos fornecedores elegíveis de forma transacional; repetições de CNPJ-raiz, destinatário ou histórico anterior são excluídas.</p>`
       : `<p class="constraint" data-blocked-reason="create">Criar cohort exige o grupo <code>operators</code> no Authelia.</p>`
   }</form>
-  ${recoverable.length > 0 ? `${recoverPending ? pendingBlock("Recuperando fornecedores anteriores na fonte atual") : ""}<form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(recoverKey)}"><input type="hidden" name="selection_mode" value="RECOVER_PRIOR"><input type="hidden" name="limit" value="10"><fieldset><legend>Recuperar versões anteriores</legend>${recoveryChoices}</fieldset><button type="submit"${recoverPending || !authority.canReview ? " disabled" : ""}>${recoverPending ? "Enviando…" : "Recompor fornecedores selecionados com a fonte atual"}</button><p class="constraint">A recuperação deduplica fornecedores, relê a fonte vigente e cria textos e hashes novos. Aprovação ou agendamento anteriores não são herdados.</p></form>` : ""}
+  ${recoverable.length > 0 ? `${recoverPending ? pendingBlock("Recuperando fornecedores anteriores na fonte atual") : ""}<form class="operator-form" data-human-gate="create" data-draft-key="gate:${escapeHtml(recoverKey)}" data-interaction="gate.recover" data-gate-key="${escapeHtml(recoverKey)}"><input type="hidden" name="selection_mode" value="RECOVER_PRIOR"><input type="hidden" name="limit" value="10"><fieldset><legend>Recuperar versões anteriores</legend>${recoveryChoices}</fieldset><button type="submit"${recoverPending || !authority.canReview ? " disabled" : ""}>${recoverPending ? "Enviando…" : "Recompor fornecedores selecionados com a fonte atual"}</button><p class="constraint">A recuperação deduplica fornecedores, relê a fonte vigente e cria textos e hashes novos. Aprovação ou agendamento anteriores não são herdados.</p></form>` : ""}
   <p class="table-scroll-hint" id="cohorts-table-hint">Tabela larga: deslize horizontalmente ou use as setas para ver todas as colunas.</p>
   <div class="table-wrap" role="region" tabindex="0" aria-labelledby="cohorts-title" aria-describedby="cohorts-table-hint"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Revisão</th></tr></thead><tbody>${rows || `<tr><td colspan="7">Nenhuma cohort ${list.status === "read" ? "listada pelo servidor" : "pôde ser lida"}.</td></tr>`}</tbody></table></div></section>`;
 }
@@ -1758,6 +1763,9 @@ function candidateCard(
   const approveKey = `review:${cohortId}:${candidateId}:APPROVE`;
   const holdKey = `review:${cohortId}:${candidateId}:HOLD_REJECT`;
   const adjustKey = `adjust:${cohortId}:${candidateId}:`;
+  const holdDraftKey = `gate:${holdKey}`;
+  const holdDraft = interactionDraft(holdDraftKey);
+  const holdDecision = holdDraft?.decision === "REJECT" ? "REJECT" : "HOLD";
 
   const copyQaFailures = Array.isArray(copyQa.failures)
     ? copyQa.failures.filter((entry): entry is string => typeof entry === "string")
@@ -1773,7 +1781,7 @@ function candidateCard(
     gate.needsValidation || !gate.allowed
       ? `
     ${gateInFlight(validateKey) ? pendingBlock("Pedindo a verificação do destinatário") : ""}
-    <form class="operator-form" data-human-gate="validate" data-gate-key="${escapeHtml(validateKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+    <form class="operator-form" data-human-gate="validate" data-interaction="gate.validate" data-one-decision="true" data-gate-key="${escapeHtml(validateKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
       <p class="constraint">Pede ao Warmbly que verifique agora se este endereço aceita entrega. Não envia mensagem nenhuma${gate.needsValidation ? ", e aprovar já faz isso sozinho" : ""}.</p>
       <button type="submit"${gateInFlight(validateKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(validateKey) ? "Enviando…" : "Verificar o destinatário agora"}</button>
     </form>
@@ -1795,7 +1803,7 @@ function candidateCard(
 `
       : `
     ${gateInFlight(approveKey) ? pendingBlock("Registrando a aprovação") : ""}
-    <form class="operator-form approve-form" data-human-gate="review" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}"${gate.needsValidation ? ` data-auto-validate="true"` : ""}>
+    <form class="operator-form approve-form" data-human-gate="review" data-interaction="gate.approve" data-one-decision="true" data-explicit-submit="true" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}"${gate.needsValidation ? ` data-auto-validate="true"` : ""}>
       <h4>Aprovar e enfileirar este candidato</h4>
       <p class="constraint" data-approve-meaning="true">Clicar em Aprovar e enfileirar é a ciência e a autoridade de agendamento: a trilha grava sua identidade do Authelia, o instante, esta versão v${escapeHtml(version)}, o hash congelado, o destinatário exato e a decisão; a mesma operação cria a mensagem com <code>auto_send=true</code> e <code>due_at</code> na próxima janela comercial. Não há GO, segunda caixa ou passo de entrega.</p>
       ${
@@ -1804,11 +1812,6 @@ function candidateCard(
           : ""
       }
       <button type="submit" data-approve-submit="true"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Aprovar e enfileirar para envio"}</button>
-      <details data-approve-comment="true">
-        <summary>Comentário para a trilha (opcional)</summary>
-        <label>Observação<input name="reason" maxlength="200"></label>
-        <p class="constraint">Em branco, a trilha grava <code>${escapeHtml(APPROVAL_DEFAULT_REASON)}</code>. Aprovação comum não exige texto.</p>
-      </details>
       ${
         gate.allowed
           ? ""
@@ -1842,10 +1845,10 @@ function candidateCard(
     ? `
     ${approveControl}
     ${gateInFlight(holdKey) ? pendingBlock("Registrando HOLD/REJECT") : ""}
-    <form class="operator-form" data-human-gate="review" data-gate-key="${escapeHtml(holdKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
+    <form class="operator-form" data-human-gate="review" data-draft-key="${escapeHtml(holdDraftKey)}" data-interaction="gate.hold-reject" data-explicit-submit="true" data-gate-key="${escapeHtml(holdKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}">
       <h4>Segurar ou rejeitar</h4>
-      <label>Decisão<select name="decision"><option value="HOLD">HOLD</option><option value="REJECT">REJECT</option></select></label>
-      <label>Motivo<input name="reason" required minlength="3"></label>
+      <label>Decisão<select name="decision"><option value="HOLD"${holdDraft && holdDecision === "HOLD" ? " selected" : ""}>HOLD</option><option value="REJECT"${holdDecision === "REJECT" ? " selected" : ""}>REJECT</option></select></label>
+      <label>Motivo<input name="reason" required minlength="3" value="${escapeHtml(holdDraft?.reason ?? "")}"></label>
       <p class="constraint" data-no-ack-required="true">HOLD e REJECT exigem motivo escrito: segurar ou rejeitar é a exceção, e o texto é o que explica a exceção depois.</p>
       <button type="submit"${authority.canReview && !gateInFlight(holdKey) ? "" : " disabled"}>${gateInFlight(holdKey) ? "Enviando…" : "Registrar HOLD/REJECT"}</button>
     </form>
@@ -1988,11 +1991,10 @@ function adjustBlock(args: {
       }
       ${pending ? pendingBlock("Enviando o ajuste") : ""}
       ${diff}
-      <form class="operator-form" data-human-gate="adjust" data-gate-key="${escapeHtml(adjustKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}" data-cohort-version="${escapeHtml(version)}" data-frozen-hash="${escapeHtml(frozenHash)}" data-before-subject="${escapeHtml(subject)}" data-before-body="${escapeHtml(body)}" data-adjust-step="${draft ? "confirm" : "preview"}">
+      <form class="operator-form" data-human-gate="adjust" data-interaction="gate.adjust" data-explicit-submit="true" data-gate-key="${escapeHtml(adjustKey)}" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}" data-cohort-version="${escapeHtml(version)}" data-frozen-hash="${escapeHtml(frozenHash)}" data-before-subject="${escapeHtml(subject)}" data-before-body="${escapeHtml(body)}" data-adjust-step="${draft ? "confirm" : "preview"}">
         <label>Assunto<input name="subject" required minlength="3" maxlength="200" value="${escapeHtml(draft?.subject ?? subject)}"></label>
         <label>Corpo<textarea name="body_text" required minlength="3" rows="8">${escapeHtml(draft?.body_text ?? body)}</textarea></label>
         <label>Motivo do ajuste<input name="reason" required minlength="3" value="${escapeHtml(draft?.reason ?? "")}"></label>
-        <label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}" value="${escapeHtml(draft ? `v${version}` : "")}"></label>
         <button type="submit"${pending || unavailable || !authority.canReview ? " disabled" : ""}>${
           pending ? "Enviando…" : draft ? `Confirmar e criar a versão seguinte a partir da v${escapeHtml(version)}` : "Pré-visualizar a mudança"
         }</button>
@@ -2129,7 +2131,7 @@ function reconcileBlock(authority: OperatorAuthority): string {
     <p data-reconcile-meaning="true">Este não é um passo normal depois da revisão. APPROVE já agenda sozinho. Use o reparo somente para aprovações antigas ou para um APPROVE cujo card mostre “sem agendamento confirmado”.</p>
     <p class="constraint" data-reconcile-repeat="true">A operação percorre o histórico pelo mesmo caminho de código do APPROVE, deduplica candidatos repetidos entre cohorts e é idempotente: executar de novo não cria outra mensagem nem reenvia o que já saiu.</p>
     <p class="constraint">O resultado mostra quantos registros, vínculos e candidatos únicos foram encontrados e quantos ficaram agendados. Isto não transporta e-mail; o worker continua sob janela comercial, teto por hora, pausa e kill switch.</p>
-    <form class="operator-form" data-human-gate="reconcile" data-gate-key="${escapeHtml(reconcileKey)}">
+    <form class="operator-form" data-human-gate="reconcile" data-interaction="gate.reconcile" data-one-decision="true" data-explicit-submit="true" data-gate-key="${escapeHtml(reconcileKey)}">
       <button type="submit" data-reconcile-submit="true"${authority.canReconcile && !pending ? "" : " disabled"}>${pending ? "Enviando…" : "Reprocessar aprovações já registradas"}</button>
       ${
         authority.canReconcile
@@ -2209,7 +2211,7 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   const reproduceControl = editorial.actionable
     ? `
   ${gateInFlight(reproduceKey) ? pendingBlock("Reproduzindo a versão imutável") : ""}
-  <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
+  <form class="operator-form" data-human-gate="reproduce" data-interaction="gate.reproduce" data-one-decision="true" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
 `
     : "";
   return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>

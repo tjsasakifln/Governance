@@ -1,9 +1,4 @@
 import type { MockScenario } from "./adapters/mock";
-import {
-  clearOperatorActionDraft,
-  operatorActionDraftKey,
-  rememberOperatorActionDraft,
-} from "./action-draft";
 import type {
   AdapterWriteResult,
   ControlCenterReadAdapter,
@@ -43,6 +38,7 @@ import {
   resumeObservationFingerprint,
 } from "./warmbly-confirmation";
 import { pageIsEmpty, pageIsStale } from "./page";
+import { clearInteractionDraft, rememberInteractionDraft } from "./interaction-draft";
 import {
   confirmReviewDecided,
   markReviewDecided,
@@ -153,12 +149,14 @@ export interface MountableRoot {
       checked?: boolean;
       disabled?: boolean;
       textContent?: string | null;
+      getAttribute?(name: string): string | null;
     } | null;
     querySelectorAll?(selector: string): ArrayLike<{
       value: string;
       checked?: boolean;
       disabled?: boolean;
       textContent?: string | null;
+      getAttribute?(name: string): string | null;
       setAttribute?(name: string, value: string): void;
     }>;
     focus?(options?: { preventScroll?: boolean }): void;
@@ -223,6 +221,7 @@ function applyPaint(
   const repaint = (): void => {
     paintShell(root, adapter, renderHash, 0, () => true, navigate, replaceLocation);
   };
+  bindInteractionDraftCapture(root);
   bindWriteShortcuts(root, adapter, repaint);
   bindOperatorActions(root, adapter, repaint, navigate, renderHash);
   bindWarmblyDispatch(
@@ -490,6 +489,7 @@ export function bindReviewActions(
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    bindExplicitSubmitKey(form);
     let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -503,6 +503,7 @@ export function bindReviewActions(
       const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
       const originalSubject = form.querySelector('[name="original_subject"]')?.value ?? subject;
       const originalBodyText = form.querySelector('[name="original_body_text"]')?.value ?? bodyText;
+      const draftKey = form.getAttribute("data-draft-key") ?? "";
       if (action !== "SAVE_ADJUSTMENT" && (subject !== originalSubject || bodyText !== originalBodyText)) {
         adapter.lastOperatorResult = {
           ok: false,
@@ -516,6 +517,11 @@ export function bindReviewActions(
         return;
       }
       inFlight = true;
+      rememberInteractionDraft(draftKey, {
+        subject,
+        body_text: bodyText,
+        reason: form.querySelector('[name="reason"]')?.value ?? "",
+      });
       form.setAttribute?.("aria-busy", "true");
       const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
       for (let controlIndex = 0; controlIndex < controls.length; controlIndex += 1) {
@@ -545,6 +551,7 @@ export function bindReviewActions(
           if (result) {
             adapter.lastOperatorResult = result;
             if (result.ok) {
+              clearInteractionDraft(draftKey);
               const destinationId = action === "SAVE_ADJUSTMENT" ? id : nextReviewId;
               completionHash = withQueryParams(currentHash ?? "#/comercial/rascunhos", {
                 resource: destinationId || null,
@@ -572,6 +579,93 @@ export function bindReviewActions(
   }
 }
 
+type InteractiveForm = {
+  setAttribute?(name: string, value: string): void;
+  querySelector(selector: string): {
+    value: string;
+    checked?: boolean;
+    disabled?: boolean;
+    textContent?: string | null;
+  } | null;
+  querySelectorAll?(selector: string): ArrayLike<{
+    value: string;
+    checked?: boolean;
+    disabled?: boolean;
+    textContent?: string | null;
+  }>;
+};
+
+/** Paints the sub-100ms acknowledgement before any network promise can run. */
+function markInteractionPending(form: InteractiveForm, label: string): void {
+  form.setAttribute?.("aria-busy", "true");
+  const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
+  for (let index = 0; index < controls.length; index += 1) {
+    const control = controls[index];
+    if (control) control.disabled = true;
+  }
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) submit.textContent = label;
+}
+
+/** Enter in a text field must not impersonate a deliberate risky-button press. */
+export function bindExplicitSubmitKey(form: {
+  getAttribute(name: string): string | null;
+  addEventListener(type: string, listener: (event: Event) => void): void;
+}): void {
+  if (form.getAttribute("data-explicit-submit") !== "true") return;
+  form.addEventListener("keydown", (event) => {
+    const keyboard = event as KeyboardEvent;
+    if (keyboard.key !== "Enter") return;
+    const target = keyboard.target as { matches?(selector: string): boolean } | null;
+    if (target?.matches?.('button[type="submit"], textarea')) return;
+    event.preventDefault();
+  });
+}
+
+/**
+ * Keeps human-authored input across any whole-shell repaint, including a
+ * repaint caused by another form before this form has been submitted.
+ */
+export function bindInteractionDraftCapture(root: MountableRoot): void {
+  if (typeof root.querySelectorAll !== "function") return;
+  const forms = root.querySelectorAll("[data-draft-key]");
+  for (let index = 0; index < forms.length; index += 1) {
+    const form = forms[index];
+    const key = form?.getAttribute("data-draft-key") ?? "";
+    if (!form || !key) continue;
+    const capture = (): void => {
+      const controls = form.querySelectorAll?.("input[name],select[name],textarea[name]") ?? [];
+      const values = new Map<string, string[]>();
+      for (let controlIndex = 0; controlIndex < controls.length; controlIndex += 1) {
+        const control = controls[controlIndex];
+        const name = control?.getAttribute?.("name") ?? "";
+        if (!control || !name) continue;
+        const type = control.getAttribute?.("type")?.toLowerCase() ?? "";
+        if ((type === "checkbox" || type === "radio") && control.checked !== true) continue;
+        const selected = values.get(name) ?? [];
+        selected.push(control.value ?? "");
+        values.set(name, selected);
+      }
+      rememberInteractionDraft(
+        key,
+        Object.fromEntries(Array.from(values, ([name, selected]) => [name, selected.join("|")])),
+      );
+    };
+    form.addEventListener("input", capture);
+    form.addEventListener("change", capture);
+  }
+}
+
+function browserWriteUnknown(path: string, err: unknown): AdapterWriteResult {
+  return {
+    ok: false,
+    path,
+    kind: "nota",
+    message: `Resultado não confirmado. Não repita ainda: ${err instanceof Error ? err.message : "falha inesperada"}.`,
+    outcome: "unknown",
+    code: "browser_transport",
+  };
+}
 export function bindOperatorActions(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
@@ -584,6 +678,7 @@ export function bindOperatorActions(
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    bindExplicitSubmitKey(form);
     let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -593,44 +688,42 @@ export function bindOperatorActions(
       const targetCanonical = form.querySelector('[name="target_canonical_id"]')?.value ?? "";
       const targetSource = form.querySelector('[name="target_source_id"]')?.value ?? "";
       const note = form.querySelector('[name="note"]')?.value ?? "";
-      const draftKey = operatorActionDraftKey(actionType, targetCanonical, targetSource);
-      rememberOperatorActionDraft(draftKey, note);
+      const draftKey = form.getAttribute("data-draft-key") ?? "";
       inFlight = true;
-      form.setAttribute?.("aria-busy", "true");
-      const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
-      for (let controlIndex = 0; controlIndex < controls.length; controlIndex += 1) {
-        const control = controls[controlIndex];
-        if (control) control.disabled = true;
-      }
-      const submit = form.querySelector('button[type="submit"]');
-      if (submit) submit.textContent = "Registrando…";
-      void Promise.resolve(
-        adapter.operatorAction?.({
+      rememberInteractionDraft(draftKey, { note });
+      markInteractionPending(form, "Registrando…");
+      let continuation: string | null = null;
+      let request: AdapterWriteResult | Promise<AdapterWriteResult> | undefined;
+      try {
+        request = adapter.operatorAction?.({
           action_type: actionType,
           target_canonical_id: targetCanonical,
           target_source_id: targetSource,
           note,
-        }),
-      ).then((result) => {
-        if (result) adapter.lastOperatorResult = result;
-        if (result?.ok) clearOperatorActionDraft(draftKey);
-        if (result?.ok && form.getAttribute("data-continuity-action") === "queue" && navigate) {
-          const next = form.getAttribute("data-continuity-next");
-          navigate(next?.startsWith("#") ? next : actionContinuationHash(currentHash, next));
-          return;
-        }
+        });
+      } catch (err: unknown) {
+        adapter.lastOperatorResult = browserWriteUnknown("/v1/operator-actions", err);
         onDone();
-      }).catch((err: unknown) => {
-        adapter.lastOperatorResult = {
-          ok: false,
-          path: "/v1/operator-actions",
-          kind: "nota",
-          message: err instanceof Error ? err.message : "falha inesperada sem resposta",
-          outcome: "unknown",
-          code: "browser_transport",
-        };
-        onDone();
-      });
+        return;
+      }
+      void Promise.resolve(request)
+        .then((result) => {
+          if (result) adapter.lastOperatorResult = result;
+          if (result?.ok) {
+            clearInteractionDraft(draftKey);
+            if (form.getAttribute("data-continuity-action") === "queue" && navigate) {
+              const next = form.getAttribute("data-continuity-next");
+              continuation = next?.startsWith("#") ? next : actionContinuationHash(currentHash, next);
+            }
+          }
+        })
+        .catch((err: unknown) => {
+          adapter.lastOperatorResult = browserWriteUnknown("/v1/operator-actions", err);
+        })
+        .finally(() => {
+          if (continuation && navigate) navigate(continuation);
+          else onDone();
+        });
     });
   }
 }
@@ -650,7 +743,7 @@ export { clearPendingResumeConfirmation, pendingResumeConfirmation } from "./war
  * challenge drops the token, so a failed or spent confirmation always costs a
  * new deliberate act.
  */
-function bindWarmblyDispatch(
+export function bindWarmblyDispatch(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
@@ -661,72 +754,86 @@ function bindWarmblyDispatch(
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    bindExplicitSubmitKey(form);
+    let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inFlight) return;
+      const requested = form.getAttribute("data-warmbly-dispatch");
+      if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
+      inFlight = true;
+      const draftKey = form.getAttribute("data-draft-key") ?? "";
+      rememberInteractionDraft(draftKey, {
+        reason: form.querySelector('[name="reason"]')?.value ?? "",
+      });
+      markInteractionPending(form, "Confirmando no servidor…");
       void (async () => {
-        const requested = form.getAttribute("data-warmbly-dispatch");
-        if (requested !== "pause" && requested !== "resume" && requested !== "acknowledge") return;
-        const reason = form.querySelector('[name="reason"]')?.value ?? "";
-        const normalizedReason = reason.trim();
-        const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
+        try {
+          const reason = form.querySelector('[name="reason"]')?.value ?? "";
+          const normalizedReason = reason.trim();
+          const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
 
-        let action: "pause" | "resume_confirm" | "resume" | "acknowledge" = requested;
-        let confirmationToken: string | undefined;
-        const pending = readPendingResume();
+          let action: "pause" | "resume_confirm" | "resume" | "acknowledge" = requested;
+          let confirmationToken: string | undefined;
+          const pending = readPendingResume();
 
-        if (requested === "resume") {
-          const matchesPending =
-            pending !== undefined &&
-            pending.reason === normalizedReason &&
-            pending.observation_fingerprint === observationFingerprint;
-          if (matchesPending) {
-            // Take the token before the asynchronous freshness check. It is
-            // single-use in this client even if the read or the write fails.
-            confirmationToken = pending.token;
-            clearPendingResume();
-            const latestObservation = await latestResumeObservation(adapter);
-            if (latestObservation !== observationFingerprint) {
-              adapter.lastOperatorResult = staleResumeConfirmation();
-              onDone();
-              return;
+          if (requested === "resume") {
+            const matchesPending =
+              pending !== undefined &&
+              pending.reason === normalizedReason &&
+              pending.observation_fingerprint === observationFingerprint;
+            if (matchesPending) {
+              // Take the token before the asynchronous freshness check. It is
+              // single-use in this client even if the read or the write fails.
+              confirmationToken = pending.token;
+              clearPendingResume();
+              const latestObservation = await latestResumeObservation(adapter);
+              if (latestObservation !== observationFingerprint) {
+                adapter.lastOperatorResult = staleResumeConfirmation();
+                return;
+              }
+              action = "resume";
+            } else {
+              // A changed reason or changed rendered observation cannot inherit
+              // the old challenge. This submit starts a fresh first step.
+              clearPendingResume();
+              action = "resume_confirm";
             }
-            action = "resume";
           } else {
-            // A changed reason or changed rendered observation cannot inherit
-            // the old challenge. This submit starts a fresh first step.
+            // Pause and acknowledge are interventions. Even a refused attempt
+            // invalidates a prior resume decision before it can be reused.
             clearPendingResume();
-            action = "resume_confirm";
           }
-        } else {
-          // Pause and acknowledge are interventions. Even a refused attempt
-          // invalidates a prior resume decision before it can be reused.
-          clearPendingResume();
-        }
 
-        const result = await Promise.resolve(
-          adapter.warmblyDispatch?.({
-            action,
-            reason,
-            ...(action === "resume" && confirmationToken
-              ? { confirmation_token: confirmationToken }
-              : {}),
-            ...(requested === "acknowledge" ? { target_id: targetId } : {}),
-          }),
-        );
-        if (result) {
-          adapter.lastOperatorResult = result;
-          // Arm the following resume only when this call actually minted a
-          // challenge. A refusal arms nothing, and the challenge is bound to
-          // the same reason and observation the operator just reviewed.
-          if (action === "resume_confirm" && result.ok && result.confirmationToken) {
-            armPendingResumeConfirmation({
-              token: result.confirmationToken,
-              reason: normalizedReason,
-              observation_fingerprint: observationFingerprint,
-            });
+          const result = await Promise.resolve(
+            adapter.warmblyDispatch?.({
+              action,
+              reason,
+              ...(action === "resume" && confirmationToken
+                ? { confirmation_token: confirmationToken }
+                : {}),
+              ...(requested === "acknowledge" ? { target_id: targetId } : {}),
+            }),
+          );
+          if (result) {
+            adapter.lastOperatorResult = result;
+            if (result.ok) clearInteractionDraft(draftKey);
+            // Arm the following resume only when this call actually minted a
+            // challenge. A refusal arms nothing, and the challenge is bound to
+            // the same reason and observation the operator just reviewed.
+            if (action === "resume_confirm" && result.ok && result.confirmationToken) {
+              armPendingResumeConfirmation({
+                token: result.confirmationToken,
+                reason: normalizedReason,
+                observation_fingerprint: observationFingerprint,
+              });
+            }
           }
+        } catch (err: unknown) {
+          adapter.lastOperatorResult = browserWriteUnknown("/api/warmbly/dispatch", err);
+        } finally {
+          onDone();
         }
-        onDone();
       })();
     });
   }
@@ -763,6 +870,7 @@ function bindWarmblyHumanGate(
     if (!form) continue;
     const raw = form.getAttribute("data-human-gate");
     if (!isWarmblyGateAction(raw)) continue;
+    bindExplicitSubmitKey(form);
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const versionId = form.getAttribute("data-version") ?? "";
@@ -785,8 +893,14 @@ function bindWarmblyHumanGate(
         .map((entry) => entry.value)
         .filter(Boolean)
         .sort();
-      const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
+      // The rendered cohort version is already the frozen subject of this
+      // action. Requiring the operator to copy it into an input adds no new
+      // decision; derive the exact token while preserving the backend gate.
+      const confirmation = raw === "adjust"
+        ? `v${form.getAttribute("data-cohort-version") ?? ""}`
+        : "";
       const reason = form.querySelector('[name="reason"]')?.value ?? "";
+      const draftKey = form.getAttribute("data-draft-key") ?? "";
 
       if (raw === "adjust") {
         const subject = form.querySelector('[name="subject"]')?.value ?? "";
@@ -814,6 +928,11 @@ function bindWarmblyHumanGate(
       }
 
       if (!beginGateFlight(key)) return;
+      rememberInteractionDraft(draftKey, {
+        reason,
+        decision: decision ?? "",
+        recover_version_ids: recoverVersionIds.join("|"),
+      });
       const isApprove = raw === "review" && decision === "APPROVE";
       const intent: HumanGateIntent = {
         action: raw,
@@ -838,8 +957,8 @@ function bindWarmblyHumanGate(
         // to the trail: actor, instant, version, frozen hash and recipient are
         // all recorded already.
         ...(isApprove ? { acknowledged: true } : {}),
-        // Adjust costs a typed version confirmation so an edit cannot clobber
-        // a version the operator was not looking at.
+        // The backend still receives the exact version confirmation. Its value
+        // is derived from the immutable card the operator previewed.
         ...(raw === "adjust" && confirmation
           ? { confirmation }
           : {}),
@@ -897,7 +1016,8 @@ function bindWarmblyHumanGate(
           if (confirmedApplication(result)) confirmReviewDecided(versionId, candidateId);
           else rollbackReviewDecided(versionId, candidateId);
         }
-        if (raw === "adjust" && result.ok) clearAdjustDraft(candidateId);
+        if (raw === "adjust" && confirmedApplication(result)) clearAdjustDraft(candidateId);
+        if (confirmedApplication(result)) clearInteractionDraft(draftKey);
         // The reviewer's hands stay where they were: the next pending card
         // takes the focus so the following approval needs no scroll and no
         // pointer hunt.
@@ -987,7 +1107,11 @@ async function settleGateIntent(
   settleHumanGateIntent(intent, settledOutcome);
   const settled: AdapterWriteResult = {
     ...result,
-    ...(settledOutcome === "executed" ? { ok: true, outcome: "executed" } : {}),
+    ...(settledOutcome === "executed"
+      ? { ok: true, outcome: "executed" }
+      : settledOutcome === "refused"
+        ? { ok: false, outcome: "refused" }
+        : { ok: false, outcome: "unknown" }),
     readback,
   };
   adapter.lastOperatorResult = settled;
@@ -1264,7 +1388,7 @@ function gateNavigation(
   action: WarmblyGateAction,
   result: AdapterWriteResult | undefined,
 ): string | null {
-  if (!result?.ok) return null;
+  if (!result || !confirmedApplication(result)) return null;
   if (action !== "create" && action !== "reproduce" && action !== "adjust") return null;
   const cohortId = result.gateResource?.cohort_id;
   // No id in the response is not a reason to guess one: a version this screen
@@ -1545,7 +1669,7 @@ function staleResumeConfirmation(): AdapterWriteResult {
   };
 }
 
-function bindWriteShortcuts(
+export function bindWriteShortcuts(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
@@ -1555,13 +1679,28 @@ function bindWriteShortcuts(
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
     if (!form) continue;
+    let inFlight = false;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (inFlight) return;
       const kind = form.getAttribute("data-shortcut-form") as WriteShortcutKind | null;
       if (!kind) return;
       const title = form.querySelector('[name="title"]')?.value ?? "";
       const body = form.querySelector('[name="body"]')?.value ?? "";
-      void Promise.resolve(adapter.writeShortcut?.(kind, { title, body })).then(onDone);
+      const draftKey = form.getAttribute("data-draft-key") ?? "";
+      inFlight = true;
+      rememberInteractionDraft(draftKey, { title, body });
+      markInteractionPending(form, "Registrando…");
+      void Promise.resolve()
+        .then(() => adapter.writeShortcut?.(kind, { title, body }))
+        .then((result) => {
+          if (result) adapter.lastOperatorResult = result;
+          if (result?.ok) clearInteractionDraft(draftKey);
+        })
+        .catch((err: unknown) => {
+          adapter.lastOperatorResult = browserWriteUnknown("/v1/directives", err);
+        })
+        .finally(onDone);
     });
   }
 }

@@ -28,9 +28,9 @@
 
 import { formatLocal } from "../datetime";
 import { escapeHtml } from "../escape";
-import { operatorActionDraft, operatorActionDraftKey } from "../action-draft";
 import { formatMoney, isMoney } from "../money";
 import { ownMapValue } from "../own-map";
+import { interactionDraftValue } from "../interaction-draft";
 import { sourcePresentationLabel, sourceSystemLabel } from "../provenance";
 import type { CommercialSnapshot } from "../types";
 import {
@@ -382,8 +382,9 @@ export interface LeadAction {
   risk: ActionRisk;
   writes: ActionWriteTarget;
   effect: string;
-  /** Extra confirmation beyond the mandatory audit note. */
-  confirmation: "nota" | "nota-e-ciencia" | "nota-ciencia-e-palavra";
+  /** Only content that changes the meaning of this particular decision. */
+  humanInput: "none" | "note" | "reason";
+  confirmation: "none" | "consequence";
 }
 
 export interface LeadDetailModel {
@@ -493,7 +494,8 @@ function localActionsFor(opts: {
       risk: "baixo",
       writes: "control-center",
       effect: "Grava uma nota de auditoria no Control Center. Nada muda no Warmbly.",
-      confirmation: "nota",
+      humanInput: "note",
+      confirmation: "none",
     },
     {
       id: "MARK_REVIEWED",
@@ -501,7 +503,8 @@ function localActionsFor(opts: {
       risk: "baixo",
       writes: "control-center",
       effect: "Registra que um humano olhou este item. Não altera o estágio no Warmbly.",
-      confirmation: "nota",
+      humanInput: "none",
+      confirmation: "none",
     },
   ];
   if (opts.hasActivity) {
@@ -511,7 +514,8 @@ function localActionsFor(opts: {
       risk: "baixo",
       writes: "control-center",
       effect: "Confirma que a atividade observada confere com a realidade. Registro local.",
-      confirmation: "nota",
+      humanInput: "none",
+      confirmation: "none",
     });
   }
   if (opts.hasNextStep) {
@@ -521,7 +525,8 @@ function localActionsFor(opts: {
       risk: "baixo",
       writes: "control-center",
       effect: "Concorda com o próximo passo sugerido pela origem. Não o executa.",
-      confirmation: "nota",
+      humanInput: "none",
+      confirmation: "none",
     });
     out.push({
       id: "REJECT_NEXT_ACTION",
@@ -530,7 +535,8 @@ function localActionsFor(opts: {
       writes: "control-center",
       effect:
         "Registra que o próximo passo sugerido está errado. O Warmbly continua sugerindo até alguém corrigir lá.",
-      confirmation: "nota-e-ciencia",
+      humanInput: "reason",
+      confirmation: "consequence",
     });
   }
   if (opts.hasOpenException) {
@@ -541,7 +547,8 @@ function localActionsFor(opts: {
       writes: "control-center",
       effect:
         "Registro de auditoria local. A exceção continua aberta no Warmbly e continua nesta fila.",
-      confirmation: "nota-e-ciencia",
+      humanInput: "none",
+      confirmation: "consequence",
     });
   }
   if (opts.hasClosedException) {
@@ -551,7 +558,8 @@ function localActionsFor(opts: {
       risk: "medio",
       writes: "control-center",
       effect: "Desfaz o reconhecimento local. Não reabre nada no Warmbly.",
-      confirmation: "nota-e-ciencia",
+      humanInput: "reason",
+      confirmation: "consequence",
     });
   }
   return out;
@@ -742,11 +750,12 @@ export function leadDetailView(input: LeadDetailInput): LeadDetailModel {
         {
           id: "acknowledge_inbound_alert",
           label: "Reconhecer alerta no Warmbly",
-          risk: "alto",
+          risk: "medio",
           writes: "warmbly",
           effect:
             "Escreve no Warmbly: marca este alerta de inbound como visto por um humano. Não responde, não envia e não dispara nada.",
-          confirmation: "nota-ciencia-e-palavra",
+          humanInput: "none",
+          confirmation: "consequence",
         },
       ]
     : [];
@@ -803,28 +812,31 @@ function timeCell(at: string | null): string {
   return `<time datetime="${escapeHtml(at)}">${escapeHtml(formatLocal(at))}</time><span class="sr-only">UTC ${escapeHtml(at)}</span>`;
 }
 
-function confirmationControls(action: LeadAction): string {
-  if (action.confirmation === "nota") return "";
-  const ciencia =
-    action.writes === "warmbly"
-      ? "Entendo que esta ação grava no Warmbly."
-      : "Entendo que este é um registro local e que nada muda no Warmbly.";
-  const checkbox = `<label class="confirm"><input type="checkbox" name="ciencia" required /> ${escapeHtml(ciencia)}</label>`;
-  if (action.confirmation === "nota-e-ciencia") return checkbox;
-  return `${checkbox}<label>Digite RECONHECER para liberar <input name="palavra_de_confirmacao" required pattern="RECONHECER" title="Digite RECONHECER" /></label>`;
-}
-
 function localActionForm(action: LeadAction, resource: string, canonicalId: string, returnHash: string): string {
   const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
-  const note = operatorActionDraft(operatorActionDraftKey(action.id, canonicalId, resource));
+  const interactionIds: Record<string, string> = {
+    RECORD_NOTE: "lead.record-note",
+    MARK_REVIEWED: "lead.mark-reviewed",
+    REVIEW_ACTIVITY: "lead.review-activity",
+    CONFIRM_NEXT_ACTION: "lead.confirm-next",
+    REJECT_NEXT_ACTION: "lead.reject-next",
+    ACKNOWLEDGE_EXCEPTION: "lead.acknowledge-exception",
+    REOPEN_EXCEPTION: "lead.reopen-exception",
+  };
+  const draftKey = `operator:${action.id}:${canonicalId}:${resource}`;
+  const draftNote = interactionDraftValue(draftKey, "note");
+  const field = action.humanInput === "note"
+    ? `<label>Nota de auditoria <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(draftNote)}</textarea></label>`
+    : action.humanInput === "reason"
+      ? `<label>Motivo operacional <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(draftNote)}</textarea></label>`
+      : "";
   return `
-    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" data-continuity-action="queue" data-continuity-next="${escapeHtml(returnHash)}" class="operator-form lead-action">
+    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-draft-key="${escapeHtml(draftKey)}" data-action-risk="${escapeHtml(action.risk)}" data-human-input="${escapeHtml(action.humanInput)}" data-interaction="${escapeHtml(interactionIds[action.id] ?? action.id)}" data-continuity-action="queue" data-continuity-next="${escapeHtml(returnHash)}"${action.humanInput === "none" ? ` data-one-decision="true"` : ""} class="operator-form lead-action">
       <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonicalId)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(resource)}" />
-      <label>Nota de auditoria <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(note)}</textarea></label>
-      ${confirmationControls(action)}
+      ${field}
       <button type="submit">${escapeHtml(action.label)}</button>
     </form>`;
 }
@@ -832,12 +844,10 @@ function localActionForm(action: LeadAction, resource: string, canonicalId: stri
 function warmblyActionForm(action: LeadAction, targetId: string): string {
   const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
   return `
-    <form data-warmbly-dispatch="acknowledge" data-writes-to="warmbly" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
+    <form data-warmbly-dispatch="acknowledge" data-writes-to="warmbly" data-action-risk="${escapeHtml(action.risk)}" data-interaction="lead.warmbly-acknowledge" data-one-decision="true" class="operator-form lead-action">
       <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_id" value="${escapeHtml(targetId)}" />
-      <label>Motivo <input name="reason" required minlength="2" maxlength="200" placeholder="por que está reconhecendo" /></label>
-      ${confirmationControls(action)}
       <button type="submit">${escapeHtml(action.label)}</button>
     </form>`;
 }

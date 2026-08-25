@@ -70,7 +70,9 @@ test("progressive review tells the new approve-and-queue truth before the button
   assert.doesNotMatch(html, /data-human-gate="validate"/);
   assert.match(html, /Aprovar e enfileirar para envio/);
   assert.match(html, /auto_send=true/);
-  assert.match(html, /pattern="v3"/, "adjust still requires immutable-version confirmation");
+  assert.match(html, /data-cohort-version="3"/, "adjust remains bound to the immutable version on screen");
+  assert.doesNotMatch(html, /name="confirmation"/, "the immutable version is derived, not copied by the operator");
+  assert.doesNotMatch(html, /data-approve-comment/, "ordinary approval is exactly its named action");
   assert.doesNotMatch(html, /data-human-gate="decide"|data-human-gate="dispatch"/);
 });
 

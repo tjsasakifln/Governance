@@ -1,5 +1,4 @@
 import { escapeHtml } from "../escape";
-import { operatorActionDraft, operatorActionDraftKey } from "../action-draft";
 import { formatLocal, isUtcDateTime } from "../datetime";
 import { withQueryParams } from "../destinations";
 import {
@@ -8,6 +7,7 @@ import {
   continuitySubrouteHref,
 } from "../continuity";
 import { ACTIVITY_LIST, EXCEPTION_LIST } from "../filter";
+import { interactionDraftValue } from "../interaction-draft";
 import { formatMoney } from "../money";
 import { ownMapValue } from "../own-map";
 import { sourceSystemLabel } from "../provenance";
@@ -897,8 +897,6 @@ function activityOpsCard(
   const canonical = String(row.canonical_id ?? rowId);
   const nextId = position.next ? String(position.next.row.source_id ?? position.next.row.id ?? "") : "";
   const actionContinuity = queueActionAttributes(position, nextId);
-  const assignDraft = operatorActionDraft(operatorActionDraftKey("ASSIGN_TRIAGE", canonical, rowId));
-  const triageDraft = operatorActionDraft(operatorActionDraftKey("MARK_TRIAGED", canonical, rowId));
   return `<article class="card"${focusAttributes} data-activity-id="${escapeHtml(rowId)}" data-activity-event="${escapeHtml(event)}" data-activity-state="${escapeHtml(state)}" data-triage-state="${escapeHtml(triage)}">
     <p class="kicker">${statusPill(triage, commercialStateLabel(triage))} · ${statusPill(event, commercialEventLabel(event))}${state && state !== triage ? ` · ${statusPill(state, commercialStateLabel(state))}` : ""}</p>
     <h3>${heading}</h3>
@@ -920,18 +918,16 @@ function activityOpsCard(
       { term: "sync_status", value: sync },
     ], "daily-triage")}
     ${position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
-    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" class="operator-form"${actionContinuity}>
+    <form data-operator-form="ASSIGN_TRIAGE" data-writes-to="control-center" data-interaction="activity.assign" data-one-decision="true" class="operator-form"${actionContinuity}>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota de atribuição <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(assignDraft)}</textarea></label>
       <button type="submit">Atribuir a mim</button>
     </form>
-    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" class="operator-form"${actionContinuity}>
+    <form data-operator-form="MARK_TRIAGED" data-writes-to="control-center" data-interaction="activity.mark-triaged" data-one-decision="true" class="operator-form"${actionContinuity}>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(rowId)}" />
-      <label>Nota de triagem <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(triageDraft)}</textarea></label>
-      <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que isto registra a triagem no Control Center e não altera o Warmbly.</label>
       <button type="submit">Marcar como triado</button>
+      <p class="constraint">Registra a triagem neste Control Center; não altera o Warmbly.</p>
     </form>
     </div>` : ""}
   </article>`;
@@ -950,6 +946,7 @@ function exceptionOpsCard(
   const id = String(row.id ?? "");
   const canonical = String(row.canonical_id ?? id);
   const sourceId = String(row.source_id ?? id);
+  const startDraftKey = `operator:START_EXCEPTION_WORK:${canonical}:${sourceId}`;
   const workflow = String(row.workflow_state ?? "new");
   const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
   const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
@@ -968,8 +965,6 @@ function exceptionOpsCard(
     : "";
   const nextId = position.next ? String(position.next.row.id ?? position.next.row.source_id ?? "") : "";
   const actionContinuity = queueActionAttributes(position, nextId);
-  const acknowledgeDraft = operatorActionDraft(operatorActionDraftKey("ACKNOWLEDGE_EXCEPTION", canonical, sourceId));
-  const workDraft = operatorActionDraft(operatorActionDraftKey("START_EXCEPTION_WORK", canonical, sourceId));
   return `<article class="card"${focusAttributes} data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
     <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
     <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
@@ -992,17 +987,16 @@ function exceptionOpsCard(
       { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
     ], "resolvable-exception")}
     ${open && position.writesAllowed ? `<div class="lead-actions" data-write-boundary="control-center">
-      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" class="operator-form"${actionContinuity}>
+      <form data-operator-form="ACKNOWLEDGE_EXCEPTION" data-writes-to="control-center" data-interaction="exceptions.acknowledge" data-one-decision="true" class="operator-form"${actionContinuity}>
         <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
         <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
-        <label>Nota <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(acknowledgeDraft)}</textarea></label>
-        <label class="confirm"><input type="checkbox" required name="ciencia" /> Entendo que reconhecer não resolve nem remove a exceção.</label>
         <button type="submit">Reconhecer sem resolver</button>
+        <p class="constraint">Registra o reconhecimento local; não resolve nem remove a exceção.</p>
       </form>
-      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" class="operator-form"${actionContinuity}>
+      <form data-operator-form="START_EXCEPTION_WORK" data-writes-to="control-center" data-draft-key="${escapeHtml(startDraftKey)}" data-interaction="exceptions.start-work" class="operator-form"${actionContinuity}>
         <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonical)}" />
         <input type="hidden" name="target_source_id" value="${escapeHtml(sourceId)}" />
-        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(workDraft)}</textarea></label>
+        <label>Plano de tratamento <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(interactionDraftValue(startDraftKey, "note"))}</textarea></label>
         <button type="submit">Iniciar tratamento</button>
       </form>
     </div>` : !open ? `<p class="banner ok">Desfecho observado na origem: ${escapeHtml(commercialStateLabel(workflow))}.</p>` : ""}
@@ -1311,6 +1305,11 @@ function reviewDraftInspector(
     : ` data-reason-codes="${escapeHtml(editorial.reasonCodes.join(" "))}"`;
   const subjectRows = reviewRows(subject, 2, 4);
   const bodyRows = reviewRows(bodyText, 12, 40);
+  const editDraftKey = `review:${id}:SAVE_ADJUSTMENT`;
+  const rejectDraftKey = `review:${id}:REJECT`;
+  const editSubject = interactionDraftValue(editDraftKey, "subject", subject);
+  const editBodyText = interactionDraftValue(editDraftKey, "body_text", bodyText);
+  const rejectReason = interactionDraftValue(rejectDraftKey, "reason");
   const factUsed = reviewText(row.fact_used);
   const provenance = reviewProvenance(row);
   const targetFit = reviewTargetFit(row.target_fit);
@@ -1365,29 +1364,29 @@ function reviewDraftInspector(
   const decision = !actionable
     ? `<div class="review-readonly" data-review-readonly="${escapeHtml(id)}">${readOnlyMessage}</div>`
     : mode === "edit"
-      ? `<form data-review-form="${escapeHtml(id)}" data-review-mode="edit" class="operator-form review-decision-form">
+      ? `<form data-review-form="${escapeHtml(id)}" data-review-mode="edit" data-draft-key="${escapeHtml(editDraftKey)}" data-interaction="draft.save" class="operator-form review-decision-form">
                 ${commonHidden}
                 <input type="hidden" name="action" value="SAVE_ADJUSTMENT" />
-                <label>Assunto <textarea name="subject" rows="${subjectRows}">${escapeHtml(subject)}</textarea></label>
-                <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(bodyText)}</textarea></label>
+                <label>Assunto <textarea name="subject" rows="${subjectRows}">${escapeHtml(editSubject)}</textarea></label>
+                <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(editBodyText)}</textarea></label>
                 <div class="review-actions">
                   <button type="submit" data-review-save="true">Salvar ajuste</button>
                   <a class="button" href="${escapeHtml(reviewDraftHref(id, "inspect", hash))}">Cancelar edição</a>
                 </div>
               </form>`
       : mode === "reject"
-        ? `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="reject" class="operator-form review-decision-form">
+        ? `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="reject" data-draft-key="${escapeHtml(rejectDraftKey)}" data-interaction="draft.reject" class="operator-form review-decision-form">
                 ${commonHidden}
                 <input type="hidden" name="action" value="REJECT" />
                 <textarea name="subject" hidden>${escapeHtml(subject)}</textarea>
                 <textarea name="body_text" hidden>${escapeHtml(bodyText)}</textarea>
-                <label>Motivo para reescrita <textarea name="reason" rows="4" required></textarea></label>
+                <label>Motivo para reescrita <textarea name="reason" rows="4" required>${escapeHtml(rejectReason)}</textarea></label>
                 <div class="review-actions">
                   <button type="submit" data-review-reject="true">Rejeitar e solicitar reescrita</button>
                   <a class="button" href="${escapeHtml(reviewDraftHref(id, "inspect", hash))}">Cancelar rejeição</a>
                 </div>
               </form>`
-        : `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="approve" class="operator-form review-decision-form approve-form">
+        : `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="approve" data-interaction="draft.approve" data-one-decision="true" class="operator-form review-decision-form approve-form">
                 ${commonHidden}
                 <input type="hidden" name="action" value="APPROVE" />
                 <textarea name="subject" hidden>${escapeHtml(subject)}</textarea>

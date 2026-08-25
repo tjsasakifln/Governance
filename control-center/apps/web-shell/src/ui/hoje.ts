@@ -6,6 +6,7 @@ import { ownMapValue } from "../own-map";
 import type { HojeSection, HojeViewModel } from "../hoje-compose";
 import { WRITE_SHORTCUT_LABELS } from "../adapters/paths";
 import { freshnessTone } from "../freshness-tone";
+import { interactionDraftValue } from "../interaction-draft";
 import {
   CONFIDENCE_HELP,
   confidenceWord,
@@ -88,17 +89,18 @@ function shortcutForm(section: HojeSection): string {
   return section.shortcuts
     .map((shortcut) => {
       const label = ownMapValue(WRITE_SHORTCUT_LABELS, shortcut.kind) ?? "Atalho operacional";
+      const draftKey = `shortcut:${shortcut.kind}`;
       return `
-        <form class="shortcut-form" data-shortcut-form="${escapeHtml(shortcut.kind)}" data-write-path="/v1/directives">
+        <form class="shortcut-form" data-shortcut-form="${escapeHtml(shortcut.kind)}" data-draft-key="${escapeHtml(draftKey)}" data-interaction="today.directive" data-write-path="/v1/directives">
           <h3>${escapeHtml(label)}</h3>
           <p class="hint">${escapeHtml(shortcut.hint)}</p>
           <label>
             Título
-            <input name="title" type="text" required maxlength="200" autocomplete="off" />
+            <input name="title" type="text" required maxlength="200" autocomplete="off" value="${escapeHtml(interactionDraftValue(draftKey, "title"))}" />
           </label>
           <label>
             Corpo
-            <textarea name="body" required maxlength="8000" rows="3"></textarea>
+            <textarea name="body" required maxlength="8000" rows="3">${escapeHtml(interactionDraftValue(draftKey, "body"))}</textarea>
           </label>
           <button type="submit">${escapeHtml(label)}</button>
           ${technicalDetails(

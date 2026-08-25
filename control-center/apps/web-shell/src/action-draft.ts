@@ -1,11 +1,11 @@
-/**
- * Volatile notes for an operator action whose outcome is not definitive.
- *
- * This map survives a wholesale DOM repaint but deliberately does not survive
- * reload or reauthentication. Notes may contain sensitive operational context;
- * sessionStorage/localStorage are therefore outside this contract.
- */
-const notes = new Map<string, string>();
+import {
+  clearInteractionDraft,
+  interactionDraftValue,
+  rememberInteractionDraft,
+  resetInteractionDrafts,
+} from "./interaction-draft";
+
+const NOTE_FIELD = "note";
 
 export function operatorActionDraftKey(action: string, canonicalId: string, sourceId: string): string {
   return `${action.slice(0, 80)}\u0000${canonicalId.slice(0, 256)}\u0000${sourceId.slice(0, 256)}`;
@@ -14,20 +14,20 @@ export function operatorActionDraftKey(action: string, canonicalId: string, sour
 export function rememberOperatorActionDraft(key: string, note: string): void {
   if (!key) return;
   if (!note) {
-    notes.delete(key);
+    clearInteractionDraft(key);
     return;
   }
-  notes.set(key, note.slice(0, 500));
+  rememberInteractionDraft(key, { [NOTE_FIELD]: note.slice(0, 500) });
 }
 
 export function operatorActionDraft(key: string): string {
-  return notes.get(key) ?? "";
+  return interactionDraftValue(key, NOTE_FIELD);
 }
 
 export function clearOperatorActionDraft(key: string): void {
-  notes.delete(key);
+  clearInteractionDraft(key);
 }
 
 export function resetOperatorActionDrafts(): void {
-  notes.clear();
+  resetInteractionDrafts();
 }
