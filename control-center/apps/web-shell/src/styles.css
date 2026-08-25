@@ -14,6 +14,35 @@
   --low: #b7c4d4;
   --ok: #b5c9b0;
   --space: 0.85rem;
+  /* Semantic contract. Legacy tokens above remain migration aliases while
+     domain styles adopt these roles progressively. */
+  --surface-page: var(--bg);
+  --surface-raised: var(--bg-elev);
+  --surface-card: var(--bg-card);
+  --text-primary: var(--fg);
+  --text-secondary: var(--fg-muted);
+  --border-default: var(--line);
+  --action-primary: var(--accent);
+  --state-critical: var(--crit);
+  --state-alert: var(--high);
+  --state-success: var(--ok);
+  --state-unknown: var(--low);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --radius-control: 0.35rem;
+  --radius-panel: 0.5rem;
+  --elevation-overlay: 0 0.75rem 2rem rgb(0 0 0 / 35%);
+  --focus-width: 2px;
+  --control-min-size: 44px;
+  --measure-reading: 70ch;
+  --type-page: 1.35rem;
+  --type-section: 0.78rem;
+  --type-body: 1rem;
+  --density-control-block: 0.55rem;
+  --motion-fast: 120ms;
   /* Design-system maximum measure for the main content column. Content wider
      than this is centred inside the column instead of hugging its left edge. */
   --content-max: 76rem;
@@ -89,7 +118,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--focus);
+  outline: var(--focus-width) solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -561,7 +590,7 @@ main {
 
 .page-head h1 {
   margin: 0 0 0.3rem;
-  font-size: 1.35rem;
+  font-size: var(--type-page);
   font-weight: 650;
 }
 
@@ -707,6 +736,73 @@ main {
   margin: 0 0 1rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
+}
+
+.operational-feedback {
+  border-radius: var(--radius-panel);
+  border-left-width: 4px;
+  background: var(--surface-raised);
+  transition: border-color var(--motion-fast) ease-out;
+}
+
+.operational-feedback-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.operational-feedback-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--type-section);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.operational-feedback-body {
+  max-width: var(--measure-reading);
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+}
+
+.operational-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.operational-primary-action,
+.operational-secondary-action {
+  min-height: var(--control-min-size);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--density-control-block) var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.operational-primary-action {
+  border-color: var(--action-primary);
+  font-weight: 650;
+}
+
+.operational-action-guidance {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+  }
 }
 
 .banner.loading {

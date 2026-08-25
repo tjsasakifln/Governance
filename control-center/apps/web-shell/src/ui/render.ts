@@ -37,6 +37,10 @@ import {
 import { warmblyBlock } from "./warmbly";
 import { renderDesktopNavigation, renderMobileTaskNavigation } from "./navigation";
 import {
+  operationalFeedback,
+  operationalPageHeader,
+} from "./design-system";
+import {
   pendingResumeConfirmation,
   resumeObservationFingerprint,
 } from "../warmbly-confirmation";
@@ -94,7 +98,7 @@ function attentionCard(item: AttentionItem, now: string): string {
 function priorityCard(item: PriorityRecommendation, now: string): string {
   const alert = priorityAlert(item, now);
   return `
-    <li class="card priority alert-card" data-rank="${item.rank}" ${alertDataAttributes(alert)} data-freshness="${escapeHtml(item.provenance.freshness_status)}">
+    <li class="card priority alert-card" data-operational-component="priority" data-rank="${item.rank}" ${alertDataAttributes(alert)} data-freshness="${escapeHtml(item.provenance.freshness_status)}">
       <p class="kicker">Prioridade ${item.rank} · ${escapeHtml(priorityHorizonLabel(item.horizon))}</p>
       <h3>${escapeHtml(item.title)}</h3>
       ${alertBody(alert, item.provenance)}
@@ -129,7 +133,7 @@ function sessionCard(item: AgentSession): string {
 
 function viewBanner(view: ViewState<DestinationPage>): string {
   if (view.kind === "loading") {
-    return `<div class="banner loading" role="status">${escapeHtml(DEFAULT_LOADING_LABEL)}</div>`;
+    return operationalFeedback({ state: "loading", title: DEFAULT_LOADING_LABEL });
   }
   if (view.kind === "error") {
     const message =
@@ -138,19 +142,19 @@ function viewBanner(view: ViewState<DestinationPage>): string {
         : view.code === "CONTEXT_UNAVAILABLE"
           ? "Não foi possível carregar este recorte."
           : "Não foi possível exibir este recorte.";
-    return `<div class="banner error" role="alert"><p>${escapeHtml(message)}</p>${technicalDetails(
+    return operationalFeedback({ state: "critical", title: message, detailHtml: technicalDetails(
       [
         { term: "codigo_do_erro", value: view.code },
         { term: "mensagem_original", value: view.message },
       ],
       "view-error",
-    )}</div>`;
+    ) });
   }
   if (view.kind === "empty") {
-    return `<div class="banner empty" role="status">${escapeHtml(view.message)}</div>`;
+    return operationalFeedback({ state: "empty", title: view.message });
   }
   if (view.kind === "stale") {
-    return `<div class="banner stale" role="status">${escapeHtml(view.message)}</div>`;
+    return operationalFeedback({ state: "stale", title: view.message });
   }
   return "";
 }
@@ -201,9 +205,17 @@ export function operatorBanner(result: AdapterWriteResult | undefined): string {
             : result.path === "/v1/operator-actions"
               ? "Ação registrada no Control Center."
               : "Ação concluída.";
-  return `<div class="banner ${cls} operator-result" role="${role}" data-operator-result="${result.ok ? "ok" : "error"}" data-operator-outcome="${escapeHtml(result.outcome ?? (result.ok ? "accepted" : "refused"))}">
-    <p>${escapeHtml(message)}</p>
-    <p><strong>Próxima ação:</strong> ${escapeHtml(recovery)}</p>
+  return operationalFeedback({
+    state: result.ok ? "success" : result.outcome === "unknown" ? "unknown" : "blocked",
+    title: message,
+    body: `Próxima ação: ${recovery}`,
+    className: `operator-result ${cls}`,
+    role,
+    data: {
+      "operator-result": result.ok ? "ok" : "error",
+      "operator-outcome": result.outcome ?? (result.ok ? "accepted" : "refused"),
+    },
+    detailHtml: `
     ${receipt ? `<dl class="facts" data-action-receipt="true">
       <div data-receipt-id="${escapeHtml(receipt.id)}"><dt>Receipt</dt><dd>${review ? "write + readback canônico confirmados" : "registro append-only confirmado"}</dd></div>
       <div><dt>Ator</dt><dd>${escapeHtml(review?.approvedBy ?? receipt.actor_id ?? (receipt.writes_to === "warmbly" ? "sessão autenticada na borda" : "não retornado"))}</dd></div>
@@ -233,8 +245,8 @@ export function operatorBanner(result: AdapterWriteResult | undefined): string {
       { term: "approved_content_hash", value: review?.approvedContentHash ?? "" },
       { term: "scheduled_for", value: review?.scheduledFor ?? "" },
       { term: "approved_at", value: review?.approvedAt ?? "" },
-    ], "operator-write-result")}
-  </div>`;
+    ], "operator-write-result")}`,
+  });
 }
 
 function hojeBody(page: DestinationPage): string {
@@ -421,10 +433,7 @@ export function renderShell(model: ShellModel): string {
       ${renderMobileTaskNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
       ${renderDesktopNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
       <main id="conteudo" tabindex="-1">
-        <header class="page-head">
-          <h1>${escapeHtml(label)}</h1>
-          <p>${escapeHtml(headline)}</p>
-        </header>
+        ${operationalPageHeader(label, headline)}
         ${renderOrientationSummary(orientation)}
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}

@@ -6,6 +6,7 @@ import { collectProvenance } from "../page";
 import type { AttentionItem, FreshnessStatus, PriorityRecommendation } from "../types";
 import type { ViewKind, ViewState } from "../view-state";
 import { severityLabel } from "./labels";
+import { operationalActionBar } from "./design-system";
 
 export const ORIENTATION_FIELDS = ["state", "risk", "next-action"] as const;
 
@@ -419,14 +420,21 @@ function statement(
 }
 
 export function renderOrientationSummary(summary: OrientationSummary): string {
-  const actionBody = summary.action.href === null
-    ? `<p class="orientation-value">${escapeHtml(summary.action.label)}</p>`
-    : `<a class="orientation-primary-action" data-orientation-primary-action="true" href="${escapeHtml(summary.action.href)}">${escapeHtml(summary.action.label)}</a>`;
+  const actionBody = operationalActionBar({
+    label: "Próxima ação do recorte",
+    ...(summary.action.href === null
+      ? { guidance: summary.action.label }
+      : {
+          primary: { label: summary.action.label, href: summary.action.href },
+          primaryClassName: "orientation-primary-action",
+          primaryData: { "orientation-primary-action": "true" },
+        }),
+  });
   const observedAt = summary.observedAt === null
     ? escapeHtml(summary.observedAtLabel)
     : `<time datetime="${escapeHtml(summary.observedAt)}">${escapeHtml(summary.observedAtLabel)}</time>`;
 
-  return `<section class="orientation-summary" aria-labelledby="orientation-title" data-orientation-contract="v1" data-orientation-destination="${escapeHtml(summary.destination)}" data-orientation-view="${summary.viewKind}">
+  return `<section class="orientation-summary" aria-labelledby="orientation-title" data-operational-component="state-summary" data-orientation-contract="v1" data-orientation-destination="${escapeHtml(summary.destination)}" data-orientation-view="${summary.viewKind}">
     <header class="orientation-heading">
       <h2 id="orientation-title">Orientação rápida — ${escapeHtml(summary.locationLabel)}</h2>
       <p>${observedAt}</p>

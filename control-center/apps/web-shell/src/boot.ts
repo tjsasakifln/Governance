@@ -3,6 +3,11 @@ import { createProductionAdapter } from "./adapters/http";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
 import { registeredVisualRoutes, type VisualRoute } from "./visual-matrix";
+import {
+  OPERATIONAL_COMPONENT_CONTRACT,
+  OPERATIONAL_STATES,
+  renderOperationalComponentCatalog,
+} from "./ui/design-system";
 
 export const SHELL_VERSION = "0.1.0";
 export const SHELL_GLOBAL_KEY = "__CONFENGE_CONTROL_CENTER__";
@@ -15,6 +20,11 @@ export interface ShellGlobals {
   version: string;
   destinations: readonly string[];
   visualRoutes: readonly VisualRoute[];
+  designSystem: {
+    components: typeof OPERATIONAL_COMPONENT_CONTRACT;
+    states: typeof OPERATIONAL_STATES;
+    renderCatalog: typeof renderOperationalComponentCatalog;
+  };
   primarySurface: typeof PRIMARY_SURFACE;
   mount: typeof mount;
 }
@@ -30,6 +40,11 @@ export function installShellGlobals(win: ShellWindow): ShellGlobals {
     version: SHELL_VERSION,
     destinations: DESTINATION_IDS,
     visualRoutes: registeredVisualRoutes(),
+    designSystem: {
+      components: OPERATIONAL_COMPONENT_CONTRACT,
+      states: OPERATIONAL_STATES,
+      renderCatalog: renderOperationalComponentCatalog,
+    },
     primarySurface: PRIMARY_SURFACE,
     mount,
   };
