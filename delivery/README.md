@@ -10,10 +10,10 @@ synthetic/redacted `CFG-DIAG-EXP-v1` path.
   `confenge.delivery_order_requested.v1` producer.
 - web-cfg remains authoritative for the 54 public deliverable identities and
   the `expansion_package` composition.
-- Governance validates financial gate, readiness and capacity before creating
-  `confenge.work_order.v1`.
-- SQLite is the durable minimum. Work Order events are append-only truth;
-  Work Order and Control Center projections are disposable read models.
+- Governance readiness/capacity validates the admission before the canonical
+  Control Center Delivery domain creates `confenge.work_order.v1`.
+- PostgreSQL Work Order events are the sole append-only execution truth. The
+  SQLite database in this directory stores capacity allocations only.
 - The policy ceiling of 50 is never treated as staffed capacity.
 - Synthetic evidence always has `received_revenue=false`. No Asaas, checkout,
   email or customer endpoint is called.
@@ -43,7 +43,7 @@ sandbox delivery and explicit sandbox acceptance.
 
 `AWAITING_INPUTS -> READY -> IN_PROGRESS <-> BLOCKED -> QA -> READY_TO_DELIVER -> DELIVERED -> ACCEPTED -> CLOSED`
 
-A failed review returns `QA -> IN_PROGRESS`. Missing identity, hash, version,
+A failed review follows `QA -> REWORK_REQUIRED -> IN_PROGRESS`. Missing identity, hash, version,
 onboarding, finance, readiness, capacity, input, owner, artifact or explicit
 acceptance fails closed.
 
@@ -51,8 +51,8 @@ The unique business key is:
 
 `proposal_id + proposal_version + accepted_snapshot_hash + deliverable_id + deliverable_version`
 
-The append-only SQLite log, optimistic version and deterministic IDs make
-transport duplicates and replay converge on one Work Order.
+The canonical TypeScript aggregate and PostgreSQL event store provide optimistic
+locking, deterministic IDs, strict event order and rebuildable projections.
 
 ## Stable API
 
@@ -61,25 +61,24 @@ from delivery.canary_gate import CanaryGate
 from delivery.capacity import CapacityLedger, evaluate_admission
 from delivery.production.cfg_diag_exp import produce_sandbox_artifact, run_qa
 from delivery.readiness import promote_to_delivery_validated
-from delivery.store import SQLiteWorkOrderStore
-from delivery.work_order import WorkOrderService, rebuild_store_projection
 ```
 
-`CapacityLedger` persists only operational `HELD -> COMMITTED -> RELEASED`
-allocations. It is not a billing ledger. The Control Center package copies the
-persisted Work Order read model and exports no command.
+`CapacityLedger` persists only operational
+`HELD -> COMMITTED -> RELEASED | EXPIRED` allocations. It is not a billing or
+Work Order ledger. The Control Center package owns the Work Order and exposes a
+read-only projection.
 
 ## Verification
 
 ```bash
 python3 -m pytest -q \
   tests/test_delivery_contracts.py \
-  tests/test_work_order.py \
   tests/test_delivery_readiness.py \
   tests/test_delivery_capacity.py \
   tests/test_delivery_canary_gate.py
 npm --prefix control-center run typecheck --workspace=@confenge/control-center-delivery
 npm --prefix control-center run test --workspace=@confenge/control-center-delivery
+npm --prefix control-center run test:delivery-canary
 ```
 
 The end-to-end command is `python3 -m delivery.canary`; it can execute the

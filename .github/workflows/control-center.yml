@@ -28,7 +28,7 @@ jobs:
         working-directory: control-center
         run: npm test
       - name: Delivery vertical-slice canary
-        run: python3 -m delivery.canary --handoff delivery/fixtures/delivery_order_requested.synthetic.v1.json --projector typescript --state-dir ${{ runner.temp }}/confenge-delivery-canary --output ${{ runner.temp }}/confenge-delivery-canary/manifest.json
+        run: npm --prefix control-center run test:delivery-canary
 
   integration:
     runs-on: ubuntu-latest

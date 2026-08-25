@@ -106,6 +106,8 @@ function immutableIdentityMatches(current: WorkOrder, next: WorkOrder): boolean 
     current.terms_version === next.terms_version &&
     current.business_calendar_version === next.business_calendar_version &&
     current.estimated_effort_minutes === next.estimated_effort_minutes &&
+    current.estimated_capacity_units === next.estimated_capacity_units &&
+    current.capacity_commitment_id === next.capacity_commitment_id &&
     current.created_at === next.created_at &&
     current.synthetic === next.synthetic &&
     isDeepStrictEqual(

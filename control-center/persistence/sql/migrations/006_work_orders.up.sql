@@ -61,6 +61,8 @@ BEGIN
      OR (NEW.projection_json ->> 'terms_version') IS DISTINCT FROM (OLD.projection_json ->> 'terms_version')
      OR (NEW.projection_json ->> 'business_calendar_version') IS DISTINCT FROM (OLD.projection_json ->> 'business_calendar_version')
      OR (NEW.projection_json ->> 'estimated_effort_minutes') IS DISTINCT FROM (OLD.projection_json ->> 'estimated_effort_minutes')
+     OR (NEW.projection_json ->> 'estimated_capacity_units') IS DISTINCT FROM (OLD.projection_json ->> 'estimated_capacity_units')
+     OR (NEW.projection_json ->> 'capacity_commitment_id') IS DISTINCT FROM (OLD.projection_json ->> 'capacity_commitment_id')
      OR (NEW.projection_json ->> 'created_at') IS DISTINCT FROM (OLD.projection_json ->> 'created_at')
      OR (NEW.projection_json ->> 'synthetic') IS DISTINCT FROM (OLD.projection_json ->> 'synthetic')
      OR jsonb_path_query_array(NEW.projection_json, '$.inputs_required[*].input_id')

@@ -22,7 +22,6 @@
     "domains/delivery",
     "domains/commercial",
     "domains/finance",
-    "domains/delivery",
     "domains/engineering",
     "domains/agent-activity",
     "intelligence/attention",
@@ -42,7 +41,7 @@
     "build": "npm run build --workspaces --if-present",
     "test:integration": "node scripts/integration.mjs",
     "test:e2e": "node scripts/e2e.mjs",
-    "test:delivery-canary": "PYTHONPATH=.. python3 -m delivery.canary --handoff ../delivery/fixtures/delivery_order_requested.synthetic.v1.json --projector typescript --state-dir /tmp/confenge-delivery-canary-ci --output /tmp/confenge-delivery-canary-ci/manifest.json",
+    "test:delivery-canary": "PYTHONPATH=.. python3 -m delivery.canary --handoff ../delivery/fixtures/delivery_order_requested.synthetic.v1.json --state-dir /tmp/confenge-delivery-canary-ci --output /tmp/confenge-delivery-canary-ci/manifest.json",
     "qa": "npm run gate --workspace=@confenge/control-center-qa",
     "qa:live": "npx tsx tests/convergence/live-runtime/run-gate.ts"
   }

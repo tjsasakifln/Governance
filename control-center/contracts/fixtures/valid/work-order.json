@@ -37,6 +37,8 @@
   "current_stage": "AWAITING_INPUTS",
   "responsible_owner": null,
   "estimated_effort_minutes": 4800,
+  "estimated_capacity_units": 1,
+  "capacity_commitment_id": "hold_diag_sbx_001",
   "actual_effort_minutes": 0,
   "QA_state": "NOT_STARTED",
   "QA_checklist_version": null,

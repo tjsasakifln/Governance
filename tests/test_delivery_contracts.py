@@ -8,10 +8,8 @@ import pytest
 
 from delivery.contracts import (
     ContractError,
-    deterministic_work_order_id,
     validate_delivery_order_requested,
     validate_financial_gate,
-    work_order_business_key,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,14 +20,12 @@ def request() -> dict:
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_handoff_contract_preserves_cross_repo_identity_and_stable_work_order_id():
+def test_handoff_contract_preserves_cross_repo_identity_for_the_canonical_work_order():
     clean = validate_delivery_order_requested(request())
     assert clean["proposal_id"] == "220f817a-5b2b-5799-b403-2ce8c731e4bf"
     assert clean["qco_id"] == "qco-synthetic-cfg-diag-exp-001"
     assert clean["offer_id"] == "CFG-DIAG-EXP-v1"
     assert clean["deliverable_id"] == "CFG-DIAG-EXP-v1"
-    assert work_order_business_key(clean).count("|") == 4
-    assert deterministic_work_order_id(clean) == deterministic_work_order_id(deepcopy(clean))
 
 
 def test_financial_gate_absent_or_unknown_fails_contract_or_remains_unknown():
@@ -56,6 +52,11 @@ def test_synthetic_event_cannot_become_received_revenue():
     with pytest.raises(ContractError, match="never become received revenue"):
         validate_financial_gate(gate)
 
+    authorized = deepcopy(request()["financial_gate"])
+    authorized.update({"state": "AUTHORIZED", "synthetic": False, "received_revenue": True})
+    with pytest.raises(ContractError, match="never become received revenue"):
+        validate_financial_gate(authorized)
+
 
 def test_accepted_hash_and_version_are_not_inferred():
     invalid_hash = request()
@@ -66,3 +67,17 @@ def test_accepted_hash_and_version_are_not_inferred():
     invalid_version["proposal_version"] = 0
     with pytest.raises(ContractError, match="positive integer"):
         validate_delivery_order_requested(invalid_version)
+
+
+def test_handoff_normalizes_compatible_hash_and_time_but_rejects_unknown_fields():
+    compatible = request()
+    compatible["accepted_snapshot_hash"] = compatible["accepted_snapshot_hash"].removeprefix("sha256:")
+    compatible["occurred_at"] = "2026-08-25T09:05:00-03:00"
+    clean = validate_delivery_order_requested(compatible)
+    assert clean["accepted_snapshot_hash"].startswith("sha256:")
+    assert clean["occurred_at"] == "2026-08-25T12:05:00.000Z"
+
+    unexpected = request()
+    unexpected["customer_email"] = "must-not-enter-delivery"
+    with pytest.raises(ContractError, match="unknown fields"):
+        validate_delivery_order_requested(unexpected)

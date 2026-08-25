@@ -277,6 +277,8 @@ export interface WorkOrder {
   current_stage: WorkOrderStage;
   responsible_owner: string | null;
   estimated_effort_minutes: number | null;
+  estimated_capacity_units: number;
+  capacity_commitment_id: string;
   actual_effort_minutes: number;
   QA_state: "NOT_STARTED" | "IN_REVIEW" | "PASSED" | "FAILED";
   QA_checklist_version: string | null;

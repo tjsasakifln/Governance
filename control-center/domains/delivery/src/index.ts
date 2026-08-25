@@ -2,6 +2,7 @@ export {
   applyWorkOrderEvent,
   createWorkOrder,
   decideWorkOrder,
+  deriveWorkOrderId,
   replayWorkOrder,
   type CreateWorkOrderCommand,
   type EventContext,

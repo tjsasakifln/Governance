@@ -11,6 +11,7 @@ from delivery.readiness import (
     ReadinessError,
     generate_fail_closed_snapshot,
     promote_to_delivery_validated,
+    readiness_for_admission,
     validate_operational_profile,
 )
 
@@ -170,3 +171,23 @@ def test_delivery_validation_requires_closed_accepted_sandbox_canary_and_is_immu
             canary_evidence=bad,
             promoted_at="2026-08-25T18:00:00Z",
         )
+
+
+def test_malformed_future_and_unproven_readiness_fail_closed():
+    profile = load("cfg-diag-exp-v1.production-ready.json")
+    malformed = deepcopy(profile)
+    malformed["inputs_required"] = ["not-an-object"]
+    assert readiness_for_admission(
+        malformed, evaluated_at="2026-08-25T12:06:00Z"
+    )["reason_codes"] == ["READINESS_EVIDENCE_INVALID"]
+
+    future = deepcopy(profile)
+    future["freshness"]["evaluated_at"] = "2026-08-25T12:06:01Z"
+    assert readiness_for_admission(
+        future, evaluated_at="2026-08-25T12:06:00Z"
+    )["reason_codes"] == ["READINESS_FROM_FUTURE"]
+
+    unproven = deepcopy(profile)
+    unproven["readiness_state"] = "DELIVERY_VALIDATED"
+    with pytest.raises(ReadinessError, match="canary reference"):
+        validate_operational_profile(unproven)

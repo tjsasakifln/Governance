@@ -1,4 +1,4 @@
-"""Typed failures used by command handlers and contract tests."""
+"""Typed failures used by the cross-repository handoff contract."""
 
 
 class DeliveryError(Exception):
@@ -9,23 +9,3 @@ class DeliveryError(Exception):
 
 class ContractError(DeliveryError):
     code = "contract_invalid"
-
-
-class GateHeldError(DeliveryError):
-    code = "gate_held"
-
-
-class IllegalTransitionError(DeliveryError):
-    code = "illegal_transition"
-
-
-class OptimisticConcurrencyError(DeliveryError):
-    code = "optimistic_concurrency"
-
-
-class DuplicateEventConflictError(DeliveryError):
-    code = "duplicate_event_conflict"
-
-
-class ReplayError(DeliveryError):
-    code = "replay_invalid"

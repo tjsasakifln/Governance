@@ -19,6 +19,20 @@ class CapacityError(ValueError):
 
 TERMINAL_WORK_ORDER_STAGES = frozenset({"CLOSED", "CANCELLED"})
 ALLOCATION_STATES = frozenset({"HELD", "COMMITTED", "RELEASED", "EXPIRED"})
+WORK_ORDER_STAGES = frozenset(
+    {
+        "AWAITING_INPUTS",
+        "READY",
+        "IN_PROGRESS",
+        "BLOCKED",
+        "QA",
+        "READY_TO_DELIVER",
+        "DELIVERED",
+        "ACCEPTED",
+        "REWORK_REQUIRED",
+        *TERMINAL_WORK_ORDER_STAGES,
+    }
+)
 
 
 def _parse_instant(value: str, field: str) -> datetime:
@@ -46,10 +60,17 @@ def _stable_id(prefix: str, value: Any) -> str:
 def _is_working_day(day: date, calendar: Mapping[str, Any]) -> bool:
     weekdays = calendar.get("working_weekdays")
     holidays = calendar.get("holidays")
-    if not isinstance(weekdays, list) or not all(isinstance(item, int) for item in weekdays):
+    if (
+        not isinstance(weekdays, list)
+        or not weekdays
+        or not all(isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 6 for item in weekdays)
+        or len(set(weekdays)) != len(weekdays)
+    ):
         raise CapacityError("working calendar lacks working_weekdays")
-    if not isinstance(holidays, list):
+    if not isinstance(holidays, list) or not all(isinstance(item, str) for item in holidays):
         raise CapacityError("working calendar lacks holidays")
+    for holiday in holidays:
+        _parse_day(holiday, "calendar.holidays")
     return day.weekday() in weekdays and day.isoformat() not in set(holidays)
 
 
@@ -159,12 +180,21 @@ def evaluate_admission(
             capacity_snapshot=capacity_snapshot,
         )
     try:
+        snapshot_as_of = _parse_instant(capacity_snapshot.get("as_of"), "capacity.as_of")
         snapshot_expiry = _parse_instant(capacity_snapshot.get("expires_at"), "capacity.expires_at")
     except CapacityError:
         return _unknown_decision(
             request=request,
             evaluated_at=evaluated_at,
             reasons=["CAPACITY_FRESHNESS_UNKNOWN"],
+            readiness=readiness,
+            capacity_snapshot=capacity_snapshot,
+        )
+    if snapshot_as_of >= snapshot_expiry or now < snapshot_as_of:
+        return _unknown_decision(
+            request=request,
+            evaluated_at=evaluated_at,
+            reasons=["CAPACITY_SNAPSHOT_FROM_FUTURE"],
             readiness=readiness,
             capacity_snapshot=capacity_snapshot,
         )
@@ -192,6 +222,19 @@ def evaluate_admission(
             readiness=readiness,
             capacity_snapshot=capacity_snapshot,
         )
+    if (
+        capacity_snapshot.get("unit") != "delivery_slot"
+        or capacity_snapshot.get("policy_ceiling_used_as_staffed_capacity") is not False
+        or capacity_snapshot.get("real_checkout_enabled") is not False
+        or not capacity_snapshot.get("evidence_refs")
+    ):
+        return _unknown_decision(
+            request=request,
+            evaluated_at=evaluated_at,
+            reasons=["CAPACITY_SNAPSHOT_INVALID"],
+            readiness=readiness,
+            capacity_snapshot=capacity_snapshot,
+        )
 
     if (
         request.get("deliverable_id") != readiness.get("deliverable_id")
@@ -214,10 +257,35 @@ def evaluate_admission(
         )
 
     active_effort = 0
+    seen_work_order_ids: set[str] = set()
     for work_order in active_work_orders:
-        if work_order.get("stage") in TERMINAL_WORK_ORDER_STAGES:
+        if not isinstance(work_order, Mapping):
+            return _unknown_decision(
+                request=request,
+                evaluated_at=evaluated_at,
+                reasons=["ACTIVE_WIP_INVALID"],
+                readiness=readiness,
+                capacity_snapshot=capacity_snapshot,
+            )
+        work_order_id = work_order.get("work_order_id")
+        stage = work_order.get("current_stage")
+        if (
+            not isinstance(work_order_id, str)
+            or not work_order_id
+            or work_order_id in seen_work_order_ids
+            or stage not in WORK_ORDER_STAGES
+        ):
+            return _unknown_decision(
+                request=request,
+                evaluated_at=evaluated_at,
+                reasons=["ACTIVE_WIP_INVALID"],
+                readiness=readiness,
+                capacity_snapshot=capacity_snapshot,
+            )
+        seen_work_order_ids.add(work_order_id)
+        if stage in TERMINAL_WORK_ORDER_STAGES:
             continue
-        effort = work_order.get("estimated_effort_units")
+        effort = work_order.get("estimated_capacity_units")
         if not isinstance(effort, int) or effort <= 0:
             return _unknown_decision(
                 request=request,
@@ -310,7 +378,7 @@ def evaluate_admission(
         "active_work_order_ids": [
             item["work_order_id"]
             for item in active_work_orders
-            if item.get("stage") not in TERMINAL_WORK_ORDER_STAGES
+            if item.get("current_stage") not in TERMINAL_WORK_ORDER_STAGES
         ],
         "reserved_effort_units": reserved_effort_units,
         "requested_effort_units": effort_units,
@@ -371,6 +439,7 @@ class CapacityLedger:
                     idempotency_key TEXT PRIMARY KEY,
                     command_type TEXT NOT NULL,
                     hold_id TEXT NOT NULL,
+                    command_hash TEXT NOT NULL,
                     result_json TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS capacity_allocations_snapshot_state
@@ -382,19 +451,40 @@ class CapacityLedger:
     def _row(row: sqlite3.Row) -> dict[str, Any]:
         return dict(row)
 
-    def _command_result(self, idempotency_key: str, command_type: str) -> dict[str, Any] | None:
+    @staticmethod
+    def _command_hash(value: Mapping[str, Any]) -> str:
+        return hashlib.sha256(canonical_json(value)).hexdigest()
+
+    def _command_result(
+        self, idempotency_key: str, command_type: str, command: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
         row = self._connection.execute(
-            "SELECT command_type, result_json FROM capacity_commands WHERE idempotency_key = ?",
+            "SELECT command_type, command_hash, result_json FROM capacity_commands WHERE idempotency_key = ?",
             (idempotency_key,),
         ).fetchone()
-        if row and row["command_type"] != command_type:
-            raise CapacityError("idempotency key was already used by another command")
+        if row and (
+            row["command_type"] != command_type
+            or row["command_hash"] != self._command_hash(command)
+        ):
+            raise CapacityError("idempotency key was already used by a different command")
         return json.loads(row["result_json"]) if row else None
 
-    def _record_command(self, idempotency_key: str, command_type: str, result: Mapping[str, Any]) -> None:
+    def _record_command(
+        self,
+        idempotency_key: str,
+        command_type: str,
+        command: Mapping[str, Any],
+        result: Mapping[str, Any],
+    ) -> None:
         self._connection.execute(
-            "INSERT INTO capacity_commands(idempotency_key, command_type, hold_id, result_json) VALUES (?, ?, ?, ?)",
-            (idempotency_key, command_type, result["hold_id"], json.dumps(result, sort_keys=True)),
+            "INSERT INTO capacity_commands(idempotency_key, command_type, hold_id, command_hash, result_json) VALUES (?, ?, ?, ?, ?)",
+            (
+                idempotency_key,
+                command_type,
+                result["hold_id"],
+                self._command_hash(command),
+                json.dumps(result, sort_keys=True),
+            ),
         )
 
     def acquire_hold(
@@ -418,11 +508,17 @@ class CapacityLedger:
         capacity_limit = decision.get("capacity_limit_after_wip_units")
         if not isinstance(effort_units, int) or effort_units <= 0 or not isinstance(capacity_limit, int):
             raise CapacityError("admission lacks effort/capacity basis")
+        command = {
+            "decision": dict(decision),
+            "correlation_id": correlation_id,
+            "created_at": created_at,
+            "expires_at": expires_at,
+        }
 
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                replay = self._command_result(idempotency_key, "HOLD")
+                replay = self._command_result(idempotency_key, "HOLD", command)
                 if replay is not None:
                     self._connection.commit()
                     return replay
@@ -468,7 +564,7 @@ class CapacityLedger:
                     ),
                 )
                 result = self.get(hold_id)
-                self._record_command(idempotency_key, "HOLD", result)
+                self._record_command(idempotency_key, "HOLD", command, result)
                 self._connection.commit()
                 return result
             except Exception:
@@ -483,15 +579,24 @@ class CapacityLedger:
         idempotency_key: str,
         committed_at: str,
     ) -> dict[str, Any]:
-        _parse_instant(committed_at, "committed_at")
+        committed = _parse_instant(committed_at, "committed_at")
+        command = {
+            "hold_id": hold_id,
+            "work_order_id": work_order_id,
+            "committed_at": committed_at,
+        }
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                replay = self._command_result(idempotency_key, "COMMIT")
+                replay = self._command_result(idempotency_key, "COMMIT", command)
                 if replay is not None:
                     self._connection.commit()
                     return replay
                 allocation = self.get(hold_id)
+                if committed < _parse_instant(allocation["created_at"], "created_at"):
+                    raise CapacityError("commit timestamp precedes the hold")
+                if committed >= _parse_instant(allocation["expires_at"], "expires_at"):
+                    raise CapacityError("cannot commit an expired hold")
                 if allocation["state"] == "COMMITTED" and allocation["work_order_id"] == work_order_id:
                     result = allocation
                 elif allocation["state"] != "HELD":
@@ -506,7 +611,7 @@ class CapacityLedger:
                         (committed_at, work_order_id, hold_id),
                     )
                     result = self.get(hold_id)
-                self._record_command(idempotency_key, "COMMIT", result)
+                self._record_command(idempotency_key, "COMMIT", command, result)
                 self._connection.commit()
                 return result
             except Exception:
@@ -521,17 +626,21 @@ class CapacityLedger:
         idempotency_key: str,
         released_at: str,
     ) -> dict[str, Any]:
-        _parse_instant(released_at, "released_at")
+        released = _parse_instant(released_at, "released_at")
         if not reason:
             raise CapacityError("release reason is required")
+        command = {"hold_id": hold_id, "reason": reason, "released_at": released_at}
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                replay = self._command_result(idempotency_key, "RELEASE")
+                replay = self._command_result(idempotency_key, "RELEASE", command)
                 if replay is not None:
                     self._connection.commit()
                     return replay
                 allocation = self.get(hold_id)
+                lower_bound = allocation["committed_at"] or allocation["created_at"]
+                if released < _parse_instant(lower_bound, "allocation timestamp"):
+                    raise CapacityError("release timestamp precedes the allocation")
                 if allocation["state"] == "RELEASED":
                     result = allocation
                 elif allocation["state"] not in {"HELD", "COMMITTED"}:
@@ -546,7 +655,7 @@ class CapacityLedger:
                         (released_at, reason, hold_id),
                     )
                     result = self.get(hold_id)
-                self._record_command(idempotency_key, "RELEASE", result)
+                self._record_command(idempotency_key, "RELEASE", command, result)
                 self._connection.commit()
                 return result
             except Exception:
@@ -561,6 +670,32 @@ class CapacityLedger:
         if row is None:
             raise CapacityError(f"unknown capacity hold {hold_id}")
         return self._row(row)
+
+    def reconcile_expired(self, *, as_of: str) -> list[str]:
+        """Durably transition elapsed, uncommitted holds to EXPIRED."""
+
+        instant = _parse_instant(as_of, "as_of")
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = self._connection.execute(
+                    "SELECT hold_id, expires_at FROM capacity_allocations WHERE state = 'HELD'"
+                ).fetchall()
+                expired = sorted(
+                    row["hold_id"]
+                    for row in rows
+                    if _parse_instant(row["expires_at"], "expires_at") <= instant
+                )
+                if expired:
+                    self._connection.executemany(
+                        "UPDATE capacity_allocations SET state = 'EXPIRED', released_at = ?, release_reason = 'HOLD_EXPIRED' WHERE hold_id = ? AND state = 'HELD'",
+                        [(as_of, hold_id) for hold_id in expired],
+                    )
+                self._connection.commit()
+                return expired
+            except Exception:
+                self._connection.rollback()
+                raise
 
     def reserved_effort_units(
         self,
@@ -592,15 +727,31 @@ class CapacityLedger:
         staffed_capacity_units: int,
         active_work_orders: Sequence[Mapping[str, Any]],
     ) -> dict[str, Any]:
+        seen_ids: set[str] = set()
+        for item in active_work_orders:
+            work_order_id = item.get("work_order_id")
+            stage = item.get("current_stage")
+            effort = item.get("estimated_capacity_units")
+            if (
+                not isinstance(work_order_id, str)
+                or not work_order_id
+                or work_order_id in seen_ids
+                or stage not in WORK_ORDER_STAGES
+                or not isinstance(effort, int)
+                or isinstance(effort, bool)
+                or effort <= 0
+            ):
+                raise CapacityError("capacity projection requires unique canonical Work Orders")
+            seen_ids.add(work_order_id)
         active_ids = {
             item["work_order_id"]
             for item in active_work_orders
-            if item.get("stage") not in TERMINAL_WORK_ORDER_STAGES
+            if item.get("current_stage") not in TERMINAL_WORK_ORDER_STAGES
         }
         active_wip_units = sum(
-            item["estimated_effort_units"]
+            item["estimated_capacity_units"]
             for item in active_work_orders
-            if item.get("stage") not in TERMINAL_WORK_ORDER_STAGES
+            if item.get("current_stage") not in TERMINAL_WORK_ORDER_STAGES
         )
         rows = self._connection.execute(
             "SELECT effort_units, state, work_order_id FROM capacity_allocations WHERE capacity_snapshot_id = ?",

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,7 @@ class ReadinessError(ValueError):
 
 
 READY_STATES = frozenset({"PRODUCTION_READY", "DELIVERY_VALIDATED"})
+SHA256_REF = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 def canonical_json(value: Any) -> bytes:
@@ -85,6 +87,8 @@ def generate_fail_closed_snapshot(
     records: list[dict[str, Any]] = []
     identities: set[tuple[str, str]] = set()
     for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise ReadinessError(f"registry row {index} must be an object")
         deliverable_id = row.get("deliverable_id")
         deliverable_version = row.get("version")
         if not isinstance(deliverable_id, str) or not isinstance(deliverable_version, str):
@@ -171,34 +175,65 @@ def validate_operational_profile(profile: Mapping[str, Any]) -> None:
         raise ReadinessError("operational profile is not ready")
     if profile.get("blockers"):
         raise ReadinessError("ready operational profile cannot have active blockers")
-    if not str(profile["registry_hash"]).startswith("sha256:"):
+    if SHA256_REF.fullmatch(str(profile["registry_hash"])) is None:
         raise ReadinessError("registry_hash must be a sha256 reference")
 
     scope = profile["scope"]
+    if not isinstance(scope, Mapping):
+        raise ReadinessError("scope must be an object")
     if not scope.get("version") or not scope.get("definition_ref") or not scope.get("component_refs"):
         raise ReadinessError("scope must pin version, definition and components")
-    if not all(item.get("required") is True and item.get("input_id") for item in profile["inputs_required"]):
+    inputs = profile["inputs_required"]
+    if not isinstance(inputs, list) or not inputs or not all(
+        isinstance(item, Mapping) and item.get("required") is True and item.get("input_id")
+        for item in inputs
+    ):
         raise ReadinessError("every declared input must have an id and be explicitly required")
+    input_ids = [str(item["input_id"]) for item in inputs]
+    if len(set(input_ids)) != len(input_ids):
+        raise ReadinessError("declared input ids must be unique")
 
     producer = profile["producer"]
+    if not isinstance(producer, Mapping):
+        raise ReadinessError("producer must be an object")
     if not all(producer.get(key) for key in ("implementation_ref", "workflow_ref", "version")):
         raise ReadinessError("producer must pin implementation, workflow and version")
     qa = profile["qa"]
+    if not isinstance(qa, Mapping):
+        raise ReadinessError("QA must be an object")
     if not qa.get("checklist_ref") or not qa.get("version"):
         raise ReadinessError("QA checklist/version must be pinned")
 
     effort = profile["estimated_effort"]
+    if not isinstance(effort, Mapping):
+        raise ReadinessError("estimated effort must be an object")
     if not isinstance(effort.get("amount"), int) or effort["amount"] <= 0:
         raise ReadinessError("estimated effort must be a positive integer")
     if not isinstance(effort.get("lead_time_business_days"), int) or effort["lead_time_business_days"] <= 0:
         raise ReadinessError("lead time must be a positive number of business days")
-    unavailable = [item.get("dependency_id", "UNKNOWN") for item in profile["dependencies"] if item.get("state") != "AVAILABLE"]
+    dependencies = profile["dependencies"]
+    if not isinstance(dependencies, list) or not dependencies or not all(
+        isinstance(item, Mapping) for item in dependencies
+    ):
+        raise ReadinessError("dependencies must be a non-empty object list")
+    unavailable = [item.get("dependency_id", "UNKNOWN") for item in dependencies if item.get("state") != "AVAILABLE"]
     if unavailable:
         raise ReadinessError(f"operational dependencies unavailable: {unavailable}")
 
     freshness = profile["freshness"]
-    _parse_instant(freshness.get("evaluated_at"), "freshness.evaluated_at")
-    _parse_instant(freshness.get("expires_at"), "freshness.expires_at")
+    if not isinstance(freshness, Mapping):
+        raise ReadinessError("freshness must be an object")
+    evaluated = _parse_instant(freshness.get("evaluated_at"), "freshness.evaluated_at")
+    expires = _parse_instant(freshness.get("expires_at"), "freshness.expires_at")
+    if evaluated >= expires:
+        raise ReadinessError("readiness freshness window is empty")
+    if profile.get("readiness_state") == "DELIVERY_VALIDATED":
+        canary = profile.get("canary_ref")
+        if not isinstance(canary, Mapping) or canary.get("synthetic") is not True or not all(
+            canary.get(field) for field in ("work_order_id", "evidence_ref", "completed_at")
+        ):
+            raise ReadinessError("DELIVERY_VALIDATED requires a synthetic canary reference")
+        _parse_instant(canary["completed_at"], "canary_ref.completed_at")
 
 
 def readiness_for_admission(profile: Mapping[str, Any] | None, *, evaluated_at: str) -> dict[str, Any]:
@@ -211,9 +246,12 @@ def readiness_for_admission(profile: Mapping[str, Any] | None, *, evaluated_at: 
         return {"verdict": "CANNOT_ACCEPT", "reason_codes": ["READINESS_NOT_READY"]}
     try:
         validate_operational_profile(profile)
-    except ReadinessError:
+    except (ReadinessError, AttributeError, KeyError, TypeError):
         return {"verdict": "UNKNOWN", "reason_codes": ["READINESS_EVIDENCE_INVALID"]}
+    evaluated = _parse_instant(profile["freshness"]["evaluated_at"], "freshness.evaluated_at")
     expires = _parse_instant(profile["freshness"]["expires_at"], "freshness.expires_at")
+    if now < evaluated:
+        return {"verdict": "UNKNOWN", "reason_codes": ["READINESS_FROM_FUTURE"]}
     if now >= expires:
         return {"verdict": "UNKNOWN", "reason_codes": ["READINESS_STALE"]}
     return {

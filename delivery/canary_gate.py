@@ -31,10 +31,11 @@ class CanaryGate:
         active_work_orders: Sequence[Mapping[str, Any]],
         evaluated_at: str,
     ) -> dict[str, Any]:
+        self.ledger.reconcile_expired(as_of=evaluated_at)
         active_ids = [
             item["work_order_id"]
             for item in active_work_orders
-            if item.get("stage") not in {"CLOSED", "CANCELLED"}
+            if item.get("current_stage") not in {"CLOSED", "CANCELLED"}
         ]
         reserved = self.ledger.reserved_effort_units(
             capacity_snapshot_id=self.capacity_snapshot["capacity_snapshot_id"],
@@ -144,8 +145,8 @@ def main() -> int:
             active_work_orders=[
                 {
                     "work_order_id": args.work_order_id,
-                    "stage": "IN_PROGRESS",
-                    "estimated_effort_units": readiness["estimated_effort"]["amount"],
+                    "current_stage": "IN_PROGRESS",
+                    "estimated_capacity_units": readiness["estimated_effort"]["amount"],
                 }
             ],
         )
@@ -160,8 +161,8 @@ def main() -> int:
             active_work_orders=[
                 {
                     "work_order_id": args.work_order_id,
-                    "stage": "CLOSED",
-                    "estimated_effort_units": readiness["estimated_effort"]["amount"],
+                    "current_stage": "CLOSED",
+                    "estimated_capacity_units": readiness["estimated_effort"]["amount"],
                 }
             ],
         )

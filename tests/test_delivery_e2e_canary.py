@@ -14,7 +14,7 @@ def test_single_canary_closes_projects_and_replays_without_duplicates(tmp_path: 
         handoff=handoff,
         state_dir=tmp_path,
         repo_paths={"warmbly": ROOT, "governance": ROOT, "web_cfg": ROOT},
-        projector="python",
+        projector="typescript",
         producer_mode="test-golden",
     )
     assert manifest["proposal_state"] == "ACCEPTED"
@@ -37,7 +37,7 @@ def test_single_canary_closes_projects_and_replays_without_duplicates(tmp_path: 
     assert manifest["real_customer"] is False
     assert manifest["received_revenue"] is False
     assert manifest["control_center"]["stage"] == manifest["stage"]
-    assert manifest["control_center"]["source"]["last_event_id"] in manifest["evidence_refs"]
+    assert manifest["control_center"]["source"]["event_id"] in manifest["evidence_refs"]
     assert manifest["schema_fingerprints"] == {
         "confenge.delivery_order_requested.v1": "6464c124040bbadea9f719dcecacdcd3faa85febfa4610950f3791bb224fb0ba",
         "confenge.financial_gate.v1": "5c0bdecf80fdfe1101ba1606f8a5462f035aae7c2a2b0d262af86de7b6d4a903",
@@ -50,7 +50,7 @@ def test_repeated_canary_command_converges_on_the_same_ids_and_state(tmp_path: P
         "handoff": handoff,
         "state_dir": tmp_path,
         "repo_paths": {"warmbly": ROOT, "governance": ROOT, "web_cfg": ROOT},
-        "projector": "python",
+        "projector": "typescript",
         "producer_mode": "test-golden",
     }
     first = run_canary(**kwargs)

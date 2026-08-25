@@ -52,10 +52,10 @@ def test_zero_one_wip_and_deadline_decisions_are_explicit():
     assert one["decision"] == "CAN_ACCEPT"
     assert one["available_effort_units"] == 1
 
-    active = [{"work_order_id": "wo_existing", "stage": "IN_PROGRESS", "estimated_effort_units": 1}]
+    active = [{"work_order_id": "wo_existing", "current_stage": "IN_PROGRESS", "estimated_capacity_units": 1}]
     exhausted = decide(active=active)
     assert exhausted["decision"] == "CANNOT_ACCEPT"
-    closed = [{**active[0], "stage": "CLOSED"}]
+    closed = [{**active[0], "current_stage": "CLOSED"}]
     assert decide(active=closed)["decision"] == "CAN_ACCEPT"
 
     impossible = load("canary-capacity-request.v1.json")
@@ -124,7 +124,7 @@ def test_commit_and_close_release_update_projection_without_double_count(tmp_pat
             idempotency_key="diag-canary-001:commit",
             committed_at="2026-08-25T13:00:00Z",
         ) == committed
-        active = [{"work_order_id": "wo_confenge_diag_canary_001", "stage": "IN_PROGRESS", "estimated_effort_units": 1}]
+        active = [{"work_order_id": "wo_confenge_diag_canary_001", "current_stage": "IN_PROGRESS", "estimated_capacity_units": 1}]
         projection = ledger.projection(
             capacity_snapshot_id=decision["capacity_snapshot_id"],
             staffed_capacity_units=1,
@@ -152,7 +152,7 @@ def test_commit_and_close_release_update_projection_without_double_count(tmp_pat
             released_at="2026-08-25T18:00:00Z",
         )
         assert released["state"] == "RELEASED"
-        closed = [{**active[0], "stage": "CLOSED"}]
+        closed = [{**active[0], "current_stage": "CLOSED"}]
         released_projection = ledger.projection(
             capacity_snapshot_id=decision["capacity_snapshot_id"],
             staffed_capacity_units=1,
@@ -170,3 +170,58 @@ def test_policy_ceiling_50_is_not_a_capacity_input():
     assert snapshot["staffed_capacity_units"] == 1
     assert snapshot["policy_ceiling_used_as_staffed_capacity"] is False
     assert snapshot["real_checkout_enabled"] is False
+
+
+def test_expiry_reconciliation_and_idempotency_payloads_fail_closed(tmp_path: Path):
+    decision = decide()
+    with CapacityLedger(tmp_path / "capacity.sqlite3") as ledger:
+        held = ledger.acquire_hold(
+            decision=decision,
+            idempotency_key="diag-expiry:hold",
+            correlation_id="corr_confenge_diag_canary_001",
+            created_at=EVALUATED_AT,
+            expires_at="2026-08-25T13:00:00Z",
+        )
+        with pytest.raises(CapacityError, match="different command"):
+            ledger.acquire_hold(
+                decision=decision,
+                idempotency_key="diag-expiry:hold",
+                correlation_id="corr_confenge_diag_canary_001",
+                created_at=EVALUATED_AT,
+                expires_at="2026-08-25T14:00:00Z",
+            )
+        assert ledger.reconcile_expired(as_of="2026-08-25T13:00:00Z") == [held["hold_id"]]
+        assert ledger.get(held["hold_id"])["state"] == "EXPIRED"
+        assert ledger.get(held["hold_id"])["release_reason"] == "HOLD_EXPIRED"
+        assert ledger.reserved_effort_units(
+            capacity_snapshot_id=decision["capacity_snapshot_id"]
+        ) == 0
+        with pytest.raises(CapacityError, match="EXPIRED"):
+            ledger.commit(
+                hold_id=held["hold_id"],
+                work_order_id="cc:work-order:expired",
+                idempotency_key="diag-expiry:commit",
+                committed_at="2026-08-25T12:30:00Z",
+            )
+
+
+def test_duplicate_or_legacy_wip_shape_is_unknown():
+    canonical = {
+        "work_order_id": "cc:work-order:active",
+        "current_stage": "IN_PROGRESS",
+        "estimated_capacity_units": 1,
+    }
+    assert decide(active=[canonical, canonical])["reason_codes"] == ["ACTIVE_WIP_INVALID"]
+    assert decide(
+        active=[{"work_order_id": "legacy", "stage": "IN_PROGRESS", "estimated_effort_units": 1}]
+    )["reason_codes"] == ["ACTIVE_WIP_INVALID"]
+
+
+def test_future_capacity_snapshot_and_empty_calendar_fail_closed():
+    future = load("capacity-synthetic-one.v1.json")
+    future["as_of"] = "2026-08-25T12:00:01Z"
+    assert decide(capacity=future)["reason_codes"] == ["CAPACITY_SNAPSHOT_FROM_FUTURE"]
+
+    no_days = load("capacity-synthetic-one.v1.json")
+    no_days["working_calendar"]["working_weekdays"] = []
+    assert decide(capacity=no_days)["reason_codes"] == ["WORKING_CALENDAR_INVALID"]

@@ -14,6 +14,8 @@ export interface WorkOrderProjection {
   acceptance_state: WorkOrder["client_acceptance_state"];
   actual_effort_minutes: number;
   capacity_consumed: boolean;
+  estimated_capacity_units: number;
+  capacity_commitment_id: string;
   synthetic: boolean;
   version: number;
   source: {
@@ -93,6 +95,8 @@ export function projectWorkOrder(
     acceptance_state: order.client_acceptance_state,
     actual_effort_minutes: order.actual_effort_minutes,
     capacity_consumed: CAPACITY_STAGES.has(order.current_stage),
+    estimated_capacity_units: order.estimated_capacity_units,
+    capacity_commitment_id: order.capacity_commitment_id,
     synthetic: order.synthetic,
     version: order.version,
     source: {

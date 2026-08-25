@@ -17,7 +17,8 @@ test("Work Order schema requires the complete v1 execution authority", () => {
     "offer_version", "deliverable_id", "deliverable_version", "scope_version", "price_version",
     "terms_version", "inputs_required", "inputs_received", "created_at", "started_at", "due_at",
     "business_calendar_version", "clock_state", "clock_reason_version", "blockers", "current_stage",
-    "responsible_owner", "estimated_effort_minutes", "actual_effort_minutes", "QA_state",
+    "responsible_owner", "estimated_effort_minutes", "estimated_capacity_units",
+    "capacity_commitment_id", "actual_effort_minutes", "QA_state",
     "QA_checklist_version", "delivery_artifact_refs", "delivered_at", "client_acceptance_state",
     "nonconformities", "change_requests", "outcome", "expansion_candidate", "version", "last_event_id",
   ]) {
