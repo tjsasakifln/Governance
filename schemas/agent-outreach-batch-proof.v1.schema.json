@@ -9,6 +9,8 @@
     "agent_batch_id",
     "source_run_id",
     "source_run_hash",
+    "lead_ref_scheme",
+    "lead_ref_key_version",
     "executor_ref",
     "started_at",
     "completed_at",
@@ -26,6 +28,8 @@
     "agent_batch_id": { "$ref": "#/$defs/token" },
     "source_run_id": { "$ref": "#/$defs/token" },
     "source_run_hash": { "$ref": "#/$defs/hash" },
+    "lead_ref_scheme": { "const": "HMAC_SHA256_V1" },
+    "lead_ref_key_version": { "$ref": "#/$defs/token" },
     "executor_ref": { "$ref": "#/$defs/token" },
     "started_at": { "$ref": "#/$defs/timestamp" },
     "completed_at": { "$ref": "#/$defs/timestamp" },
@@ -36,10 +40,17 @@
     "universe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["target_confirmed_total", "batch_reserved", "unique_processed_total_after_batch", "remaining_after_batch"],
+      "required": [
+        "target_confirmed_total",
+        "batch_reserved",
+        "unique_processed_total_before_batch",
+        "unique_processed_total_after_batch",
+        "remaining_after_batch"
+      ],
       "properties": {
         "target_confirmed_total": { "$ref": "#/$defs/count" },
         "batch_reserved": { "$ref": "#/$defs/count" },
+        "unique_processed_total_before_batch": { "$ref": "#/$defs/count" },
         "unique_processed_total_after_batch": { "$ref": "#/$defs/count" },
         "remaining_after_batch": { "$ref": "#/$defs/count" }
       }
@@ -76,6 +87,7 @@
       "required": [
         "reserved_count",
         "completed_count",
+        "newly_processed",
         "datalake_attempted",
         "web_attempted",
         "reconciled_count",
@@ -89,6 +101,7 @@
       "properties": {
         "reserved_count": { "$ref": "#/$defs/count" },
         "completed_count": { "$ref": "#/$defs/count" },
+        "newly_processed": { "$ref": "#/$defs/count" },
         "datalake_attempted": { "$ref": "#/$defs/count" },
         "web_attempted": { "$ref": "#/$defs/count" },
         "reconciled_count": { "$ref": "#/$defs/count" },
@@ -116,6 +129,10 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
+    "opaque_ref": {
+      "type": "string",
+      "pattern": "^hmac-sha256:[0-9a-f]{64}$"
+    },
     "timestamp": {
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
@@ -133,7 +150,13 @@
         "observed_at": { "$ref": "#/$defs/timestamp" },
         "attempt_hash": { "$ref": "#/$defs/hash" },
         "evidence_count": { "$ref": "#/$defs/count" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "OBSERVED" } }, "required": ["status"] },
+          "then": { "properties": { "evidence_count": { "type": "integer", "minimum": 1 } } }
+        }
+      ]
     },
     "draft": {
       "type": "object",
@@ -164,6 +187,7 @@
       "additionalProperties": false,
       "required": [
         "lead_ref",
+        "denominator_effect",
         "lanes",
         "reconciliation_status",
         "critical_conflict",
@@ -171,7 +195,8 @@
         "idempotency_key"
       ],
       "properties": {
-        "lead_ref": { "$ref": "#/$defs/hash" },
+        "lead_ref": { "$ref": "#/$defs/opaque_ref" },
+        "denominator_effect": { "enum": ["NEWLY_PROCESSED", "ALREADY_PROCESSED"] },
         "lanes": {
           "type": "object",
           "additionalProperties": false,

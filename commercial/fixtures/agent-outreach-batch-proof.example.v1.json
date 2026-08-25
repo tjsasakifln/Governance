@@ -3,6 +3,8 @@
   "agent_batch_id": "agent-batch-fixture-001",
   "source_run_id": "supplier-run-2026-08-25",
   "source_run_hash": "sha256:b7b4d8c60defdd4c0183bc8e94c4fd0701d5f4eebcd8037600a2731278cbb7ac",
+  "lead_ref_scheme": "HMAC_SHA256_V1",
+  "lead_ref_key_version": "outreach-lead-ref.v1",
   "executor_ref": "agent-fixture-01",
   "started_at": "2026-08-25T10:00:00Z",
   "completed_at": "2026-08-25T10:15:00Z",
@@ -13,6 +15,7 @@
   "universe": {
     "target_confirmed_total": 8245,
     "batch_reserved": 2,
+    "unique_processed_total_before_batch": 0,
     "unique_processed_total_after_batch": 2,
     "remaining_after_batch": 8243
   },
@@ -30,6 +33,7 @@
   "summary": {
     "reserved_count": 2,
     "completed_count": 2,
+    "newly_processed": 2,
     "datalake_attempted": 2,
     "web_attempted": 2,
     "reconciled_count": 2,
@@ -42,7 +46,8 @@
   },
   "members": [
     {
-      "lead_ref": "sha256:1d3f39947f5df5ccd0ada5099320ead76c296d7ae6b89025275bad9e6772f545",
+      "lead_ref": "hmac-sha256:1d3f39947f5df5ccd0ada5099320ead76c296d7ae6b89025275bad9e6772f545",
+      "denominator_effect": "NEWLY_PROCESSED",
       "lanes": {
         "datalake": {
           "status": "OBSERVED",
@@ -60,7 +65,7 @@
       "reconciliation_status": "DATALAKE_WEB_CORROBORATED",
       "critical_conflict": false,
       "outcome": "IMPORTED_NEEDS_REVIEW",
-      "idempotency_key": "sha256:b87cea1bf936bdf3a5e933e7f0d2f40a3e888f87447d581d92a239c3817ca4fd",
+      "idempotency_key": "sha256:2740d18be49e2c2a32749fd57bf7b558d66cdba6fe81ff844fbc281489dd13f1",
       "draft": {
         "state": "NEEDS_REVIEW",
         "recipient_class": "GENERIC_COMPANY",
@@ -70,7 +75,8 @@
       }
     },
     {
-      "lead_ref": "sha256:1dd80a9160c04c4e00a18414c7b1bb69bd1adb4f2f80907eeb3566e5184944f3",
+      "lead_ref": "hmac-sha256:1dd80a9160c04c4e00a18414c7b1bb69bd1adb4f2f80907eeb3566e5184944f3",
+      "denominator_effect": "NEWLY_PROCESSED",
       "lanes": {
         "datalake": {
           "status": "OBSERVED",
@@ -88,7 +94,7 @@
       "reconciliation_status": "DATALAKE_ONLY",
       "critical_conflict": false,
       "outcome": "BLOCKED",
-      "idempotency_key": "sha256:a52b7e1ebb470d85850f1573b93c90c07ff28f1715a3b14b3aa6c8541a78d15f",
+      "idempotency_key": "sha256:6336b2161eb0bc6994bedc34bf4b51731971bc72c69ba9ddc4ace5acfa3591ee",
       "blocker": {
         "code": "NO_PUBLIC_EMAIL_FOUND",
         "next_action_code": "RESEARCH_ALTERNATE_PUBLIC_SOURCE",

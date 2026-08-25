@@ -23,6 +23,7 @@ DEFAULT_PROOF = ROOT / "commercial" / "fixtures" / "agent-outreach-batch-proof.e
 
 SCHEMA_VERSION = "confenge.agent-outreach-batch-proof.v1"
 HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+OPAQUE_REF_RE = re.compile(r"^hmac-sha256:[0-9a-f]{64}$")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 ISO_Z_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 EMAIL_RE = re.compile(r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![A-Za-z0-9.-])")
@@ -48,6 +49,7 @@ RECIPIENT_CLASSES = frozenset(
 SUMMARY_KEYS = (
     "reserved_count",
     "completed_count",
+    "newly_processed",
     "datalake_attempted",
     "web_attempted",
     "reconciled_count",
@@ -81,6 +83,8 @@ TOP_LEVEL_KEYS = frozenset(
         "agent_batch_id",
         "source_run_id",
         "source_run_hash",
+        "lead_ref_scheme",
+        "lead_ref_key_version",
         "executor_ref",
         "started_at",
         "completed_at",
@@ -110,23 +114,29 @@ def sha256_ref(value: Any) -> str:
 
 def expected_idempotency_key(
     source_run_id: str,
+    source_run_hash: str,
     lead_ref: str,
+    lead_ref_key_version: str,
     evidence_version: str,
     template_version: str,
+    policy_version: str,
 ) -> str:
-    """Derive the public-safe equivalent of source-run+CNPJ+evidence+template.
+    """Derive the public-safe source-run+lead+evidence+template+policy identity.
 
-    ``lead_ref`` is the operational system's stable, salted CNPJ reference. The
-    raw CNPJ never enters the public proof, while rerunning the same tuple still
-    produces exactly the same key.
+    ``lead_ref`` is the operational system's stable, secret-keyed CNPJ reference.
+    The raw CNPJ never enters the public proof, while rerunning the same tuple
+    still produces exactly the same key.
     """
 
     return sha256_ref(
         {
             "source_run_id": source_run_id,
+            "source_run_hash": source_run_hash,
             "lead_ref": lead_ref,
+            "lead_ref_key_version": lead_ref_key_version,
             "evidence_version": evidence_version,
             "template_version": template_version,
+            "policy_version": policy_version,
         }
     )
 
@@ -157,6 +167,12 @@ def _hash(value: Any, path: str) -> str:
     return value
 
 
+def _opaque_ref(value: Any, path: str) -> str:
+    if not isinstance(value, str) or not OPAQUE_REF_RE.fullmatch(value):
+        raise ValidationError(f"{path} must be an HMAC-SHA256 opaque reference")
+    return value
+
+
 def _nonnegative_int(value: Any, path: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValidationError(f"{path} must be a non-negative integer")
@@ -166,7 +182,10 @@ def _nonnegative_int(value: Any, path: str) -> int:
 def _timestamp(value: Any, path: str) -> datetime:
     if not isinstance(value, str) or not ISO_Z_RE.fullmatch(value):
         raise ValidationError(f"{path} must be UTC with whole seconds and Z")
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValidationError(f"{path} is not a real UTC calendar instant") from error
 
 
 def assert_sanitized(value: Any, path: str = "$") -> None:
@@ -182,9 +201,9 @@ def assert_sanitized(value: Any, path: str = "$") -> None:
             assert_sanitized(child, f"{path}[{index}]")
         return
     if isinstance(value, str):
-        # Opaque SHA-256 references can contain long decimal runs by chance;
-        # they are already irreversible proof material, not raw CNPJ values.
-        if HASH_RE.fullmatch(value):
+        # Typed digest/HMAC references can contain long decimal runs by chance;
+        # they are proof material rather than raw CNPJ values.
+        if HASH_RE.fullmatch(value) or OPAQUE_REF_RE.fullmatch(value):
             return
         if EMAIL_RE.search(value):
             raise ValidationError(f"{path} contains an email address")
@@ -209,7 +228,7 @@ def _validate_lane(value: Any, path: str, started: datetime, completed: datetime
     return lane
 
 
-def _validate_draft(value: Any, path: str) -> None:
+def _validate_draft(value: Any, path: str) -> Mapping[str, Any]:
     draft = _mapping(value, path)
     _exact_keys(
         draft,
@@ -222,6 +241,9 @@ def _validate_draft(value: Any, path: str) -> None:
         raise ValidationError(f"{path}.recipient_class is not an attributable-company route")
     for key in ("content_hash", "evidence_bundle_hash", "import_receipt_hash"):
         _hash(draft[key], f"{path}.{key}")
+    if len({draft["content_hash"], draft["evidence_bundle_hash"], draft["import_receipt_hash"]}) != 3:
+        raise ValidationError(f"{path} reuses one hash for semantically distinct artifacts")
+    return draft
 
 
 def validate_document(document: Any) -> dict[str, Any]:
@@ -230,9 +252,19 @@ def validate_document(document: Any) -> dict[str, Any]:
     _exact_keys(doc, TOP_LEVEL_KEYS, "$")
     if doc["schema_version"] != SCHEMA_VERSION:
         raise ValidationError("$.schema_version is not the batch proof v1 contract")
-    for key in ("agent_batch_id", "source_run_id", "executor_ref", "policy_version", "template_version", "evidence_version"):
+    for key in (
+        "agent_batch_id",
+        "source_run_id",
+        "lead_ref_key_version",
+        "executor_ref",
+        "policy_version",
+        "template_version",
+        "evidence_version",
+    ):
         _token(doc[key], f"$.{key}")
     _hash(doc["source_run_hash"], "$.source_run_hash")
+    if doc["lead_ref_scheme"] != "HMAC_SHA256_V1":
+        raise ValidationError("$.lead_ref_scheme must be HMAC_SHA256_V1")
     started = _timestamp(doc["started_at"], "$.started_at")
     completed = _timestamp(doc["completed_at"], "$.completed_at")
     expires = _timestamp(doc["reservation_expires_at"], "$.reservation_expires_at")
@@ -244,18 +276,29 @@ def validate_document(document: Any) -> dict[str, Any]:
     universe = _mapping(doc["universe"], "$.universe")
     _exact_keys(
         universe,
-        {"target_confirmed_total", "batch_reserved", "unique_processed_total_after_batch", "remaining_after_batch"},
+        {
+            "target_confirmed_total",
+            "batch_reserved",
+            "unique_processed_total_before_batch",
+            "unique_processed_total_after_batch",
+            "remaining_after_batch",
+        },
         "$.universe",
     )
     total = _nonnegative_int(universe["target_confirmed_total"], "$.universe.target_confirmed_total")
     reserved = _nonnegative_int(universe["batch_reserved"], "$.universe.batch_reserved")
-    processed = _nonnegative_int(
+    processed_before = _nonnegative_int(
+        universe["unique_processed_total_before_batch"], "$.universe.unique_processed_total_before_batch"
+    )
+    processed_after = _nonnegative_int(
         universe["unique_processed_total_after_batch"], "$.universe.unique_processed_total_after_batch"
     )
     remaining = _nonnegative_int(universe["remaining_after_batch"], "$.universe.remaining_after_batch")
     if reserved > total:
         raise ValidationError("$.universe.batch_reserved exceeds the TARGET_CONFIRMED denominator")
-    if processed > total or remaining != total - processed:
+    if processed_before > total or processed_after > total or processed_after < processed_before:
+        raise ValidationError("$.universe processed totals are not monotonic within the denominator")
+    if remaining != total - processed_after:
         raise ValidationError("$.universe does not reconcile processed and remaining against the denominator")
 
     safety = _mapping(doc["safety"], "$.safety")
@@ -291,14 +334,17 @@ def validate_document(document: Any) -> dict[str, Any]:
 
     lead_refs: set[str] = set()
     idempotency_keys: set[str] = set()
+    import_receipt_hashes: set[str] = set()
     outcome_counts = {outcome: 0 for outcome in TERMINAL_OUTCOMES}
     reconciled_count = 0
     generated_count = 0
+    newly_processed = 0
     for index, raw_member in enumerate(members):
         path = f"$.members[{index}]"
         member = _mapping(raw_member, path)
         base_keys = {
             "lead_ref",
+            "denominator_effect",
             "lanes",
             "reconciliation_status",
             "critical_conflict",
@@ -308,10 +354,15 @@ def validate_document(document: Any) -> dict[str, Any]:
         outcome = member.get("outcome")
         expected_keys = base_keys | ({"draft"} if outcome == "IMPORTED_NEEDS_REVIEW" else {"blocker"})
         _exact_keys(member, expected_keys, path)
-        lead_ref = _hash(member["lead_ref"], f"{path}.lead_ref")
+        lead_ref = _opaque_ref(member["lead_ref"], f"{path}.lead_ref")
         if lead_ref in lead_refs:
             raise ValidationError(f"{path}.lead_ref is reserved twice in one batch")
         lead_refs.add(lead_ref)
+        denominator_effect = member["denominator_effect"]
+        if denominator_effect not in {"NEWLY_PROCESSED", "ALREADY_PROCESSED"}:
+            raise ValidationError(f"{path}.denominator_effect is invalid")
+        if denominator_effect == "NEWLY_PROCESSED":
+            newly_processed += 1
 
         lanes = _mapping(member["lanes"], f"{path}.lanes")
         _exact_keys(lanes, {"datalake", "web"}, f"{path}.lanes")
@@ -323,6 +374,19 @@ def validate_document(document: Any) -> dict[str, Any]:
             raise ValidationError(f"{path}.reconciliation_status is invalid")
         if not isinstance(member["critical_conflict"], bool):
             raise ValidationError(f"{path}.critical_conflict must be boolean")
+        lane_statuses = (datalake["status"], web["status"])
+        if "ERROR" in lane_statuses and reconciliation != "UNKNOWN":
+            raise ValidationError(f"{path}.reconciliation_status must be UNKNOWN after a lane error")
+        expected_lane_statuses = {
+            "DATALAKE_WEB_CORROBORATED": ("OBSERVED", "OBSERVED"),
+            "DATALAKE_ONLY": ("OBSERVED", "NO_MATCH"),
+            "WEB_ONLY": ("NO_MATCH", "OBSERVED"),
+            "CONFLICT": ("OBSERVED", "OBSERVED"),
+        }
+        if reconciliation in expected_lane_statuses and lane_statuses != expected_lane_statuses[reconciliation]:
+            raise ValidationError(f"{path}.reconciliation_status contradicts the two lane results")
+        if member["critical_conflict"] and reconciliation != "CONFLICT":
+            raise ValidationError(f"{path}.critical_conflict requires reconciliation_status CONFLICT")
         if outcome not in TERMINAL_OUTCOMES:
             raise ValidationError(f"{path}.outcome is not terminal")
         outcome_counts[outcome] += 1
@@ -330,10 +394,18 @@ def validate_document(document: Any) -> dict[str, Any]:
             reconciled_count += 1
 
         expected_key = expected_idempotency_key(
-            doc["source_run_id"], lead_ref, doc["evidence_version"], doc["template_version"]
+            doc["source_run_id"],
+            doc["source_run_hash"],
+            lead_ref,
+            doc["lead_ref_key_version"],
+            doc["evidence_version"],
+            doc["template_version"],
+            doc["policy_version"],
         )
         if member["idempotency_key"] != expected_key:
-            raise ValidationError(f"{path}.idempotency_key does not match source-run+lead+evidence+template")
+            raise ValidationError(
+                f"{path}.idempotency_key does not match source-run+lead-key+evidence+template+policy"
+            )
         if member["idempotency_key"] in idempotency_keys:
             raise ValidationError(f"{path}.idempotency_key is duplicated")
         idempotency_keys.add(member["idempotency_key"])
@@ -343,7 +415,11 @@ def validate_document(document: Any) -> dict[str, Any]:
                 raise ValidationError(f"{path} imported a draft while an evidence lane failed")
             if reconciliation in {"CONFLICT", "UNKNOWN"} or member["critical_conflict"]:
                 raise ValidationError(f"{path} imported a draft without safe reconciliation")
-            _validate_draft(member["draft"], f"{path}.draft")
+            draft = _validate_draft(member["draft"], f"{path}.draft")
+            receipt_hash = draft["import_receipt_hash"]
+            if receipt_hash in import_receipt_hashes:
+                raise ValidationError(f"{path}.draft.import_receipt_hash is reused by another member")
+            import_receipt_hashes.add(receipt_hash)
             generated_count += 1
         else:
             blocker = _mapping(member["blocker"], f"{path}.blocker")
@@ -359,6 +435,7 @@ def validate_document(document: Any) -> dict[str, Any]:
     expected_summary = {
         "reserved_count": len(members),
         "completed_count": len(members),
+        "newly_processed": newly_processed,
         "datalake_attempted": len(members),
         "web_attempted": len(members),
         "reconciled_count": reconciled_count,
@@ -371,13 +448,27 @@ def validate_document(document: Any) -> dict[str, Any]:
     }
     if dict(summary) != expected_summary:
         raise ValidationError(f"$.summary does not reconcile members: expected={expected_summary}")
+    if processed_after != processed_before + newly_processed:
+        raise ValidationError("$.universe processed delta does not equal members marked NEWLY_PROCESSED")
 
     return {
         "agent_batch_id": doc["agent_batch_id"],
         "source_run_id": doc["source_run_id"],
+        "source_run_hash": doc["source_run_hash"],
+        "lead_ref_key_version": doc["lead_ref_key_version"],
+        "target_confirmed_total": total,
         "started_at": started,
         "completed_at": completed,
-        "member_outcomes": [(member["lead_ref"], member["idempotency_key"], member["outcome"]) for member in members],
+        "reservation_expires_at": expires,
+        "member_outcomes": [
+            (
+                member["lead_ref"],
+                member["idempotency_key"],
+                member["outcome"],
+                member.get("draft", {}).get("import_receipt_hash"),
+            )
+            for member in members
+        ],
         "manifest_hash": sha256_ref(doc),
     }
 
@@ -385,27 +476,44 @@ def validate_document(document: Any) -> dict[str, Any]:
 def validate_documents(documents: Sequence[Any]) -> list[dict[str, Any]]:
     results = [validate_document(document) for document in documents]
     batch_ids: set[str] = set()
-    windows: dict[tuple[str, str], list[tuple[datetime, datetime, str]]] = {}
+    windows: dict[str, list[tuple[datetime, datetime, str]]] = {}
     imported_by_key: dict[str, str] = {}
+    imported_by_receipt: dict[str, str] = {}
+    source_runs: dict[str, tuple[str, int, str]] = {}
     for result in results:
         batch_id = result["agent_batch_id"]
         if batch_id in batch_ids:
             raise ValidationError(f"agent_batch_id {batch_id} is duplicated")
         batch_ids.add(batch_id)
-        for lead_ref, key, outcome in result["member_outcomes"]:
-            lane_key = (result["source_run_id"], lead_ref)
-            for prior_start, prior_end, prior_batch in windows.get(lane_key, []):
-                if result["started_at"] < prior_end and prior_start < result["completed_at"]:
+        source_run_id = result["source_run_id"]
+        source_identity = (
+            result["source_run_hash"],
+            result["target_confirmed_total"],
+            result["lead_ref_key_version"],
+        )
+        if source_run_id in source_runs and source_runs[source_run_id] != source_identity:
+            raise ValidationError(f"source_run_id {source_run_id} has divergent identity or denominator")
+        source_runs[source_run_id] = source_identity
+        for lead_ref, key, outcome, receipt_hash in result["member_outcomes"]:
+            for prior_start, prior_expiry, prior_batch in windows.get(lead_ref, []):
+                if result["started_at"] < prior_expiry and prior_start < result["reservation_expires_at"]:
                     raise ValidationError(
                         f"lead {lead_ref} has overlapping reservations in {prior_batch} and {batch_id}"
                     )
-            windows.setdefault(lane_key, []).append((result["started_at"], result["completed_at"], batch_id))
+            windows.setdefault(lead_ref, []).append(
+                (result["started_at"], result["reservation_expires_at"], batch_id)
+            )
             if outcome == "IMPORTED_NEEDS_REVIEW":
                 if key in imported_by_key:
                     raise ValidationError(
                         f"idempotency key was imported by both {imported_by_key[key]} and {batch_id}"
                     )
                 imported_by_key[key] = batch_id
+                if receipt_hash in imported_by_receipt:
+                    raise ValidationError(
+                        f"import receipt was claimed by both {imported_by_receipt[receipt_hash]} and {batch_id}"
+                    )
+                imported_by_receipt[receipt_hash] = batch_id
     return results
 
 

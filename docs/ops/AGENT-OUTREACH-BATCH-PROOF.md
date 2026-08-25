@@ -42,23 +42,27 @@ contrato.
    prova sanitizada. Só então encerre a reserva.
 
 O endereço, texto, fontes e CNPJ não são substituídos por valores fictícios no
-manifesto: eles simplesmente não são exportados. `lead_ref` é a referência
-salted e estável do CNPJ produzida pela autoridade operacional.
+manifesto: eles simplesmente não são exportados. `lead_ref` é uma referência
+estável produzida com HMAC-SHA256 e chave privada versionada pela autoridade
+operacional. Um SHA simples do CNPJ é recusado porque permitiria enumeração a
+partir de listas públicas.
 
 ## Idempotência
 
 O gate recalcula a chave pública segura sobre:
 
 ```text
-source_run_id + lead_ref + evidence_version + template_version
+source_run_id + source_run_hash + lead_ref + lead_ref_key_version + evidence_version + template_version + policy_version
 ```
 
-Como `lead_ref` representa de forma estável o CNPJ privado, reexecutar o mesmo
-tuple produz a mesma chave. Alterar fato/evidência ou template produz nova
-versão. Ao validar mais de um manifesto, o gate também rejeita:
+Como `lead_ref` representa de forma estável e não enumerável o CNPJ privado,
+reexecutar o mesmo tuple produz a mesma chave. Alterar source run, fato/evidência,
+template ou policy produz nova versão. Ao validar mais de um manifesto, o gate
+também rejeita:
 
-- janelas sobrepostas para o mesmo `source_run_id + lead_ref`;
+- janelas de reserva sobrepostas para o mesmo `lead_ref`, inclusive entre source runs;
 - dois imports `NEEDS_REVIEW` com a mesma chave idempotente;
+- dois membros que reivindicam o mesmo recibo individual de importação;
 - dois membros iguais dentro do mesmo lote.
 
 ## Exportação sanitizada
@@ -67,7 +71,8 @@ Parta do exemplo
 `commercial/fixtures/agent-outreach-batch-proof.example.v1.json` e substitua
 somente por valores sanitizados derivados do lote privado. O manifesto exige:
 
-- denominador, processados únicos e restante reconciliados;
+- denominador, processados únicos antes/depois e restante reconciliados pelo
+  efeito explícito de cada membro;
 - ambas as lanes por membro, mesmo quando o resultado é `NO_MATCH` ou `ERROR`;
 - outcome terminal para todos os reservados;
 - hashes de tentativa/evidência/conteúdo/recibo em vez dos dados;
