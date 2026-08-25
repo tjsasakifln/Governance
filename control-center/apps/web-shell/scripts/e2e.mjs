@@ -79,7 +79,22 @@ async function tryPlaywright(baseUrl, screenshot) {
   process.stdout.write(probe.stdout || "");
   process.stderr.write(probe.stderr || "");
   if (probe.status === 0) {
-    return { ok: true, output };
+    const performance = spawnSync("node", [join(here, "performance-probe.mjs"), baseUrl], {
+      cwd: app,
+      encoding: "utf8",
+      env: process.env,
+    });
+    const performanceOutput = `${performance.stdout || ""}${performance.stderr || ""}`;
+    process.stdout.write(performance.stdout || "");
+    process.stderr.write(performance.stderr || "");
+    if (performance.status === 0) {
+      return { ok: true, output: `${output}${performanceOutput}` };
+    }
+    return {
+      ok: false,
+      launcher: isOsLibLauncherFailure(performanceOutput),
+      output: `${output}${performanceOutput}`,
+    };
   }
   writeFileSync(join(app, "playwright-env.log"), output || "playwright probe failed");
   return { ok: false, launcher: isOsLibLauncherFailure(output), output };
@@ -88,6 +103,14 @@ async function tryPlaywright(baseUrl, screenshot) {
 const built = spawnSync("npm", ["run", "build"], { cwd: app, stdio: "inherit" });
 if (built.status !== 0) {
   process.exit(built.status ?? 1);
+}
+const performanceBudget = spawnSync("node", [join(here, "performance-budget.mjs")], {
+  cwd: app,
+  stdio: "inherit",
+  env: process.env,
+});
+if (performanceBudget.status !== 0) {
+  process.exit(performanceBudget.status ?? 1);
 }
 
 const distHtml = join(app, "dist/index.html");

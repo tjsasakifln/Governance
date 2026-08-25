@@ -522,8 +522,11 @@ try {
   if (priorities < 1 || priorities > 3) {
     throw new Error(`Hoje priorities out of range: ${priorities}`);
   }
-  const priorityHeading = await page.locator("#hoje-top3").innerText();
-  const exceptionsHeading = await page.locator("#hoje-incidents").innerText();
+  // Below-fold bands deliberately use content-visibility:auto. `innerText`
+  // returns an empty string while the browser skips their paint, even though
+  // the authored heading is present and becomes visible when scrolled near.
+  const priorityHeading = await page.locator("#hoje-top3").textContent();
+  const exceptionsHeading = await page.locator("#hoje-incidents").textContent();
   console.log(`hoje_priority_heading=${priorityHeading}`);
   console.log(`hoje_exceptions_heading=${exceptionsHeading}`);
   if (!priorityHeading.trim()) {

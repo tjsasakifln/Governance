@@ -43,6 +43,47 @@ body {
   min-height: 100dvh;
 }
 
+/* Useful first paint is present in index.html before the application bundle
+   runs. It is a real status with the final hierarchy, not an ornamental
+   skeleton, and is atomically replaced by the first authenticated paint. */
+.boot-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--bg);
+}
+
+.boot-shell__topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+.boot-shell__topbar span {
+  color: var(--fg-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.boot-shell__main {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: 1rem;
+}
+
+/* Pointer and keyboard receipt is painted synchronously by performance-ux.ts,
+   before navigation or a write waits on I/O. Paint-only properties avoid a
+   layout shift while still making receipt unambiguous. */
+:where(a, button, input, select, textarea, summary)[data-interaction-received="true"] {
+  filter: brightness(1.22);
+  box-shadow: 0 0 0 2px var(--focus) inset;
+}
+
 a {
   color: var(--accent);
 }

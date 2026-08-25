@@ -19,7 +19,19 @@
     <title>Control Center — Confenge</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-shell" data-boot-shell="true" role="status" aria-live="polite">
+        <header class="boot-shell__topbar">
+          <strong>CONFENGE</strong>
+          <span>Control Center</span>
+        </header>
+        <main class="boot-shell__main">
+          <p class="kicker">Cockpit operacional</p>
+          <h1>Carregando o recorte atual…</h1>
+          <p>A estrutura está pronta; os dados autenticados ainda estão sendo lidos.</p>
+        </main>
+      </div>
+    </div>
     <noscript>
       Este cockpit precisa de JavaScript. No diretório
       <code>control-center/apps/web-shell</code> execute

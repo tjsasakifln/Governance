@@ -1,0 +1,31 @@
+{
+  "schema_version": "control-center.performance-budget.v1",
+  "simulation": {
+    "name": "mobile-lab",
+    "viewport": { "width": 390, "height": 844 },
+    "latency_ms": 120,
+    "download_kbps": 1600,
+    "upload_kbps": 750,
+    "cpu_slowdown": 4,
+    "samples_per_route": 4
+  },
+  "routes": [
+    { "id": "hoje", "hash": "#/hoje" },
+    { "id": "rascunhos", "hash": "#/comercial/rascunhos" },
+    { "id": "coortes", "hash": "#/warmbly/cohorts" }
+  ],
+  "budgets": {
+    "interaction_feedback_ms": 100,
+    "navigation_structure_ms": 200,
+    "inp_p75_ms": 200,
+    "lcp_p75_ms": 2500,
+    "cls_p75": 0.1,
+    "long_task_max_ms": 350,
+    "initial_request_count": 16,
+    "javascript_raw_bytes": 375000,
+    "javascript_gzip_bytes": 110000,
+    "css_raw_bytes": 24000,
+    "css_gzip_bytes": 7000,
+    "bundle_gzip_bytes": 120000
+  }
+}

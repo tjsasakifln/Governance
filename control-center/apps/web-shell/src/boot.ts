@@ -1,6 +1,5 @@
 import type { ControlCenterReadAdapter } from "./adapters/contract";
 import { createProductionAdapter } from "./adapters/http";
-import { createMockAdapter } from "./adapters/mock";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
 import { registeredVisualRoutes, type VisualRoute } from "./visual-matrix";
@@ -82,7 +81,9 @@ export function startBrowser(
   if (applyFileProtocolGuard(win.location, root)) {
     return;
   }
-  mount(root, resolveBrowserAdapter(win, doc));
+  void resolveBrowserAdapter(win, doc).then((adapter) => {
+    mount(root, adapter);
+  });
 }
 
 export interface AdapterDocument {
@@ -97,15 +98,16 @@ export interface AdapterWindow {
  * Mock is selected only by explicit injection (window.__CC_TEST_ADAPTER__ or
  * meta cc-use-mock=1). Production boot constructs HttpControlCenterAdapter.
  */
-export function resolveBrowserAdapter(
+export async function resolveBrowserAdapter(
   win: AdapterWindow | undefined,
   doc: AdapterDocument | undefined,
-): ControlCenterReadAdapter {
+): Promise<ControlCenterReadAdapter> {
   if (win?.__CC_TEST_ADAPTER__) {
     return win.__CC_TEST_ADAPTER__;
   }
   const mockMeta = doc?.querySelector?.('meta[name="cc-use-mock"]')?.getAttribute("content") === "1";
   if (mockMeta) {
+    const { createMockAdapter } = await import("./adapters/mock");
     return createMockAdapter();
   }
   return createProductionAdapter();
