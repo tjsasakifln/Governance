@@ -29,6 +29,7 @@ export const GET_EXACT = new Set<string>([
   "/v1/confenge/accounts",
   "/v1/confenge/working-overview",
   "/v1/confenge/dispatch/status",
+  "/v1/confenge/first-touch/status",
   "/v1/confenge/intel/scoreboard",
   "/v1/confenge/intel/executive",
   "/v1/confenge/intel/report",

@@ -56,6 +56,12 @@ export const COLLECT_ROUTES: CollectRoute[] = [
     required: false,
   },
   {
+    key: "confenge_first_touch_status",
+    method: "GET",
+    path: "/v1/confenge/first-touch/status",
+    required: false,
+  },
+  {
     key: "confenge_intel_scoreboard",
     method: "GET",
     path: "/v1/confenge/intel/scoreboard?include_synthetic=0",

@@ -1,22 +1,33 @@
-# Gate humano Warmbly — APPROVE agenda a mensagem
+# Gate humano Warmbly — exceções e aprovação explícita
 
 Status: contrato implantável de `ops.confenge.com.br`.
+
+> Escopo supersedido em 2026-08-25 por
+> `ADR-CFG-FIRST-TOUCH-ROUTING-001`: revisão humana não é obrigatória para um
+> first touch que passe integralmente `CFG-FIRST-TOUCH-ROUTING-v1`. Este fluxo
+> continua canônico para exceções, `UNKNOWN`, conflito, drift, reprovação de
+> gate e qualquer mensagem fora da policy. O histórico abaixo é preservado;
+> ele não deve ser lido como pedágio universal.
 
 ## Fluxo canônico
 
 ```text
-cohort/version imutável
+exceção/cohort versionada
   → leitura autenticada do candidate + preview congelado
   → validation vigente e VALID no Warmbly
-  → APPROVE por operators, com acknowledged=true
+  → HUMAN_APPROVE por operators, com acknowledged=true
   → na mesma transação lógica: touchpoint + auto_send=true + QUEUED + due_at
   → worker Warmbly, quando todos os gates permitirem
   → envio em dia útil, 09:00–18:00 America/Sao_Paulo, ≤10/hora
 ```
 
-APPROVE é a autoridade humana completa para uma mensagem. Não há GO, handoff,
+HUMAN_APPROVE é a autoridade humana completa para a mensagem em exceção. Não há GO, handoff,
 “Entregar à fila” nem segunda tela. O clique não transporta e-mail: ele deixa a
 mensagem agendada, e somente o worker pode transportá-la depois.
+
+No caminho feliz delegado, Warmbly registra `DELEGATED_POLICY_APPROVE` com o
+executor real `agent/system`, policy/version, hashes, evidência e readback. Esse
+evento jamais usa a identidade do founder e reutiliza o mesmo scheduler e fila.
 
 `NEXT_UNCLAIMED` usa claims transacionais por conta, fonte, fornecedor e
 destinatário. Não existe offset controlável pelo navegador: cohorts sucessivas
@@ -29,7 +40,8 @@ herdados.
 |---|---|---|
 | Cohort/version | Warmbly | congela seleção, denominadores, copy, hashes e policy |
 | Validation | Warmbly | precisa estar vigente e `VALID`; a ação de aprovar pode obtê-la antes da escrita |
-| APPROVE | `operators` | grava a revisão e converge a mensagem para `QUEUED`, `due_at`, `auto_send=true` |
+| HUMAN_APPROVE | `operators` | grava a revisão de exceção e converge a mensagem para `QUEUED`, `due_at`, `auto_send=true` |
+| DELEGATED_POLICY_APPROVE | Warmbly sob policy founder-versionada | para first touch integralmente elegível, grava a decisão não humana e usa o mesmo agendador |
 | HOLD/REJECT | `operators` | exige motivo e cancela/desenfileira a mensagem ainda não enviada |
 | Reconciliação | `admins` | reprocessa APPROVEs já gravados pelo mesmo agendador; é reparo global e idempotente |
 | Transporte | worker Warmbly | revalida drift e gates operacionais; envia somente na janela e sob o teto |
@@ -37,13 +49,13 @@ herdados.
 ## Auto-send: dois conceitos diferentes
 
 - `scheduling.auto_send=true` é por mensagem aprovada. É o efeito esperado de
-  APPROVE e permite que o worker a recolha na janela comercial.
+  HUMAN_APPROVE ou DELEGATED_POLICY_APPROVE e permite que o worker a recolha na janela comercial.
 - `CONFENGE_AUTO_SEND_ENABLED=true` e `GREEN_AUTORUN=true` continuam proibidos e
   derrubam o boot. As flags globais permanecem `false`.
 
 Não existe job de dispatch de cohort. A única criação de trabalho outbound
-controlado nasce de uma aprovação individual ou da reconciliação dessa mesma
-aprovação preexistente.
+controlado nasce de uma aprovação humana individual, de uma aprovação delegada
+válida ou da reconciliação idempotente de aprovação preexistente.
 
 ## GO/NO-GO histórico
 
@@ -86,7 +98,10 @@ deste fluxo.
 ## Invariantes de segurança
 
 - O frontend não calcula elegibilidade nem destinatários.
-- APPROVE continua exigindo validation vigente e `VALID` no servidor.
+- HUMAN_APPROVE continua exigindo validation vigente e `VALID` no servidor.
+- DELEGATED_POLICY_APPROVE exige simultaneamente todos os hard gates e falha
+  fechado para `UNKNOWN`, conflito ou drift; a UI apenas lê essa decisão do
+  Warmbly e nunca recalcula elegibilidade.
 - O clique continua produzindo `acknowledged=true`; o adaptador recusa antes do
   fio quando ele falta.
 - HOLD/REJECT continuam exigindo motivo escrito.
@@ -106,7 +121,7 @@ deste fluxo.
 ## RBAC deliberado
 
 - `operators`: listar, criar/reproduzir, validar, ajustar e registrar
-  APPROVE/HOLD/REJECT. Portanto `operators` podem provocar saída futura de
+  HUMAN_APPROVE/HOLD/REJECT nas exceções. Portanto `operators` podem provocar saída futura de
   e-mail; o botão diz “Aprovar e enfileirar para envio”.
 - `admins`: reparo global de aprovações já registradas. Na instalação atual a
   identidade administrativa também pertence a `operators`.

@@ -215,6 +215,40 @@
     "sending_allowed": true,
     "feed_configured": true
   },
+  "confenge_first_touch_status": {
+    "policy_id": "CFG-FIRST-TOUCH-ROUTING-v1",
+    "policy_version": "CFG-FIRST-TOUCH-ROUTING-v1",
+    "policy_hash": "3ea77bb047d9db19c061d96c62ae302768f25dbd075db7cccac5fe56d3fe3b99",
+    "policy_active": true,
+    "counts": { "QUEUED": 1, "HOLD": 1 },
+    "human_approved": 2,
+    "queued_readback": 1,
+    "items": [
+      {
+        "cnpj14": "12345678000190",
+        "supplier_cnpj14": "12345678000190",
+        "recipient": "compras@fornecedora.invalid",
+        "route_class": "ROLE_OR_DEPARTMENT",
+        "approval_source": "DELEGATED_POLICY_APPROVE",
+        "state": "QUEUED",
+        "evidence_reference": "extra-cli:v_contracts_canonical_v2:contract-fixture",
+        "evidence_hash": "evidence-fixture-hash",
+        "source_run_id": "run-current",
+        "reason_codes": ["ALL_HARD_GATES_PASS"],
+        "content_hash": "content-fixture-hash",
+        "due_at": "2026-08-25T15:00:00Z",
+        "readback_at": "2026-08-25T14:59:01Z"
+      },
+      {
+        "cnpj14": "22345678000190",
+        "route_class": "GENERIC_COMPANY",
+        "approval_source": "POLICY_EVALUATION_HOLD",
+        "state": "HOLD",
+        "source_run_id": "run-current",
+        "reason_codes": ["PARTY_ROLE_UNKNOWN"]
+      }
+    ]
+  },
   "confenge_ops_health": {
     "data": {
       "computed_at": "2026-08-20T14:50:00.000Z",

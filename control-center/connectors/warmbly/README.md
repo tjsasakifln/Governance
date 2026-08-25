@@ -31,7 +31,7 @@ Canonical CRM remains Warmbly. This workstream does not persist leads/deals/stag
   - Operator writes are **never retried** (a retried acknowledge would double-acknowledge). 4xx from Warmbly does not trip the circuit breaker; 5xx/429/timeout does.
   - The channel may share the read client's `CircuitBreaker`, so a degraded Warmbly blocks operator writes too. When the breaker is open, the refusal names the out-of-band fallback: `deploy/confenge-vps/pause.sh` on the VPS.
 - **Amended boundary (human-review bridge).** `control-center/services/context` may call only the exact review routes listed in `required_upstream_contract.json → human_review_bridge`. The authenticated founder may save copy adjustments, approve an exact content hash for the next eligible business window, reject a draft back into editorial recovery, or apply those decisions in a bounded batch. Approval never transports a message immediately.
-- **Amended boundary (cohort human gate).** The authenticated edge may list/read immutable cohorts and candidates; create the next disjoint supplier cohort; recover stale supplier versions; validate, review, or adjust one candidate; and let `admins` invoke the targetless, idempotent reconciliation of old durable approvals. Leads are supplier/contracted-company CNPJ roots, never contracting authorities. Effective APPROVE is the sole operation that asks Warmbly to schedule the exact reviewed message for its next eligible business window. There is no GO or cohort-dispatch route in the current allowlist.
+- **Amended boundary (cohort human exception gate).** The authenticated edge may list/read immutable cohorts and candidates; create the next disjoint supplier cohort; recover stale supplier versions; validate, review, or adjust one candidate; and let `admins` invoke the targetless, idempotent reconciliation of old durable human approvals. Leads are supplier/contracted-company CNPJ roots, never contracting authorities. `HUMAN_APPROVE` schedules an exception through the existing Warmbly scheduler. Eligible first touches may instead arrive as `DELEGATED_POLICY_APPROVE` under `CFG-FIRST-TOUCH-ROUTING-v1`; the read-only collector displays that authoritative Warmbly decision and never evaluates it locally. There is no GO or cohort-dispatch route in the current allowlist.
 - **Still forbidden:** `PATCH`/`PUT`/`DELETE` on any path, creating contacts/deals/tasks, campaign start/stop/send, `dispatch-now` / cohort dispatch / cohort decision, enroll, draft send, review writes outside the typed bridges, `POST /v1/confenge/inbound/:id/outcome` and `/resolve`, Confenge import/sync/bootstrap, unibox reply/compose/snooze, and **any Asaas / checkout / refund / financial mutation** (`commercial/authority/authority-manifest.v1.json` still carries `real_money_mutation_approved: false`).
 - Every aggregated item carries `source`, `observed_at` (UTC), `freshness_status`, and `confidence` when the upstream payload supplies it.
 - Deal money is integer **cents** + `currency`. Warmbly `value` is treated as major units (1500.50 BRL → 150050 cents).
@@ -60,6 +60,8 @@ See `required_upstream_contract.json` for the full table. Collect calls:
 | GET | `/v1/confenge/attention` | Warmbly-native needs-attention |
 | GET | `/v1/confenge/today` | executable human work |
 | GET | `/v1/confenge/inbound` | inbound leads needing a human |
+| GET | `/v1/confenge/dispatch/status` | pause/window/queue transport controls |
+| GET | `/v1/confenge/first-touch/status` | delegated policy/version, approval source, HOLD exceptions, evidence/reasons and QUEUED readback |
 
 Auth: `Authorization: Bearer <token>` and `API-Version: v1`. Tokens are prefixed `wmbly_`.
 
@@ -74,7 +76,7 @@ The Control Center's `Comercial → Rascunhos` surface uses a dedicated, server-
 | `POST /v1/commercial/review-drafts/:id` | `POST /v1/confenge/review/drafts/:id/decision` | save adjustment, approve, or reject |
 | `POST /v1/commercial/review-batches` | `POST /v1/confenge/review/batches` | apply up to 500 independently reported decisions |
 
-Every request requires the trusted founder identity. `APPROVE` carries `expected_content_hash` and only creates a durable queue entry for the next eligible business window. `REJECT` preserves the lead and routes the draft to AI-assisted editorial recovery. This bridge does not expose an immediate-send operation.
+Every request requires the trusted founder identity. `HUMAN_APPROVE` carries `expected_content_hash` and only creates a durable queue entry for the next eligible business window. It is the exception path, not a requirement for first touches already covered by `CFG-FIRST-TOUCH-ROUTING-v1`. `REJECT` preserves the lead and routes the draft to AI-assisted editorial recovery. This bridge does not expose an immediate-send operation.
 
 The list boundary emits `control-center.review-draft-page.v1`. Requested
 `limit`/`offset` and the observed row count always describe the local page;
