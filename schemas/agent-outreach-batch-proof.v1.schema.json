@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/agent-outreach-batch-proof.v1.schema.json",
+  "title": "Sanitized proof of a synchronous outreach agent batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "agent_batch_id",
+    "source_run_id",
+    "source_run_hash",
+    "executor_ref",
+    "started_at",
+    "completed_at",
+    "reservation_expires_at",
+    "policy_version",
+    "template_version",
+    "evidence_version",
+    "universe",
+    "safety",
+    "summary",
+    "members"
+  ],
+  "properties": {
+    "schema_version": { "const": "confenge.agent-outreach-batch-proof.v1" },
+    "agent_batch_id": { "$ref": "#/$defs/token" },
+    "source_run_id": { "$ref": "#/$defs/token" },
+    "source_run_hash": { "$ref": "#/$defs/hash" },
+    "executor_ref": { "$ref": "#/$defs/token" },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "completed_at": { "$ref": "#/$defs/timestamp" },
+    "reservation_expires_at": { "$ref": "#/$defs/timestamp" },
+    "policy_version": { "$ref": "#/$defs/token" },
+    "template_version": { "$ref": "#/$defs/token" },
+    "evidence_version": { "$ref": "#/$defs/token" },
+    "universe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_confirmed_total", "batch_reserved", "unique_processed_total_after_batch", "remaining_after_batch"],
+      "properties": {
+        "target_confirmed_total": { "$ref": "#/$defs/count" },
+        "batch_reserved": { "$ref": "#/$defs/count" },
+        "unique_processed_total_after_batch": { "$ref": "#/$defs/count" },
+        "remaining_after_batch": { "$ref": "#/$defs/count" }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "llm_api_calls",
+        "runtime_generation",
+        "provider_mutations",
+        "approvals",
+        "scheduled",
+        "sent",
+        "auto_send_changed",
+        "kill_switch_changed",
+        "operational_data_included"
+      ],
+      "properties": {
+        "llm_api_calls": { "const": 0 },
+        "runtime_generation": { "const": false },
+        "provider_mutations": { "const": 0 },
+        "approvals": { "const": 0 },
+        "scheduled": { "const": 0 },
+        "sent": { "const": 0 },
+        "auto_send_changed": { "const": false },
+        "kill_switch_changed": { "const": false },
+        "operational_data_included": { "const": false }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reserved_count",
+        "completed_count",
+        "datalake_attempted",
+        "web_attempted",
+        "reconciled_count",
+        "draft_generated",
+        "imported_needs_review",
+        "blocked",
+        "duplicate",
+        "invalid",
+        "retry_required"
+      ],
+      "properties": {
+        "reserved_count": { "$ref": "#/$defs/count" },
+        "completed_count": { "$ref": "#/$defs/count" },
+        "datalake_attempted": { "$ref": "#/$defs/count" },
+        "web_attempted": { "$ref": "#/$defs/count" },
+        "reconciled_count": { "$ref": "#/$defs/count" },
+        "draft_generated": { "$ref": "#/$defs/count" },
+        "imported_needs_review": { "$ref": "#/$defs/count" },
+        "blocked": { "$ref": "#/$defs/count" },
+        "duplicate": { "$ref": "#/$defs/count" },
+        "invalid": { "$ref": "#/$defs/count" },
+        "retry_required": { "$ref": "#/$defs/count" }
+      }
+    },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/member" }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "observed_at", "attempt_hash", "evidence_count"],
+      "properties": {
+        "status": { "enum": ["OBSERVED", "NO_MATCH", "ERROR"] },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "attempt_hash": { "$ref": "#/$defs/hash" },
+        "evidence_count": { "$ref": "#/$defs/count" }
+      }
+    },
+    "draft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "recipient_class", "content_hash", "evidence_bundle_hash", "import_receipt_hash"],
+      "properties": {
+        "state": { "const": "NEEDS_REVIEW" },
+        "recipient_class": {
+          "enum": ["DIRECT_PERSON", "ROLE_OR_DEPARTMENT", "GENERIC_COMPANY", "PUBLIC_COMPANY_FREEMAIL"]
+        },
+        "content_hash": { "$ref": "#/$defs/hash" },
+        "evidence_bundle_hash": { "$ref": "#/$defs/hash" },
+        "import_receipt_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "next_action_code", "evidence_hash"],
+      "properties": {
+        "code": { "$ref": "#/$defs/token" },
+        "next_action_code": { "$ref": "#/$defs/token" },
+        "evidence_hash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lead_ref",
+        "lanes",
+        "reconciliation_status",
+        "critical_conflict",
+        "outcome",
+        "idempotency_key"
+      ],
+      "properties": {
+        "lead_ref": { "$ref": "#/$defs/hash" },
+        "lanes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["datalake", "web"],
+          "properties": {
+            "datalake": { "$ref": "#/$defs/lane" },
+            "web": { "$ref": "#/$defs/lane" }
+          }
+        },
+        "reconciliation_status": {
+          "enum": ["DATALAKE_WEB_CORROBORATED", "DATALAKE_ONLY", "WEB_ONLY", "CONFLICT", "UNKNOWN"]
+        },
+        "critical_conflict": { "type": "boolean" },
+        "outcome": { "enum": ["IMPORTED_NEEDS_REVIEW", "BLOCKED", "DUPLICATE", "INVALID", "RETRY_REQUIRED"] },
+        "idempotency_key": { "$ref": "#/$defs/hash" },
+        "draft": { "$ref": "#/$defs/draft" },
+        "blocker": { "$ref": "#/$defs/blocker" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "IMPORTED_NEEDS_REVIEW" } }, "required": ["outcome"] },
+          "then": { "required": ["draft"], "not": { "required": ["blocker"] } },
+          "else": { "required": ["blocker"], "not": { "required": ["draft"] } }
+        }
+      ]
+    }
+  }
+}
