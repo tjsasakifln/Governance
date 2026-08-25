@@ -15,11 +15,11 @@ after(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });
 
-function fakeDockerBin(): string {
+function fakeRuntimeBin(): string {
   const root = mkdtempSync(join(tmpdir(), "cc-release-attestation-"));
   tempDirs.push(root);
-  const script = join(root, "docker");
-  writeFileSync(script, `#!/bin/sh
+  const docker = join(root, "docker");
+  writeFileSync(docker, `#!/bin/sh
 case "$1" in
   inspect)
     case "$*" in
@@ -35,7 +35,19 @@ case "$1" in
   *) exit 2 ;;
 esac
 `, "utf8");
-  chmodSync(script, 0o755);
+  chmodSync(docker, 0o755);
+  const git = join(root, "git");
+  writeFileSync(git, `#!/bin/sh
+case "$1" in
+  cat-file) exit 0 ;;
+  merge-base)
+    if [ "\${FAKE_GIT_ANCESTRY:-valid}" = "valid" ]; then exit 0; fi
+    exit 1
+    ;;
+  *) exec /usr/bin/git "$@" ;;
+esac
+`, "utf8");
+  chmodSync(git, 0o755);
   return root;
 }
 
@@ -50,7 +62,7 @@ function repositoryHead(): string {
 
 test("release attestation reconciles repository, image, container env and HTTP identity", () => {
   const sha = repositoryHead();
-  const bin = fakeDockerBin();
+  const bin = fakeRuntimeBin();
   const result = spawnSync("bash", [SCRIPT, sha, "context", "web"], {
     cwd: REPOSITORY_ROOT,
     env: {
@@ -69,7 +81,7 @@ test("release attestation reconciles repository, image, container env and HTTP i
 
 test("release attestation fails closed when the live HTTP SHA differs", () => {
   const sha = repositoryHead();
-  const bin = fakeDockerBin();
+  const bin = fakeRuntimeBin();
   const result = spawnSync("bash", [SCRIPT, sha, "context", "web"], {
     cwd: REPOSITORY_ROOT,
     env: {
@@ -92,4 +104,20 @@ test("release attestation rejects tags and abbreviated SHAs as mutable identitie
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /full lowercase 40-character commit identity/);
+});
+
+test("release attestation rejects a full SHA outside the required baseline", () => {
+  const sha = repositoryHead();
+  const bin = fakeRuntimeBin();
+  const result = spawnSync("bash", [SCRIPT, sha, "context", "web"], {
+    cwd: REPOSITORY_ROOT,
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+      FAKE_GIT_ANCESTRY: "invalid",
+    },
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /does not descend from required baseline/);
 });

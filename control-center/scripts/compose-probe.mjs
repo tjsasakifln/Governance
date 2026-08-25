@@ -12,6 +12,15 @@ import { fileURLToPath } from "node:url";
 const deploy = resolve(dirname(fileURLToPath(import.meta.url)), "../deploy");
 const password = "compose-probe-not-production";
 const mcpToken = "compose-probe-mcp-not-production";
+const release = spawnSync("git", ["rev-parse", "HEAD"], {
+  cwd: deploy,
+  encoding: "utf8",
+});
+const releaseSha = (release.stdout ?? "").trim();
+if (release.status !== 0 || !/^[0-9a-f]{40}$/.test(releaseSha)) {
+  process.stderr.write(`compose probe could not resolve an immutable release SHA: ${release.stderr ?? ""}\n`);
+  process.exit(1);
+}
 const env = {
   ...process.env,
   POSTGRES_PASSWORD: password,
@@ -19,6 +28,7 @@ const env = {
   POSTGRES_DB: "control_center",
   CONTROL_CENTER_FOUNDER_ACTOR_ID: "founder-local",
   CONFENGE_MCP_AUTH_TOKEN: mcpToken,
+  CC_RELEASE_SHA: releaseSha,
   CONTROL_CENTER_BACKUP_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   CONTROL_CENTER_DATABASE_URL: `postgres://control_center:${password}@postgres:5432/control_center`,
 };
@@ -93,6 +103,9 @@ const body = waitFetch("context", {
   url: "http://127.0.0.1:8080/v1/context?scope=company",
   headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },
 });
+const runtimeIdentityBody = waitFetch("context", {
+  url: "http://127.0.0.1:8080/v1/runtime-identity",
+});
 const mcpHealthBody = waitFetch("mcp", { url: "http://127.0.0.1:8080/healthz" });
 
 const initPayload = JSON.stringify({
@@ -153,6 +166,16 @@ try {
   parsed = JSON.parse(body);
 } catch {
   fail(`context body is not JSON: ${body.slice(0, 400)}`, null);
+}
+
+let runtimeIdentity;
+try {
+  runtimeIdentity = JSON.parse(runtimeIdentityBody);
+} catch {
+  fail(`context runtime identity is not JSON: ${runtimeIdentityBody.slice(0, 400)}`, null);
+}
+if (runtimeIdentity.release_status !== "PINNED" || runtimeIdentity.release_sha !== releaseSha) {
+  fail(`context runtime identity diverged from checkout ${releaseSha}: ${runtimeIdentityBody.slice(0, 400)}`, null);
 }
 
 const freshness = parsed.freshness_status;
@@ -226,6 +249,7 @@ process.stdout.write(
       observed_at: observed,
       source,
       confidence: parsed.confidence,
+      release_sha: runtimeIdentity.release_sha,
       mcp_health: mcpHealthBody,
       mcp_server: initResult.serverInfo,
       mcp_freshness_status: mcpFreshness,

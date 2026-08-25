@@ -91,6 +91,7 @@ services:
       HOST: 0.0.0.0
       PORT: "8080"
       NODE_ENV: production
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
       DATABASE_URL: "${CONTROL_CENTER_DATABASE_URL:-postgres://control_center@postgres:5432/control_center}"
       CONTROL_CENTER_FOUNDER_ACTOR_ID: "${CONTROL_CENTER_FOUNDER_ACTOR_ID:?CONTROL_CENTER_FOUNDER_ACTOR_ID must be set}"
       CONTROL_CENTER_ENV: production
@@ -158,6 +159,8 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "8080"
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
+      CONTROL_CENTER_ENV: production
     healthcheck:
       test: ["CMD", "node", "/app/node-http-probe.mjs", "http://127.0.0.1:8080", "/healthz", "/ready"]
       interval: 10s

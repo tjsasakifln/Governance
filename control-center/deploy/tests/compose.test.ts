@@ -52,6 +52,11 @@ test("shipped compose names the Control Center project, postgres volume, health+
   assert.equal(requireService(doc, "mcp").build?.dockerfile, "services/mcp/Dockerfile");
   assert.equal(requireService(doc, "collector").build?.dockerfile, "connectors/runner/Dockerfile");
   assert.equal(requireService(doc, "web").build?.dockerfile, "apps/web-shell/Dockerfile");
+  const contextEnvironment = requireService(doc, "context").environment ?? {};
+  const webEnvironment = requireService(doc, "web").environment ?? {};
+  assert.equal(contextEnvironment.CC_RELEASE_SHA, webEnvironment.CC_RELEASE_SHA);
+  assert.equal(contextEnvironment.CONTROL_CENTER_ENV, "production");
+  assert.equal(webEnvironment.CONTROL_CENTER_ENV, "production");
 
   const caddy = requireService(doc, "caddy");
   assert.equal(caddy.restart, "unless-stopped");
