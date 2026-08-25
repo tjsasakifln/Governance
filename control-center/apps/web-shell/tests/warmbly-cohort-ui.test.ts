@@ -708,6 +708,29 @@ test("cohorts exposes disjoint next-page progress and fresh-source recovery", ()
   assert.match(html, /class="table-wrap" role="region" tabindex="0"[^>]*aria-describedby="cohorts-table-hint"/);
 });
 
+test("creating a cohort sends the quantity chosen by the operator", async () => {
+  reset();
+  const { adapter, seen } = gateAdapter({
+    respond: () => ({
+      ok: false,
+      path: "/x",
+      kind: "nota" as const,
+      message: "fixture recusada depois de inspecionar o pedido",
+      outcome: "refused",
+      gateAction: "create" as const,
+    }),
+  });
+  const dom = paintingRoot();
+  paintShell(dom.root as never, adapter as never, "#/warmbly/cohorts");
+  const form = dom.find('[data-gate-key="create:next-unclaimed"]');
+  form.set("limit", "3");
+  form.fire();
+  await settle();
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0]!.limit, 3);
+  assert.equal(seen[0]!.selection_mode, "NEXT_UNCLAIMED");
+});
+
 /* ------------------------------------------------------------------ *
  * 3. Actions must be comprehensible and safe.
  * ------------------------------------------------------------------ */
@@ -868,10 +891,9 @@ test("HOLD e REJECT exigem motivo escrito; aprovar não exige nem motivo nem cai
 
   const approveForm = html.match(/data-gate-key="review:[^"]*:APPROVE"[\s\S]*?<\/form>/)?.[0] ?? "";
   assert.doesNotMatch(approveForm, /name="ack"/, "a caixa de ciência saiu do fluxo normal");
-  assert.doesNotMatch(approveForm, /name="reason" required/, "aprovação comum não exige texto");
-  assert.match(approveForm, /name="reason" maxlength="200"/, "o comentário continua disponível");
+  assert.doesNotMatch(approveForm, /name="reason"/, "aprovação comum não pede comentário de bookkeeping");
   assert.match(approveForm, /data-approve-meaning="true"/, "o botão precisa dizer o que ele assume");
-  assert.match(approveForm, /approved_by_human_reviewer/);
+  assert.match(approveForm, /identidade do Authelia/);
 });
 
 test("HOLD really reaches the adapter without an acknowledgement", async () => {
@@ -1012,7 +1034,8 @@ test("the adjust editor offers exactly subject, body and reason, and warns that 
   assert.match(editor, /data-adjust-warning="true"/);
   assert.match(editor, /cria uma NOVA versão/i);
   const names = [...editor.matchAll(/name="([a-z_]+)"/g)].map((match) => match[1]).sort();
-  assert.deepEqual(names, ["body_text", "confirmation", "reason", "subject"]);
+  assert.deepEqual(names, ["body_text", "reason", "subject"]);
+  assert.match(editor, /data-cohort-version="1"/, "the exact version confirmation is derived from the immutable card");
   for (const forbidden of ["mailbox", "evidence", "route_class", "policy_version", "source"]) {
     assert.doesNotMatch(editor, new RegExp(`name="${forbidden}"`), `${forbidden} must never be editable`);
   }
@@ -1043,19 +1066,29 @@ test("the first adjust submit previews the diff and writes nothing", async () =>
 test("a confirmed adjust sends the contract body and lands on the new version the server named", async () => {
   reset();
   const navigations: string[] = [];
+  let adjusted = false;
   const { adapter, seen } = gateAdapter({
-    respond: () => ({
-      ok: true,
-      path: "/x",
-      kind: "nota" as const,
-      status: 201,
-      message: "Ajuste aceito.",
-      outcome: "executed",
-      gateAction: "adjust" as const,
-      gateTarget: { cohort_id: COHORT_ID, candidate_id: CANDIDATE_ID },
-      gateResource: { cohort_id: NEXT_COHORT_ID, version: 2 },
-      diff: [{ field: "subject", before: "Assunto exato congelado", after: "Assunto revisado" }],
-    }),
+    gate: () => gatePayload(
+      ["operators", "admins"],
+      adjusted
+        ? cohort({ id: NEXT_COHORT_ID, cohort_id: NEXT_COHORT_ID, version: 2 })
+        : cohort(),
+    ),
+    respond: () => {
+      adjusted = true;
+      return {
+        ok: true,
+        path: "/x",
+        kind: "nota" as const,
+        status: 201,
+        message: "Ajuste aceito.",
+        outcome: "executed",
+        gateAction: "adjust" as const,
+        gateTarget: { cohort_id: COHORT_ID, candidate_id: CANDIDATE_ID },
+        gateResource: { cohort_id: NEXT_COHORT_ID, version: 2 },
+        diff: [{ field: "subject", before: "Assunto exato congelado", after: "Assunto revisado" }],
+      };
+    },
   });
   const dom = paintingRoot();
   paintShell(
@@ -2350,6 +2383,12 @@ test("uma releitura que não confirma o efeito devolve a mensagem para a fila", 
   await settle();
   assert.match(dom.root.innerHTML, /data-readback="not_confirmed"/);
   assert.match(dom.root.innerHTML, /data-queue-pending="1"/, "sem confirmação, continua sendo trabalho");
+  assert.equal(
+    (adapter.lastOperatorResult as AdapterWriteResult | undefined)?.ok,
+    false,
+    "uma resposta aceita sem readback não pode continuar semanticamente bem-sucedida",
+  );
+  assert.equal((adapter.lastOperatorResult as AdapterWriteResult | undefined)?.outcome, "unknown");
 });
 
 test("uma escrita aceita cuja releitura falha não some da fila nem avança a chave de idempotência", async () => {

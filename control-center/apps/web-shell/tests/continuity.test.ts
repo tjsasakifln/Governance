@@ -135,6 +135,9 @@ test("a definitive queue action navigates to the next item and unknown stays put
       if (name === "data-operator-form") return "START_EXCEPTION_WORK";
       if (name === "data-continuity-action") return "queue";
       if (name === "data-continuity-next") return next;
+      if (name === "data-draft-key") {
+        return operatorActionDraftKey("START_EXCEPTION_WORK", "cc:exception:1", "exception-1");
+      }
       return null;
     },
     querySelector(selector: string): { value: string } | null {

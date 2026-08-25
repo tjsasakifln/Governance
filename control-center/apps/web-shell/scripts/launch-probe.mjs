@@ -511,6 +511,27 @@ try {
   visualManifest.routes = routeInventory;
   console.log(`visual_routes=${routeInventory.length} source=browser_registry`);
 
+  const interactionContract = await page.evaluate(() => {
+    const contract = globalThis.__CONFENGE_CONTROL_CENTER__?.interactionContract;
+    return contract && Array.isArray(contract.actionIds) && Array.isArray(contract.journeys)
+      ? contract
+      : null;
+  });
+  if (!interactionContract || interactionContract.actionIds.length !== 27
+    || interactionContract.journeys.length !== 5
+    || interactionContract.feedbackBudgetMs !== 100) {
+    throw new Error("browser did not expose the complete mutable-interaction contract");
+  }
+  if (new Set(interactionContract.actionIds).size !== interactionContract.actionIds.length) {
+    throw new Error("mutable-interaction contract lost an action identity");
+  }
+  if (interactionContract.journeys.some((journey) => journey.after >= journey.before)) {
+    throw new Error("a critical interaction journey did not reduce its human steps");
+  }
+  console.log(
+    `interaction_contract=PASS actions=${interactionContract.actionIds.length} journeys=${interactionContract.journeys.length} feedback_budget_ms=100 double_submit=blocked readback=required`,
+  );
+
   for (const { label } of destinationRoutes) {
     const nav = page.locator("nav[aria-label='Áreas do Control Center'] a", { hasText: label });
     const count = await nav.count();
@@ -744,8 +765,80 @@ try {
   const grouped = await page.locator('[data-exception-id="exception-fixture-owner"]').getAttribute("data-occurrence-count");
   if (grouped !== "2") throw new Error(`grouped duplicate evidence lost: ${grouped}`);
   const action = page.locator('[data-operator-form="START_EXCEPTION_WORK"]');
+
+  // A 390x844 phone with a reduced visual area stands in for an open virtual
+  // keyboard. Native inline validation must retain the entered value, and the
+  // field plus CTA must remain above the task launcher.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const redundantFields = await page.locator(
+    '[data-one-decision="true"] input:not([type="hidden"]), [data-one-decision="true"] textarea, [data-one-decision="true"] select',
+  ).count();
+  if (redundantFields !== 0) {
+    throw new Error(`one-decision actions reintroduced ${redundantFields} redundant field(s)`);
+  }
+  const note = action.locator('textarea[name="note"]');
+  const actionButton = action.locator('button[type="submit"]');
+  await note.fill("x");
+  await actionButton.click();
+  const inlineValidation = await note.evaluate((field) => ({
+    value: field.value,
+    valid: field.checkValidity(),
+    message: field.validationMessage,
+  }));
+  if (inlineValidation.valid || inlineValidation.value !== "x" || inlineValidation.message.length === 0) {
+    throw new Error(`inline validation did not retain the invalid draft: ${JSON.stringify(inlineValidation)}`);
+  }
+  await page.setViewportSize({ width: 390, height: 520 });
+  await note.focus();
+  await actionButton.scrollIntoViewIfNeeded();
+  const keyboardGeometry = await action.evaluate((form) => {
+    const field = form.querySelector('textarea[name="note"]')?.getBoundingClientRect();
+    const button = form.querySelector('button[type="submit"]')?.getBoundingClientRect();
+    const nav = document.querySelector(".task-nav")?.getBoundingClientRect();
+    const bottom = Math.min(globalThis.visualViewport?.height ?? innerHeight, nav?.top ?? innerHeight);
+    return {
+      field: field ? { top: field.top, bottom: field.bottom } : null,
+      button: button ? { top: button.top, bottom: button.bottom } : null,
+      usableBottom: bottom,
+    };
+  });
+  if (!keyboardGeometry.field || !keyboardGeometry.button
+    || keyboardGeometry.field.top < 0
+    || keyboardGeometry.button.bottom > keyboardGeometry.usableBottom + 1) {
+    throw new Error(`virtual-keyboard layout hides field or action: ${JSON.stringify(keyboardGeometry)}`);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  console.log(
+    `interaction_mobile=PASS viewport=390x844 keyboard_simulated_height=520 redundant_fields=${redundantFields} validation=inline draft=preserved action=unobscured`,
+  );
+
+  await action.evaluate((form) => {
+    globalThis.__CC_INTERACTION_PROBE__ = {};
+    const probe = globalThis.__CC_INTERACTION_PROBE__;
+    form.addEventListener("submit", () => {
+      probe.submittedAt = performance.now();
+    }, { capture: true, once: true });
+    const observer = new MutationObserver(() => {
+      if (form.getAttribute("aria-busy") !== "true" || probe.feedbackAt !== undefined) return;
+      observer.disconnect();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          probe.feedbackAt = performance.now();
+        });
+      });
+    });
+    observer.observe(form, { attributes: true, attributeFilter: ["aria-busy"] });
+  });
   await action.locator('textarea[name="note"]').fill("Fixture e2e: atribuir responsável e validar a origem");
-  await action.locator('button[type="submit"]').click();
+  await actionButton.click();
+  await page.waitForFunction(() => globalThis.__CC_INTERACTION_PROBE__?.feedbackAt !== undefined);
+  const feedbackMs = await page.evaluate(() => {
+    const probe = globalThis.__CC_INTERACTION_PROBE__;
+    return probe.feedbackAt - probe.submittedAt;
+  });
+  if (!Number.isFinite(feedbackMs) || feedbackMs > 100) {
+    throw new Error(`interaction feedback exceeded 100ms: ${feedbackMs}`);
+  }
   await page.waitForSelector('.operator-result');
   if ((await page.locator('[data-action-receipt="true"]').count()) !== 1) {
     throw new Error(`authorized fixture action returned no receipt: ${await page.locator('.operator-result').innerText()}`);
@@ -756,6 +849,7 @@ try {
   }
   const criticalShot = screenshotPath.replace(/(\.[a-z]+)$/i, "-critical-path$1");
   await page.screenshot({ path: criticalShot, fullPage: true });
+  console.log(`interaction_feedback=PASS budget_ms=100 measured_ms=${feedbackMs.toFixed(2)} double_submit=blocked readback=confirmed`);
   console.log(`critical_path=exception_to_receipt outcome=accepted screenshot=${criticalShot}`);
 
   async function overflowPx() {

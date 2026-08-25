@@ -32,10 +32,9 @@ function acknowledgeForm(alert: AlertPresentation): string {
   const ack = alert.acknowledge;
   if (!ack) return "";
   return `
-        <form data-operator-form="${escapeHtml(ack.action_type)}" class="operator-form alert-ack">
+        <form data-operator-form="${escapeHtml(ack.action_type)}" data-interaction="today.acknowledge" data-one-decision="true" class="operator-form alert-ack">
           <input type="hidden" name="target_canonical_id" value="${escapeHtml(ack.target_canonical_id)}" />
           <input type="hidden" name="target_source_id" value="${escapeHtml(ack.target_source_id)}" />
-          <label>Nota do reconhecimento <textarea name="note" required minlength="2" rows="2"></textarea></label>
           <button type="submit">Reconhecer sem resolver</button>
           <p class="hint" data-ack-effect="control-center-only">${escapeHtml(ack.effect)}</p>
         </form>`;

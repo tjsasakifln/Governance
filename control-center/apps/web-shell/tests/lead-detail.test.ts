@@ -335,7 +335,7 @@ test("local records and Warmbly writes are two separate, separately labelled gro
     );
   }
   // Every local form declares where it writes, and it is never Warmbly.
-  const localScoped = [...html.matchAll(/data-operator-form="[A-Z_]+" data-writes-to="([a-z-]+)"/g)].map(
+  const localScoped = [...html.matchAll(/data-operator-form="[A-Z_]+"[^>]* data-writes-to="([a-z-]+)"/g)].map(
     (m) => m[1],
   );
   assert.equal(localScoped.length, localForms.length);
@@ -466,7 +466,7 @@ test("an inbound exception without proven lead identity fails closed even when s
   assert.match(html, /data-warmbly-refusal="lead-id-unproven"/);
 });
 
-test("confirmation is proportional to risk and enforced by the form, not by copy", () => {
+test("confirmation is proportional to consequence without duplicating the human decision", () => {
   const html = leadDetailBlock({ snapshot: snapshotWith(representativeOperations()), resource: DEAL_ID });
   const formFor = (attr: string, value: string): string => {
     const start = html.indexOf(`${attr}="${value}"`);
@@ -483,16 +483,15 @@ test("confirmation is proportional to risk and enforced by the form, not by copy
 
   const medium = formFor("data-operator-form", "REJECT_NEXT_ACTION");
   assert.match(medium, /data-action-risk="medio"/);
-  assert.match(medium, /<input type="checkbox" name="ciencia" required \/>/);
-  assert.match(medium, /registro local/);
-  assert.equal(/pattern="RECONHECER"/.test(medium), false);
+  assert.match(medium, /Motivo operacional/);
+  assert.match(medium, /name="note" required/);
+  assert.equal(/name="ciencia"|pattern="RECONHECER"/.test(medium), false);
 
   const high = formFor("data-warmbly-dispatch", "acknowledge");
-  assert.match(high, /data-action-risk="alto"/);
-  assert.match(high, /<input type="checkbox" name="ciencia" required \/>/);
-  assert.match(high, /Entendo que esta ação grava no Warmbly/);
-  assert.match(high, /pattern="RECONHECER"/);
-  assert.match(high, /name="reason" required/);
+  assert.match(high, /data-action-risk="medio"/);
+  assert.match(high, /data-one-decision="true"/);
+  assert.match(high, /marca este alerta de inbound como visto/);
+  assert.equal(/name="ciencia"|pattern="RECONHECER"|name="reason"/.test(high), false);
 });
 
 test("an id the operator channel would reject is never offered as a Warmbly write", () => {

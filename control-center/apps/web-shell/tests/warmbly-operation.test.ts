@@ -290,12 +290,14 @@ test("state, reason, window, queue, limits and last action are all rendered befo
   }
 });
 
-test("the cockpit offers exactly pause, resume and acknowledge, and no send control", () => {
+test("the cockpit keeps pause/resume and routes acknowledgement through a proven alert target", () => {
   clearPendingResumeConfirmation();
   const { root, unmount } = mountWarmbly();
   try {
     const actions = [...root.innerHTML.matchAll(/data-warmbly-dispatch="([a-z_]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(actions, ["pause", "resume", "acknowledge"]);
+    assert.deepEqual(actions, ["pause", "resume"]);
+    assert.match(root.innerHTML, /Abrir alertas de inbound não lidos/);
+    assert.match(root.innerHTML, /condicao=unread/);
     assert.equal(hasMutationControls(root.innerHTML), false);
     assert.doesNotMatch(root.innerHTML, /enviar campanha|SEND_CAMPAIGN|disparar agora/i);
     // The open-circuit caveat has to be standing, not only after a refusal:

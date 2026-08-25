@@ -128,6 +128,9 @@ jobs:
           grep -E "launch-probe ok" /tmp/cc-e2e.log
           grep -E "view_state_driven=empty" /tmp/cc-e2e.log
           grep -E "visual_routes=[1-9][0-9]* source=browser_registry" /tmp/cc-e2e.log
+          grep -E "interaction_contract=PASS actions=[1-9][0-9]* journeys=[1-9]" /tmp/cc-e2e.log
+          grep -E "interaction_feedback=PASS budget_ms=100" /tmp/cc-e2e.log
+          grep -E "interaction_mobile=PASS viewport=390x844" /tmp/cc-e2e.log
           grep -E "visual_gate=PASS routes=[1-9][0-9]* axe_checks=[1-9]" /tmp/cc-e2e.log
           grep -E "performance_build=PASS" /tmp/cc-e2e.log
           grep -E "performance_lab=PASS routes=3 samples=12 canonical_sampled=false" /tmp/cc-e2e.log

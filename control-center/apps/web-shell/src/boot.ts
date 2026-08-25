@@ -9,6 +9,11 @@ import {
   OPERATIONAL_STATES,
   renderOperationalComponentCatalog,
 } from "./ui/design-system";
+import {
+  CRITICAL_INTERACTION_JOURNEYS,
+  INTERACTION_FEEDBACK_BUDGET_MS,
+  MUTABLE_INTERACTION_IDS,
+} from "./interaction-runtime";
 
 export const SHELL_VERSION = "0.1.0";
 export const SHELL_GLOBAL_KEY = "__CONFENGE_CONTROL_CENTER__";
@@ -28,6 +33,11 @@ export interface ShellGlobals {
     components: typeof OPERATIONAL_COMPONENT_CONTRACT;
     states: typeof OPERATIONAL_STATES;
     renderCatalog: typeof renderOperationalComponentCatalog;
+  };
+  interactionContract: {
+    actionIds: typeof MUTABLE_INTERACTION_IDS;
+    journeys: typeof CRITICAL_INTERACTION_JOURNEYS;
+    feedbackBudgetMs: typeof INTERACTION_FEEDBACK_BUDGET_MS;
   };
   primarySurface: typeof PRIMARY_SURFACE;
   mount: typeof mount;
@@ -51,6 +61,11 @@ export function installShellGlobals(win: ShellWindow): ShellGlobals {
       components: OPERATIONAL_COMPONENT_CONTRACT,
       states: OPERATIONAL_STATES,
       renderCatalog: renderOperationalComponentCatalog,
+    },
+    interactionContract: {
+      actionIds: MUTABLE_INTERACTION_IDS,
+      journeys: CRITICAL_INTERACTION_JOURNEYS,
+      feedbackBudgetMs: INTERACTION_FEEDBACK_BUDGET_MS,
     },
     primarySurface: PRIMARY_SURFACE,
     mount,
