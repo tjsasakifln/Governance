@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { bootFromEnv } from "../src/boot.ts";
 import { createRequestListener } from "../src/http.ts";
 import { silentLogger } from "../src/log.ts";
-import { createWarmblyReviewPortFromEnv } from "../src/operational/warmbly-review.ts";
+import { createWarmblyReviewPortFromEnv, reviewDraftPage } from "../src/operational/warmbly-review.ts";
 import type { WarmblyReviewPort } from "../src/operational/warmbly-review.ts";
 
 const FOUNDER = { kind: "human" as const, id: "founder-local" };
@@ -33,6 +33,58 @@ function decisionBody(touchpoint = queuedTouchpoint(), scheduledFor: unknown = D
   return { data: { touchpoint, scheduled_for: scheduledFor } };
 }
 
+test("review list publishes only authoritative and internally consistent pagination", () => {
+  const rows = Array.from({ length: 55 }, (_, index) => ({ id: `draft-${index}` }));
+  const fullPage = Array.from({ length: 100 }, (_, index) => ({ id: `draft-${index}` }));
+  assert.deepEqual(reviewDraftPage({ data: fullPage, pagination: { total: 250, has_more: true } }, 100, 100).page, {
+    limit: 100,
+    offset: 100,
+    loaded_count: 100,
+    coverage_status: "TOTAL_KNOWN",
+    total_count: 250,
+    remaining_count: 50,
+    has_more: true,
+    next_offset: 200,
+  });
+  assert.deepEqual(reviewDraftPage({ data: fullPage, pagination: { has_more: true } }, 100, 100).page, {
+    limit: 100,
+    offset: 100,
+    loaded_count: 100,
+    coverage_status: "PAGE_ONLY",
+    has_more: true,
+    next_offset: 200,
+  });
+  assert.deepEqual(reviewDraftPage({ data: rows, pagination: { total: 155, has_more: false } }, 100, 100).page, {
+    limit: 100,
+    offset: 100,
+    loaded_count: 55,
+    coverage_status: "TOTAL_KNOWN",
+    total_count: 155,
+    remaining_count: 0,
+    has_more: false,
+  });
+  assert.equal(reviewDraftPage({ data: rows }, 100, 0).page.coverage_status, "UNPROVEN");
+
+  const contradictions = [
+    { total: 54, has_more: false },
+    { total: 250, has_more: false },
+    { total: -1, has_more: true },
+    { total: "250", has_more: true },
+    { has_more: "true" },
+    { total: 250, has_more: true },
+  ];
+  for (const pagination of contradictions) {
+    const page = reviewDraftPage({ data: rows, pagination }, 100, 0).page;
+    assert.equal(page.coverage_status, "UNPROVEN");
+    assert.equal(Object.hasOwn(page, "total_count"), false);
+    assert.equal(Object.hasOwn(page, "has_more"), false);
+  }
+  assert.throws(
+    () => reviewDraftPage({ data: { id: "not-a-list" } }, 100, 0),
+    /did not contain a data array/,
+  );
+});
+
 test("Warmbly review proxy preserves exact-hash decision metadata", async () => {
   const calls: Array<{ url: string; init: RequestInit }> = [];
   const fetchImpl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -54,7 +106,17 @@ test("Warmbly review proxy preserves exact-hash decision metadata", async () => 
   }, fetchImpl);
   assert.ok(port);
 
-  await port.list(FOUNDER, new URLSearchParams({ limit: "999", offset: "12" }));
+  const listed = await port.list(FOUNDER, new URLSearchParams({ limit: "999", offset: "12" }));
+  assert.deepEqual(listed, {
+    schema_version: "control-center.review-draft-page.v1",
+    data: [],
+    page: {
+      limit: 200,
+      offset: 12,
+      loaded_count: 0,
+      coverage_status: "UNPROVEN",
+    },
+  });
   const result = await port.decide(FOUNDER, DRAFT_ID, {
     action: "APPROVE",
     expected_content_hash: HASH,

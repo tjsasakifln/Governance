@@ -8,7 +8,7 @@ import type {
 } from "./adapters/contract";
 import { APPROVAL_DEFAULT_REASON, isWarmblyGateAction } from "./adapters/contract";
 import { WARMBLY_DISPATCH_PATHS, type WriteShortcutKind } from "./adapters/paths";
-import { parseHash } from "./destinations";
+import { parseHash, withQueryParams } from "./destinations";
 import { LIST_FORM_FIELDS, defaultParamValues, listHref, listSpecById } from "./filter";
 import {
   beginGateFlight,
@@ -490,9 +490,11 @@ export function bindReviewActions(
             adapter.lastOperatorResult = result;
             if (result.ok) {
               const destinationId = action === "SAVE_ADJUSTMENT" ? id : nextReviewId;
-              completionHash = destinationId
-                ? `#/comercial/rascunhos?resource=${encodeURIComponent(destinationId)}&${REVIEW_FOCUS_PARAM}=${REVIEW_FOCUS_VALUE}`
-                : `#/comercial/rascunhos?${REVIEW_FOCUS_PARAM}=${REVIEW_FOCUS_VALUE}`;
+              completionHash = withQueryParams(currentHash ?? "#/comercial/rascunhos", {
+                resource: destinationId || null,
+                mode: null,
+                [REVIEW_FOCUS_PARAM]: REVIEW_FOCUS_VALUE,
+              });
             }
           }
         })

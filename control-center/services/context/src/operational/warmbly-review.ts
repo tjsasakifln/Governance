@@ -43,6 +43,21 @@ export interface ReviewDecisionReceipt {
   approved_at?: string;
 }
 
+export interface ReviewDraftPage {
+  schema_version: "control-center.review-draft-page.v1";
+  data: unknown[];
+  page: {
+    limit: number;
+    offset: number;
+    loaded_count: number;
+    coverage_status: "TOTAL_KNOWN" | "PAGE_ONLY" | "UNPROVEN";
+    total_count?: number;
+    remaining_count?: number;
+    has_more?: boolean;
+    next_offset?: number;
+  };
+}
+
 export interface WarmblyReviewPort {
   list(actor: ActorRef, query: URLSearchParams): Promise<unknown>;
   get(actor: ActorRef, id: string): Promise<unknown>;
@@ -64,6 +79,82 @@ function record(value: unknown): Record<string, unknown> | undefined {
 
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+/**
+ * Warmbly owns the review backlog. This boundary publishes only pagination it
+ * can prove from Warmbly's response; the page length is never promoted to a
+ * server total. Invalid or contradictory metadata is discarded as UNPROVEN.
+ */
+export function reviewDraftPage(payload: unknown, limit: number, offset: number): ReviewDraftPage {
+  const root = record(payload);
+  if (!root || !Array.isArray(root.data)) {
+    throw new ServiceError(
+      "warmbly_review_failed",
+      "Warmbly review list did not contain a data array",
+      502,
+    );
+  }
+  const data = root.data;
+  const base: ReviewDraftPage = {
+    schema_version: "control-center.review-draft-page.v1",
+    data,
+    page: {
+      limit,
+      offset,
+      loaded_count: data.length,
+      coverage_status: "UNPROVEN",
+    },
+  };
+  const pagination = record(root.pagination);
+  if (!pagination || data.length > limit) return base;
+
+  const total = nonNegativeInteger(pagination.total);
+  const declaredHasMore = typeof pagination.has_more === "boolean"
+    ? pagination.has_more
+    : undefined;
+  if (pagination.total !== undefined && pagination.total !== null && total === undefined) return base;
+  if (pagination.has_more !== undefined && declaredHasMore === undefined) return base;
+  if (declaredHasMore === true && data.length === 0) return base;
+
+  const pageEnd = offset + data.length;
+  if (total !== undefined) {
+    if (total < pageEnd) return base;
+    const hasMore = pageEnd < total;
+    if (declaredHasMore !== undefined && declaredHasMore !== hasMore) return base;
+    if (hasMore && data.length !== limit) return base;
+    return {
+      ...base,
+      page: {
+        ...base.page,
+        coverage_status: "TOTAL_KNOWN",
+        total_count: total,
+        remaining_count: total - pageEnd,
+        has_more: hasMore,
+        ...(hasMore ? { next_offset: pageEnd } : {}),
+      },
+    };
+  }
+
+  if (declaredHasMore !== undefined) {
+    if (declaredHasMore && data.length !== limit) return base;
+    return {
+      ...base,
+      page: {
+        ...base.page,
+        coverage_status: "PAGE_ONLY",
+        has_more: declaredHasMore,
+        ...(declaredHasMore ? { next_offset: pageEnd } : {}),
+      },
+    };
+  }
+  return base;
 }
 
 function instant(value: unknown): string | undefined {
@@ -302,7 +393,8 @@ export function createWarmblyReviewPortFromEnv(
     async list(_actor, query) {
       const limit = boundedInt(query.get("limit"), 100, 200);
       const offset = boundedInt(query.get("offset"), 0, 100_000);
-      return request(`/v1/confenge/review/drafts?limit=${limit}&offset=${offset}`);
+      const payload = await request(`/v1/confenge/review/drafts?limit=${limit}&offset=${offset}`);
+      return reviewDraftPage(payload, limit, offset);
     },
     async get(_actor, id) {
       assertId(id);

@@ -60,6 +60,13 @@ POST /v1/commercial/review-batches
 
 As quatro rotas comerciais são uma ponte server-side protegida pela identidade operacional autenticada no edge para o human gate do Warmbly. `APPROVE` vincula `expected_content_hash` e agenda a próxima janela útil; não existe envio imediato nessa ponte.
 
+A listagem devolve `control-center.review-draft-page.v1`: `limit`, `offset` e
+`loaded_count` descrevem o recorte solicitado. `total_count`,
+`remaining_count`, `has_more` e `next_offset` só sobrevivem quando a paginação
+do Warmbly é válida e coerente. Ausência, tipo inválido, total menor que os itens
+observados ou continuidade contraditória resulta em `coverage_status=UNPROVEN`;
+o tamanho da página nunca é promovido a total do servidor.
+
 A resposta 2xx do write não é prova de efeito. Para uma decisão individual, a ponte parseia o envelope do Warmbly, executa `GET /v1/confenge/review/drafts/:id` e devolve `control-center.review-decision-receipt.v1`. `APPROVE` só sai como `confirmed` quando write e readback concordam em ID, hash/approved hash, operador, instante e `QUEUED|SENT`, com `due_at == scheduled_for` em `QUEUED`. Corpo vazio, divergência ou readback indisponível vira `not_confirmed` e orienta a não repetir antes de reler com a mesma `Idempotency-Key`.
 
 Headers obrigatórios em tudo exceto `/healthz`: `X-Actor-Id`, `X-Actor-Kind` (`human` | `agent` | `system`).
