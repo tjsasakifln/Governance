@@ -79,6 +79,13 @@ function stringValue(record: Record<string, unknown>, key: string): string | und
 
 const REVIEW_PAGE_LIMIT = 100;
 
+class HttpReadError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`Backend operacional indisponível (${status} ${path}).`);
+    this.name = "HttpReadError";
+  }
+}
+
 function reviewOffsetOf(location: string | undefined): number {
   const raw = queryParamsOf(location ?? "").offset;
   if (typeof raw !== "string" || !/^\d+$/.test(raw)) return 0;
@@ -552,11 +559,12 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       const page = await this.loadPage(id, location);
       return { ok: true, loading: false, page };
     } catch (err) {
+      const denied = err instanceof HttpReadError && (err.status === 401 || err.status === 403);
       return {
         ok: false,
         loading: false,
         error: {
-          code: "CONTEXT_UNAVAILABLE",
+          code: denied ? "PERMISSION_DENIED" : "CONTEXT_UNAVAILABLE",
           message:
             err instanceof Error
               ? err.message
@@ -1388,7 +1396,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
     });
     if (response.status === 404) return undefined;
     if (!response.ok) {
-      throw new Error(`Backend operacional indisponível (${response.status} ${path}).`);
+      throw new HttpReadError(response.status, path);
     }
     try {
       return await response.json() as unknown;
@@ -1411,7 +1419,7 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       return undefined;
     }
     if (!response.ok) {
-      throw new Error(`Backend operacional indisponível (${response.status} ${path}).`);
+      throw new HttpReadError(response.status, path);
     }
     try {
       return JSON.parse(text) as unknown;
