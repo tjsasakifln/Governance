@@ -8,6 +8,18 @@ const EXPECTED_CATALOG_VIEWPORTS = [
   { id: "390", width: 390, height: 844 },
   { id: "desktop-1440", width: 1440, height: 1000 },
 ];
+const EXPECTED_CATALOG_COMPONENTS = [
+  "page-header",
+  "state-summary",
+  "priority",
+  "action-bar",
+  "queue-item",
+  "form",
+  "feedback",
+  "view-state",
+  "technical-detail",
+  "confirmation",
+];
 
 function fail(message) {
   throw new Error(`invalid visual gate manifest: ${message}`);
@@ -87,7 +99,7 @@ function assertSafety(safety) {
 function assertCatalog(catalog) {
   if (!catalog || typeof catalog !== "object"
     || catalog.id !== "operational-component-catalog"
-    || catalog.components !== 10
+    || JSON.stringify(catalog.components) !== JSON.stringify(EXPECTED_CATALOG_COMPONENTS)
     || catalog.state !== "extreme-fixtures"
     || JSON.stringify(catalog.viewports) !== JSON.stringify(EXPECTED_CATALOG_VIEWPORTS)
     || !Array.isArray(catalog.checks)) {

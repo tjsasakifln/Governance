@@ -48,8 +48,20 @@ export const OPERATIONAL_COMPONENT_CONTRACT = [
 function dataAttributes(data: Readonly<Record<string, string>> | undefined): string {
   if (!data) return "";
   return Object.entries(data)
-    .map(([key, value]) => ` data-${escapeHtml(key)}="${escapeHtml(value)}"`)
+    .map(([key, value]) => {
+      if (!/^[a-z][a-z0-9-]*$/.test(key)) {
+        throw new Error(`invalid operational data attribute: ${key}`);
+      }
+      return ` data-${key}="${escapeHtml(value)}"`;
+    })
     .join("");
+}
+
+function fragmentHref(value: string): string {
+  if (!value.startsWith("#")) {
+    throw new Error("operational actions must target a shell fragment");
+  }
+  return escapeHtml(value);
 }
 
 export function operationalFeedback(input: {
@@ -62,6 +74,9 @@ export function operationalFeedback(input: {
   readonly data?: Readonly<Record<string, string>>;
 }): string {
   const definition = OPERATIONAL_STATES[input.state];
+  if (input.className && !/^[a-z0-9 _-]+$/i.test(input.className)) {
+    throw new Error("invalid operational feedback class name");
+  }
   const classes = ["banner", definition.legacyClass, "operational-feedback", input.className]
     .filter(Boolean)
     .join(" ");
@@ -89,8 +104,8 @@ export function operationalActionBar(input: {
 }): string {
   const secondary = input.secondary ?? [];
   return `<div class="operational-action-bar" data-operational-component="action-bar" data-primary-actions="${input.primary ? "1" : "0"}" aria-label="${escapeHtml(input.label)}">
-    ${input.primary ? `<a class="operational-primary-action ${escapeHtml(input.primaryClassName ?? "")}" href="${escapeHtml(input.primary.href)}"${dataAttributes(input.primaryData)}>${escapeHtml(input.primary.label)}</a>` : ""}
-    ${secondary.map((action) => `<a class="operational-secondary-action" href="${escapeHtml(action.href)}">${escapeHtml(action.label)}</a>`).join("")}
+    ${input.primary ? `<a class="operational-primary-action ${escapeHtml(input.primaryClassName ?? "")}" href="${fragmentHref(input.primary.href)}"${dataAttributes(input.primaryData)}>${escapeHtml(input.primary.label)}</a>` : ""}
+    ${secondary.map((action) => `<a class="operational-secondary-action" href="${fragmentHref(action.href)}">${escapeHtml(action.label)}</a>`).join("")}
     ${input.guidance ? `<p class="operational-action-guidance">${escapeHtml(input.guidance)}</p>` : ""}
   </div>`;
 }
@@ -108,7 +123,7 @@ export function renderOperationalComponentCatalog(): string {
       <h2 id="catalog-summary-title">Resumo de estado</h2>
       <p><strong>Estado:</strong> leitura parcial. <strong>Risco:</strong> desconhecido. <strong>Próxima ação:</strong> confirmar a origem.</p>
     </section>
-    <section aria-labelledby="catalog-feedback-title"><h2 id="catalog-feedback-title">Feedback e estados</h2><div class="component-catalog-grid">${feedback}</div></section>
+    <section aria-labelledby="catalog-feedback-title"><h2 id="catalog-feedback-title">Feedback e estados</h2><div class="component-catalog-grid" data-view-state="loading">${feedback}</div></section>
     <section aria-labelledby="catalog-priority-title"><h2 id="catalog-priority-title">Prioridade e fila</h2>
       <article class="card priority" data-operational-component="priority"><p class="kicker"><span class="pill">Prioridade 1</span></p><h3>Resolver identidade ausente sem inventar cliente</h3><p>${longText}</p></article>
       <ul class="review-queue" aria-label="Fila de revisão extrema"><li class="review-queue-item" data-review-list-item="catalog-long"><strong>Mensagem com destinatário ausente</strong><p>${longText}</p></li></ul>

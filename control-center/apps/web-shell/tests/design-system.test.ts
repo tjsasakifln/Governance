@@ -44,6 +44,25 @@ test("action bar allows exactly zero or one primary action", () => {
   const passive = operationalActionBar({ label: "Ações", guidance: "Nenhuma ação agora" });
   assert.match(passive, /data-primary-actions="0"/);
   assert.doesNotMatch(passive, /operational-primary-action/);
+  assert.throws(
+    () => operationalActionBar({ label: "Ações", primary: { label: "Executar", href: "javascript:alert(1)" } }),
+    /must target a shell fragment/,
+  );
+});
+
+test("component helpers reject markup-shaped attribute and class names", () => {
+  assert.throws(
+    () => operationalFeedback({
+      state: "success",
+      title: "Feito",
+      data: { 'result onmouseover': "unsafe" },
+    }),
+    /invalid operational data attribute/,
+  );
+  assert.throws(
+    () => operationalFeedback({ state: "success", title: "Feito", className: 'ok" onmouseover="x' }),
+    /invalid operational feedback class name/,
+  );
 });
 
 test("catalog covers ten real contracts, extreme states, missing data and long copy", () => {

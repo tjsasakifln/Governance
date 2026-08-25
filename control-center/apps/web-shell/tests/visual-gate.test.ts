@@ -97,7 +97,18 @@ function completeManifest(): Record<string, unknown> {
     checks,
     catalog: {
       id: "operational-component-catalog",
-      components: 10,
+      components: [
+        "page-header",
+        "state-summary",
+        "priority",
+        "action-bar",
+        "queue-item",
+        "form",
+        "feedback",
+        "view-state",
+        "technical-detail",
+        "confirmation",
+      ],
       state: "extreme-fixtures",
       viewports: [
         { id: "390", width: 390, height: 844 },

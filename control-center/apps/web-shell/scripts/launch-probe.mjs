@@ -92,7 +92,7 @@ const visualManifest = {
   checks: [],
   catalog: {
     id: "operational-component-catalog",
-    components: 10,
+    components: [],
     state: "extreme-fixtures",
     viewports: [
       { id: "390", width: 390, height: 844 },
@@ -853,17 +853,40 @@ try {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
     await page.waitForSelector('[data-destination="hoje"][data-view-state="ready"]');
-    const componentCount = await page.evaluate(() => {
+    const catalogCoverage = await page.evaluate(() => {
       const designSystem = window.__CONFENGE_CONTROL_CENTER__?.designSystem;
       const main = document.querySelector("main");
       if (!designSystem || !main) throw new Error("operational design-system catalog is unavailable");
       main.innerHTML = designSystem.renderCatalog();
-      return designSystem.components.length;
+      const components = designSystem.components.map(({ id, selector }) => ({
+        id,
+        selector,
+        matches: main.querySelectorAll(selector).length,
+      }));
+      const invalidActionBars = [...main.querySelectorAll('[data-operational-component="action-bar"]')]
+        .filter((bar) => {
+          const declared = Number.parseInt(bar.getAttribute("data-primary-actions") ?? "", 10);
+          return (declared !== 0 && declared !== 1)
+            || bar.querySelectorAll(".operational-primary-action").length !== declared;
+        }).length;
+      return {
+        componentIds: components.map((component) => component.id),
+        missing: components.filter((component) => component.matches < 1),
+        invalidActionBars,
+      };
     });
-    if (componentCount !== 10) {
-      throw new Error(`operational component contract expected 10 entries, got ${componentCount}`);
+    if (catalogCoverage.componentIds.length !== 10 || catalogCoverage.missing.length > 0) {
+      throw new Error(`operational component catalog coverage failed: ${JSON.stringify(catalogCoverage)}`);
     }
-    catalogComponentCount = componentCount;
+    if (catalogCoverage.invalidActionBars > 0) {
+      throw new Error(`operational component catalog has ${catalogCoverage.invalidActionBars} invalid action bars`);
+    }
+    if (visualManifest.catalog.components.length > 0
+      && JSON.stringify(visualManifest.catalog.components) !== JSON.stringify(catalogCoverage.componentIds)) {
+      throw new Error("operational component catalog changed between viewports");
+    }
+    visualManifest.catalog.components = catalogCoverage.componentIds;
+    catalogComponentCount = catalogCoverage.componentIds.length;
     const catalogOverflow = await overflowPx();
     if (catalogOverflow > 1) {
       throw new Error(`${vp.name}/component-catalog horizontal overflow ${catalogOverflow}px`);
@@ -893,7 +916,7 @@ try {
     });
     const catalogShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-component-catalog-${vp.name}$1`);
     await page.screenshot({ path: catalogShot, fullPage: true });
-    console.log(`component_catalog viewport=${vp.name} components=${componentCount} overflow=${catalogOverflow} axe_violations=${axeViolations} screenshot=${catalogShot}`);
+    console.log(`component_catalog viewport=${vp.name} components=${catalogComponentCount} overflow=${catalogOverflow} axe_violations=${axeViolations} screenshot=${catalogShot}`);
   }
   console.log(`component_catalog=PASS components=${catalogComponentCount} viewports=2 axe_checks=${catalogAxeChecks}`);
 
