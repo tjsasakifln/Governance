@@ -1,0 +1,12 @@
+{
+  "schema_version": "confenge.capacity_request.v1",
+  "request_id": "capacity_request_diag_canary_001",
+  "correlation_id": "corr_confenge_diag_canary_001",
+  "proposal_id": "proposal_confenge_diag_canary_001",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "deliverable_version": "v1",
+  "scope_version": "CFG-SCOPE-DIAG-EXP-v1",
+  "requested_deadline": "2026-09-15",
+  "calendar_version": "CFG-CALENDAR-SYNTHETIC-BR-2026-v1",
+  "synthetic": true
+}

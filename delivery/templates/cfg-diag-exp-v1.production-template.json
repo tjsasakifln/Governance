@@ -1,0 +1,19 @@
+{
+  "schema_version": "confenge.production_template.v1",
+  "template_id": "CFG-DIAG-EXP-SANDBOX-TEMPLATE-v1",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "version": "v1",
+  "scope_version": "CFG-SCOPE-DIAG-EXP-v1",
+  "mode": "SANDBOX_SYNTHETIC_ONLY",
+  "sections": [
+    {"section_id": "canonical_quantitative_base", "component_ref": "CFG-D02/v1"},
+    {"section_id": "executive_decision_narrative", "component_ref": "CFG-D03/v1"},
+    {"section_id": "public_buyer_map", "component_ref": "CFG-D04/v1"},
+    {"section_id": "expiring_contract_signals", "component_ref": "CFG-D05/v1"},
+    {"section_id": "competitor_panel", "component_ref": "CFG-D06/v1"},
+    {"section_id": "public_price_panel", "component_ref": "CFG-D07/v1"},
+    {"section_id": "executive_recommendations", "component_ref": "CFG-D08/v1"}
+  ],
+  "output_contract": "confenge.delivery_artifact_manifest.v1",
+  "side_effects": {"real_customer": false, "real_email": false, "real_money": false}
+}

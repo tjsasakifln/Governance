@@ -1,0 +1,1259 @@
+{
+  "generated_at": "2026-08-25T12:00:00Z",
+  "record_count": 54,
+  "records": [
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D01",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/0",
+      "registry_record_hash": "sha256:87e34d81ca43532767d0af023397c0c97dd0acc64c0d306310515e302c27c799",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D02",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/1",
+      "registry_record_hash": "sha256:8bab3bcf5de3450e01c86967ce9f66b33294ba27450b08bf045338a88213023e",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D03",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/2",
+      "registry_record_hash": "sha256:06160bda05d97e7621ea95eb62e8c7223761bfcb866ae5654997db9631cf3122",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D04",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/3",
+      "registry_record_hash": "sha256:ab491eaa1c4c567eefdee87da46716b1670ea73c17354ebca3b953036bf00a91",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D05",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/4",
+      "registry_record_hash": "sha256:5a35885291f08cd30d5e25b69e75ee1db3830da398b0fd90edb5ac28efd0cc82",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D06",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/5",
+      "registry_record_hash": "sha256:4cf7f178cb3e7905fa41610ebf18f75956fa7063badff836427c0d3bea67cbbe",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D07",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/6",
+      "registry_record_hash": "sha256:91c57c3dbf9f62970eca8dfe9c501e9ed41c4bec34ca6d27e781ddff0f5aa8f0",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#331"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D08",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#331"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/7",
+      "registry_record_hash": "sha256:ee617c9378ee33a703b6e1aa264d99adc5481f36d5fe1a302714acb957cfda35",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#332"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D09",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#332"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/8",
+      "registry_record_hash": "sha256:96ad448eb489b5da95b6dc29f3e49ad1ba265030a75b599737bbd5f5c65bb98b",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#332"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D10",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#332"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/9",
+      "registry_record_hash": "sha256:a5f881712e0d771e46d6e2f4671763c2e6839c61d9417ceebcf3fe306b90c189",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "REGISTRY_BLOCKER_REQUIRES_EVALUATION",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#332",
+            "tjsasakifln/web-cfg#156"
+          ],
+          "next_step": "evaluate the registry blocker and then materialize operational evidence",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D11",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#332",
+        "tjsasakifln/web-cfg#156"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/10",
+      "registry_record_hash": "sha256:6040f9fdf27585aa0a4dcbb50a5161e33ad2fb3125c2c242cea9a2c615dd12f8",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#330"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D12",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#330"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/11",
+      "registry_record_hash": "sha256:8f40c50014135d0bfc948bf7859bdc6eb9590a1d4a7d46b69c922e4d496b719f",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#330"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D13",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#330"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/12",
+      "registry_record_hash": "sha256:c4f925655634d2de4ae5e2f23a752ea6e5889b9f0f5f525f0ccf2c4d2379fbe0",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#330"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D14",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#330"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/13",
+      "registry_record_hash": "sha256:6e8deb2852cf47ca3d49db3698bbce6ae84621a265af55fc72bf92e2b289d65b",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#330"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D15",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#330"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/14",
+      "registry_record_hash": "sha256:ed73e2f4330256839649cc795a8b052af4e8cb13024621c6c2f89f83b404d12b",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#330"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D16",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#330"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/15",
+      "registry_record_hash": "sha256:249c0251f40bf07b07d0c3081d3e4bc2c1928db18f1d8f3261a76560208e877e",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D17",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/16",
+      "registry_record_hash": "sha256:2e4511d96e703fca0c5dee035481308ad53e5d3381952e7a55687025918f997a",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D18",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/17",
+      "registry_record_hash": "sha256:71a4ea33392d06879ca5a62ec005651bcd33b739598c363868c15358b809aa61",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D19",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/18",
+      "registry_record_hash": "sha256:77e4436d270ef85495fed8644fc8772f92632d7cf64c070815df1d7102275d43",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D20",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/19",
+      "registry_record_hash": "sha256:6f07cfc346cd99252e80a55f20055ee25321da96866a26da9d55ca710f7ce159",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D21",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/20",
+      "registry_record_hash": "sha256:4855c1fb03d6d476c2355448f2dde9650de9787db9d0aae61c3356e02be73ec8",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D22",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/21",
+      "registry_record_hash": "sha256:d853af5a637b56d0bc8a2bbcbc6e359eef81370bfd3bb64b6a8941a0ac063e2f",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#333"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D23",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#333"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/22",
+      "registry_record_hash": "sha256:67302616e7f1cffdac54b286cb99b3c135b5ddc40d685a5c475cfa4b149e08aa",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#334"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D24",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#334"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/23",
+      "registry_record_hash": "sha256:992a0eda1462356239151d4ec1731c968d08eef3713c4858220806e601828d1c",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#334"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D25",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#334"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/24",
+      "registry_record_hash": "sha256:146239f618ee30f3b5f7ca4148cf31624ea1c87943c956620207ba83bbab431a",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D26",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/25",
+      "registry_record_hash": "sha256:8c637e243681e02314d825f4346797c3ecdb44f583a7f62c472371574f8de802",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D27",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/26",
+      "registry_record_hash": "sha256:4b70f8db7fb280d2457d47f2587cb2827e1dab8ee5b3f87625d0a2d2831a134c",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D28",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/27",
+      "registry_record_hash": "sha256:31c2f59dd89e99ea3d06a7749e10c07c2e1493e3e7ecd7a11399d25d36b99353",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D29",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/28",
+      "registry_record_hash": "sha256:9a5393986782a1701057cc0740c8e73d5fefe25b0cafff2b41414ea37b102dd7",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D30",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/29",
+      "registry_record_hash": "sha256:64414e7b36f46aed1a4fac248ce173f7a327c843d4dda2c62aaef7ec426bd7da",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D31",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/30",
+      "registry_record_hash": "sha256:0bf9d53c6d9364ed942c841cd8b4e9b13f57d13f4423ff694f8d99e1111c0764",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D32",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/31",
+      "registry_record_hash": "sha256:ffa19c727f3d914046b4ca3ff052f2d3a6cd9d4aebce1c9f1a3b7e6d2f7da824",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D33",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/32",
+      "registry_record_hash": "sha256:7d7cd96cedefd9e1281cbc03754186537460f21eeb22aab51eac2cdc8bf7205e",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D34",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/33",
+      "registry_record_hash": "sha256:54988c6680d854706e06628076fc1ab3aaf595f87379232825b9075626efb4d9",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D35",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/34",
+      "registry_record_hash": "sha256:b8733615e5d1b173ec5f7a8089062bcf52887769400fac83cec704365a86e575",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D36",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/35",
+      "registry_record_hash": "sha256:4b43efdca6839aa5fe26bc7816bf6cc4aa583dc3a39ab66c6ac545fddc7630d8",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D37",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/36",
+      "registry_record_hash": "sha256:c3f3520d7a7b33aa0b2cb561892fb07636adbae1c205c70fe86fa3068f299141",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D38",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/37",
+      "registry_record_hash": "sha256:7199abee7ba8823021fac1ad2e566facdfb1dc7fc284912a49ca910464ade479",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#340"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D39",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#340"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/38",
+      "registry_record_hash": "sha256:fa3e57f0cc72e07fbdd62d5121f7300a7957fc2386fdca0bb43ef5c12bb7a863",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#339"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D40",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#339"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/39",
+      "registry_record_hash": "sha256:69c3e2ab26029e9e8a2c5a18949371c5f3b4534e56473263a3c35c5a619b9a65",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#339"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D41",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#339"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/40",
+      "registry_record_hash": "sha256:c21b64fda6b7d7cbe10b77879992eee30b407d2e386efcaf36501807ccfb2035",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#339"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D42",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#339"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/41",
+      "registry_record_hash": "sha256:8710f7e30d11e7adfe9f1d74361dbd6943b43737cf225e22c5e6547516f4673d",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "REGISTRY_BLOCKER_REQUIRES_EVALUATION",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#342",
+            "tjsasakifln/web-cfg#156"
+          ],
+          "next_step": "evaluate the registry blocker and then materialize operational evidence",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D43",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#342",
+        "tjsasakifln/web-cfg#156"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/42",
+      "registry_record_hash": "sha256:09bb4d6c54b839d52056b27933e400225512e182ebbbe3cdf42e48923142589f",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#342"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D44",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#342"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/43",
+      "registry_record_hash": "sha256:ab81bc75c24fe7ee7c63b273ee3408f943d7205a4044ffd8aae01f86bcd88676",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#337"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D45",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#337"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/44",
+      "registry_record_hash": "sha256:e73c0a66ac6e4895d010989381564bcc8b449fc92205483045abca48bfdf0883",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#337"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D46",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#337"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/45",
+      "registry_record_hash": "sha256:dde7364994bbb2887358100aeb0da1b32710388996fa2ed079fb576a30edaa32",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#337"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D47",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#337"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/46",
+      "registry_record_hash": "sha256:d41d7cd97f06c8491b3dc878a70c8fb24f1cdaa58ca409ede012cc2804e1db69",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#337"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D48",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#337"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/47",
+      "registry_record_hash": "sha256:51ce9b9592caf50b34de2d16e49ce56e27217de790125ad05717e46d57287985",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D49",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/48",
+      "registry_record_hash": "sha256:e57bdd60fd559f5a83e2c6939e81da746795389a6f8208dc48e14f1eb0dc7774",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D50",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/49",
+      "registry_record_hash": "sha256:10247443bfa7141f693438d90a34da15413f683632fa5c3c4836ef772edd8fb3",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D51",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/50",
+      "registry_record_hash": "sha256:6b549d351798a96e7e3cef21fc28c236af3fb85288fe1aa2f6d2cd9cd2309d79",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D52",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/51",
+      "registry_record_hash": "sha256:e4fa3c397b7e257593b0b0f57519ef0717471cb5fbd9cf7c2c8458fa35450706",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D53",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/52",
+      "registry_record_hash": "sha256:dd10014fa0187699588a6c2f7232a042197b40ea3ed5386c911cf7a546c0fcf0",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    },
+    {
+      "blockers": [
+        {
+          "code": "OPERATIONAL_EVIDENCE_UNKNOWN",
+          "evidence_refs": [
+            "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+            "tjsasakifln/web-cfg#344"
+          ],
+          "next_step": "materialize template, producer, QA, owner, effort and dependencies",
+          "owner": "tjsasakifln/Governance#122"
+        }
+      ],
+      "deliverable_id": "CFG-D54",
+      "deliverable_version": "v1",
+      "evidence_refs": [
+        "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+        "tjsasakifln/web-cfg#344"
+      ],
+      "readiness_state": "UNKNOWN",
+      "registry_pointer": "/deliverables/53",
+      "registry_record_hash": "sha256:6a45810d5172a81c6e34f08a3da9f0be09eb7250a113b9219de720ac36f89ee2",
+      "state_reason": "NOT_OPERATIONALLY_EVALUATED"
+    }
+  ],
+  "registry_authority": {
+    "content_hash": "sha256:b4d85f4d32244e2d27c8a68b68e02041c7621bc23060ad4046217a35f86606cc",
+    "ref": "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json",
+    "registry_version": "CFG-DELIVERABLES-2026-08-24-v1",
+    "source_revision": "6c3415cb05b3423d87592eba39d3a0ec61bde0b1"
+  },
+  "schema_version": "confenge.delivery_readiness_inventory.v1"
+}

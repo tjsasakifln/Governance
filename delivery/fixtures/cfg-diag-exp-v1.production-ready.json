@@ -1,0 +1,85 @@
+{
+  "schema_version": "confenge.delivery_readiness.v1",
+  "readiness_ref": "governance://delivery/readiness/CFG-DIAG-EXP-v1/v1",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "deliverable_version": "v1",
+  "offer_id": "CFG-DIAG-EXP-v1",
+  "offer_version": "v1",
+  "registry_ref": "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
+  "registry_hash": "sha256:b4d85f4d32244e2d27c8a68b68e02041c7621bc23060ad4046217a35f86606cc",
+  "scope": {
+    "version": "CFG-SCOPE-DIAG-EXP-v1",
+    "definition_ref": "commercial/legal/founder-approved-v1/TERMOS_B2B_DIAGNOSTICO.md#3-entregaveis",
+    "component_refs": ["CFG-D02/v1", "CFG-D03/v1", "CFG-D04/v1", "CFG-D05/v1", "CFG-D06/v1", "CFG-D07/v1", "CFG-D08/v1"]
+  },
+  "price_version": "CFG-OFFER-CATALOG-v1",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "inputs_required": [
+    {"input_id": "organization_identity_ref", "required": true, "storage": "REFERENCE_ONLY"},
+    {"input_id": "expansion_scope_ref", "required": true, "storage": "REFERENCE_ONLY"},
+    {"input_id": "public_portfolio_ref", "required": true, "storage": "REFERENCE_ONLY"},
+    {"input_id": "data_use_authorization_ref", "required": true, "storage": "REFERENCE_ONLY"},
+    {"input_id": "operational_channel_ref", "required": true, "storage": "REFERENCE_ONLY"}
+  ],
+  "exclusions": [
+    "field_due_diligence",
+    "ART_or_RRT",
+    "complete_budget",
+    "construction_execution",
+    "financial_guarantee",
+    "legal_opinion",
+    "accounting_opinion",
+    "public_agent_contact_or_representation",
+    "guaranteed_procurement_or_revenue_outcome"
+  ],
+  "public_source_refs": [
+    "github://tjsasakifln/extra-cli@eb2b9c4b3532d17cbc09975dd0b7da66a25060b9/config/source_applicability.yaml",
+    "github://tjsasakifln/extra-cli@eb2b9c4b3532d17cbc09975dd0b7da66a25060b9/docs/contracts/public-read-v1.md"
+  ],
+  "producer": {
+    "producer_id": "CFG-DIAG-EXP-SANDBOX-PRODUCER",
+    "version": "v1",
+    "implementation_ref": "delivery/production/cfg_diag_exp.py:produce_sandbox_artifact",
+    "workflow_ref": "delivery/templates/cfg-diag-exp-v1.production-template.json",
+    "mode": "SANDBOX_SYNTHETIC_ONLY"
+  },
+  "production_template_ref": "delivery/templates/cfg-diag-exp-v1.production-template.json",
+  "qa": {
+    "checklist_ref": "delivery/qa/cfg-diag-exp-v1.qa-checklist.json",
+    "implementation_ref": "delivery/production/cfg_diag_exp.py:run_qa",
+    "version": "v1"
+  },
+  "responsible_owner": {
+    "owner_id": "CFG-DELIVERY-CANARY-OWNER-01",
+    "owner_type": "SYNTHETIC_DELIVERY_OWNER",
+    "synthetic": true
+  },
+  "estimated_effort": {
+    "amount": 1,
+    "unit": "delivery_slot",
+    "lead_time_business_days": 10,
+    "basis": "SYNTHETIC_CANARY_UNIT"
+  },
+  "dependencies": [
+    {"dependency_id": "WEB_CFG_REGISTRY_PIN", "state": "AVAILABLE", "evidence_ref": "sha256:b4d85f4d32244e2d27c8a68b68e02041c7621bc23060ad4046217a35f86606cc"},
+    {"dependency_id": "FOUNDER_APPROVED_SCOPE", "state": "AVAILABLE", "evidence_ref": "commercial/legal/founder-approved-v1/manifest.json"},
+    {"dependency_id": "PUBLIC_SOURCE_CONTRACTS", "state": "AVAILABLE", "evidence_ref": "github://tjsasakifln/extra-cli@eb2b9c4b3532d17cbc09975dd0b7da66a25060b9/docs/contracts/public-read-v1.md"},
+    {"dependency_id": "SANDBOX_PRODUCER_AND_QA", "state": "AVAILABLE", "evidence_ref": "tests/test_delivery_readiness.py"}
+  ],
+  "blockers": [],
+  "readiness_state": "PRODUCTION_READY",
+  "state_reason": "SANDBOX_PRODUCTION_PATH_MATERIALIZED",
+  "canary_ref": null,
+  "tests": ["tests/test_delivery_readiness.py", "tests/test_delivery_canary_gate.py"],
+  "evidence_refs": [
+    "commercial/legal/founder-approved-v1/manifest.json",
+    "delivery/templates/cfg-diag-exp-v1.production-template.json",
+    "delivery/qa/cfg-diag-exp-v1.qa-checklist.json",
+    "delivery/production/cfg_diag_exp.py"
+  ],
+  "freshness": {
+    "evaluated_at": "2026-08-25T12:00:00Z",
+    "expires_at": "2026-12-31T23:59:59Z"
+  },
+  "constraints": {"synthetic_only": true, "real_customer": false, "real_email": false, "real_money": false}
+}
