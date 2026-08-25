@@ -9,5 +9,6 @@ users:
     email: "${CC_OPERATOR_EMAIL}"
     groups:
       - operators
-      # Bulk reconciliation is separated from routine review at the edge.
+      # Deliberate authority boundary: operators APPROVE and therefore queue;
+      # admins may run the explicit reconciliation repair.
       - admins

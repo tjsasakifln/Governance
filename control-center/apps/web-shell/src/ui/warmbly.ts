@@ -6,10 +6,9 @@
  * control here and there must never be one — this surface can stop outbound and
  * let it flow again, and that is the whole of its authority.
  *
- * The cohort dispatch that hands a GO'd cohort to Warmbly's queue lives in the
- * Revisão surface further down this module, behind a registered GO, the
- * `admins` group and a typed version confirmation. It enqueues; it does not
- * send, and it is deliberately not one of the three controls above.
+ * Candidate APPROVE lives in Revisão and is the complete per-message scheduling
+ * authority. It queues with auto_send=true for that message; only Warmbly's
+ * worker transports later, under the controls shown here.
  *
  * Everything an operator needs to decide is rendered *before* the controls:
  * dispatch state, why it is in that state, the commercial window, the approved
@@ -244,21 +243,15 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
   },
   approval_acknowledgement_required: {
     kind: "refused",
-    title: "Recusada: APPROVE exige a ciência marcada",
+    title: "Recusada: APPROVE chegou sem a ciência obrigatória",
     recovery:
-      "Aprovar é assumir que você leu destinatário, mensagem exata, policy e evidência desta versão. Marque a ciência e aprove de novo. HOLD e REJECT não pedem essa marcação.",
-  },
-  cohort_version_confirmation_required: {
-    kind: "refused",
-    title: "Recusada: falta a confirmação digitada da versão",
-    recovery:
-      "GO/NO-GO exige digitar a versão imutável (por exemplo v1). Nada foi decidido.",
+      "O clique em “Aprovar e enfileirar” é a ciência sobre destinatário, mensagem exata, policy e evidência, e deve carregar acknowledged=true. Recarregue a tela; se persistir, é defeito do Control Center. HOLD e REJECT não carregam essa ciência.",
   },
   insufficient_human_gate_role: {
     kind: "refused",
     title: "Recusada: sua sessão não tem a autoridade necessária",
     recovery:
-      "Revisar exige o grupo operators; registrar GO/NO-GO exige admins. Nada foi aplicado. Peça a inclusão no grupo no Authelia e reautentique antes de repetir.",
+      "Aprovar e enfileirar exige operators; reprocessar aprovações antigas exige admins. Nada foi aplicado. Peça a inclusão no grupo no Authelia e reautentique antes de repetir.",
   },
   idempotency_key_required: {
     kind: "refused",
@@ -306,7 +299,7 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     kind: "refused",
     title: "Recusada: há autoridade bounded ativa para esta cohort",
     recovery:
-      "Uma cohort com GO ativo não pode ter conteúdo ajustado. Registre NO-GO para revogar a autoridade e só então ajuste. Nada foi alterado.",
+      "Esta versão ainda carrega uma autoridade histórica ativa. O endpoint antigo de GO/NO-GO não existe mais: trate a revogação operacional no Warmbly antes de ajustar. Nada foi alterado.",
   },
   immutable_field: {
     kind: "refused",
@@ -343,53 +336,6 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     title: "Recusada: o destinatário foi verificado agora e não voltou VALID",
     recovery:
       "A verificação foi feita nesta ação e o APPROVE não foi enviado, então nada foi decidido. O Warmbly recusa aprovação fora de uma validação VALID: registre HOLD ou REJECT, ou corrija a origem do contato e recomponha.",
-  },
-  /* ---------------------------------------------------------------- *
-   * Entrega da cohort à fila do Warmbly. Os códigos abaixo são os do
-   * próprio Warmbly: cada um é um portão diferente e manda o operador
-   * para um lugar diferente.
-   * ---------------------------------------------------------------- */
-  auto_send_forbidden: {
-    kind: "refused",
-    title: "Recusada: auto-send está ligado no Warmbly",
-    recovery:
-      "O Warmbly recusa entregar uma cohort controlada enquanto auto-send estiver ligado, e nada foi enfileirado. Isto é configuração do Warmbly, não do operador: desligue auto-send lá antes de disparar por aqui.",
-  },
-  green_autorun_forbidden: {
-    kind: "refused",
-    title: "Recusada: green autorun está ligado no Warmbly",
-    recovery:
-      "Nada foi enfileirado. Autorun e cohort controlada são excludentes: desligue o autorun no Warmbly antes de disparar por aqui.",
-  },
-  sending_paused: {
-    kind: "refused",
-    title: "Recusada: o disparo de saída está pausado",
-    recovery:
-      "Nada foi enfileirado. Retome o disparo em Operação segura — a retomada é de dois passos e mostra o resumo de impacto — e dispare a cohort em seguida.",
-  },
-  kill_switch_engaged: {
-    kind: "refused",
-    title: "Recusada: o kill switch de arquivo está acionado",
-    recovery:
-      `Nada foi enfileirado. O kill switch fica fora deste canal por construção: remova-o na VPS (${OUT_OF_BAND_PAUSE_FALLBACK} documenta o caminho) e dispare de novo depois.`,
-  },
-  cohort_grant_revoked: {
-    kind: "refused",
-    title: "Recusada: a autoridade desta cohort foi revogada",
-    recovery:
-      "Um NO_GO revogou a autoridade bounded desta versão e nada foi enfileirado. Registre GO de novo, ou prepare uma versão nova, antes de disparar.",
-  },
-  cohort_grant_expired: {
-    kind: "refused",
-    title: "Recusada: a autoridade desta cohort venceu",
-    recovery:
-      "A autoridade bounded tem prazo e o dela passou; nada foi enfileirado. Registre GO de novo nesta versão para obter uma autoridade vigente.",
-  },
-  cohort_grant_missing: {
-    kind: "refused",
-    title: "Recusada: esta versão não tem autoridade bounded",
-    recovery:
-      "Disparar exige um GO registrado nesta versão exata. Nada foi enfileirado: registre GO e dispare em seguida.",
   },
   adjust_route_unavailable: {
     kind: "refused",
@@ -525,10 +471,8 @@ const GATE_ACTION_LABELS: Record<string, string> = {
   reproduce: "reproduzir versão imutável",
   validate: "verificar destinatário",
   review: "registrar decisão de revisão",
-  reconcile: "reconciliar aprovações com a fila",
-  decide: "registrar GO/NO-GO",
   adjust: "ajustar assunto e corpo",
-  dispatch: "entregar a cohort à fila de envio",
+  reconcile: "reprocessar aprovações já registradas",
 };
 
 const READBACK_LABELS: Record<string, string> = {
@@ -546,7 +490,7 @@ const READBACK_LABELS: Record<string, string> = {
  * Operation, Cohorts and Revisão share it deliberately. Three copies of this
  * block would drift, and the surfaces that never had one — Cohorts and Revisão —
  * are exactly where an operator was left with no success, no refusal, no code
- * and no next move after every create, review and GO.
+ * and no next move after every create, review and reconciliation.
  */
 export function writeResultBlock(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
@@ -608,7 +552,6 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
           ? `<dl class="facts" data-server-diff="true">${diffRows}</dl>`
           : ""
       }
-      ${dispatchCounters(result.dispatch)}
       ${reconcileCounters(result.reconcile)}
       ${technicalDetails(
         [
@@ -627,60 +570,35 @@ export function writeResultBlock(result: AdapterWriteResult | undefined): string
     </article>`;
 }
 
-function reconcileCounters(counts: AdapterWriteResult["reconcile"]): string {
-  if (!counts) return "";
-  const row = (label: string, value: number | undefined): string =>
-    value === undefined ? fact(label, NOT_IN_PAYLOAD) : fact(label, String(value));
-  const failures = (counts.failures ?? [])
-    .map((entry) => `<div data-reconcile-failure="${escapeHtml(entry.reason)}"><dt>${escapeHtml(entry.cohortVersionId || entry.candidateId || "registro não identificado")}</dt><dd>${escapeHtml(entry.reason || "motivo não informado pelo servidor")}</dd></div>`)
-    .join("");
-  return `<dl class="facts" data-reconcile-counts="true">
-    ${row("Registros APPROVE", counts.approvalRecords)}
-    ${row("Bindings APPROVE vigentes", counts.latestApprovedBindings)}
-    ${row("Candidatos aprovados únicos", counts.uniqueApprovedCandidates)}
-    ${row("Agendados agora", counts.scheduled)}
-    ${row("Já agendados", counts.alreadyScheduled)}
-    ${row("Falharam", counts.failed)}
-  </dl><p class="constraint" data-reconcile-not-sent="true">Reconciliação cria ou confirma trabalho na fila; não envia e não retoma o disparo.</p>${failures ? `<dl class="facts" data-reconcile-failures="true">${failures}</dl>` : ""}`;
-}
-
 /**
- * What a bounded dispatch actually queued, straight from Warmbly's counters.
+ * What approval reconciliation actually repaired, straight from Warmbly.
  *
- * "Executada" is not an answer here: ten attempted with ten accepted and ten
- * attempted with nine blocked are the same HTTP 200 and completely different
- * operational facts. A counter the server did not send renders as absent rather
- * than as zero, and every per-mailbox failure the server named is listed.
+ * "Executada" is not an answer here: six historical review rows, five latest
+ * approved bindings and three deduplicated messages are different facts. A
+ * counter the server did not send renders as absent rather than as zero, and
+ * every candidate failure the server named is listed.
  */
-function dispatchCounters(counts: AdapterWriteResult["dispatch"]): string {
+function reconcileCounters(counts: AdapterWriteResult["reconcile"]): string {
   if (!counts) return "";
   const row = (label: string, value: number | undefined): string =>
     value === undefined ? fact(label, NOT_IN_PAYLOAD) : fact(label, String(value));
   const failures = (counts.failures ?? [])
     .map(
       (entry) =>
-        `<div data-dispatch-failure="${escapeHtml(entry.reason)}"><dt>${escapeHtml(entry.mailbox || "destinatário não nomeado")}</dt><dd>${escapeHtml(entry.reason || "motivo não informado pelo servidor")}</dd></div>`,
+        `<div data-reconcile-failure="${escapeHtml(entry.reason)}"><dt>${escapeHtml(entry.cohortId || entry.candidateId || "registro não identificado")}</dt><dd>${escapeHtml(entry.reason || "motivo não informado pelo servidor")}</dd></div>`,
     )
     .join("");
   return `
-      <dl class="facts" data-dispatch-counts="true">
-        ${row("Tentados", counts.attempted)}
-        ${row("Aceitos pelo provedor", counts.accepted)}
+      <dl class="facts" data-reconcile-counts="true">
+        ${row("Registros APPROVE no histórico", counts.approvalRecords)}
+        ${row("Vínculos com APPROVE mais recente", counts.latestApprovedBindings)}
+        ${row("Candidatos únicos aprovados", counts.uniqueApprovedCandidates)}
+        ${row("Agendados agora", counts.scheduled)}
+        ${row("Já agendados", counts.alreadyScheduled)}
         ${row("Falharam", counts.failed)}
-        ${row("Pulados por duplicidade", counts.skippedDuplicate)}
-        ${row("Bloqueados", counts.blocked)}
-        ${row("Teto diário da autoridade", counts.maxDaily)}
-        ${
-          counts.killSwitchAvailable === undefined
-            ? ""
-            : fact(
-                "Kill switch disponível",
-                counts.killSwitchAvailable ? "sim" : "não — pare o outbound fora de banda se precisar",
-              )
-        }
       </dl>
-      <p class="constraint" data-dispatch-not-sent="true">Estes números são de enfileiramento, não de entrega. O envio acontece depois, pelo worker do Warmbly, dentro da janela comercial.</p>
-      ${failures ? `<dl class="facts" data-dispatch-failures="true">${failures}</dl>` : ""}`;
+      <p class="constraint" data-reconcile-not-sent="true">Reconciliação cria ou confirma trabalho na fila; não envia nem transporta e-mail. Ela usa o mesmo agendamento do APPROVE, e o worker decide a saída depois.</p>
+      ${failures ? `<dl class="facts" data-reconcile-failures="true">${failures}</dl>` : ""}`;
 }
 
 /** The "enviando…" state. A control with no pending state invites a second click. */
@@ -1005,6 +923,50 @@ function gateSection(input: WarmblySurfaceInput, key: "list" | "selected"): Gate
   };
 }
 
+/** Server-owned outbound block, rendered before any review work. */
+function outboundStatusBlock(input: WarmblySurfaceInput): string {
+  const gate = record(input.gate);
+  const status = typeof gate.outbound_status_status === "string"
+    ? gate.outbound_status_status
+    : Object.keys(record(gate.outbound_status)).length > 0
+      ? "read"
+      : "absent";
+  const detail = typeof gate.outbound_status_detail === "string" ? gate.outbound_status_detail : "";
+  const data = record(gate.outbound_status);
+  if (status !== "read") {
+    return `<article class="card banner error" role="alert" data-outbound-status="${escapeHtml(status)}">
+      <h3>Bloqueio de outbound não pôde ser lido antes da revisão</h3>
+      <p>${escapeHtml(detail || "O servidor não devolveu o status neste carregamento.")} Aprovar ainda pode enfileirar; esta tela não afirma que a mensagem poderá sair.</p>
+    </article>`;
+  }
+  const killSwitch = typeof data.kill_switch === "boolean" ? data.kill_switch : undefined;
+  const sendingAllowed = typeof data.sending_allowed === "boolean" ? data.sending_allowed : undefined;
+  const globalAutoSend = typeof data.auto_send_enabled === "boolean" ? data.auto_send_enabled : undefined;
+  const blocked = killSwitch === true || sendingAllowed === false || globalAutoSend === true;
+  if (blocked) {
+    return `<article class="card banner error" role="alert" data-outbound-status="blocked" data-kill-switch="${killSwitch === undefined ? "unknown" : String(killSwitch)}">
+      <p class="kicker"><span class="pill error">OUTBOUND BLOQUEADO</span></p>
+      <h3>APPROVE enfileira, mas nenhuma mensagem sai enquanto este bloqueio durar</h3>
+      <p>O Warmbly reporta um bloqueio ou configuração global incompatível antes desta revisão. Aprovar grava <code>auto_send=true</code> na mensagem e agenda a próxima janela comercial; o worker continuará impedido de transportá-la.</p>
+      <dl class="facts">
+        ${fact("Kill switch reportado", killSwitch === undefined ? NOT_IN_PAYLOAD : killSwitch ? "acionado" : "não acionado")}
+        ${fact("Envio permitido pelo servidor", sendingAllowed === undefined ? NOT_IN_PAYLOAD : sendingAllowed ? "sim" : "não")}
+        ${fact("Auto-send global", globalAutoSend === undefined ? NOT_IN_PAYLOAD : globalAutoSend ? "ligado — configuração inválida" : "desligado (esperado)")}
+      </dl>
+    </article>`;
+  }
+  if (killSwitch === undefined || sendingAllowed === undefined) {
+    return `<article class="card banner stale" role="alert" data-outbound-status="unknown">
+      <h3>Servidor não informou todo o estado de outbound</h3>
+      <p>Ausência não é zero nem “liberado”. APPROVE enfileira com auto_send por mensagem, mas confira o status do Warmbly antes de esperar transporte.</p>
+    </article>`;
+  }
+  return `<article class="card banner ok" role="status" data-outbound-status="allowed">
+    <h3>Outbound liberado pelo servidor neste instante</h3>
+    <p>APPROVE enfileira com auto_send por mensagem. O worker ainda decide janela comercial, teto por hora e todos os gates de última milha.</p>
+  </article>`;
+}
+
 function cohortRows(input: WarmblySurfaceInput): Record<string, unknown>[] {
   return array(gateSection(input, "list").data.data);
 }
@@ -1042,8 +1004,8 @@ function gateUnreadableBanner(section: GateSection, what: string): string {
  * ------------------------------------------------------------------ */
 
 const CAPABILITY_LABELS: Record<string, string> = {
-  operators: "revisar candidatos, criar e reproduzir cohorts, pedir verificação",
-  admins: "registrar GO/NO-GO (autoridade bounded)",
+  operators: "revisar candidatos; APPROVE enfileira com auto_send por mensagem",
+  admins: "reprocessar aprovações já registradas (reparo idempotente)",
 };
 
 export interface OperatorAuthority {
@@ -1051,7 +1013,7 @@ export interface OperatorAuthority {
   known: boolean;
   groups: readonly string[];
   canReview: boolean;
-  canDecide: boolean;
+  canReconcile: boolean;
 }
 
 /**
@@ -1066,7 +1028,9 @@ export function operatorAuthority(input: WarmblySurfaceInput): OperatorAuthority
   const actor =
     record(record(gate.list).edge_actor).groups !== undefined
       ? record(record(gate.list).edge_actor)
-      : record(record(gate.selected).edge_actor);
+      : record(record(gate.selected).edge_actor).groups !== undefined
+        ? record(record(gate.selected).edge_actor)
+        : record(record(gate.outbound_status).edge_actor);
   const groups = Array.isArray(actor.groups)
     ? actor.groups.filter((group): group is string => typeof group === "string")
     : [];
@@ -1075,7 +1039,7 @@ export function operatorAuthority(input: WarmblySurfaceInput): OperatorAuthority
     known,
     groups,
     canReview: groups.includes("operators"),
-    canDecide: groups.includes("admins"),
+    canReconcile: groups.includes("admins"),
   };
 }
 
@@ -1095,7 +1059,7 @@ function identityBlock(input: WarmblySurfaceInput, directScheduling = false): st
           .map((group) => {
             const currentLabel = directScheduling
               ? group === "operators"
-                ? "revisar e aprovar candidatos, criar e reproduzir cohorts, pedir verificação"
+                ? "revisar candidatos — APPROVE enfileira para envio futuro —, criar e reproduzir cohorts, pedir verificação"
                 : group === "admins"
                   ? "reconciliar aprovações antigas com a fila"
                   : undefined
@@ -1106,8 +1070,8 @@ function identityBlock(input: WarmblySurfaceInput, directScheduling = false): st
       : "nenhum grupo efetivo — esta sessão não pode escrever no gate"
     : NOT_IN_PAYLOAD;
   return `
-    <article class="card" data-operator-identity="true" data-can-review="${authority.canReview ? "true" : "false"}" data-can-decide="${authority.canDecide ? "true" : "false"}">
-      <p class="kicker"><span class="pill">${escapeHtml(authority.canDecide ? "admins" : authority.canReview ? "operators" : "sem autoridade de escrita")}</span></p>
+    <article class="card" data-operator-identity="true" data-can-review="${authority.canReview ? "true" : "false"}" data-can-reconcile="${authority.canReconcile ? "true" : "false"}">
+      <p class="kicker"><span class="pill">${escapeHtml(authority.canReview ? "operators" : authority.canReconcile ? "admins (somente reparo)" : "sem autoridade de escrita")}</span></p>
       <h3>Quem você é nesta tela</h3>
       <dl class="facts">
         ${fact("Operador", name)}
@@ -1160,8 +1124,16 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
   const readable = list.status === "read";
   const candidates = array(cohort?.candidates);
   const validations = candidates.map((candidate) => show(record(candidate.validation).status));
-  const reviews = candidates.map((candidate) => show(record(candidate.review).decision));
-  const decision = show(record(cohort?.decision).decision);
+  const approved = candidates.filter((candidate) => {
+    const review = record(candidate.review);
+    return review.decision === "APPROVE" && review.effective === true;
+  });
+  const scheduled = approved.filter((candidate) => {
+    const scheduling = record(candidate.scheduling);
+    return scheduling.auto_send === true
+      && ["QUEUED", "SENT"].includes(show(scheduling.state))
+      && Boolean(scheduling.due_at);
+  });
   const unknownStep = (id: string, label: string, detail: string): StepView => ({
     id,
     label,
@@ -1174,69 +1146,14 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
       unknownStep("cohort", "Cohort", "O gate não pôde ser lido neste carregamento."),
       unknownStep("validacao", "Validação", "O gate não pôde ser lido neste carregamento."),
       unknownStep("revisao", "Revisão", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("go", "GO", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("handoff", "Handoff", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("agendamento", "Agendamento", "O gate não pôde ser lido neste carregamento."),
     ];
   }
   const hasCohort = cohort !== undefined && Object.keys(cohort).length > 0;
   const source = hasCohort ? show(cohort.source) : "—";
   const freshness = hasCohort ? show(cohort.freshness) : "—";
-  const decided = decision === "GO" || decision === "NO_GO";
   const validationPending = validations.filter((status) => status !== "VALID").length;
-  const reviewPending = reviews.filter((decisionValue) => decisionValue !== "APPROVE").length;
-  const directScheduling = candidates.some((candidate) =>
-    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
-  );
-  const scheduled = candidates.filter((candidate) => {
-    const scheduling = record(candidate.scheduling);
-    return typeof scheduling.touchpoint_id === "string"
-      && scheduling.auto_send === true
-      && !scheduling.invalidated_at;
-  }).length;
-  if (directScheduling) {
-    return [
-      {
-        id: "fonte",
-        label: "Fonte",
-        state: hasCohort ? "done" : "pending",
-        detail: hasCohort
-          ? `Origem ${source}, freshness ${freshness}, as_of ${show(cohort.as_of)}.`
-          : "Nenhuma cohort listada pelo servidor.",
-      },
-      {
-        id: "cohort",
-        label: "Cohort",
-        state: hasCohort ? "done" : "current",
-        detail: hasCohort
-          ? `v${show(cohort.version)} congelada com ${candidates.length} candidato(s) no payload.`
-          : "Crie uma cohort pequena (1–10) em Cohorts para começar.",
-      },
-      {
-        id: "validacao",
-        label: "Validação",
-        state: candidates.length === 0 ? "unknown" : validationPending === 0 ? "done" : "current",
-        detail: candidates.length === 0
-          ? "O payload desta versão não trouxe candidatos."
-          : `${validations.filter((status) => status === "VALID").length} de ${candidates.length} com validação VALID segundo o servidor.`,
-      },
-      {
-        id: "revisao",
-        label: "Revisão e agendamento",
-        state: candidates.length === 0 ? "unknown" : reviewPending === 0 ? "done" : "current",
-        detail: candidates.length === 0
-          ? "O payload desta versão não trouxe candidatos."
-          : `${reviews.filter((value) => value === "APPROVE").length} de ${candidates.length} aprovados; ${scheduled} com agendamento efetivo segundo o servidor.`,
-      },
-      {
-        id: "fila",
-        label: "Fila do Warmbly",
-        state: candidates.length === 0 ? "unknown" : scheduled === candidates.length ? "done" : "pending",
-        detail: candidates.length === 0
-          ? "O payload desta versão não trouxe candidatos."
-          : `${scheduled} de ${candidates.length} estão na fila. O worker respeita pausa, janela comercial e teto por hora.`,
-      },
-    ];
-  }
+  const reviewPending = candidates.length - approved.length;
   return [
     {
       id: "fonte",
@@ -1282,26 +1199,21 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
       detail:
         !hasCohort || candidates.length === 0
           ? "O payload desta versão não trouxe candidatos."
-          : `${reviews.filter((value) => value === "APPROVE").length} de ${candidates.length} aprovados segundo o servidor.`,
+          : `${approved.length} de ${candidates.length} com APPROVE efetivo segundo o servidor. Aprovar é autoridade para enfileirar.`,
     },
     {
-      id: "go",
-      label: "GO",
-      state: decided ? "done" : hasCohort ? "pending" : "pending",
-      detail: decided
-        ? `Decisão final registrada: ${decision}.`
-        : hasCohort
-          ? "Nenhuma decisão final registrada nesta versão."
-          : "Sem cohort não existe GO.",
-    },
-    {
-      id: "handoff",
-      label: "Handoff",
-      state: decision === "GO" ? "current" : "pending",
-      detail:
-        decision === "GO"
-          ? "GO cria a autoridade bounded. Ele não enfileira, não envia e não liga auto-send."
-          : "O handoff só existe depois de um GO registrado.",
+      id: "agendamento",
+      label: "Agendamento",
+      state: !hasCohort
+        ? "pending"
+        : approved.length === 0
+          ? "pending"
+          : scheduled.length === approved.length
+            ? "done"
+            : "current",
+      detail: !hasCohort
+        ? "Sem cohort não há mensagens para agendar."
+        : `${scheduled.length} de ${approved.length} aprovação(ões) efetiva(s) têm auto_send por mensagem, due_at e estado QUEUED/SENT.`,
     },
   ];
 }
@@ -1329,18 +1241,15 @@ function pilotSummary(input: WarmblySurfaceInput): string {
   const list = gateSection(input, "list");
   const latest = latestCohort(input);
   const authority = operatorAuthority(input);
-  const directScheduling = array(latest?.candidates).some((candidate) =>
-    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
-  );
   const open = latest
     ? `<p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(latest.id))}">Abrir revisão da v${escapeHtml(show(latest.version))}</a></p>`
     : `<p><a class="button" data-open-cohorts="true" href="#/warmbly/cohorts">Abrir Cohorts para criar a primeira versão</a></p>`;
   return `
     <section class="stack" aria-labelledby="warmbly-piloto" data-pilot-summary="true">
       <h2 id="warmbly-piloto">Onde o piloto está</h2>
-      <p class="constraint">${directScheduling ? "Fonte → Cohort → Validação → APPROVE → fila. O APPROVE agenda a mensagem; o worker respeita pausa, janela comercial e teto por hora." : "Fonte → Cohort → Validação → Revisão → GO → Handoff. Cada passo abaixo repete o que o servidor devolveu; nada é recontado nesta tela. GO não envia e-mail e auto-send permanece desligado."}</p>
+      <p class="constraint">Fonte → Cohort → Validação → Revisão → Agendamento. APPROVE já enfileira a mensagem com auto_send=true para ela; a automação global continua desligada. Cada passo abaixo repete o servidor.</p>
       ${gateUnreadableBanner(list, "a lista de cohorts")}
-      ${identityBlock(input, directScheduling)}
+      ${identityBlock(input, true)}
       ${stepperBlock(input)}
       ${
         latest
@@ -1350,21 +1259,21 @@ function pilotSummary(input: WarmblySurfaceInput): string {
               <dl class="facts">
                 ${fact("Identificador da versão", show(latest.id))}
                 ${fact("as_of", show(latest.as_of))}
-                ${directScheduling ? "" : fact("Decisão final", fromPayload(record(latest.decision).decision))}
+                ${fact("GO/NO-GO histórico", fromPayload(record(latest.decision).decision))}
                 ${fact("Destinatários finais no preview", fromPayload(record(record(latest.manifest).preview).recipients_final))}
               </dl>
               ${open}
             </article>`
           : list.status === "read"
-            ? `<article class="card" data-latest-cohort="none"><h3>Nenhuma cohort listada</h3><p>O servidor respondeu e não listou nenhuma versão. Uma cohort vazia nunca pode receber GO.</p>${open}</article>`
+            ? `<article class="card" data-latest-cohort="none"><h3>Nenhuma cohort listada</h3><p>O servidor respondeu e não listou nenhuma versão para revisão.</p>${open}</article>`
             : open
       }
       ${
-        authority.canDecide || directScheduling
+        authority.canReconcile
           ? ""
-          : `<p class="constraint" data-go-authority="absent">Registrar GO/NO-GO exige o grupo <code>admins</code> no Authelia. Sua sessão ${
+          : `<p class="constraint" data-reconcile-authority="absent">O reparo “Reprocessar aprovações” exige <code>admins</code>. Sua sessão ${
               authority.known ? "não tem esse grupo" : "não teve os grupos confirmados pelo canal"
-            }: revisar continua permitido, e o controle de GO aparece desabilitado com o motivo na Revisão.</p>`
+            }: o fluxo normal continua sendo APPROVE por <code>operators</code>, sem passo extra.</p>`
       }
     </section>`;
 }
@@ -1581,26 +1490,17 @@ export function approvalGate(candidate: Record<string, unknown>): ApprovalGate {
 function cohortSurface(input: WarmblySurfaceInput): string {
   const params = new URLSearchParams(input.query ?? "");
   const freshness = params.get("freshness") ?? "all";
-  const decisionFilter = params.get("decision") ?? "all";
   const list = gateSection(input, "list");
   const authority = operatorAuthority(input);
   const feedback = feedbackRouter(input.operatorResult);
   const allCohorts = cohortRows(input);
-  const directScheduling = allCohorts.some((cohort) =>
-    array(cohort.candidates).some((candidate) =>
-      Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
-    ),
+  const cohorts = allCohorts.filter(
+    (cohort) => freshness === "all" || show(cohort.freshness) === freshness,
   );
-  const cohorts = allCohorts.filter((cohort) => {
-    const decision = show(record(cohort.decision).decision);
-    return (freshness === "all" || show(cohort.freshness) === freshness)
-      && (decisionFilter === "all" || decision === decisionFilter);
-  });
   const rows = cohorts.map((cohort) => {
     const preview = record(record(cohort.manifest).preview);
-    const decision = record(cohort.decision);
     const id = show(cohort.id);
-    return `<tr data-cohort-row="${escapeHtml(id)}"><td><a href="#/warmbly/revisao?resource=${escapeHtml(id)}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(fromPayload(preview.accounts_considered))}</td><td>${escapeHtml(fromPayload(preview.accounts_eligible))}</td><td>${escapeHtml(fromPayload(preview.accounts_excluded))}</td><td>${escapeHtml(fromPayload(preview.recipients_final))}</td><td>${escapeHtml(fromPayload(decision.decision))}</td><td><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(id)}">Abrir revisão</a></td></tr>`;
+    return `<tr data-cohort-row="${escapeHtml(id)}"><td><a href="#/warmbly/revisao?resource=${escapeHtml(id)}">v${escapeHtml(show(cohort.version))}</a></td><td>${escapeHtml(show(cohort.freshness))}</td><td>${escapeHtml(fromPayload(preview.accounts_considered))}</td><td>${escapeHtml(fromPayload(preview.accounts_eligible))}</td><td>${escapeHtml(fromPayload(preview.accounts_excluded))}</td><td>${escapeHtml(fromPayload(preview.recipients_final))}</td><td><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(id)}">Abrir revisão</a></td></tr>`;
   }).join("");
   const currentSelection = record(allCohorts[0]?.selection);
   const selectionProgress = Object.keys(currentSelection).length > 0
@@ -1619,22 +1519,14 @@ function cohortSurface(input: WarmblySurfaceInput): string {
   }).join("");
   const createKey = "create:next-unclaimed";
   const recoverKey = "create:recover-prior";
-  const reconcileKey = "reconcile:approved";
   const createPending = gateInFlight(createKey);
   const recoverPending = gateInFlight(recoverKey);
-  const reconcilePending = gateInFlight(reconcileKey);
-  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. O auto-send global permanece OFF; somente uma aprovação humana efetiva pode agendar o próprio touchpoint.</p>
+  return `<section class="stack" aria-labelledby="cohorts-title"><h2 id="cohorts-title">Cohorts versionadas</h2><p class="constraint">Denominadores vêm do preview Warmbly: considerados = elegíveis + excluídos e destinatários finais nunca são recalculados nesta tela. A automação global permanece desligada; cada APPROVE agenda somente sua mensagem com <code>auto_send=true</code>.</p>
   ${gateUnreadableBanner(list, "a lista de cohorts")}
   ${feedback.remainder()}
-  ${identityBlock(input, directScheduling)}
+  ${identityBlock(input, true)}
   ${selectionProgress}
-  ${reconcilePending ? pendingBlock("Reconciliando aprovações já registradas") : ""}
-  <form class="operator-form" data-human-gate="reconcile" data-gate-key="${escapeHtml(reconcileKey)}"><button type="submit"${reconcilePending || !authority.canDecide ? " disabled" : ""}>${reconcilePending ? "Enviando…" : "Reconciliar aprovações antigas com a fila"}</button><p class="constraint">Execute antes de ampliar o backlog. O Warmbly agenda de forma idempotente os APPROVEs duráveis ainda sem fila; não envia nada e não retoma o disparo.</p>${
-    authority.canDecide
-      ? ""
-      : `<p class="constraint" data-blocked-reason="reconcile">Reconciliar em lote exige o grupo <code>admins</code> no Authelia.</p>`
-  }</form>
-  <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label><label>Decisão<select name="decision"><option value="all">Todas</option><option value="GO"${decisionFilter === "GO" ? " selected" : ""}>GO</option><option value="NO_GO"${decisionFilter === "NO_GO" ? " selected" : ""}>NO_GO</option></select></label></form>
+  <form class="filters" data-human-gate-filters="cohorts"><label>Freshness<select name="freshness"><option value="all">Todos</option><option value="FRESH"${freshness === "FRESH" ? " selected" : ""}>FRESH</option><option value="STALE"${freshness === "STALE" ? " selected" : ""}>STALE</option></select></label></form>
   ${createPending ? pendingBlock("Criando a cohort congelada") : ""}
   <form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(createKey)}"><input type="hidden" name="selection_mode" value="NEXT_UNCLAIMED"><label>Próxima cohort (1–10)<input name="limit" type="number" min="1" max="10" value="10" required></label><button type="submit"${createPending || !authority.canReview ? " disabled" : ""}>${createPending ? "Enviando…" : "Criar próxima cohort sem repetição"}</button>${
     authority.canReview
@@ -1642,7 +1534,7 @@ function cohortSurface(input: WarmblySurfaceInput): string {
       : `<p class="constraint" data-blocked-reason="create">Criar cohort exige o grupo <code>operators</code> no Authelia.</p>`
   }</form>
   ${recoverable.length > 0 ? `${recoverPending ? pendingBlock("Recuperando fornecedores anteriores na fonte atual") : ""}<form class="operator-form" data-human-gate="create" data-gate-key="${escapeHtml(recoverKey)}"><input type="hidden" name="selection_mode" value="RECOVER_PRIOR"><input type="hidden" name="limit" value="10"><fieldset><legend>Recuperar versões anteriores</legend>${recoveryChoices}</fieldset><button type="submit"${recoverPending || !authority.canReview ? " disabled" : ""}>${recoverPending ? "Enviando…" : "Recompor fornecedores selecionados com a fonte atual"}</button><p class="constraint">A recuperação deduplica fornecedores, relê a fonte vigente e cria textos e hashes novos. Aprovação ou agendamento anteriores não são herdados.</p></form>` : ""}
-  <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Decisão</th><th>Revisão</th></tr></thead><tbody>${rows || `<tr><td colspan="8">Nenhuma cohort ${list.status === "read" ? "listada pelo servidor" : "pôde ser lida"}. Uma cohort vazia nunca pode receber GO.</td></tr>`}</tbody></table></div></section>`;
+  <div class="table-wrap"><table><thead><tr><th>Versão</th><th>Freshness</th><th>Considerados</th><th>Elegíveis</th><th>Excluídos</th><th>Finais</th><th>Revisão</th></tr></thead><tbody>${rows || `<tr><td colspan="7">Nenhuma cohort ${list.status === "read" ? "listada pelo servidor" : "pôde ser lida"}.</td></tr>`}</tbody></table></div></section>`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1768,8 +1660,15 @@ function candidateCard(
   const review = record(candidate.review);
   const schedulingKnown = Object.prototype.hasOwnProperty.call(candidate, "scheduling");
   const scheduling = record(candidate.scheduling);
+  const reviewApproved = review.decision === "APPROVE" && review.effective === true;
   const schedulingState = textOf(scheduling.state);
+  const schedulingDueAt = textOf(scheduling.due_at);
   const schedulingInvalidated = textOf(scheduling.invalidated_at);
+  const schedulingConfirmed =
+    reviewApproved
+    && scheduling.auto_send === true
+    && schedulingDueAt !== null
+    && (schedulingState === "QUEUED" || schedulingState === "SENT");
   // Produção manda `observed_fact` e `fact_source` como texto simples. Ler o
   // texto como objeto fazia o fato real sair como "não informado pelo servidor"
   // embaixo de uma mensagem que afirmava exatamente esse fato. O formato objeto
@@ -1887,20 +1786,22 @@ function candidateCard(
     <p class="banner ok" role="status" data-already-approved="${escapeHtml(queue.optimistic ? "local" : "server")}">${
       queue.optimistic
         ? "Aprovação registrada nesta sessão. A releitura do servidor ainda não voltou; se ela discordar, este candidato volta para a fila."
-        : "Este candidato já está aprovado nesta versão. Para reverter, registre HOLD ou REJECT abaixo."
+        : schedulingConfirmed
+          ? "Este candidato já está aprovado e agendado pelo servidor. Para cancelar antes do envio, registre HOLD ou REJECT abaixo."
+          : "Este candidato já está aprovado, mas o agendamento não foi confirmado. Um admin deve usar o reparo idempotente desta página; não reaprove o candidato."
     }</p>
 `
       : `
     ${gateInFlight(approveKey) ? pendingBlock("Registrando a aprovação") : ""}
     <form class="operator-form approve-form" data-human-gate="review" data-gate-key="${escapeHtml(approveKey)}" data-decision="APPROVE" data-version="${escapeHtml(cohortId)}" data-candidate="${escapeHtml(candidateId)}"${gate.needsValidation ? ` data-auto-validate="true"` : ""}>
-      <h4>Aprovar este candidato</h4>
-      <p class="constraint" data-approve-meaning="true">Clicar em Aprovar é a ciência: a trilha grava sua identidade do Authelia, o instante, esta versão v${escapeHtml(version)}, o hash congelado, o destinatário exato e a decisão. Não há segunda caixa a marcar.</p>
+      <h4>Aprovar e enfileirar este candidato</h4>
+      <p class="constraint" data-approve-meaning="true">Clicar em Aprovar e enfileirar é a ciência e a autoridade de agendamento: a trilha grava sua identidade do Authelia, o instante, esta versão v${escapeHtml(version)}, o hash congelado, o destinatário exato e a decisão; a mesma operação cria a mensagem com <code>auto_send=true</code> e <code>due_at</code> na próxima janela comercial. Não há GO, segunda caixa ou passo de entrega.</p>
       ${
         gate.needsValidation
           ? `<p class="constraint" data-approve-autovalidate="true">Este destinatário ainda não tem verificação vigente. Aprovar pede a verificação ao Warmbly primeiro e só registra o APPROVE se ela voltar VALID — você não precisa acionar nada antes.</p>`
           : ""
       }
-      <button type="submit" data-approve-submit="true"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Aprovar"}</button>
+      <button type="submit" data-approve-submit="true"${gate.allowed && authority.canReview && !gateInFlight(approveKey) ? "" : " disabled"}>${gateInFlight(approveKey) ? "Enviando…" : "Aprovar e enfileirar para envio"}</button>
       <details data-approve-comment="true">
         <summary>Comentário para a trilha (opcional)</summary>
         <label>Observação<input name="reason" maxlength="200"></label>
@@ -1918,6 +1819,20 @@ function candidateCard(
       }
     </form>
 `;
+
+  const schedulingBlock = reviewApproved
+    ? schedulingConfirmed
+      ? `<article class="banner ok" role="status" data-approval-scheduling="true" data-scheduling-confirmed="true" data-scheduling-state="${escapeHtml(schedulingState ?? "")}">
+          <h4>Agendamento confirmado pelo servidor</h4>
+          <p>APPROVE agenda a mensagem: ela está ${schedulingState === "SENT" ? "marcada como enviada" : "na fila do worker"}, com <code>auto_send=true</code>${schedulingState === "QUEUED" ? " e saída prevista para a próxima janela permitida" : ""}. Pausa, kill switch, janela comercial, teto por hora e validação de última milha ainda governam o transporte.</p>
+          <dl class="facts">${fact("Estado", schedulingState ?? NOT_IN_PAYLOAD)}${fact("due_at", schedulingDueAt === null ? NOT_IN_PAYLOAD : stamp(schedulingDueAt))}${fact("auto_send da mensagem", "true")}</dl>
+        </article>`
+      : `<article class="banner error" role="alert" data-approval-scheduling="true" data-scheduling-confirmed="false">
+          <h4>Defeito: APPROVE efetivo sem agendamento confirmado</h4>
+          <p>Uma aprovação válida deve sair da mesma operação em <code>QUEUED</code>, com <code>due_at</code> e <code>auto_send=true</code>. Não reaprove. Um admin deve executar “Reprocessar aprovações já registradas” e reler este candidato.</p>
+          <dl class="facts">${fact("Estado", schedulingState ?? NOT_IN_PAYLOAD)}${fact("due_at", schedulingDueAt === null ? NOT_IN_PAYLOAD : stamp(schedulingDueAt))}${fact("auto_send da mensagem", scheduling.auto_send === undefined ? NOT_IN_PAYLOAD : String(scheduling.auto_send))}</dl>
+        </article>`
+    : "";
 
   // Not merely disabled: a historical version emits no decision markup at all,
   // so there is nothing for devtools to re-enable.
@@ -1982,6 +1897,7 @@ ${validateControl}
       ${factWhenPresent("Excluído do preview por", flagText(candidate.exclusion_reason ?? candidate.excluded_reason))}
     </dl>
 
+    ${schedulingBlock}
     ${controls}
     ${technicalDetails(
       [
@@ -2005,7 +1921,7 @@ ${validateControl}
         { term: "review_decision", value: techValue(review.decision) },
         { term: "review_effective", value: techValue(review.effective) },
         { term: "scheduling_state", value: techValue(scheduling.state) },
-        { term: "scheduling_due_at", value: scheduling.due_at ? stamp(scheduling.due_at) : "" },
+        { term: "scheduling_due_at", value: techValue(scheduling.due_at) },
         { term: "scheduling_auto_send", value: techValue(scheduling.auto_send) },
         { term: "scheduling_invalidated_at", value: techValue(scheduling.invalidated_at) },
         { term: "scheduling_invalidation_reason", value: techValue(scheduling.invalidation_reason) },
@@ -2056,7 +1972,7 @@ function adjustBlock(args: {
           <div data-diff-field="body_text"><dt>Corpo</dt><dd><del><pre class="message-preview">${escapeHtml(draft.before_body_text)}</pre></del><ins><pre class="message-preview">${escapeHtml(draft.body_text)}</pre></ins></dd></div>
           <div data-diff-field="reason"><dt>Motivo</dt><dd>${escapeHtml(draft.reason)}</dd></div>
         </dl>
-        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação, revisão e agendamento da nova versão começam pendentes.</p>
+        <p class="constraint">Confirmar cria a versão seguinte. A versão v${escapeHtml(version)} continua existindo e legível; validação e revisão da nova versão começam pendentes. Cada APPROVE nela fará o próprio agendamento.</p>
       </div>`
     : "";
   return `
@@ -2099,7 +2015,7 @@ function legacyBanner(editorial: EditorialReading, cohortId: string): string {
   const linkable = editorial.currentVersionId !== "" && editorial.currentVersionId !== cohortId;
   return `<section class="banner error" role="alert" data-legacy-banner="true" data-editorial-state="${escapeHtml(editorial.state)}">
     <h3>Versão histórica. Não enviar.</h3>
-    <p data-legacy-summary="true">Esta é uma versão antiga desta cohort, mantida legível só para auditoria. A mensagem abaixo não é enviável: aprovar, ajustar, verificar e registrar GO não são oferecidos nesta tela.</p>
+    <p data-legacy-summary="true">Esta é uma versão antiga desta cohort, mantida legível só para auditoria. A mensagem abaixo não é enviável: aprovar, ajustar e verificar não são oferecidos nesta tela.</p>
     ${reasons ? `<p data-legacy-reasons="true">Por que ficou histórica: ${escapeHtml(reasons)}.</p>` : ""}
     ${editorial.notice ? `<p data-editorial-notice="true">${escapeHtml(editorial.notice)}</p>` : ""}
     ${
@@ -2164,7 +2080,7 @@ function queueBlock(
     <p class="kicker"><span class="pill">FILA</span></p>
     <h3 data-queue-progress-text="true">${counts.pendentes} pendente(s) · ${counts.aprovadas} aprovada(s) · ${counts.ajuste} em ajuste · ${counts.total} no total</h3>
     <nav class="subnav queue-filters" data-review-filters="true" aria-label="Estado da revisão">${tabs}</nav>
-    <p class="constraint">A fila abre em Pendentes. Uma mensagem aprovada sai daqui na hora e a próxima assume a posição; as concluídas continuam legíveis nos outros recortes.</p>
+    <p class="constraint">A fila abre em Pendentes. Uma mensagem aprovada sai deste recorte e, na mesma operação, entra na fila do worker com <code>auto_send=true</code>; as concluídas continuam legíveis nos outros recortes.</p>
   </article>`;
 }
 
@@ -2180,17 +2096,11 @@ function emptyQueueBlock(
   filter: ReviewQueueFilter,
   params: URLSearchParams,
   actionable: boolean,
-  directScheduling: boolean,
 ): string {
   const everything = `<p><a class="button" data-queue-see-all="true" href="${escapeHtml(queueFilterHref(params, "todas"))}">Ver todas as ${counts.total}</a></p>`;
   if (filter === "pendentes") {
-    // A historical version offers no GO control at all, so naming GO as the
-    // next step there would point the founder at a button this screen refuses
-    // to render.
     const next = actionable
-      ? directScheduling
-        ? "Os APPROVEs efetivos já criaram ou confirmaram seus agendamentos na fila do Warmbly."
-        : "O próximo passo é o GO/NO-GO logo abaixo, e ele continua exigindo a confirmação digitada da versão."
+      ? "Não há GO nem entrega manual: cada APPROVE efetivo já deve estar agendado. Confira o estado de agendamento nas mensagens aprovadas."
       : "Esta versão é histórica e não é enviável, então não há próximo passo aqui: decida na versão corrente.";
     return `<article class="card banner ok" role="status" data-queue-empty="pendentes">
       <h3>Fila vazia: nada pendente nesta versão.</h3>
@@ -2205,57 +2115,24 @@ function emptyQueueBlock(
   </article>`;
 }
 
-/**
- * Entregar a cohort à fila do Warmbly.
- *
- * The last control on the page, and the only one on this surface whose effect
- * leaves the building. Four things make it what it is:
- *
- * 1. **It only exists after GO.** The server's own `decision` is what gates it,
- *    not anything this screen inferred. Without a registered GO there is no
- *    form at all — not a disabled one — so there is nothing for devtools to
- *    re-enable, exactly as with a historical version.
- * 2. **It says what it does and what it does not do.** It hands the authorised
- *    cohort to Warmbly's queue. It does not send: the worker delivers inside
- *    the commercial window, under the rolling-hour cap, and the pause switch in
- *    Operação segura still stops everything.
- * 3. **It costs a typed confirmation**, like GO. One click that queues real mail
- *    to real companies is the one place on this surface where a second,
- *    deliberate act is worth its cost.
- * 4. **It never claims a number.** How many messages Warmbly accepted comes back
- *    in the response and is rendered from it; this block only states the ceiling
- *    the server enforces.
- */
-function dispatchBlock(args: {
-  cohortId: string;
-  version: string;
-  decisionValue: string;
-  counts: ReturnType<typeof reviewQueueCounts>;
-  authority: OperatorAuthority;
-  actionable: boolean;
-}): string {
-  const { cohortId, version, decisionValue, counts, authority, actionable } = args;
-  if (!actionable) return "";
-  const dispatchKey = `dispatch:${cohortId}::`;
-  const pending = gateInFlight(dispatchKey);
-  if (decisionValue !== "GO") {
-    return `<p class="constraint" data-dispatch-gate="no-go">Entregar esta cohort à fila só é oferecido depois de um GO registrado nesta versão. A decisão final lida agora é ${escapeHtml(decisionValue)}.</p>`;
-  }
+/** Admin-only repair for approvals that predate or missed atomic scheduling. */
+function reconcileBlock(authority: OperatorAuthority): string {
+  const reconcileKey = "reconcile::::";
+  const pending = gateInFlight(reconcileKey);
   return `
-  ${pending ? pendingBlock("Entregando a cohort à fila do Warmbly") : ""}
-  <article class="card" data-cohort-dispatch="${escapeHtml(cohortId)}">
-    <p class="kicker"><span class="pill">GO REGISTRADO</span></p>
-    <h3>Entregar esta cohort à fila de envio</h3>
-    <p data-dispatch-meaning="true">Isto entrega ao Warmbly os ${counts.aprovadas} candidato(s) aprovado(s) desta versão. O Warmbly enfileira cada um e o worker dele envia dentro da janela comercial, no máximo 10 por hora e no máximo 10 por disparo. Esta tela não envia e-mail e não tem controle de send.</p>
-    <p class="constraint" data-dispatch-gates="true">O Warmbly recusa o disparo por conta própria se o GO tiver sido revogado ou vencido, se auto-send ou autorun estiverem ligados, se o disparo estiver pausado ou se o kill switch estiver acionado. Nenhum desses portões é contornável a partir daqui.</p>
-    <p class="constraint" data-dispatch-repeat="true">Disparar de novo é seguro: o Warmbly pula os candidatos já enfileirados desta versão e os conta como duplicados na resposta. Repetir não reenvia o que já saiu.</p>
-    <form class="operator-form" data-human-gate="dispatch" data-gate-key="${escapeHtml(dispatchKey)}" data-version="${escapeHtml(cohortId)}">
-      <label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label>
-      <button type="submit" data-dispatch-submit="true"${authority.canDecide && !pending ? "" : " disabled"}>${pending ? "Enviando…" : `Entregar v${escapeHtml(version)} à fila do Warmbly`}</button>
+  ${pending ? pendingBlock("Reprocessando aprovações já registradas") : ""}
+  <article class="card" data-approval-reconcile="true">
+    <p class="kicker"><span class="pill">REPARO · ADMINS</span></p>
+    <h3>Reprocessar aprovações já registradas</h3>
+    <p data-reconcile-meaning="true">Este não é um passo normal depois da revisão. APPROVE já agenda sozinho. Use o reparo somente para aprovações antigas ou para um APPROVE cujo card mostre “sem agendamento confirmado”.</p>
+    <p class="constraint" data-reconcile-repeat="true">A operação percorre o histórico pelo mesmo caminho de código do APPROVE, deduplica candidatos repetidos entre cohorts e é idempotente: executar de novo não cria outra mensagem nem reenvia o que já saiu.</p>
+    <p class="constraint">O resultado mostra quantos registros, vínculos e candidatos únicos foram encontrados e quantos ficaram agendados. Isto não transporta e-mail; o worker continua sob janela comercial, teto por hora, pausa e kill switch.</p>
+    <form class="operator-form" data-human-gate="reconcile" data-gate-key="${escapeHtml(reconcileKey)}">
+      <button type="submit" data-reconcile-submit="true"${authority.canReconcile && !pending ? "" : " disabled"}>${pending ? "Enviando…" : "Reprocessar aprovações já registradas"}</button>
       ${
-        authority.canDecide
+        authority.canReconcile
           ? ""
-          : `<p class="constraint" data-dispatch-authority="absent">Entregar a cohort à fila exige o grupo <code>admins</code> no Authelia, a mesma autoridade do GO. Revisar continua permitido com <code>operators</code>.</p>`
+          : `<p class="constraint" data-reconcile-authority="absent">Este reparo exige o grupo <code>admins</code> no Authelia. O fluxo normal continua disponível a <code>operators</code>: “Aprovar e enfileirar para envio”, sem passo extra.</p>`
       }
     </form>
   </article>`;
@@ -2274,10 +2151,11 @@ function reviewSurface(input: WarmblySurfaceInput): string {
     const options = cohortRows(input)
       .map(
         (row) =>
-          `<li class="card" data-cohort-option="${escapeHtml(show(row.id))}"><h3>v${escapeHtml(show(row.version))} · ${escapeHtml(show(row.freshness))}</h3><dl class="facts">${fact("Origem", show(row.source))}${fact("as_of", show(row.as_of))}${fact("Decisão final", fromPayload(record(row.decision).decision))}</dl><p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(row.id))}">Abrir revisão</a></p></li>`,
+          `<li class="card" data-cohort-option="${escapeHtml(show(row.id))}"><h3>v${escapeHtml(show(row.version))} · ${escapeHtml(show(row.freshness))}</h3><dl class="facts">${fact("Origem", show(row.source))}${fact("as_of", show(row.as_of))}${fact("GO/NO-GO histórico (sem efeito operacional)", fromPayload(record(row.decision).decision))}</dl><p><a class="button" data-open-review="true" href="#/warmbly/revisao?resource=${escapeHtml(show(row.id))}">Abrir revisão</a></p></li>`,
       )
       .join("");
     return `<section class="stack" data-review-empty="true"><h2>Revisão</h2>
+      ${outboundStatusBlock(input)}
       ${feedback.remainder()}
       ${input.resource ? gateUnreadableBanner(selected, "a versão selecionada") : ""}
       ${gateUnreadableBanner(list, "a lista de cohorts")}
@@ -2292,15 +2170,11 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   const manifest = record(cohort.manifest);
   const preview = record(manifest.preview);
   const candidates = array(cohort.candidates);
-  const directScheduling = candidates.some((candidate) =>
-    Object.prototype.hasOwnProperty.call(candidate, "scheduling"),
-  );
   const params = new URLSearchParams(input.query ?? "");
   const expandAll = params.get("mensagens") !== "recolhidas";
   const cohortId = show(cohort.id);
   const version = show(cohort.version);
   const reproduceKey = `reproduce:${cohortId}::`;
-  const decideKey = `decide:${cohortId}::`;
   // The recorte links are built from the route's own query, and the selected
   // version is restated into it when the route did not carry it. A filter that
   // drops `resource` lands the reviewer on an empty Revisão, which is the exact
@@ -2328,44 +2202,21 @@ function reviewSurface(input: WarmblySurfaceInput): string {
     .join("");
   const cohortFeedback = feedback.forCohort(cohortId);
   const leftover = feedback.remainder();
-  const decisionValue = fromPayload(record(cohort.decision).decision);
+  const historicalDecision = fromPayload(record(cohort.decision).decision);
   const editorial = readEditorialState(cohort);
-  // A historical version emits neither the GO/NO-GO form nor the reproduce
-  // form. The facts below them stay: this removes decisions, not information.
   const reproduceControl = editorial.actionable
     ? `
   ${gateInFlight(reproduceKey) ? pendingBlock("Reproduzindo a versão imutável") : ""}
   <form class="operator-form" data-human-gate="reproduce" data-gate-key="${escapeHtml(reproduceKey)}" data-version="${escapeHtml(cohortId)}"><button type="submit"${gateInFlight(reproduceKey) || !authority.canReview ? " disabled" : ""}>${gateInFlight(reproduceKey) ? "Enviando…" : "Reproduzir versão imutável"}</button></form>
 `
     : "";
-  const dispatchControl = directScheduling ? "" : dispatchBlock({
-    cohortId,
-    version,
-    decisionValue,
-    counts,
-    authority,
-    actionable: editorial.actionable,
-  });
-  const decideControl = directScheduling
-    ? editorial.actionable
-      ? `<article class="card" data-approval-scheduling="true"><h3>APPROVE agenda a mensagem</h3><p>Cada APPROVE efetivo cria ou confirma o trabalho na fila do Warmbly para a próxima janela comercial elegível. Não existe GO nem entrega manual da cohort neste contrato.</p><p class="constraint">O worker continua submetido à pausa operacional, ao kill switch, à janela de dias úteis e ao teto por hora.</p></article>`
-      : `<p class="constraint" data-non-actionable-surface="true">Versão histórica, não enviável. Revisão, agendamento e reprodução não são oferecidos aqui. Decida na versão corrente.</p>`
-    : editorial.actionable
-    ? `
-  ${gateInFlight(decideKey) ? pendingBlock("Registrando GO/NO-GO") : ""}
-  <form class="operator-form" data-human-gate="decide" data-gate-key="${escapeHtml(decideKey)}" data-version="${escapeHtml(cohortId)}"><label>Decisão final<select name="decision"><option value="NO_GO">NO_GO</option><option value="GO">GO</option></select></label><label>Motivo<input name="reason" required minlength="3"></label><label>Confirme digitando <code>v${escapeHtml(version)}</code><input name="confirmation" required pattern="v${escapeHtml(version)}"></label><button type="submit"${authority.canDecide && !gateInFlight(decideKey) ? "" : " disabled"}>${gateInFlight(decideKey) ? "Enviando…" : "Registrar GO/NO-GO"}</button>${
-    authority.canDecide
-      ? ""
-      : `<p class="constraint" data-go-authority="absent">GO/NO-GO está desabilitado nesta sessão: ele exige o grupo <code>admins</code> no Authelia. Peça a inclusão nesse grupo e reautentique; revisar candidatos continua permitido com <code>operators</code>.</p>`
-  }</form>
-`
-    : `<p class="constraint" data-non-actionable-surface="true">Versão histórica, não enviável. GO/NO-GO e a reprodução da versão imutável não são oferecidos aqui. Decida na versão corrente.</p>`;
   return `<section class="stack" aria-labelledby="review-title" data-review-cohort="${escapeHtml(cohortId)}" data-editorial-state="${escapeHtml(editorial.state)}" data-actionable="${editorial.actionable ? "true" : "false"}"><h2 id="review-title">Revisão v${escapeHtml(version)}</h2>
+  ${outboundStatusBlock(input)}
   ${legacyBanner(editorial, cohortId)}
   ${leftover}${cohortFeedback}
   ${gateUnreadableBanner(selected, "a versão selecionada")}
   <p class="constraint">${escapeHtml(show(cohort.source))}, as_of ${escapeHtml(show(cohort.as_of))}, ${escapeHtml(show(cohort.freshness))}, policy ${escapeHtml(show(cohort.policy_version))}. Receipt ${escapeHtml(show(cohort.receipt))}.</p>
-  ${identityBlock(input, directScheduling)}
+  ${identityBlock(input, true)}
   ${previewBlock(preview)}
   <p><button type="button" data-toggle-messages="true" aria-expanded="${expandAll ? "true" : "false"}">${expandAll ? "Recolher todas as mensagens" : "Expandir todas as mensagens"}</button></p>
   ${reproduceControl}
@@ -2382,13 +2233,12 @@ function reviewSurface(input: WarmblySurfaceInput): string {
   ${
     candidateCards
       || (candidates.length === 0
-        ? `<p class="banner error">${directScheduling ? "Cohort vazia: nenhuma mensagem pode ser revisada ou agendada." : "Cohort vazia: GO bloqueado."}</p>`
-        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable, directScheduling))
+        ? `<p class="banner error">Cohort vazia: nenhum candidato para revisar ou agendar.</p>`
+        : emptyQueueBlock(counts, queueFilter, queueParams, editorial.actionable))
   }
-  ${decideControl}
-  ${directScheduling ? "" : `<dl class="facts"><div><dt>Decisão final registrada</dt><dd>${escapeHtml(decisionValue)}</dd></div></dl>`}
-  ${dispatchControl}
-  <p class="constraint">${directScheduling ? "Aprovar agenda; não envia imediatamente. O envio é do worker do Warmbly na janela comercial e sob o teto por hora. Esta tela não retoma o disparo." : "GO autoriza e não envia. Entregar a cohort à fila é o passo seguinte e separado; o envio em si é do worker do Warmbly, dentro da janela comercial e sob o teto por hora. Esta tela continua sem qualquer controle de send, queue ou resume."}</p></section>`;
+  <details class="card" data-historical-go-audit="true"><summary>Auditoria histórica de GO/NO-GO (sem efeito operacional)</summary><dl class="facts"><div><dt>Último valor histórico</dt><dd>${escapeHtml(historicalDecision)}</dd></div></dl><p class="constraint">O controle foi removido da Revisão. Este dado antigo permanece apenas para auditoria: não autoriza, bloqueia, enfileira nem desenfileira mensagens.</p></details>
+  ${reconcileBlock(authority)}
+  <p class="constraint">APPROVE é o único ato humano necessário para agendar a mensagem. O envio em si continua sendo do worker do Warmbly, na janela comercial e sob o teto por hora; esta tela não expõe send, queue ou resume.</p></section>`;
 }
 
 function warmblySubnav(current: WarmblySurface, resource: string | null | undefined): string {

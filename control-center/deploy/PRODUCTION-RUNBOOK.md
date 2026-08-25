@@ -104,17 +104,21 @@ value and does not touch any other secret. Remove the one-time source after
 the Context container can read the mount and `/v1/me` proves `permissions=196` and
 the absence of `send_campaigns`. Never reuse the collector's broader read key.
 
-On an upgraded installation, preserve the current password hash and add `admins`
-to the authorized operator's existing `users.yml` groups beside `operators`.
-Back up the file first, validate YAML and restart only Authelia. Never regenerate
-the secret pack to make this group change.
+On an upgraded installation, preserve the current password hash and group
+membership. The boundary is deliberate: `operators` may APPROVE and therefore
+queue a message; `admins` may run the explicit reconciliation repair. If a
+future release changes either group, back up `users.yml`, validate YAML and
+restart only Authelia. Never regenerate the secret pack to make a group change.
 
 ## Ordered Warmbly prerequisite
 
-Merge and deploy the backward-compatible Warmbly human-gate and editorial-review
-APIs before the Control Center release. Apply migrations through
-`000122_confenge_cohort_selection` with the normal Warmbly deploy path; verify
-schema is `122`, `/ready` is ready, and all of
+Merge and deploy the Warmbly approval-scheduling API before the Control Center
+release. Apply migrations through `000122_confenge_cohort_selection` (including
+`000121_confenge_human_gate_scheduling`) with the normal Warmbly deploy path;
+verify schema is `122`, `/ready` is ready,
+`POST /v1/confenge/cohorts/{cohort}/candidates/{candidate}/review`
+schedules an APPROVE, and `POST /v1/confenge/cohorts/reconcile-approved` exists.
+Verify all of
 these remain false/true as shown:
 
 ```
@@ -124,31 +128,44 @@ CONFENGE_REQUIRE_HUMAN_APPROVAL=true
 ```
 
 Keep the dispatch kill switch engaged for deployment and sandbox verification.
-The migrations are additive. Do not expose the Control Center override until
-this prerequisite passes. The same least-privilege human-gate credential and
-private Context-to-Warmbly network path serve draft review: mask `196` already
-contains the required contact read/write permissions and still contains no send
-permission. Do not create a browser token or expose the credential to `web`.
-
-Before creating any additional backlog, an authenticated `admins` operator must
-run approval reconciliation once and inspect every reported failure. On the
-current contract an effective APPROVE creates or confirms its own queued
-touchpoint for the next eligible business window; there is no live cohort GO or
-manual cohort dispatch step. Reconciliation covers durable approvals created
-before that scheduling behavior. Neither operation sends immediately or resumes
-the dispatch kill switch.
+The migration is additive. Do not expose the Control Center contract until this
+prerequisite passes. The same least-privilege human-gate credential and private
+Context-to-Warmbly network path serve review: mask `196` already contains the
+required contact read/write permissions and still contains no send permission.
+Do not create a browser token or expose the credential to `web`.
 
 ## Deploy (production-edge)
 
-Checkout the certified `RELEASE_SHA` at `/opt/confenge-control-center`.
+Before every release, record the current Git SHA and image IDs for `context`,
+`web` and `mcp`; those are the rollback point. Then fast-forward the certified
+release at `/opt/confenge-control-center`. The Warmbly connector is compiled
+inside the Context image, so every connector change must rebuild `context`.
 
 ```bash
+git -C /opt/confenge-control-center pull --ff-only
 cd /opt/confenge-control-center/control-center/deploy/overlays/production-edge
 set -a
 source /etc/confenge/control-center/secrets/.env
 set +a
 export CC_SECRET_DIR=/etc/confenge/control-center/secrets
+export CC_RELEASE_SHA=<certified-git-sha>
 
+# Build and replace both artifacts touched by the release. The connector travels
+# in Context; updating only web leaves the old server contract in production.
+docker compose -p confenge-control-center \
+  -f docker-compose.production-edge.yml \
+  -f docker-compose.warmbly-human-gate.override.yml \
+  build context web
+docker compose -p confenge-control-center \
+  -f docker-compose.production-edge.yml \
+  -f docker-compose.warmbly-human-gate.override.yml \
+  up -d context web
+```
+
+For a first installation only, use the full bootstrap sequence instead of the
+two-service replacement above:
+
+```bash
 # 1. datastores
 docker compose -f docker-compose.production-edge.yml up -d postgres redis nats
 # confirm alias cc-postgres on cc_internal
@@ -183,6 +200,41 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: ops.confenge.com.br' http://
 Public cockpit: `https://ops.confenge.com.br/` → Authelia 302 until authenticated + 2FA.
 
 Do not treat `/healthz` 200 as authenticated cockpit access.
+
+## Approval reconciliation after this release
+
+Take the database counts below before the write. With the kill switch still
+engaged, an authenticated `admins` identity runs **Reprocessar aprovações já
+registradas** once. This is the only production POST in this rollout. It calls
+the same Warmbly scheduling function used synchronously by APPROVE; it is not a
+cohort dispatch and it cannot transport mail. Run it a second time to prove
+idempotency, then repeat the SELECTs and record every `due_at`.
+
+```sql
+SELECT decision, count(*)
+FROM confenge_cohort_candidate_reviews
+GROUP BY decision ORDER BY decision;
+
+SELECT count(*) AS dispatch_bindings
+FROM confenge_cohort_candidate_dispatches;
+
+SELECT t.state, d.auto_send, count(*)
+FROM confenge_cohort_candidate_dispatches d
+JOIN outreach_touchpoints t ON t.id = d.touchpoint_id
+GROUP BY t.state, d.auto_send ORDER BY t.state, d.auto_send;
+
+SELECT t.id, t.state, t.due_at, d.auto_send, d.cohort_version_id,
+       d.candidate_id, d.invalidated_at
+FROM confenge_cohort_candidate_dispatches d
+JOIN outreach_touchpoints t ON t.id = d.touchpoint_id
+ORDER BY t.due_at, t.id;
+```
+
+An absent row is reported as absent, never as zero inferred by the UI. Repeating
+reconciliation must create neither a second dispatch binding for the same
+`(cohort_id, candidate_id)` nor a second live touchpoint for duplicate frozen
+content. Do not remove `/data/confenge-ops/kill-switch`; do not POST a separate
+smoke; do not change global auto-send or autorun.
 
 ## Governance bootstrap
 
@@ -247,7 +299,7 @@ Mechanical requirement: `same_content=true` (SHA-256 of restored dump equals pla
 4. Revoke the `control-center-human-gate` API key. Do not alter the collector key,
    host PostgreSQL, or extra-cli.
 5. Roll back Warmbly only after Control Center no longer calls the new contract.
-   Keep migration 122 data for evidence; run down migrations only after export and
+   Keep migration 121/122 data for evidence; run down migrations only after export and
    only if schema rollback is explicitly required.
 6. Prove `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health`
    remains READY and `auto_send_enabled=false`.
@@ -271,11 +323,14 @@ Backup `/etc/nginx` first. Install only `ops.confenge.com.br` and `auth.ops.conf
 - `api.confenge.com.br` inbound READY
 - Warmbly `/ready` live=true ready=true, `CONFENGE_AUTO_SEND_ENABLED=false`
 - Human-gate credential `/v1/me`: exact mask `196`, no `SEND_CAMPAIGNS`; do not log its value
-- authenticated `operators` can GET/list/review and APPROVE schedules only the
-  exact reviewed message; only `admins` can reconcile old durable approvals
-- production smoke is GET-only; all POST verification uses fixtures/sandbox and `.invalid` recipients
-- review list and reconciliation report reachable from `context`, with dispatch
-  paused throughout rollout
+- authenticated `operators` can GET/list/review and APPROVE; the button says that
+  APPROVE enqueues. A group without `operators` receives 403 at the edge before upstream.
+- only `admins` can run reconciliation; a group without `admins` receives 403 at
+  the edge before upstream. There is no live GO/NO-GO or cohort-dispatch route.
+- production smoke is GET-only except for the planned reconciliation above; all
+  other POST verification uses fixtures/sandbox and `.invalid` recipients
+- review list and outbound status are reachable from `context`; the kill switch
+  warning renders before review work and remains engaged throughout rollout
 - GitHub collector FRESH when token+allowlist are set; otherwise honest ERROR/UNKNOWN
 
 ## `/intranet`

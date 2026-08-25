@@ -8,30 +8,19 @@
 | VALID/RISKY/INVALID/UNKNOWN/STALE | `TestNormalizeHumanGateValidationStatus`; UI `data-validation-status` |
 | Invalidation recipient/message/policy/evidence/expiry | `TestHumanGateApprovalInvalidatesEveryBoundDimension` |
 | suppression tardia/opt-out/bounce/removal | `GetHumanGateCohort` relê candidato canônico e invalida fail-closed |
-| APPROVE/REJECT/HOLD e agendamento | `TestHumanGateValidApprovalRemainsEffectiveAndHoldNeverDoes`; testes de approval-time scheduling; adapter e proxy preservam `acknowledged` e expõem `scheduling` |
-| Seleção disjunta de fornecedores | teste PostgreSQL concorrente 10×10 prova 100 CNPJs-raiz e destinatários únicos; replay idempotente devolve a mesma cohort |
-| Recuperação de versão stale | testes de `RECOVER_PRIOR` provam releitura da fonte atual e ausência de approval/agendamento herdado |
+| APPROVE agenda; HOLD/REJECT cancelam | testes PostgreSQL Warmbly `human_gate_scheduling_pg_test.go`; adapter e proxy preservam `acknowledged=true`; UI exige releitura com `effective=true`, `auto_send=true`, `QUEUED|SENT` e `due_at` |
+| GO/NO-GO removido do fluxo vivo | rotas antigas não são registradas no Warmbly nem construíveis no conector; UI mostra somente auditoria histórica sem efeito |
 | MX ausente/risky/invalid/unknown | verificador existente + normalização/teste; somente VALID permite APPROVE |
-| Authelia, 401/403 e least privilege | `human-gate.test.ts`: identidade ausente não chega ao upstream; reconciliação exige admins; GO/dispatch não existem no allowlist atual |
+| Authelia, 401/403 e least privilege | `human-gate.test.ts`: identidade ausente não chega ao upstream; `operators` aprovam/enfileiram e `admins` reconciliam; grupo incorreto falha antes do upstream |
 | timeout/payload parcial/conflito/write denied | proxy retorna UNKNOWN sem retry e envelope completo; handler 400; request-hash 409; RBAC 403 |
 | sem PII nos logs | proxy loga somente actor/id/path/status/receipt; Warmbly audit usa ids/hashes/status |
-| pausa e last-mile gates | worker Warmbly revalida pause/kill switch/janela/teto/suppression; UI não oferece GO/queue/dispatch/send no contrato atual |
-| auto-send global OFF / nenhum e-mail real | boot fail-closed fixa global false; `auto_send=true` é somente por touchpoint aprovado; testes usam `.invalid` |
+| pausa/kill switch/janela/cap e last-mile gates | o worker Warmbly continua como único transportador; revalidação invalida e cancela trabalho não enviado; UI não oferece queue/dispatch/send |
+| auto-send por mensagem; automação global OFF | scheduling persiste `auto_send=true`; snapshots fixam flags globais false; testes usam `.invalid`; runbook permite somente a reconciliação planejada em produção |
 
-Evidência executada em 2026-08-24 para esta revisão:
-
-- Web-shell: 415/415 — PASS, incluindo contrato de scheduling, ocultação de
-  GO/dispatch, reconciliação e cohorts sem repetição.
-- Connector Warmbly: 161/161 + 1 canário ignorado — PASS, incluindo
-  reconciliação `admins`, fixed allowlist sem GO/dispatch e exclusão de ator
-  controlável pelo navegador.
-- TypeScript typecheck: connector e web-shell — PASS.
-- Warmbly PostgreSQL 16: migration até 122 e integração 10×10 — PASS, com 100
-  fornecedores CNPJ-raiz e 100 destinatários distintos, além de replay
-  idempotente.
-- Nenhum POST de envio foi executado; dispatch permaneceu pausado.
-
-Evidência histórica executada em 2026-08-23:
+Evidência abaixo executada em 2026-08-23 para a entrega anterior; os números não
+descrevem a mudança de agendamento por APPROVE. A evidência atual fica nos testes
+e no runbook desta entrega, incluindo jornada real, reconciliação duas vezes e
+SELECT antes/depois em produção:
 
 - TypeScript typecheck: connector, Context Service e web-shell — PASS.
 - Contract cross-repo: 1/1 — PASS; cópia Governance idêntica ao schema Warmbly.

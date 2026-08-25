@@ -15,6 +15,7 @@ import {
 
 export { HUMAN_GATE_CONTRACT };
 export const HUMAN_GATE_PREFIX = "/v1/warmbly/operator/cohorts";
+export const HUMAN_GATE_STATUS_PATH = "/v1/warmbly/operator/outbound-status";
 
 const UUID = UUID_PATTERN_SOURCE;
 
@@ -36,6 +37,7 @@ interface HumanGateRoute {
 }
 
 const routes: readonly HumanGateRoute[] = [
+  { method: "GET", operation: "read_status", local: new RegExp(`^${HUMAN_GATE_STATUS_PATH}$`), upstream: () => "/v1/confenge/status", role: "operators" },
   { method: "GET", operation: "list_cohorts", local: new RegExp(`^${HUMAN_GATE_PREFIX}$`), upstream: () => WARMBLY_COHORTS_PREFIX, role: "operators" },
   { method: "POST", operation: "create", local: new RegExp(`^${HUMAN_GATE_PREFIX}$`), upstream: () => WARMBLY_COHORTS_PREFIX, role: "operators" },
   { method: "GET", operation: "read_cohort", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}`, role: "operators" },
@@ -47,10 +49,10 @@ const routes: readonly HumanGateRoute[] = [
   // a new immutable version and revokes the authorization bound to the old one;
   // it is not a GO, so it is deliberately NOT behind the admins gate.
   { method: "POST", operation: "adjust", local: new RegExp(`^${HUMAN_GATE_PREFIX}/(${UUID})/candidates/(${UUID})/adjust$`), upstream: (m) => `${WARMBLY_COHORTS_PREFIX}/${m[1]}/candidates/${m[2]}/adjust`, role: "operators", validate: validateAdjustRequest },
-  // Replays the backend's idempotent scheduler for durable APPROVEs created
-  // before scheduling landed. It does not send or resume anything; admins use
-  // it once while dispatch remains paused, then inspect the returned counts.
-  { method: "POST", operation: "reconcile_approved", local: new RegExp(`^${HUMAN_GATE_PREFIX}/reconcile-approved$`), upstream: () => `${WARMBLY_COHORTS_PREFIX}/reconcile-approved`, role: "admins" },
+  // Repair-only replay of the same scheduling path an APPROVE already runs.
+  // It is global, payload-free and naturally idempotent upstream; admins own
+  // repair while operators own the ordinary approve-and-queue decision.
+  { method: "POST", operation: "reconcile", local: new RegExp(`^${HUMAN_GATE_PREFIX}/reconcile-approved$`), upstream: () => `${WARMBLY_COHORTS_PREFIX}/reconcile-approved`, role: "admins" },
 ];
 
 /** Exposed for tests and for the cockpit: the complete reachable surface. */
@@ -144,7 +146,17 @@ function edgeEnvelope(
     reason,
     correlation_id: typeof meta.correlation_id === "string" ? meta.correlation_id : ctx.correlation,
     receipt: upstreamReceipt(payload) ?? `edge:${ctx.correlation}`,
-    auto_send_enabled: false,
+    // Human-gate envelopes retain their canonical global-off assertion. The
+    // dedicated status read is different: it is server telemetry, so preserve
+    // a real boolean and let absence remain absence instead of stamping false.
+    ...(ctx.operation === "read_status"
+      ? {
+          auto_send_enabled:
+            typeof payload.auto_send_enabled === "boolean"
+              ? payload.auto_send_enabled
+              : undefined,
+        }
+      : { auto_send_enabled: false }),
     edge_correlation_id: ctx.correlation,
     // Distinct write results used to arrive as one indistinguishable body. These
     // three say which call this was, how it ended, and what it produced.
@@ -169,9 +181,9 @@ export interface HumanGateHttpOptions {
 }
 
 /**
- * Fixed-route authenticated proxy. It has no `send`, `queue`, `resume`, GO or
- * cohort-dispatch route by construction. Only an effective APPROVE may ask the
- * current Warmbly contract to schedule its exact reviewed message.
+ * Fixed-route authenticated proxy. It has no `send`, `dispatch`, `queue` or
+ * `resume` route by construction. APPROVE and repair reconciliation are the
+ * only ways this surface can cause durable scheduling.
  */
 export function createHumanGateHttpHandler(options: HumanGateHttpOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -247,7 +259,7 @@ export function createHumanGateHttpHandler(options: HumanGateHttpOptions) {
         };
       }
       body = { ...validated.value };
-    } else {
+    } else if (route.operation !== "reconcile") {
       for (const field of ["limit", "source_run_id", "selection_mode", "recover_version_ids", "decision", "reason", "acknowledged", "confirmation"] as const) {
         if (submitted[field] !== undefined) body[field] = submitted[field];
       }

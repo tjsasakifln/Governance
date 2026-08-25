@@ -14,10 +14,9 @@ APP="$CC/apps/web-shell"
 WORK="$(mktemp -d)"
 
 WPORT=${WPORT:-8099}; CPORT=${CPORT:-8098}; SPORT=${SPORT:-8097}; EPORT=${EPORT:-8096}
-# A second edge+shell pair whose forward-auth identity carries `admins`.
-# GO and cohort dispatch are admins-only, so proving both the refusal (on the
-# operators-only pair) and the happy path needs two identities, and the fake
-# edge fixes its groups at startup.
+# A second edge+shell pair whose forward-auth identity carries both groups.
+# APPROVE stays with operators; only idempotent approval reconciliation is
+# admins-only. The two fixed identities prove both sides of that boundary.
 EPORT2=${EPORT2:-8095}; SPORT2=${SPORT2:-8094}
 TOKEN=stub-operator-token
 TOKFILE="$WORK/token"; printf %s "$TOKEN" > "$TOKFILE"

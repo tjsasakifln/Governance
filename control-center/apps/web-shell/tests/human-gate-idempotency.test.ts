@@ -40,8 +40,10 @@ test("a definitive response advances the generation but changed payload has anot
   const second = humanGateIdempotencyKey(intent, shared);
   assert.notEqual(first, second);
   assert.notEqual(humanGateIdempotencyKey({ ...intent, limit: 4 }, shared), second);
-  const decision: HumanGateIntent = { action: "decide", version_id: "v-id", decision: "NO_GO", reason: "fixture", confirmation: "v3" };
-  assert.notEqual(humanGateIdempotencyKey(decision, shared), humanGateIdempotencyKey({ ...decision, confirmation: "v4" }, shared));
+  const hold: HumanGateIntent = { action: "review", version_id: "v-id", candidate_id: "candidate-id", decision: "HOLD", reason: "fixture" };
+  assert.notEqual(humanGateIdempotencyKey(hold, shared), humanGateIdempotencyKey({ ...hold, reason: "fixture changed" }, shared));
+  const repair: HumanGateIntent = { action: "reconcile" };
+  assert.equal(humanGateIdempotencyKey(repair, shared), humanGateIdempotencyKey({ ...repair }, shared));
 });
 
 test("selection mode and recovery set are part of the create intent", () => {

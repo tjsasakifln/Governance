@@ -2,9 +2,9 @@
  * The cohort `adjust` control-plane operation.
  *
  * Adjust mints a new immutable cohort version from edited copy and revokes the
- * authorization bound to the version it supersedes. It is the sixth and only
- * new member of the fixed human-gate allowlist; everything asserted here is
- * about keeping it exactly that narrow.
+ * historical authority bound to the version it supersedes. It remains one
+ * member of the fixed human-gate allowlist; everything asserted here is about
+ * keeping it exactly that narrow.
  *
  * No real mailbox, token or PII appears in this file. Hosts are `.invalid`,
  * hashes are obvious fixtures, and copy is neutral Portuguese.
@@ -118,26 +118,26 @@ describe("human gate adjust — the request that reaches Warmbly", () => {
     assert.match(String(seen.headers?.get("x-correlation-id")), /^cc:human-gate:/);
   });
 
-  it("runs under operators, while approval reconciliation remains admins-only", async () => {
+  it("runs under operators, like review and unlike admin-only reconciliation", async () => {
     let hits = 0;
     const handler = handlerWith(async () => {
       hits += 1;
       return new Response(JSON.stringify(createdPayload()), { status: 201 });
     });
-    // One identity, operators only. Adjust is reachable for it; bulk approval
-    // reconciliation is not. That difference is the whole RBAC claim.
+    // One identity, operators only. Adjust is reachable; repair is not.
     const ok = await handler(request("POST", ADJUST_PATH, "operators", adjustBody()));
     assert.equal(ok.status, 201, "operators must be sufficient for adjust");
     assert.equal(hits, 1);
 
-    const denied = await handler(
-      request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "operators", {
-        idempotency_key: "idem-reconcile-0002",
-      }),
-    );
+    const denied = await handler(request(
+      "POST",
+      `${HUMAN_GATE_PREFIX}/reconcile-approved`,
+      "operators",
+      { idempotency_key: "idem-reconcile-0002" },
+    ));
     assert.equal(denied.status, 403);
     assert.equal(denied.body.code, "insufficient_human_gate_role");
-    assert.equal(denied.body.operation, "reconcile_approved");
+    assert.equal(denied.body.operation, "reconcile");
     assert.equal(hits, 1, "a role refusal must never reach Warmbly");
   });
 
@@ -290,7 +290,7 @@ describe("human gate adjust — response fidelity", () => {
     assert.equal(res.body.receipt, "review:r1");
   });
 
-  it("labels every one of the six writes with its own operation name", async () => {
+  it("labels every fixed human-gate operation with its own name", async () => {
     const handler = handlerWith(async () => new Response(JSON.stringify({ receipt: "r" }), { status: 200 }));
     const cases: [string, string, Record<string, unknown>, string][] = [
       ["POST", HUMAN_GATE_PREFIX, { limit: 2, idempotency_key: "idem-create-0001" }, "create"],
@@ -299,17 +299,19 @@ describe("human gate adjust — response fidelity", () => {
       ["POST", `${HUMAN_GATE_PREFIX}/${COHORT}/candidates/${CANDIDATE}/review`, { decision: "HOLD", reason: "x", idempotency_key: "idem-review-0002" }, "review"],
       ["POST", ADJUST_PATH, adjustBody(), "adjust"],
       ["GET", HUMAN_GATE_PREFIX, {}, "list_cohorts"],
+      ["GET", "/v1/warmbly/operator/outbound-status", {}, "read_status"],
     ];
     for (const [method, path, body, operation] of cases) {
       const res = await handler(request(method, path, "operators", body));
       assert.equal(res.body.operation, operation, `${method} ${path}`);
     }
-    const reconcile = await handler(
-      request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "admins,operators", {
-        idempotency_key: "idem-reconcile-0001",
-      }),
-    );
-    assert.equal(reconcile.body.operation, "reconcile_approved");
+    const reconcile = await handler(request(
+      "POST",
+      `${HUMAN_GATE_PREFIX}/reconcile-approved`,
+      "admins,operators",
+      { idempotency_key: "idem-reconcile-0001" },
+    ));
+    assert.equal(reconcile.body.operation, "reconcile");
   });
 
   it("preserves the server's own refusal codes for every adjust conflict", async () => {

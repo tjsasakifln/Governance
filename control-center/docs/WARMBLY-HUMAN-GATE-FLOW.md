@@ -1,99 +1,115 @@
-# Gate humano de outbound — mapa de autoridade
+# Gate humano Warmbly — APPROVE agenda a mensagem
 
-Status: contrato de implementação para `ops.confenge.com.br`
-Fontes: `confenge.human-gate.v1`, `confenge.frozen_cohort.v1`,
-`bounded-cohort-policy.v1` e ADR-CC-001.
+Status: contrato implantável de `ops.confenge.com.br`.
 
 ## Fluxo canônico
 
 ```text
-fonte canônica de contratos públicos
-  -- somente fornecedor/contratada; órgão contratante é excluído -->
-fornecedor_cnpj_raiz × destinatário único
-  -- claims transacionais, sem repetição entre cohorts -->
-cohort/version imutável (máximo 10)
-  -- leitura autenticada --> candidate + preview exato congelado
-  -- escrita idempotente, disparada pela própria aprovação --> validation
-  -- escrita humana, uma ação --> APPROVE | REJECT | HOLD por candidate
-  -- APPROVE efetivo cria/confirma o touchpoint --> queue
-  -- worker do Warmbly, quando a pausa permitir, na janela e sob o teto --> send
+cohort/version imutável
+  → leitura autenticada do candidate + preview congelado
+  → validation vigente e VALID no Warmbly
+  → APPROVE por operators, com acknowledged=true
+  → na mesma transação lógica: touchpoint + auto_send=true + QUEUED + due_at
+  → worker Warmbly, quando todos os gates permitirem
+  → envio em dia útil, 09:00–18:00 America/Sao_Paulo, ≤10/hora
 ```
 
-| Etapa | Autoridade | Leitura no Control Center | Escrita permitida | Pode enviar? |
-|---|---|---|---|---|
-| Fonte/seleção | Warmbly + feed canônico | origem, `as_of`, freshness, progresso e exclusões | nenhuma seleção no frontend | não |
-| Cohort/version | Warmbly | lista, denominadores e relatório de exclusões | criar a próxima cohort sem repetição ou recuperar fornecedores de versões vencidas | não |
-| Candidate/preview | snapshot congelado Warmbly | fornecedor, destinatário, provenance, rota, assunto e corpo exatos | ajustar texto dentro do contrato tipado | não |
-| Validation | verificador do Warmbly | VALID/RISKY/INVALID/UNKNOWN/STALE, motivo e validade | solicitar/repetir; APPROVE a solicita sozinho quando necessário | não |
-| Review decision | Warmbly | decisão atual, vínculo, invalidações e agendamento | APPROVE/REJECT/HOLD com ator Authelia e motivo | APPROVE agenda; não entrega imediatamente |
-| Reconciliação | Warmbly | denominadores e falhas do relatório | `admins` conciliam APPROVEs duráveis anteriores ao agendamento | não |
-| Queue/send | runtime Warmbly | estado do touchpoint e métricas | não existe ação de send no gate | sim, somente pelo worker, com pausa liberada, janela e teto válidos |
+APPROVE é a autoridade humana completa para uma mensagem. Não há GO, handoff,
+“Entregar à fila” nem segunda tela. O clique não transporta e-mail: ele deixa a
+mensagem agendada, e somente o worker pode transportá-la depois.
+
+`NEXT_UNCLAIMED` usa claims transacionais por conta, fonte, fornecedor e
+destinatário. Não existe offset controlável pelo navegador: cohorts sucessivas
+ficam disjuntas mesmo com duas abas ou operadores concorrentes. Para versões
+vencidas, `RECOVER_PRIOR` relê os mesmos fornecedores na fonte atual e gera
+texto, evidência e hashes novos; decisões e agendamentos antigos não são
+herdados.
+
+| Etapa | Autoridade | Efeito |
+|---|---|---|
+| Cohort/version | Warmbly | congela seleção, denominadores, copy, hashes e policy |
+| Validation | Warmbly | precisa estar vigente e `VALID`; a ação de aprovar pode obtê-la antes da escrita |
+| APPROVE | `operators` | grava a revisão e converge a mensagem para `QUEUED`, `due_at`, `auto_send=true` |
+| HOLD/REJECT | `operators` | exige motivo e cancela/desenfileira a mensagem ainda não enviada |
+| Reconciliação | `admins` | reprocessa APPROVEs já gravados pelo mesmo agendador; é reparo global e idempotente |
+| Transporte | worker Warmbly | revalida drift e gates operacionais; envia somente na janela e sob o teto |
+
+## Auto-send: dois conceitos diferentes
+
+- `scheduling.auto_send=true` é por mensagem aprovada. É o efeito esperado de
+  APPROVE e permite que o worker a recolha na janela comercial.
+- `CONFENGE_AUTO_SEND_ENABLED=true` e `GREEN_AUTORUN=true` continuam proibidos e
+  derrubam o boot. As flags globais permanecem `false`.
+
+Não existe job de dispatch de cohort. A única criação de trabalho outbound
+controlado nasce de uma aprovação individual ou da reconciliação dessa mesma
+aprovação preexistente.
+
+## GO/NO-GO histórico
+
+Os endpoints de decisão da cohort e de dispatch foram removidos do contrato
+vivo. Registros antigos de GO/NO-GO continuam legíveis somente para auditoria:
+não autorizam, bloqueiam, enfileiram nem desenfileiram.
+
+O equivalente operacional de impedir uma mensagem ainda não enviada é
+HOLD/REJECT no candidato. O Warmbly invalida o vínculo, cancela a fila e preserva
+o histórico. Depois de `SENT`, o histórico é imutável.
+
+## Reconciliação e backfill
+
+`POST /v1/confenge/cohorts/reconcile-approved` percorre as decisões duráveis,
+seleciona a decisão mais recente de cada `(cohort_version_id, candidate_id)` e
+chama exatamente o agendador usado por APPROVE. Aprovações duplicadas da mesma
+mensagem convergem em um touchpoint. A resposta distingue:
+
+- `approval_records` — histórico bruto;
+- `latest_approved_bindings` — vínculos cuja decisão mais recente é APPROVE;
+- `unique_approved_candidates` — mensagens distintas após deduplicação;
+- `scheduled`, `already_scheduled`, `failed` e falhas nomeadas.
+
+Reexecutar é seguro: a chave persistida em
+`confenge_cohort_candidate_dispatches` e os invariantes do touchpoint impedem
+duplicação. No Control Center essa rota aparece como “Reprocessar aprovações já
+registradas”, explicitamente como reparo de `admins`, nunca como próximo passo.
+
+## Bloqueio visível antes da revisão
+
+Toda carga de Warmbly lê `GET /v1/warmbly/operator/outbound-status`, que o
+conector fixa em `GET /v1/confenge/status`. A Revisão renderiza o resultado logo
+após o título, antes de preview, identidade ou botões. Kill switch, pausa ou
+leitura incompleta nunca viram “liberado” por inferência.
+
+Com kill switch acionado, a mensagem ainda fica `QUEUED` com `due_at` e
+`auto_send=true`, mas a tela diz que nada sairá até o bloqueio ser removido fora
+deste fluxo.
 
 ## Invariantes de segurança
 
-- Leads são empresas fornecedoras/contratadas. A identidade canônica usa
-  `fornecedor_cnpj`/`ni_fornecedor`, reduzida ao CNPJ-raiz; `orgao_cnpj` e demais
-  entidades contratantes nunca são leads.
-- O frontend exibe elegibilidade e motivos recebidos do contrato versionado; não
-  calcula, completa ou corrige candidatos localmente.
-- `NEXT_UNCLAIMED` usa claims transacionais por conta, fonte, fornecedor e
-  destinatário. Dez requisições de dez formam até 100 leads disjuntos, sem
-  offset controlável pelo navegador. Replay da mesma idempotency key devolve a
-  mesma cohort.
-- `RECOVER_PRIOR` relê os mesmos fornecedores na fonte atual e gera texto,
-  evidência e hashes novos. Aprovação e agendamento antigos não são herdados.
-- Quando não há validation vigente, APPROVE dispara validation, relê o estado e
-  só registra a decisão se o Warmbly devolver VALID. Um estado não VALID encerra
-  a cadeia sem tentar o APPROVE.
-- APPROVE é bloqueado onde verificar de novo não ajuda: destinatário ausente ou
-  inválido, INVALID/RISKY resolvido, hard bounce, suppression, opt-out,
-  duplicidade, copy QA reprovada ou proveniência ausente declarada pelo servidor.
-- A ciência do revisor é o clique em Aprovar e viaja como `acknowledged=true`.
-  O adaptador recusa antes do fio qualquer APPROVE sem esse campo.
-- Cada APPROVE fica ligado aos hashes de recipient, content, policy e evidence e
-  à validation vigente. Drift, expiração, HOLD ou REJECT invalidam o agendamento
-  correspondente sem apagar a decisão humana original.
-- Um APPROVE efetivo cria ou confirma, na mesma operação, um touchpoint com
-  `auto_send=true` para a próxima janela elegível. Esse valor é por mensagem e
-  não habilita o auto-send global nem o green autorun.
-- Não existe GO nem entrega manual da cohort no contrato vigente. As rotas
-  legadas podem permanecer pinadas durante rollout, mas a interface atual não
-  apresenta seus controles.
-- A reconciliação chama somente `POST {prefix}/reconcile-approved`, sem cohort,
-  destinatário ou conteúdo escolhidos pelo navegador. Ela é `admins`,
-  idempotente, atende primeiro aprovações duráveis antigas e não envia nem
-  retoma o disparo.
-- Pausa, kill switch, dias úteis, janela comercial, teto por hora, suppression,
-  opt-out e bounce continuam sendo reavaliados pelo Warmbly. Agendado não
-  significa enviado.
-- A identidade humana nasce somente dos headers ForwardAuth entregues por hop
-  confiável. O navegador não declara ator. Auditoria registra ids opacos,
-  hashes, estados e reason codes; recipient, subject e body não entram em logs.
-- O Control Center não expõe `send`, `queue`, `resume`, `payment` nem proxy
-  genérico no human gate. O controle operacional de pausa/retomada continua uma
-  superfície separada e mais restrita.
+- O frontend não calcula elegibilidade nem destinatários.
+- APPROVE continua exigindo validation vigente e `VALID` no servidor.
+- O clique continua produzindo `acknowledged=true`; o adaptador recusa antes do
+  fio quando ele falta.
+- HOLD/REJECT continuam exigindo motivo escrito.
+- Drift de recipient, content, evidence, policy, validation ou suppression
+  invalida/cancela antes do transporte.
+- Janela, dias úteis, cap 10/hora, pausa e kill switch permanecem no Warmbly.
+- Writes têm idempotency key e a borda descarta query string.
+- O conector não possui proxy genérico. `send`, `dispatch`, `queue`, `resume`,
+  `payment`, `charge`, `enroll` e `deliver` são segmentos proibidos e testados
+  em todas as formas. A reconciliação é uma rota fixa, global e sem payload
+  upstream.
+- Ausência é ausência, nunca zero; `effective` ausente nunca é APPROVE efetivo.
+- Uma marca otimista só sobrevive quando a releitura confirma APPROVE efetivo,
+  `auto_send=true`, `QUEUED`/`SENT` e `due_at`.
+- Timeout ou 5xx de write é `UNKNOWN`; retry reutiliza a mesma idempotency key.
 
-## Fronteiras de RBAC
+## RBAC deliberado
 
-- `operators`: listar, detalhar, criar/reproduzir cohort pequena, solicitar
-  validation, ajustar texto e registrar APPROVE/REJECT/HOLD.
-- `admins`: tudo acima e reconciliar aprovações duráveis antigas com a fila.
-- Serviço Control Center → Warmbly usa credencial própria de menor escopo, sem
-  permissão de send. O ator humano e seus grupos vêm da borda autenticada, nunca
-  de headers controláveis pelo browser.
-
-## Falhas e concorrência
-
-- POSTs exigem `Idempotency-Key`; acknowledgement e motivo fazem parte da
-  intenção. Retry, duas abas e restart devolvem o mesmo receipt, ou 409 se a
-  chave for reutilizada com payload diferente.
-- Um clique repetido durante validation → review não vira segunda intenção: o
-  formulário fica reservado até o fim da cadeia.
-- Timeout depois de write é desfecho desconhecido. A tela relê o recurso antes
-  de permitir repetição e preserva a idempotency key da intenção incerta.
-- A reconciliação relata registros APPROVE, bindings vigentes, candidatos
-  únicos, agendados agora, já agendados e falhas. Qualquer falha interrompe a
-  ampliação do backlog até classificação do motivo.
-- Payload parcial é 400, ausência de sessão é 401, grupo insuficiente é 403,
-  conflito/version drift é 409 e indisponibilidade upstream é 502/503. Nenhum
-  desses casos promove candidato, fila ou envio.
+- `operators`: listar, criar/reproduzir, validar, ajustar e registrar
+  APPROVE/HOLD/REJECT. Portanto `operators` podem provocar saída futura de
+  e-mail; o botão diz “Aprovar e enfileirar para envio”.
+- `admins`: reparo global de aprovações já registradas. Na instalação atual a
+  identidade administrativa também pertence a `operators`.
+- Uma identidade sem o grupo da rota é recusada na borda antes do upstream.
+- A identidade vem de ForwardAuth em hop confiável; o navegador nunca declara o
+  ator e PII/copy não entra em logs.
