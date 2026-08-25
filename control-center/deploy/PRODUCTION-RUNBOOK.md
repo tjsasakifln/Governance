@@ -164,9 +164,11 @@ docker compose -p confenge-control-center \
 # Mandatory identity gate: proves baseline ancestry and reconciles repository
 # SHA -> image label/ID -> container env -> each live HTTP response. Save this
 # output beside the release record; health alone is not release evidence.
+export CC_RELEASE_EVIDENCE_DIR=/opt/confenge-control-center-release-evidence
+mkdir -p "$CC_RELEASE_EVIDENCE_DIR"
 set -o pipefail
 ./verify-release.sh "$CC_RELEASE_SHA" context web | tee \
-  "release-attestation-${CC_RELEASE_SHA}.log"
+  "$CC_RELEASE_EVIDENCE_DIR/release-attestation-${CC_RELEASE_SHA}.log"
 ```
 
 For a first installation only, use the full bootstrap sequence instead of the

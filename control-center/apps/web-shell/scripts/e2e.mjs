@@ -11,6 +11,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 const app = join(here, "..");
 const ccRoot = join(app, "../..");
 const E2E_RELEASE_SHA = "8a2eb1f012345678901234567890123456789012";
+const REQUIRED_RUNTIME_BASELINE_SHA = "64ece7d38abacd3adeaa02735b4f22af66caab0f";
+
+function assertRuntimeIdentity(identity, service) {
+  if (identity.schema_version !== "control-center.runtime-identity.v1"
+    || identity.service !== service
+    || identity.release_sha !== E2E_RELEASE_SHA
+    || identity.required_baseline_sha !== REQUIRED_RUNTIME_BASELINE_SHA
+    || identity.release_status !== "PINNED"
+    || identity.production_required !== true) {
+    throw new Error(`invalid runtime identity for ${service}: ${JSON.stringify(identity)}`);
+  }
+}
 
 async function freePort() {
   const probe = createServer();
@@ -121,9 +133,8 @@ try {
   await waitHttp(`${webBase}/ready`, 15_000);
   const contextIdentity = await fetch(`${contextBase}/v1/runtime-identity`).then((response) => response.json());
   const webIdentity = await fetch(`${webBase}/runtime-identity`).then((response) => response.json());
-  if (contextIdentity.release_sha !== E2E_RELEASE_SHA || webIdentity.release_sha !== E2E_RELEASE_SHA) {
-    throw new Error(`runtime identity diverged: context=${contextIdentity.release_sha} web=${webIdentity.release_sha}`);
-  }
+  assertRuntimeIdentity(contextIdentity, "control-center-context");
+  assertRuntimeIdentity(webIdentity, "control-center-web");
   const cockpitHtml = await fetch(`${webBase}/`).then((response) => response.text());
   if (!cockpitHtml.includes(`name="cc-release-sha" content="${E2E_RELEASE_SHA}"`)) {
     throw new Error("authenticated cockpit does not receive the immutable release SHA");

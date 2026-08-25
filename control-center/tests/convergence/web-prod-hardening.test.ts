@@ -89,6 +89,12 @@ test("web production readiness fails closed when the release SHA is not pinned",
       release_status: "UNVERIFIED",
     });
   });
+
+  await withProductionWeb({ NODE_ENV: "production", CC_RELEASE_SHA: "local" }, async (base) => {
+    const ready = await fetch(`${base}/ready`);
+    assert.equal(ready.status, 503);
+    assert.equal((await ready.json() as { ready: boolean }).ready, false);
+  });
 });
 
 test("web identity endpoint and authenticated cockpit carry the exact pinned SHA", async () => {

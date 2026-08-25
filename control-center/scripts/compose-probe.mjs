@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 const deploy = resolve(dirname(fileURLToPath(import.meta.url)), "../deploy");
 const password = "compose-probe-not-production";
 const mcpToken = "compose-probe-mcp-not-production";
+const requiredRuntimeBaselineSha = "64ece7d38abacd3adeaa02735b4f22af66caab0f";
 const release = spawnSync("git", ["rev-parse", "HEAD"], {
   cwd: deploy,
   encoding: "utf8",
@@ -174,7 +175,12 @@ try {
 } catch {
   fail(`context runtime identity is not JSON: ${runtimeIdentityBody.slice(0, 400)}`, null);
 }
-if (runtimeIdentity.release_status !== "PINNED" || runtimeIdentity.release_sha !== releaseSha) {
+if (runtimeIdentity.schema_version !== "control-center.runtime-identity.v1"
+  || runtimeIdentity.service !== "control-center-context"
+  || runtimeIdentity.release_status !== "PINNED"
+  || runtimeIdentity.release_sha !== releaseSha
+  || runtimeIdentity.required_baseline_sha !== requiredRuntimeBaselineSha
+  || runtimeIdentity.production_required !== true) {
   fail(`context runtime identity diverged from checkout ${releaseSha}: ${runtimeIdentityBody.slice(0, 400)}`, null);
 }
 

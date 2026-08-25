@@ -17,13 +17,15 @@ export function runtimeIdentityFromEnv(
 ): RuntimeIdentity {
   const candidate = (env.CC_RELEASE_SHA ?? "").trim();
   const releaseSha = FULL_GIT_SHA.test(candidate) ? candidate : null;
+  const productionRequired = [env.CONTROL_CENTER_ENV, env.NODE_ENV]
+    .some((value) => value?.trim().toLowerCase() === "production");
   return {
     schema_version: "control-center.runtime-identity.v1",
     service,
     release_sha: releaseSha,
     required_baseline_sha: REQUIRED_RUNTIME_BASELINE_SHA,
     release_status: releaseSha === null ? "UNVERIFIED" : "PINNED",
-    production_required: env.CONTROL_CENTER_ENV === "production",
+    production_required: productionRequired,
   };
 }
 

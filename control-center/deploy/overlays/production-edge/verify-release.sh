@@ -17,6 +17,22 @@ if ! git cat-file -e "${EXPECTED}^{commit}" 2>/dev/null; then
   echo "FAIL release: expected SHA is not a commit in this repository"
   exit 1
 fi
+if ! REPOSITORY_HEAD=$(git rev-parse HEAD 2>/dev/null); then
+  echo "FAIL release: repository HEAD could not be resolved"
+  exit 1
+fi
+if [ "$REPOSITORY_HEAD" != "$EXPECTED" ]; then
+  echo "FAIL release: checkout HEAD ${REPOSITORY_HEAD} does not exactly match expected ${EXPECTED}"
+  exit 1
+fi
+if ! SOURCE_STATUS=$(git status --porcelain=v1 --untracked-files=all); then
+  echo "FAIL release: repository source status could not be inspected"
+  exit 1
+fi
+if [ -n "$SOURCE_STATUS" ]; then
+  echo "FAIL release: checkout contains tracked or untracked changes; image provenance is not reproducible"
+  exit 1
+fi
 if ! git merge-base --is-ancestor "$BASELINE" "$EXPECTED"; then
   echo "FAIL release: ${EXPECTED} does not descend from required baseline ${BASELINE}"
   exit 1
@@ -48,14 +64,19 @@ for svc in "${SERVICES[@]}"; do
   esac
   if [ -n "$runtime_endpoint" ]; then
     runtime_http=$(docker exec "$container" node -e '
-      const endpoint = process.argv[1];
-      fetch(endpoint).then(async (response) => {
+      const [endpoint, expectedService, expectedBaseline] = process.argv.slice(1);
+      fetch(endpoint, { signal: AbortSignal.timeout(5000) }).then(async (response) => {
         if (!response.ok) throw new Error(`status_${response.status}`);
         const body = await response.json();
+        if (body.schema_version !== "control-center.runtime-identity.v1") throw new Error("schema_mismatch");
+        if (body.service !== expectedService) throw new Error("service_mismatch");
+        if (body.required_baseline_sha !== expectedBaseline) throw new Error("baseline_mismatch");
+        if (body.production_required !== true) throw new Error("production_gate_disabled");
         if (body.release_status !== "PINNED") throw new Error("release_not_pinned");
+        if (!/^[0-9a-f]{40}$/.test(String(body.release_sha ?? ""))) throw new Error("release_invalid");
         process.stdout.write(String(body.release_sha ?? ""));
       }).catch(() => process.exit(2));
-    ' "$runtime_endpoint" 2>/dev/null || true)
+    ' "$runtime_endpoint" "control-center-${svc}" "$BASELINE" 2>/dev/null || true)
   fi
 
   echo "--- ${svc}"

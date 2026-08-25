@@ -53,6 +53,12 @@ test("runtime identity accepts only a full immutable SHA and pins the required b
     CC_RELEASE_SHA: RELEASE_SHA.toUpperCase(),
   }, "control-center-context");
   assert.equal(uppercase.release_status, "UNVERIFIED");
+
+  const standardProduction = runtimeIdentityFromEnv({
+    NODE_ENV: "production",
+    CC_RELEASE_SHA: "local",
+  }, "control-center-context");
+  assert.equal(standardProduction.production_required, true);
 });
 
 test("production readiness fails closed without release identity", async () => {

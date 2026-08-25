@@ -40,6 +40,17 @@ esac
   writeFileSync(git, `#!/bin/sh
 case "$1" in
   cat-file) exit 0 ;;
+  rev-parse)
+    if [ -n "\${FAKE_GIT_HEAD:-}" ]; then printf '%s\\n' "$FAKE_GIT_HEAD"; exit 0; fi
+    exec /usr/bin/git "$@"
+    ;;
+  status)
+    if [ "\${FAKE_GIT_DIRTY:-false}" = "true" ]; then
+      printf ' M control-center/services/context/src/runtime-identity.ts\\n'
+      exit 0
+    fi
+    exit 0
+    ;;
   merge-base)
     if [ "\${FAKE_GIT_ANCESTRY:-valid}" = "valid" ]; then exit 0; fi
     exit 1
@@ -120,4 +131,36 @@ test("release attestation rejects a full SHA outside the required baseline", () 
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /does not descend from required baseline/);
+});
+
+test("release attestation rejects an expected SHA that is not the checked-out HEAD", () => {
+  const sha = repositoryHead();
+  const bin = fakeRuntimeBin();
+  const result = spawnSync("bash", [SCRIPT, sha, "context", "web"], {
+    cwd: REPOSITORY_ROOT,
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+      FAKE_GIT_HEAD: "0000000000000000000000000000000000000000",
+    },
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /checkout HEAD .* does not exactly match expected/);
+});
+
+test("release attestation rejects a dirty image source tree", () => {
+  const sha = repositoryHead();
+  const bin = fakeRuntimeBin();
+  const result = spawnSync("bash", [SCRIPT, sha, "context", "web"], {
+    cwd: REPOSITORY_ROOT,
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+      FAKE_GIT_DIRTY: "true",
+    },
+    encoding: "utf8",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /checkout contains tracked or untracked changes/);
 });
