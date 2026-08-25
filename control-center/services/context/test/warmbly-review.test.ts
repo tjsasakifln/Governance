@@ -36,7 +36,17 @@ function decisionBody(touchpoint = queuedTouchpoint(), scheduledFor: unknown = D
 test("review list publishes only authoritative and internally consistent pagination", () => {
   const rows = Array.from({ length: 55 }, (_, index) => ({ id: `draft-${index}` }));
   const fullPage = Array.from({ length: 100 }, (_, index) => ({ id: `draft-${index}` }));
-  assert.deepEqual(reviewDraftPage({ data: fullPage, pagination: { total: 250, has_more: true } }, 100, 100).page, {
+  assert.deepEqual(reviewDraftPage({
+    data: fullPage,
+    pagination: {
+      limit: 100,
+      offset: 100,
+      total: 250,
+      remaining_count: 50,
+      has_more: true,
+      next_offset: 200,
+    },
+  }, 100, 100).page, {
     limit: 100,
     offset: 100,
     loaded_count: 100,
@@ -78,6 +88,18 @@ test("review list publishes only authoritative and internally consistent paginat
     assert.equal(page.coverage_status, "UNPROVEN");
     assert.equal(Object.hasOwn(page, "total_count"), false);
     assert.equal(Object.hasOwn(page, "has_more"), false);
+  }
+  const cursorContradictions = [
+    { total: 250, has_more: true, next_offset: 999 },
+    { total: 250, has_more: true, remaining_count: 1 },
+    { total: 250, has_more: true, limit: 50 },
+    { total: 250, has_more: true, offset: 0 },
+    { has_more: true, next_offset: "200" },
+  ];
+  for (const pagination of cursorContradictions) {
+    const page = reviewDraftPage({ data: fullPage, pagination }, 100, 100).page;
+    assert.equal(page.coverage_status, "UNPROVEN");
+    assert.equal(Object.hasOwn(page, "next_offset"), false);
   }
   assert.throws(
     () => reviewDraftPage({ data: { id: "not-a-list" } }, 100, 0),

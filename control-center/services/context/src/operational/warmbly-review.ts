@@ -116,11 +116,29 @@ export function reviewDraftPage(payload: unknown, limit: number, offset: number)
   if (!pagination || data.length > limit) return base;
 
   const total = nonNegativeInteger(pagination.total);
+  const declaredLimit = nonNegativeInteger(pagination.limit);
+  const declaredOffset = nonNegativeInteger(pagination.offset);
+  const declaredRemaining = nonNegativeInteger(pagination.remaining_count);
+  const declaredNextOffset = nonNegativeInteger(pagination.next_offset);
   const declaredHasMore = typeof pagination.has_more === "boolean"
     ? pagination.has_more
     : undefined;
   if (pagination.total !== undefined && pagination.total !== null && total === undefined) return base;
+  if (pagination.limit !== undefined && pagination.limit !== null && declaredLimit === undefined) return base;
+  if (pagination.offset !== undefined && pagination.offset !== null && declaredOffset === undefined) return base;
+  if (
+    pagination.remaining_count !== undefined &&
+    pagination.remaining_count !== null &&
+    declaredRemaining === undefined
+  ) return base;
+  if (
+    pagination.next_offset !== undefined &&
+    pagination.next_offset !== null &&
+    declaredNextOffset === undefined
+  ) return base;
   if (pagination.has_more !== undefined && declaredHasMore === undefined) return base;
+  if (declaredLimit !== undefined && declaredLimit !== limit) return base;
+  if (declaredOffset !== undefined && declaredOffset !== offset) return base;
   if (declaredHasMore === true && data.length === 0) return base;
 
   const pageEnd = offset + data.length;
@@ -128,6 +146,8 @@ export function reviewDraftPage(payload: unknown, limit: number, offset: number)
     if (total < pageEnd) return base;
     const hasMore = pageEnd < total;
     if (declaredHasMore !== undefined && declaredHasMore !== hasMore) return base;
+    if (declaredRemaining !== undefined && declaredRemaining !== total - pageEnd) return base;
+    if (declaredNextOffset !== undefined && (!hasMore || declaredNextOffset !== pageEnd)) return base;
     if (hasMore && data.length !== limit) return base;
     return {
       ...base,
@@ -143,6 +163,8 @@ export function reviewDraftPage(payload: unknown, limit: number, offset: number)
   }
 
   if (declaredHasMore !== undefined) {
+    if (declaredRemaining !== undefined) return base;
+    if (declaredNextOffset !== undefined && (!declaredHasMore || declaredNextOffset !== pageEnd)) return base;
     if (declaredHasMore && data.length !== limit) return base;
     return {
       ...base,
