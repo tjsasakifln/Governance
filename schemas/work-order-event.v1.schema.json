@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/confenge.work_order_event.v1.schema.json",
+  "title": "confenge.work_order_event.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "schema_version", "work_order_id", "event_type", "version", "expected_version", "idempotency_key", "causation_id", "occurred_at", "actor", "payload"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "confenge.work_order_event.v1"},
+    "work_order_id": {"type": "string", "minLength": 1},
+    "event_type": {"enum": ["WORK_ORDER_CREATED", "OWNER_ASSIGNED", "INPUT_RECEIVED", "WORK_STARTED", "WORK_BLOCKED", "WORK_RESUMED", "ARTIFACT_RECORDED", "QA_STARTED", "QA_FAILED", "QA_PASSED", "DELIVERED", "DELIVERY_ACCEPTED", "WORK_ORDER_CLOSED"]},
+    "version": {"type": "integer", "minimum": 1},
+    "expected_version": {"type": "integer", "minimum": 0},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "causation_id": {"type": "string", "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "actor": {"type": "string", "minLength": 1},
+    "payload": {"type": "object"}
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/confenge.delivery_order_requested.v1.schema.json",
+  "title": "confenge.delivery_order_requested.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id", "schema_version", "synthetic", "correlation_id", "causation_id", "idempotency_key",
+    "organization_id", "account_id", "client_ref", "opportunity_id", "qco_id", "proposal_id",
+    "proposal_version", "accepted_snapshot_hash", "offer_id", "offer_version", "deliverable_id",
+    "deliverable_version", "scope_version", "price_version", "terms_version", "financial_gate",
+    "onboarding_ref", "occurred_at", "evidence_refs"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "confenge.delivery_order_requested.v1"},
+    "synthetic": {"type": "boolean"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "causation_id": {"type": "string", "minLength": 1},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "organization_id": {"type": "string", "minLength": 1},
+    "account_id": {"type": "string", "minLength": 1},
+    "client_ref": {"type": "string", "minLength": 1},
+    "opportunity_id": {"type": "string", "minLength": 1},
+    "qco_id": {"type": "string", "minLength": 1},
+    "proposal_id": {"type": "string", "minLength": 1},
+    "proposal_version": {"type": "integer", "minimum": 1},
+    "accepted_snapshot_hash": {"type": "string", "pattern": "^(sha256:)?[a-f0-9]{64}$"},
+    "offer_id": {"type": "string", "minLength": 1},
+    "offer_version": {"type": "string", "minLength": 1},
+    "deliverable_id": {"type": "string", "minLength": 1},
+    "deliverable_version": {"type": "string", "minLength": 1},
+    "scope_version": {"type": "string", "minLength": 1},
+    "price_version": {"type": "string", "minLength": 1},
+    "terms_version": {"type": "string", "minLength": 1},
+    "financial_gate": {"$ref": "financial-gate.v1.schema.json"},
+    "onboarding_ref": {"type": ["string", "null"], "minLength": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  }
+}

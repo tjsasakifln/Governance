@@ -1,0 +1,39 @@
+{
+  "event_id": "evt-delivery-request-diag-accepted-gate-001",
+  "schema_version": "confenge.delivery_order_requested.v1",
+  "synthetic": true,
+  "correlation_id": "corr-confenge-diag-canary-001",
+  "causation_id": "evt-proposal-accepted-diag-001",
+  "idempotency_key": "delivery-request:proposal-diag-canary-001:1:synthetic-gate-001",
+  "organization_id": "org-confenge-synthetic-001",
+  "account_id": "acct-synthetic-redacted-001",
+  "client_ref": "client-synthetic-redacted-001",
+  "opportunity_id": "opp-diag-synthetic-001",
+  "qco_id": "qco-diag-synthetic-001",
+  "proposal_id": "proposal-diag-synthetic-001",
+  "proposal_version": 1,
+  "accepted_snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "offer_id": "CFG-DIAG-EXP-v1",
+  "offer_version": "v1",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "deliverable_version": "v1",
+  "scope_version": "CFG-SCOPE-DIAG-EXP-v1",
+  "price_version": "CFG-OFFER-CATALOG-v1",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "financial_gate": {
+    "schema_version": "confenge.financial_gate.v1",
+    "state": "SYNTHETIC_VALID",
+    "synthetic": true,
+    "source_event_id": "fixture:financial-gate-diag-synthetic-001",
+    "received_revenue": false,
+    "evidence_refs": [
+      "fixture:financial-gate-diag-synthetic-001"
+    ]
+  },
+  "onboarding_ref": "fixture:onboarding-diag-synthetic-001",
+  "occurred_at": "2026-08-25T12:00:00.000Z",
+  "evidence_refs": [
+    "fixture:proposal-diag-synthetic-accepted-v1",
+    "fixture:onboarding-diag-synthetic-001"
+  ]
+}
