@@ -1138,6 +1138,8 @@ function reviewDraftCard(item: unknown): string {
   const decision = actionable
     ? `<form data-review-form="${escapeHtml(id)}" class="operator-form">
                 <input type="hidden" name="expected_content_hash" value="${escapeHtml(contentHash)}" />
+                <textarea name="original_subject" hidden>${escapeHtml(subject)}</textarea>
+                <textarea name="original_body_text" hidden>${escapeHtml(bodyText)}</textarea>
                 <label>Assunto <textarea name="subject" rows="${subjectRows}">${escapeHtml(subject)}</textarea></label>
                 <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(bodyText)}</textarea></label>
                 <label>Decisão <select name="action">

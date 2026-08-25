@@ -1,10 +1,39 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { bindReviewActions } from "../src/app";
 import { createHttpAdapter } from "../src/adapters";
 import { commercialBlock } from "../src/ui/domains";
+import { operatorBanner } from "../src/ui/render";
 import { recordingFetch, operationalRouter } from "./helpers";
 
 const DRAFT_ID = "11111111-2222-4333-8444-555555555555";
+const HASH = "sha256:exact";
+
+function confirmedDecision(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const observedAt = new Date(Date.now() - 1_000).toISOString();
+  const approvedAt = new Date(Date.now() - 2_000).toISOString();
+  const dueAt = new Date(Date.now() + 86_400_000).toISOString();
+  return {
+    schema_version: "control-center.review-decision-receipt.v1",
+    outcome: "confirmed",
+    action: "APPROVE",
+    touchpoint_id: DRAFT_ID,
+    expected_content_hash: HASH,
+    correlation_id: `review:APPROVE:${DRAFT_ID}:${HASH}`,
+    observed_at: observedAt,
+    message: `Aprovação confirmada no servidor em QUEUED para ${dueAt}.`,
+    readback: { status: "confirmed", detail: "write e readback confirmam a mesma versão persistida" },
+    receipt_id: `review:${DRAFT_ID}:2026-08-25T04:00:01Z`,
+    content_hash: HASH,
+    approved_content_hash: HASH,
+    state: "QUEUED",
+    due_at: dueAt,
+    scheduled_for: dueAt,
+    approved_by: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    approved_at: approvedAt,
+    ...overrides,
+  };
+}
 
 test("commercial review surface renders editable exact-hash decisions without an immediate-send control", async () => {
   const router = operationalRouter();
@@ -38,23 +67,192 @@ test("commercial review surface renders editable exact-hash decisions without an
   assert.doesNotMatch(html, /enviar agora|dispatch-now/i);
 });
 
-test("review decision posts the expected hash and reports next-window scheduling", async () => {
-  let request: RequestInit | undefined;
+test("review decision posts the expected hash and only confirms a canonical receipt", async () => {
+  const requests: RequestInit[] = [];
   const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    request = init;
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    requests.push(init ?? {});
+    return new Response(JSON.stringify(confirmedDecision()), { status: 200 });
   }) as typeof fetch;
   const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
   const result = await adapter.reviewDraftAction({
     id: DRAFT_ID,
     action: "APPROVE",
-    expected_content_hash: "sha256:exact",
+    expected_content_hash: HASH,
   });
   assert.equal(result.ok, true);
-  assert.match(result.message, /próxima janela útil/);
-  assert.match(String(request?.body), /sha256:exact/);
-  const headers = request?.headers as Record<string, string>;
-  assert.match(String(headers["idempotency-key"]), /sha256:exact/);
+  assert.match(result.message, /confirmada no servidor/);
+  assert.equal(result.outcome, "executed");
+  assert.equal(result.readback?.status, "confirmed");
+  assert.equal(result.reviewDecision?.state, "QUEUED");
+  assert.equal(result.reviewDecision?.approvedContentHash, HASH);
+  assert.equal(result.receipt?.writes_to, "warmbly");
+  assert.match(String(requests[0]?.body), /sha256:exact/);
+  const headers = requests[0]?.headers as Record<string, string>;
+  assert.equal(headers["idempotency-key"], `review:APPROVE:${DRAFT_ID}:${HASH}`);
+
+  const replay = await adapter.reviewDraftAction({ id: DRAFT_ID, action: "APPROVE", expected_content_hash: HASH });
+  assert.equal(replay.ok, true);
+  const replayHeaders = requests[1]?.headers as Record<string, string>;
+  assert.equal(replayHeaders["idempotency-key"], headers["idempotency-key"]);
+  assert.equal(replay.receipt?.id, result.receipt?.id);
+
+  const html = operatorBanner(result);
+  assert.match(html, /Aprovação e agendamento confirmados pelo servidor/);
+  assert.match(html, /data-review-decision-receipt="true"/);
+  assert.match(html, /data-review-state="QUEUED"/);
+  assert.match(html, /data-review-due-at=/);
+  assert.match(html, /agendada pelo Warmbly; pausa e kill switch ainda governam a saída/);
+  assert.match(html, /write \+ readback canônico confirmados/);
+});
+
+test("browser never turns malformed or incomplete 2xx review bodies into success", async (t) => {
+  const cases: Array<{ name: string; body?: unknown }> = [
+    { name: "empty body", body: undefined },
+    { name: "legacy ok boolean", body: { ok: true } },
+    { name: "wrong id", body: confirmedDecision({ touchpoint_id: "99999999-8888-4777-8666-555555555555" }) },
+    { name: "wrong hash", body: confirmedDecision({ content_hash: "sha256:other" }) },
+    { name: "APPROVE not effective", body: confirmedDecision({ state: "NEEDS_REVIEW" }) },
+    { name: "QUEUED without due_at", body: confirmedDecision({ due_at: "", scheduled_for: "" }) },
+    { name: "readback stale", body: confirmedDecision({ readback: { status: "not_confirmed", detail: "stale" } }) },
+  ];
+  for (const scenario of cases) {
+    await t.test(scenario.name, async () => {
+      const fetchImpl = (async () => scenario.body === undefined
+        ? new Response(null, { status: 204 })
+        : new Response(JSON.stringify(scenario.body), { status: 200 })) as typeof fetch;
+      const adapter = createHttpAdapter("http://context.test", fetchImpl, { kind: "human", id: "founder-local" });
+      const result = await adapter.reviewDraftAction({
+        id: DRAFT_ID,
+        action: "APPROVE",
+        expected_content_hash: HASH,
+      });
+      assert.equal(result.ok, false);
+      assert.equal(result.outcome, "unknown");
+      assert.match(result.message, /não confirmado|recibo incompatível/i);
+      assert.doesNotMatch(result.message, /aprovada e agendada para a próxima janela útil/i);
+    });
+  }
+});
+
+test("server not_confirmed and browser transport failure both say not to repeat", async () => {
+  const notConfirmed = confirmedDecision({
+    outcome: "not_confirmed",
+    message: "Resultado não confirmado. Não repita ainda: readback indisponível.",
+    readback: { status: "unavailable", detail: "readback indisponível" },
+    receipt_id: undefined,
+    state: undefined,
+    due_at: undefined,
+    scheduled_for: undefined,
+  });
+  const serverAdapter = createHttpAdapter(
+    "http://context.test",
+    (async () => new Response(JSON.stringify(notConfirmed), { status: 200 })) as typeof fetch,
+    { kind: "human", id: "founder-local" },
+  );
+  const serverResult = await serverAdapter.reviewDraftAction({
+    id: DRAFT_ID,
+    action: "APPROVE",
+    expected_content_hash: HASH,
+  });
+  assert.equal(serverResult.ok, false);
+  assert.equal(serverResult.readback?.status, "unavailable");
+  assert.match(serverResult.message, /não repita ainda/i);
+  const unconfirmedHtml = operatorBanner(serverResult);
+  assert.match(unconfirmedHtml, /Resultado não confirmado/);
+  assert.match(unconfirmedHtml, /continua em Ação necessária/);
+  assert.match(unconfirmedHtml, /Não repita agora/);
+
+  const transportAdapter = createHttpAdapter(
+    "http://context.test",
+    (async () => { throw new Error("timeout pós-write"); }) as typeof fetch,
+    { kind: "human", id: "founder-local" },
+  );
+  const transportResult = await transportAdapter.reviewDraftAction({
+    id: DRAFT_ID,
+    action: "APPROVE",
+    expected_content_hash: HASH,
+  });
+  assert.equal(transportResult.ok, false);
+  assert.equal(transportResult.code, "browser_transport");
+  assert.match(transportResult.message, /não repita ainda/i);
+});
+
+test("review submit disables every control immediately and ignores a second click", async () => {
+  let release: (() => void) | undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let calls = 0;
+  let painted = 0;
+  const controls = Array.from({ length: 6 }, () => ({ value: "", disabled: false, textContent: "" }));
+  const fields: Record<string, { value: string; disabled?: boolean; textContent?: string }> = {
+    action: { value: "APPROVE" },
+    expected_content_hash: { value: HASH },
+    subject: { value: "Assunto" },
+    body_text: { value: "Corpo" },
+    original_subject: { value: "Assunto" },
+    original_body_text: { value: "Corpo" },
+    reason: { value: "" },
+    generic_ack: { value: "true" },
+    submit: controls[0]!,
+  };
+  let listener: ((event: Event) => void) | undefined;
+  const form = {
+    addEventListener(_type: string, next: (event: Event) => void): void { listener = next; },
+    getAttribute(name: string): string | null { return name === "data-review-form" ? DRAFT_ID : null; },
+    setAttribute(): void {},
+    querySelector(selector: string) {
+      if (selector === 'button[type="submit"]') return fields.submit!;
+      const name = selector.match(/name="([^"]+)"/)?.[1] ?? "";
+      return fields[name] ?? null;
+    },
+    querySelectorAll(): typeof controls { return controls; },
+  };
+  const adapter = {
+    reviewDraftAction: async () => {
+      calls += 1;
+      await held;
+      return { ok: true, path: "/review", kind: "nota" as const, message: "confirmado" };
+    },
+  };
+  bindReviewActions({ innerHTML: "", querySelectorAll: () => [form] } as never, adapter as never, () => { painted += 1; });
+  const event = { preventDefault(): void {} } as unknown as Event;
+  listener?.(event);
+  listener?.(event);
+  assert.equal(calls, 1);
+  assert.equal(controls.every((control) => control.disabled), true);
+  assert.equal(fields.submit?.textContent, "Confirmando no servidor…");
+  release?.();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(painted, 1);
+});
+
+test("unsaved edits must be persisted and reread before APPROVE", () => {
+  let called = false;
+  let painted = 0;
+  const fields: Record<string, { value: string }> = {
+    action: { value: "APPROVE" },
+    expected_content_hash: { value: HASH },
+    subject: { value: "Assunto alterado" },
+    body_text: { value: "Corpo" },
+    original_subject: { value: "Assunto original" },
+    original_body_text: { value: "Corpo" },
+    reason: { value: "" },
+    generic_ack: { value: "false" },
+  };
+  let listener: ((event: Event) => void) | undefined;
+  const form = {
+    addEventListener(_type: string, next: (event: Event) => void): void { listener = next; },
+    getAttribute(): string { return DRAFT_ID; },
+    querySelector(selector: string) {
+      const name = selector.match(/name="([^"]+)"/)?.[1] ?? "";
+      return fields[name] ?? null;
+    },
+  };
+  const adapter = { reviewDraftAction: async () => { called = true; throw new Error("must not run"); } };
+  bindReviewActions({ innerHTML: "", querySelectorAll: () => [form] } as never, adapter as never, () => { painted += 1; });
+  listener?.({ preventDefault(): void {} } as unknown as Event);
+  assert.equal(called, false);
+  assert.equal(painted, 1);
+  assert.equal((adapter as { lastOperatorResult?: { code?: string } }).lastOperatorResult?.code, "review_adjustment_not_saved");
 });
 
 const LEGACY_ID = "99999999-8888-4777-8666-555555555555";

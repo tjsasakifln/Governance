@@ -151,11 +151,12 @@ function viewBanner(view: ViewState<DestinationPage>): string {
   return "";
 }
 
-function operatorBanner(result: AdapterWriteResult | undefined): string {
+export function operatorBanner(result: AdapterWriteResult | undefined): string {
   if (!result) return "";
   const cls = result.ok ? "ok" : "error";
   const role = result.ok ? "status" : "alert";
   const receipt = result.receipt;
+  const review = result.reviewDecision;
   const outcomeLabels: Record<string, string> = {
     accepted: "aceito",
     duplicate: "duplicado; receipt original preservado",
@@ -164,14 +165,26 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
     refused: "recusado",
     unknown: "indeterminado",
   };
-  const recovery = result.outcome === "unknown"
+  const recovery = review && !result.ok
+    ? "Não repita agora: releia este rascunho e use a mesma correlação somente depois de confirmar o estado no servidor."
+    : review?.action === "APPROVE" && result.ok
+      ? "O agendamento foi confirmado; verifique pausa/kill switch antes de interpretar quando a mensagem poderá sair."
+      : result.outcome === "unknown"
     ? "Não repita agora: releia a origem e a auditoria para saber se a escrita ocorreu."
     : !result.ok
       ? "Revise sua sessão/permissão e tente novamente somente depois de confirmar que nada foi aplicado."
       : receipt?.writes_to === "warmbly"
         ? "Releia o estado do Warmbly para confirmar o efeito observado."
         : "A mudança ficou apenas na auditoria local; execute a correção indicada na origem quando aplicável.";
-  const message = !result.ok
+  const message = review && !result.ok
+    ? "Resultado não confirmado. A mensagem continua em Ação necessária até novo readback."
+    : review?.action === "APPROVE"
+      ? "Aprovação e agendamento confirmados pelo servidor."
+      : review?.action === "REJECT"
+        ? "Rejeição e encaminhamento para reescrita confirmados pelo servidor."
+        : review?.action === "SAVE_ADJUSTMENT"
+          ? "Ajuste confirmado; a aprovação continua pendente."
+          : !result.ok
     ? "A ação não foi concluída. Consulte o detalhe técnico antes de tentar novamente."
     : result.path === WARMBLY_DISPATCH_PATHS.pause
       ? "Disparos pausados."
@@ -188,11 +201,19 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
     <p>${escapeHtml(message)}</p>
     <p><strong>Próxima ação:</strong> ${escapeHtml(recovery)}</p>
     ${receipt ? `<dl class="facts" data-action-receipt="true">
-      <div data-receipt-id="${escapeHtml(receipt.id)}"><dt>Receipt</dt><dd>registro append-only confirmado</dd></div>
-      <div><dt>Ator</dt><dd>${escapeHtml(receipt.actor_id ?? (receipt.writes_to === "warmbly" ? "sessão autenticada na borda" : "não retornado"))}</dd></div>
+      <div data-receipt-id="${escapeHtml(receipt.id)}"><dt>Receipt</dt><dd>${review ? "write + readback canônico confirmados" : "registro append-only confirmado"}</dd></div>
+      <div><dt>Ator</dt><dd>${escapeHtml(review?.approvedBy ?? receipt.actor_id ?? (receipt.writes_to === "warmbly" ? "sessão autenticada na borda" : "não retornado"))}</dd></div>
       <div data-correlation-id="${escapeHtml(receipt.correlation_id)}"><dt>Sessão/correlação</dt><dd>registrada para esta ação</dd></div>
       <div><dt>Desfecho</dt><dd>${escapeHtml(ownMapValue(outcomeLabels, receipt.outcome) ?? "desfecho não catalogado")}</dd></div>
       <div><dt>Fronteira de escrita</dt><dd>${receipt.writes_to === "warmbly" ? "Warmbly" : "somente Control Center"}</dd></div>
+    </dl>` : ""}
+    ${review ? `<dl class="facts" data-review-decision-receipt="true">
+      <div data-review-touchpoint="${escapeHtml(review.touchpointId)}"><dt>Mensagem</dt><dd>${escapeHtml(review.touchpointId)}</dd></div>
+      <div><dt>Decisão</dt><dd>${escapeHtml(review.action)}</dd></div>
+      <div data-review-state="${escapeHtml(review.state ?? "não confirmado")}"><dt>Estado observado</dt><dd>${escapeHtml(review.state ?? "não confirmado")}</dd></div>
+      <div><dt>Pode sair?</dt><dd>${review.state === "QUEUED" || review.state === "SENT" ? "agendada pelo Warmbly; pausa e kill switch ainda governam a saída" : "não confirmado"}</dd></div>
+      <div data-review-due-at="${escapeHtml(review.dueAt ?? "")}"><dt>Primeiro horário observado</dt><dd>${escapeHtml(review.dueAt ?? "não confirmado")}</dd></div>
+      <div><dt>Última observação</dt><dd>${escapeHtml(review.observedAt)}</dd></div>
     </dl>` : ""}
     ${technicalDetails([
       { term: "path", value: result.path },
@@ -203,6 +224,11 @@ function operatorBanner(result: AdapterWriteResult | undefined): string {
       { term: "correlation_id", value: receipt?.correlation_id ?? "" },
       { term: "occurred_at", value: receipt?.occurred_at ?? "" },
       { term: "target", value: receipt?.target ?? "" },
+      { term: "expected_content_hash", value: review?.expectedContentHash ?? "" },
+      { term: "content_hash", value: review?.contentHash ?? "" },
+      { term: "approved_content_hash", value: review?.approvedContentHash ?? "" },
+      { term: "scheduled_for", value: review?.scheduledFor ?? "" },
+      { term: "approved_at", value: review?.approvedAt ?? "" },
     ], "operator-write-result")}
   </div>`;
 }

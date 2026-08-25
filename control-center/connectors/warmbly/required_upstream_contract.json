@@ -101,7 +101,7 @@
         "path": "/v1/confenge/review/drafts/{draft_id}/decision",
         "permission": "PermManageContacts / APIPermWriteContacts",
         "actions": ["SAVE_ADJUSTMENT", "APPROVE", "REJECT"],
-        "notes": "APPROVE binds expected_content_hash and schedules the exact copy for the next eligible business window; it never sends immediately"
+        "notes": "APPROVE binds expected_content_hash and schedules the exact copy for the next eligible business window; it never sends immediately; Control Center requires the decision response plus canonical GET readback before confirming the effect"
       },
       {
         "method": "POST",

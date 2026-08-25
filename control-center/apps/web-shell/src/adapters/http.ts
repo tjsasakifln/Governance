@@ -86,6 +86,159 @@ function validReceiptInstant(value: string, now = Date.now()): boolean {
   return inputSecond === parsedSecond;
 }
 
+type ReviewDraftAction = "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT";
+
+function reviewDecisionFailure(
+  path: string,
+  message: string,
+  status?: number,
+  code = "review_result_not_confirmed",
+): AdapterWriteResult {
+  return {
+    ok: false,
+    path,
+    kind: "nota",
+    message,
+    outcome: "unknown",
+    code,
+    ...(status === undefined ? {} : { status }),
+    readback: { status: "not_confirmed", detail: message },
+  };
+}
+
+function reviewDecisionResult(
+  input: { id: string; action: ReviewDraftAction; expected_content_hash: string },
+  path: string,
+  idempotency: string,
+  status: number,
+  payload: unknown,
+): AdapterWriteResult {
+  const body = asRecord(payload);
+  const readback = asRecord(body?.readback);
+  const outcome = stringValue(body ?? {}, "outcome");
+  const action = stringValue(body ?? {}, "action");
+  const touchpointId = stringValue(body ?? {}, "touchpoint_id");
+  const expectedContentHash = stringValue(body ?? {}, "expected_content_hash");
+  const correlationId = stringValue(body ?? {}, "correlation_id");
+  const observedAt = stringValue(body ?? {}, "observed_at");
+  const message = stringValue(body ?? {}, "message");
+  const readbackStatus = stringValue(readback ?? {}, "status");
+  const readbackDetail = stringValue(readback ?? {}, "detail");
+  const envelopeValid =
+    body?.schema_version === "control-center.review-decision-receipt.v1" &&
+    (outcome === "confirmed" || outcome === "not_confirmed") &&
+    action === input.action &&
+    touchpointId === input.id &&
+    expectedContentHash === input.expected_content_hash &&
+    correlationId === idempotency &&
+    observedAt !== undefined &&
+    validReceiptInstant(observedAt) &&
+    message !== undefined &&
+    (readbackStatus === "confirmed" || readbackStatus === "not_confirmed" || readbackStatus === "unavailable") &&
+    readbackDetail !== undefined;
+  if (!envelopeValid) {
+    return reviewDecisionFailure(
+      path,
+      "Resultado não confirmado. Não repita ainda: o servidor retornou um recibo incompatível.",
+      status,
+      "review_receipt_invalid",
+    );
+  }
+
+  const evidence = {
+    action: action as ReviewDraftAction,
+    touchpointId: touchpointId!,
+    expectedContentHash: expectedContentHash!,
+    ...(stringValue(body, "content_hash") ? { contentHash: stringValue(body, "content_hash")! } : {}),
+    ...(stringValue(body, "approved_content_hash")
+      ? { approvedContentHash: stringValue(body, "approved_content_hash")! }
+      : {}),
+    ...(stringValue(body, "state") ? { state: stringValue(body, "state")! } : {}),
+    ...(stringValue(body, "due_at") ? { dueAt: stringValue(body, "due_at")! } : {}),
+    ...(stringValue(body, "scheduled_for") ? { scheduledFor: stringValue(body, "scheduled_for")! } : {}),
+    ...(stringValue(body, "approved_by") ? { approvedBy: stringValue(body, "approved_by")! } : {}),
+    ...(stringValue(body, "approved_at") ? { approvedAt: stringValue(body, "approved_at")! } : {}),
+    observedAt: observedAt!,
+  };
+  const adapterReadback = {
+    status: readbackStatus === "confirmed"
+      ? "confirmed" as const
+      : readbackStatus === "unavailable"
+        ? "unavailable" as const
+        : "not_confirmed" as const,
+    detail: readbackDetail!,
+  };
+  if (outcome !== "confirmed") {
+    return {
+      ...reviewDecisionFailure(path, message!, status),
+      readback: adapterReadback,
+      reviewDecision: evidence,
+    };
+  }
+
+  const receiptId = stringValue(body, "receipt_id");
+  const contentHash = stringValue(body, "content_hash");
+  const state = stringValue(body, "state");
+  let confirmationFailure: string | undefined;
+  if (!receiptId || !contentHash || !state || readbackStatus !== "confirmed") {
+    confirmationFailure = "receipt, hash, estado ou readback confirmado ausente";
+  } else if (input.action === "APPROVE") {
+    const approvedHash = stringValue(body, "approved_content_hash");
+    const approvedBy = stringValue(body, "approved_by");
+    const approvedAt = stringValue(body, "approved_at");
+    const dueAt = stringValue(body, "due_at");
+    const scheduledFor = stringValue(body, "scheduled_for");
+    if (contentHash !== input.expected_content_hash || approvedHash !== input.expected_content_hash) {
+      confirmationFailure = "o servidor não confirmou o hash exato aprovado";
+    } else if (state !== "QUEUED" && state !== "SENT") {
+      confirmationFailure = "APPROVE não foi observado em QUEUED ou SENT";
+    } else if (!approvedBy || !approvedAt || !isUtcDateTime(approvedAt)) {
+      confirmationFailure = "ator ou instante de aprovação ausente";
+    } else if (
+      state === "QUEUED" &&
+      (!dueAt || !scheduledFor || !isUtcDateTime(dueAt) || dueAt !== scheduledFor)
+    ) {
+      confirmationFailure = "QUEUED não possui due_at/scheduled_for confirmado";
+    }
+  } else if (input.action === "REJECT") {
+    if (contentHash !== input.expected_content_hash || state !== "REJECTED_REWRITE_PENDING") {
+      confirmationFailure = "REJECT não foi confirmado sobre o hash e estado esperados";
+    }
+  } else if (state !== "NEEDS_REVIEW" && state !== "DRAFTED") {
+    confirmationFailure = "SAVE_ADJUSTMENT não permaneceu em revisão";
+  }
+  if (confirmationFailure) {
+    return {
+      ...reviewDecisionFailure(
+        path,
+        `Resultado não confirmado. Não repita ainda: ${confirmationFailure}.`,
+        status,
+        "review_confirmation_invalid",
+      ),
+      reviewDecision: evidence,
+    };
+  }
+
+  return {
+    ok: true,
+    path,
+    kind: "nota",
+    message: message!,
+    outcome: "executed",
+    status,
+    receipt: {
+      id: receiptId!,
+      correlation_id: correlationId!,
+      occurred_at: observedAt!,
+      outcome: "accepted",
+      target: touchpointId!,
+      writes_to: "warmbly",
+    },
+    readback: adapterReadback,
+    reviewDecision: evidence,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Human-gate response reading.
  *
@@ -744,22 +897,30 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
         } catch {
           // The status remains the safe diagnostic.
         }
-        const failed: AdapterWriteResult = { ok: false, path, kind: "nota", message };
+        const failed: AdapterWriteResult = {
+          ...reviewDecisionFailure(path, message, response.status, "review_write_refused"),
+          outcome: response.status >= 500 ? "unknown" : "refused",
+        };
         this.lastOperatorResult = failed;
         return failed;
       }
-      const message = input.action === "APPROVE"
-        ? "mensagem aprovada e agendada para a próxima janela útil"
-        : input.action === "REJECT"
-          ? "rascunho rejeitado e devolvido para reescrita"
-          : "ajuste salvo; aprovação ainda pendente";
-      const accepted: AdapterWriteResult = { ok: true, path, kind: "nota", message };
-      this.lastOperatorResult = accepted;
-      return accepted;
+      let payload: unknown;
+      try {
+        payload = raw.trim() === "" ? undefined : JSON.parse(raw) as unknown;
+      } catch {
+        payload = undefined;
+      }
+      const result = reviewDecisionResult(input, path, idempotency, response.status, payload);
+      this.lastOperatorResult = result;
+      return result;
     } catch (err) {
       const failed: AdapterWriteResult = {
-        ok: false, path, kind: "nota",
-        message: err instanceof Error ? err.message : "Warmbly indisponível",
+        ...reviewDecisionFailure(
+          path,
+          `Resultado não confirmado. Não repita ainda: ${err instanceof Error ? err.message : "Warmbly indisponível"}.`,
+          undefined,
+          "browser_transport",
+        ),
       };
       this.lastOperatorResult = failed;
       return failed;

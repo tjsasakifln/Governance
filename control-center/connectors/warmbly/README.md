@@ -76,6 +76,8 @@ The Control Center's `Comercial → Rascunhos` surface uses a dedicated, server-
 
 Every request requires the trusted founder identity. `APPROVE` carries `expected_content_hash` and only creates a durable queue entry for the next eligible business window. `REJECT` preserves the lead and routes the draft to AI-assisted editorial recovery. This bridge does not expose an immediate-send operation.
 
+An individual decision is not considered complete from HTTP status alone. The Context Service validates Warmbly's decision envelope, reads the exact touchpoint back, and emits a sanitized `control-center.review-decision-receipt.v1`. Empty/incompatible bodies, divergent hashes/states, missing `due_at` for `QUEUED`, and unavailable readback remain `not_confirmed`; clients must not issue a fresh intent while that outcome is ambiguous.
+
 ## Operator action channel (`src/operator/`)
 
 The only write surface in this connector. Read `required_upstream_contract.json → operator_actions` for the upstream table.
