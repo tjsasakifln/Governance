@@ -19,11 +19,13 @@ describe("Warmbly human gate fixed proxy", () => {
     assert.match(String(res.body.receipt), /^edge:cc:human-gate:/);
   });
 
-  it("requires admins for GO/NO-GO but lets operators review", async () => {
+  it("exposes neither legacy GO/NO-GO nor cohort dispatch", async () => {
     let hits=0; const handler=createHumanGateHttpHandler({baseUrl:"https://warmbly.invalid",token:"wmbly_secret_12345678",identityPolicy:defaultOperatorIdentityPolicy([hop]),fetchImpl:async()=>{hits++;return new Response("{}")}});
     const id="11111111-1111-4111-8111-111111111111";
-    const denied=await handler(request("POST",`${HUMAN_GATE_PREFIX}/${id}/decision`,"operators",{decision:"GO",reason:"ok",idempotency_key:"idem-12345678"}));
-    assert.equal(denied.status,403); assert.equal(hits,0);
+    for (const path of [`${HUMAN_GATE_PREFIX}/${id}/decision`, `${HUMAN_GATE_PREFIX}/${id}/dispatch`]) {
+      const denied=await handler(request("POST",path,"admins,operators",{decision:"GO",reason:"ok",idempotency_key:"idem-12345678"}));
+      assert.equal(denied.status,404); assert.equal(hits,0);
+    }
   });
 
   it("forwards only fixed routes, strips browser actor and preserves idempotency", async () => {
@@ -37,23 +39,66 @@ describe("Warmbly human gate fixed proxy", () => {
     assert.equal(seen?.headers?.has("x-actor-id"),false);
   });
 
-  it("forwards typed immutable-version confirmation for GO/NO-GO", async () => {
-    let seen: Record<string, unknown> = {};
+  it("forwards server-managed next-page and recovery selection without exposing an offset", async () => {
+    const bodies: Record<string, unknown>[] = [];
     const handler = createHumanGateHttpHandler({
       baseUrl: "https://warmbly.invalid",
       token: "wmbly_secret_12345678",
       identityPolicy: defaultOperatorIdentityPolicy([hop]),
       fetchImpl: async (_input, init) => {
-        seen = JSON.parse(String(init?.body));
-        return new Response(JSON.stringify({ receipt: "decision:r1" }), { status: 200 });
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ receipt: "cohort:r1" }), { status: 201 });
       },
     });
-    const version = "11111111-1111-4111-8111-111111111111";
-    const res = await handler(request("POST", `${HUMAN_GATE_PREFIX}/${version}/decision`, "admins,operators", {
-      decision: "NO_GO", reason: "fixture", confirmation: "v3", idempotency_key: "idem-confirm-v3",
+    const prior = "11111111-1111-4111-8111-111111111111";
+    await handler(request("POST", HUMAN_GATE_PREFIX, "operators", {
+      limit: 10,
+      selection_mode: "NEXT_UNCLAIMED",
+      offset: 100,
+      idempotency_key: "idem-next-unclaimed",
     }));
-    assert.equal(res.status, 200);
-    assert.equal(seen.confirmation, "v3");
+    await handler(request("POST", HUMAN_GATE_PREFIX, "operators", {
+      limit: 10,
+      selection_mode: "RECOVER_PRIOR",
+      recover_version_ids: [prior],
+      idempotency_key: "idem-recover-prior",
+    }));
+    assert.deepEqual(bodies[0], { limit: 10, selection_mode: "NEXT_UNCLAIMED" });
+    assert.deepEqual(bodies[1], { limit: 10, selection_mode: "RECOVER_PRIOR", recover_version_ids: [prior] });
+  });
+
+  it("lets only admins reconcile durable approvals and forwards no caller target", async () => {
+    let hits = 0;
+    let seenUrl = "";
+    let seenBody: Record<string, unknown> = { unexpected: true };
+    let seenKey = "";
+    const handler = createHumanGateHttpHandler({
+      baseUrl: "https://warmbly.invalid",
+      token: "wmbly_secret_12345678",
+      identityPolicy: defaultOperatorIdentityPolicy([hop]),
+      fetchImpl: async (input, init) => {
+        hits += 1;
+        seenUrl = String(input);
+        seenBody = JSON.parse(String(init?.body));
+        seenKey = new Headers(init?.headers).get("idempotency-key") ?? "";
+        return new Response(JSON.stringify({ data: { scheduled: 4, already_scheduled: 7, failed: 0 } }), { status: 200 });
+      },
+    });
+    const denied = await handler(request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "operators", {
+      idempotency_key: "idem-reconcile-approvals",
+      cohort_id: "attacker-controlled",
+    }));
+    assert.equal(denied.status, 403);
+    assert.equal(hits, 0);
+    const allowed = await handler(request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "admins,operators", {
+      idempotency_key: "idem-reconcile-approvals",
+      cohort_id: "attacker-controlled",
+    }));
+    assert.equal(allowed.status, 200);
+    assert.equal(hits, 1);
+    assert.equal(seenUrl, "https://warmbly.invalid/v1/confenge/cohorts/reconcile-approved");
+    assert.deepEqual(seenBody, {});
+    assert.equal(seenKey, "idem-reconcile-approvals");
   });
 
   it("allows the exact candidate/message-preview read and nothing below it", async () => {
@@ -102,15 +147,13 @@ describe("Warmbly human gate fixed proxy", () => {
       identityPolicy: defaultOperatorIdentityPolicy([hop]),
       fetchImpl: async () => { hits += 1; return new Response("{}"); },
     });
-    const id = "11111111-1111-4111-8111-111111111111";
-    const res = await handler(request("POST", `${HUMAN_GATE_PREFIX}/${id}/decision`, "admins,operators", { decision: "GO" }));
+    const res = await handler(request("POST", HUMAN_GATE_PREFIX, "operators", { limit: 10 }));
     assert.equal(res.status, 400);
     assert.equal(res.body.code, "idempotency_key_required");
     assert.equal(hits, 0);
   });
 
   it("preserves upstream partial-payload, unauthorized, forbidden, conflict and write-denied failures without retry", async () => {
-    const id = "11111111-1111-4111-8111-111111111111";
     for (const [status, code] of [[400, "invalid_payload"], [401, "unauthorized"], [403, "write_denied"], [409, "idempotency_payload_conflict"]] as const) {
       let hits = 0;
       const handler = createHumanGateHttpHandler({
@@ -125,8 +168,8 @@ describe("Warmbly human gate fixed proxy", () => {
           });
         },
       });
-      const res = await handler(request("POST", `${HUMAN_GATE_PREFIX}/${id}/decision`, "admins,operators", {
-        decision: "GO", reason: "fixture", idempotency_key: `idem-${status}-fixture`,
+      const res = await handler(request("POST", HUMAN_GATE_PREFIX, "operators", {
+        limit: 10, selection_mode: "NEXT_UNCLAIMED", idempotency_key: `idem-${status}-fixture`,
       }));
       assert.equal(res.status, status);
       assert.equal(res.body.code, code);

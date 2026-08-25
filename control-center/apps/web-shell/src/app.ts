@@ -112,6 +112,7 @@ export interface MountableRoot {
     addEventListener(type: string, listener: (event: Event) => void): void;
     getAttribute(name: string): string | null;
     querySelector(selector: string): { value: string; checked?: boolean } | null;
+    querySelectorAll?(selector: string): ArrayLike<{ value: string; checked?: boolean }>;
     focus?(options?: { preventScroll?: boolean }): void;
     scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
   }>;
@@ -588,6 +589,16 @@ function bindWarmblyHumanGate(
       const fixedDecision = form.getAttribute("data-decision");
       const decision = fixedDecision ?? form.querySelector('[name="decision"]')?.value;
       const limit = Number(form.querySelector('[name="limit"]')?.value ?? 0);
+      const selectionMode = form.querySelector('[name="selection_mode"]')?.value;
+      const recoverFallback = form.querySelector('[name="recover_version_ids"]');
+      const recoverVersionIds = Array.from(
+        form.querySelectorAll?.('[name="recover_version_ids"]')
+          ?? (recoverFallback ? [recoverFallback] : []),
+      )
+        .filter((entry) => entry.checked === true)
+        .map((entry) => entry.value)
+        .filter(Boolean)
+        .sort();
       const confirmation = form.querySelector('[name="confirmation"]')?.value?.trim() ?? "";
       const reason = form.querySelector('[name="reason"]')?.value ?? "";
 
@@ -623,6 +634,10 @@ function bindWarmblyHumanGate(
         ...(versionId ? { version_id: versionId } : {}),
         ...(candidateId ? { candidate_id: candidateId } : {}),
         ...(limit > 0 ? { limit } : {}),
+        ...(selectionMode === "NEXT_UNCLAIMED" || selectionMode === "RECOVER_PRIOR"
+          ? { selection_mode: selectionMode }
+          : {}),
+        ...(recoverVersionIds.length > 0 ? { recover_version_ids: recoverVersionIds } : {}),
         ...(decision === "APPROVE" || decision === "REJECT" || decision === "HOLD" || decision === "GO" || decision === "NO_GO" ? { decision } : {}),
         // An ordinary approval types nothing, and the trail must still say what
         // happened. The default is folded in here, not only at the wire, so the
@@ -1130,6 +1145,14 @@ async function gateReadback(
       detail: "Nenhuma releitura é devida: o canal não relatou uma escrita aplicada.",
     };
   }
+  if (intent.action === "reconcile") {
+    return {
+      status: "confirmed",
+      detail: result.reconcile
+        ? "A resposta trouxe os denominadores da reconciliação; nenhuma mensagem foi enviada por esta ação."
+        : "A reconciliação foi aceita, mas a resposta não trouxe denominadores.",
+    };
+  }
   const cohortId = result.gateResource?.cohort_id ?? intent.version_id;
   if (!cohortId) {
     return { status: "unavailable", detail: "A resposta não nomeou nenhum recurso para reler." };
@@ -1186,6 +1209,22 @@ async function gateReadback(
           detail:
             "O servidor registra APPROVE, mas não confirma que a aprovação está efetiva para o destinatário, conteúdo, policy e evidência atuais.",
         };
+      }
+      if (
+        intent.decision === "APPROVE"
+        && Object.prototype.hasOwnProperty.call(candidate, "scheduling")
+      ) {
+        const scheduling = gateRecord(candidate.scheduling);
+        if (
+          typeof scheduling.touchpoint_id !== "string"
+          || scheduling.auto_send !== true
+          || scheduling.invalidated_at
+        ) {
+          return {
+            status: "not_confirmed",
+            detail: "O APPROVE está registrado, mas o servidor não confirmou um agendamento efetivo para esta mensagem.",
+          };
+        }
       }
       return { status: "confirmed", detail: `O servidor registra ${String(recorded)} neste candidato.` };
     }

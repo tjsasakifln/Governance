@@ -9,5 +9,5 @@ users:
     email: "${CC_OPERATOR_EMAIL}"
     groups:
       - operators
-      # GO/NO-GO is separated from routine review at the Control Center edge.
+      # Bulk reconciliation is separated from routine review at the edge.
       - admins

@@ -118,26 +118,26 @@ describe("human gate adjust — the request that reaches Warmbly", () => {
     assert.match(String(seen.headers?.get("x-correlation-id")), /^cc:human-gate:/);
   });
 
-  it("runs under the operators role, exactly like review and never like GO", async () => {
+  it("runs under operators, while approval reconciliation remains admins-only", async () => {
     let hits = 0;
     const handler = handlerWith(async () => {
       hits += 1;
       return new Response(JSON.stringify(createdPayload()), { status: 201 });
     });
-    // One identity, operators only. Adjust is reachable for it; the cohort GO
-    // decision is not. That difference is the whole RBAC claim.
+    // One identity, operators only. Adjust is reachable for it; bulk approval
+    // reconciliation is not. That difference is the whole RBAC claim.
     const ok = await handler(request("POST", ADJUST_PATH, "operators", adjustBody()));
     assert.equal(ok.status, 201, "operators must be sufficient for adjust");
     assert.equal(hits, 1);
 
     const denied = await handler(
-      request("POST", `${HUMAN_GATE_PREFIX}/${COHORT}/decision`, "operators", {
-        decision: "GO", reason: "x", confirmation: "v3", idempotency_key: "idem-decide-0002",
+      request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "operators", {
+        idempotency_key: "idem-reconcile-0002",
       }),
     );
     assert.equal(denied.status, 403);
     assert.equal(denied.body.code, "insufficient_human_gate_role");
-    assert.equal(denied.body.operation, "decision");
+    assert.equal(denied.body.operation, "reconcile_approved");
     assert.equal(hits, 1, "a role refusal must never reach Warmbly");
   });
 
@@ -304,12 +304,12 @@ describe("human gate adjust — response fidelity", () => {
       const res = await handler(request(method, path, "operators", body));
       assert.equal(res.body.operation, operation, `${method} ${path}`);
     }
-    const decision = await handler(
-      request("POST", `${HUMAN_GATE_PREFIX}/${COHORT}/decision`, "admins,operators", {
-        decision: "NO_GO", reason: "x", confirmation: "v3", idempotency_key: "idem-decide-0001",
+    const reconcile = await handler(
+      request("POST", `${HUMAN_GATE_PREFIX}/reconcile-approved`, "admins,operators", {
+        idempotency_key: "idem-reconcile-0001",
       }),
     );
-    assert.equal(decision.body.operation, "decision");
+    assert.equal(reconcile.body.operation, "reconcile_approved");
   });
 
   it("preserves the server's own refusal codes for every adjust conflict", async () => {

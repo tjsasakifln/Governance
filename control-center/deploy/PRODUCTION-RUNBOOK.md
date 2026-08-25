@@ -113,8 +113,8 @@ the secret pack to make this group change.
 
 Merge and deploy the backward-compatible Warmbly human-gate and editorial-review
 APIs before the Control Center release. Apply migrations through
-`000118_confenge_editorial_recovery` with the normal Warmbly deploy path; verify
-schema is `118`, `/ready` is ready, and all of
+`000122_confenge_cohort_selection` with the normal Warmbly deploy path; verify
+schema is `122`, `/ready` is ready, and all of
 these remain false/true as shown:
 
 ```
@@ -129,6 +129,14 @@ this prerequisite passes. The same least-privilege human-gate credential and
 private Context-to-Warmbly network path serve draft review: mask `196` already
 contains the required contact read/write permissions and still contains no send
 permission. Do not create a browser token or expose the credential to `web`.
+
+Before creating any additional backlog, an authenticated `admins` operator must
+run approval reconciliation once and inspect every reported failure. On the
+current contract an effective APPROVE creates or confirms its own queued
+touchpoint for the next eligible business window; there is no live cohort GO or
+manual cohort dispatch step. Reconciliation covers durable approvals created
+before that scheduling behavior. Neither operation sends immediately or resumes
+the dispatch kill switch.
 
 ## Deploy (production-edge)
 
@@ -239,7 +247,7 @@ Mechanical requirement: `same_content=true` (SHA-256 of restored dump equals pla
 4. Revoke the `control-center-human-gate` API key. Do not alter the collector key,
    host PostgreSQL, or extra-cli.
 5. Roll back Warmbly only after Control Center no longer calls the new contract.
-   Keep migration 118 data for evidence; run down migrations only after export and
+   Keep migration 122 data for evidence; run down migrations only after export and
    only if schema rollback is explicitly required.
 6. Prove `https://api.confenge.com.br/api/v1/webhooks/confenge/inbound/health`
    remains READY and `auto_send_enabled=false`.
@@ -263,9 +271,11 @@ Backup `/etc/nginx` first. Install only `ops.confenge.com.br` and `auth.ops.conf
 - `api.confenge.com.br` inbound READY
 - Warmbly `/ready` live=true ready=true, `CONFENGE_AUTO_SEND_ENABLED=false`
 - Human-gate credential `/v1/me`: exact mask `196`, no `SEND_CAMPAIGNS`; do not log its value
-- authenticated `operators` can GET/list/review; only `admins` can GO/NO-GO
+- authenticated `operators` can GET/list/review and APPROVE schedules only the
+  exact reviewed message; only `admins` can reconcile old durable approvals
 - production smoke is GET-only; all POST verification uses fixtures/sandbox and `.invalid` recipients
-- review list reachable from `context`, with dispatch paused throughout rollout
+- review list and reconciliation report reachable from `context`, with dispatch
+  paused throughout rollout
 - GitHub collector FRESH when token+allowlist are set; otherwise honest ERROR/UNKNOWN
 
 ## `/intranet`

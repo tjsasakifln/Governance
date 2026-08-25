@@ -5,10 +5,12 @@
  */
 
 export interface HumanGateIntent {
-  action: "create" | "reproduce" | "validate" | "review" | "decide" | "adjust" | "dispatch";
+  action: "create" | "reproduce" | "validate" | "review" | "reconcile" | "decide" | "adjust" | "dispatch";
   version_id?: string;
   candidate_id?: string;
   limit?: number;
+  selection_mode?: "NEXT_UNCLAIMED" | "RECOVER_PRIOR";
+  recover_version_ids?: string[];
   decision?: "GO" | "NO_GO" | "APPROVE" | "REJECT" | "HOLD";
   reason?: string;
   acknowledged?: boolean;
@@ -65,6 +67,8 @@ function identity(intent: HumanGateIntent): string {
     intent.version_id ?? "",
     intent.candidate_id ?? "",
     intent.limit ?? 0,
+    intent.selection_mode ?? "",
+    [...(intent.recover_version_ids ?? [])].sort(),
     intent.decision ?? "",
     intent.reason?.trim() ?? "",
     intent.acknowledged === true,
