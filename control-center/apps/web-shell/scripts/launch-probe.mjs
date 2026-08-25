@@ -77,7 +77,7 @@ const DESKTOP_MIN_WIDTH = 880;
  */
 const MIN_CONTENT_RATIO = 0.55;
 
-const viewStates = ["loading", "error", "stale", "empty"];
+const viewStates = ["loading", "empty", "stale", "error"];
 const visualManifestPath = join(dirname(screenshotPath), "visual-gate-manifest.json");
 const visualManifest = {
   schema_version: "control-center.visual-gate.v1",
@@ -91,6 +91,10 @@ const visualManifest = {
   states: ["ready", ...viewStates],
   checks: [],
   safety: {
+    observed_request_count: 0,
+    observed_write_requests: [],
+    allowed_local_control_center_writes: [],
+    unsafe_write_requests: [],
     real_email_sent: false,
     go_issued: false,
     outbound_resumed: false,
@@ -118,10 +122,53 @@ try {
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 await page.addInitScript({ content: axeSource });
 const errors = [];
+const observedRequests = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 page.on("crash", () => errors.push("page crashed"));
+page.on("request", (request) => {
+  const method = request.method().toUpperCase();
+  let path = "invalid-url";
+  try {
+    path = new URL(request.url()).pathname;
+  } catch {
+    // Retain a bounded marker; never serialize the full malformed URL.
+  }
+  let actionType = null;
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    try {
+      const body = JSON.parse(request.postData() ?? "{}");
+      actionType = typeof body.action_type === "string" ? body.action_type : null;
+    } catch {
+      // An unreadable write body is unsafe and will fail the allowlist below.
+    }
+  }
+  observedRequests.push({ method, path, ...(actionType ? { action_type: actionType } : {}) });
+});
 
-async function assertAxe(page, where) {
+function networkSafetySnapshot() {
+  const writes = observedRequests.filter(
+    (request) => !["GET", "HEAD", "OPTIONS"].includes(request.method),
+  );
+  const allowed = writes.filter(
+    (request) => request.method === "POST"
+      && request.path === "/v1/operator-actions"
+      && request.action_type === "START_EXCEPTION_WORK",
+  );
+  const unsafe = writes.filter((request) => !allowed.includes(request));
+  return {
+    observed_request_count: observedRequests.length,
+    observed_write_requests: writes,
+    allowed_local_control_center_writes: allowed,
+    unsafe_write_requests: unsafe,
+    real_email_sent: writes.some((request) => /(?:email|send|dispatch)/i.test(`${request.path}/${request.action_type ?? ""}`)),
+    go_issued: writes.some((request) => /(?:^|[/_-])go(?:$|[/_-])/i.test(`${request.path}/${request.action_type ?? ""}`)),
+    outbound_resumed: writes.some((request) => /resume/i.test(`${request.path}/${request.action_type ?? ""}`)),
+    irreversible_action: unsafe.length > 0,
+  };
+}
+
+async function assertAxe(page, route, viewport, state) {
+  const where = `${viewport}/${route}/${state}`;
   await page.waitForFunction(() => typeof globalThis.axe?.run === "function");
   const result = await page.evaluate(async () => {
     const report = await globalThis.axe.run(document, {
@@ -145,6 +192,9 @@ async function assertAxe(page, where) {
   visualManifest.checks.push({
     kind: "axe",
     where,
+    route,
+    viewport,
+    state,
     violations: result,
     serious_or_critical: blockers.length,
   });
@@ -665,6 +715,9 @@ try {
       || releaseIdentity.sha !== releaseIdentity.meta) {
       throw new Error(`viewport ${vp.name}: runtime release identity diverged ${JSON.stringify(releaseIdentity)}`);
     }
+    if (visualManifest.runtime_sha && visualManifest.runtime_sha !== releaseIdentity.sha) {
+      throw new Error(`runtime release changed inside visual matrix: ${visualManifest.runtime_sha} -> ${releaseIdentity.sha}`);
+    }
     visualManifest.runtime_sha = releaseIdentity.sha;
     console.log(
       `brand_logo viewport=${vp.name} rendered=${Math.round(vpBrand.width)}x${Math.round(vpBrand.height)}`,
@@ -702,7 +755,7 @@ try {
       assertContentColumn(hashMetrics, `viewport ${vp.name} hash ${hash}`);
       let axeViolations = "not-run";
       if (vp.visualGate) {
-        axeViolations = await assertAxe(page, `${vp.name}/${route.key}/ready`);
+        axeViolations = await assertAxe(page, route.key, vp.name, "ready");
       }
       visualManifest.checks.push({
         kind: "geometry",
@@ -710,6 +763,7 @@ try {
         viewport: vp.name,
         state: "ready",
         horizontal_overflow_px: pageOverflow,
+        main_horizontal_overflow_px: hashMetrics.mainOverflowX,
         document_scroll_range_px: hashMetrics.documentScrollRange,
         competing_scroll_owners: hashMetrics.owners
           .filter((owner) => owner.isDocument || owner.insideMain)
@@ -752,7 +806,7 @@ try {
         }
         const stateMetrics = await layoutMetrics(page);
         assertSingleScrollContext(stateMetrics, `${vp.name}/${route.key}/${kind}`);
-        const axeViolations = await assertAxe(page, `${vp.name}/${route.key}/${kind}`);
+        const axeViolations = await assertAxe(page, route.key, vp.name, kind);
         let stateShot = "skipped";
         if (route.key === "destination:hoje" && !minimalEvidence) {
           stateShot = screenshotPath.replace(
@@ -767,6 +821,7 @@ try {
           viewport: vp.name,
           state: kind,
           horizontal_overflow_px: stateOverflow,
+          main_horizontal_overflow_px: stateMetrics.mainOverflowX,
           document_scroll_range_px: stateMetrics.documentScrollRange,
           competing_scroll_owners: stateMetrics.owners
             .filter((owner) => owner.isDocument || owner.insideMain)
@@ -782,11 +837,18 @@ try {
   if (errors.length > 0) {
     throw new Error(`page errors: ${errors.join(" | ")}`);
   }
+  visualManifest.safety = networkSafetySnapshot();
+  if (visualManifest.safety.unsafe_write_requests.length > 0
+    || visualManifest.safety.allowed_local_control_center_writes.length !== 1
+    || visualManifest.safety.observed_write_requests.length !== 1) {
+    throw new Error(`visual gate network safety failed: ${JSON.stringify(visualManifest.safety)}`);
+  }
   console.log("page_errors=0");
   visualManifest.result = "PASS";
   console.log(`visual_gate_manifest=${visualManifestPath}`);
   console.log("launch-probe ok");
 } finally {
+  visualManifest.safety = networkSafetySnapshot();
   visualManifest.completed_at = new Date().toISOString();
   writeFileSync(visualManifestPath, `${JSON.stringify(visualManifest, null, 2)}\n`);
   await browser.close();

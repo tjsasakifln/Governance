@@ -26,15 +26,20 @@ Cada observação bloqueia quando encontra:
 
 O resultado `visual-gate-manifest.json` registra SHA, rotas, viewports, estado,
 violações concretas, geometria e a declaração de segurança. O redutor E2E relê
-o manifest; não aceita apenas um score agregado ou uma linha de log. O workflow
+o manifest e exige exatamente uma observação axe e geométrica para cada célula
+obrigatória; cobertura parcial, duplicada ou um contador que contradiga as
+violações é falha. O workflow
 publica o JSON e as capturas mesmo quando o gate falha, para permitir revisão
 humana do diff sem atualizar baseline às cegas.
 
 ## Limites honestos
 
 O ambiente é a pilha autenticada isolada com fixtures sanitizadas e identidade
-imutável; o manifest declara `live_production_claimed: false`. Ele não envia
-email real, não emite GO, não retoma outbound e não executa ação irreversível.
+imutável; o manifest declara `live_production_claimed: false`. A sonda registra
+método, caminho e tipo de ação de todo request de escrita. Somente a ação local
+`START_EXCEPTION_WORK` da fixture é permitida; qualquer outra escrita falha o
+gate. Assim ela não envia email real, não emite GO, não retoma outbound e não
+executa ação irreversível por simples autodeclaração.
 
 Este gate ainda não é a auditoria humana de #111 e não mede compreensão. O
 smoke autenticado no ambiente canônico e a revisão humana das diferenças
