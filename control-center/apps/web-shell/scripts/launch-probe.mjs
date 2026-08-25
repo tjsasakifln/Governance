@@ -424,7 +424,17 @@ try {
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`screenshot=${screenshotPath}`);
 
-  await page.locator("nav[aria-label='Áreas do Control Center'] a", { hasText: "Comercial" }).click();
+  const desktopCommercial = page.locator(
+    "nav[aria-label='Áreas do Control Center'] a",
+    { hasText: "Comercial" },
+  );
+  if (await desktopCommercial.isVisible()) {
+    await desktopCommercial.click();
+  } else {
+    const moreTasks = page.locator(".task-nav-more > summary");
+    await moreTasks.click();
+    await page.locator("[data-task-nav='commercial']").click();
+  }
   await page.waitForSelector('[data-destination="comercial"]');
   const after = await page.locator("[data-destination]").getAttribute("data-destination");
   if (after !== "comercial") throw new Error(`nav did not change destination: ${after}`);

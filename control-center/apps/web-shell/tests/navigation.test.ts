@@ -112,3 +112,10 @@ test("safe-area padding and vertical task panel avoid the system gesture edge", 
   assert.match(css, /max-height:\s*min\(65dvh,/);
   assert.doesNotMatch(css, /\.task-nav-more-panel\s*\{[^}]*overflow-x/s);
 });
+
+test("the browser probe navigates through the visible mobile task launcher", () => {
+  const probe = readFileSync(join(rootDir, "scripts/launch-probe.mjs"), "utf8");
+  assert.match(probe, /desktopCommercial\.isVisible\(\)/);
+  assert.match(probe, /\.task-nav-more > summary/);
+  assert.match(probe, /\[data-task-nav='commercial'\]/);
+});
