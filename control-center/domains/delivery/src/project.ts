@@ -74,7 +74,11 @@ export function projectWorkOrder(
 ): WorkOrderProjection {
   const observedMs = new Date(observedAt).getTime();
   const sourceMs = new Date(order.provenance.observed_at).getTime();
-  const stale = !Number.isFinite(observedMs) || !Number.isFinite(sourceMs) || observedMs - sourceMs > staleAfterSeconds * 1000;
+  const stale = staleAfterSeconds < 0 ||
+    !Number.isFinite(observedMs) ||
+    !Number.isFinite(sourceMs) ||
+    observedMs < sourceMs ||
+    observedMs - sourceMs > staleAfterSeconds * 1000;
   const sla = classifySla(order, observedAt);
   return {
     schema_version: "control-center.work-order-projection.v1",

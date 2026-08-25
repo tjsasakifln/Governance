@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { WORK_ORDER_STAGES, type WorkOrder, type WorkOrderEvent, type WorkOrderEventType } from "@confenge/control-center-contracts";
 import {
   addBusinessDays,
+  applyWorkOrderEvent,
   createWorkOrder,
   decideWorkOrder,
   projectWorkOrder,
@@ -148,6 +149,41 @@ test("out-of-order and conflicting replays fail closed instead of being sorted",
   assert.ok(conflict);
   conflict.reason_code = "CONFLICTING_REPLAY";
   assert.throws(() => replayWorkOrder([events[0]!, conflict]), /idempotency/i);
+});
+
+test("the event applier rejects forged creation snapshots, temporal regressions and terminal mutations", () => {
+  contextSequence = 0;
+  const created = createWorkOrder(COMMAND, context("2026-08-25T12:00:00Z"));
+
+  const forged = structuredClone(created.event);
+  const forgedSnapshot = forged.data.work_order_snapshot as WorkOrder;
+  forgedSnapshot.created_at = "2026-08-25T11:59:00Z";
+  assert.throws(() => applyWorkOrderEvent(null, forged), /timestamp must match/i);
+
+  const ready = decideWorkOrder(created.work_order, "INPUT_RECEIVED", {
+    input_id: "brief-alinhamento",
+    evidence_ref: "evidence:sandbox:input",
+  }, context("2026-08-25T12:01:00Z"));
+  const regressed = structuredClone(ready.event);
+  regressed.occurred_at = "2026-08-25T11:59:00Z";
+  assert.throws(() => applyWorkOrderEvent(created.work_order, regressed), /precedes/i);
+
+  const { order, events } = buildClosedCanary();
+  const terminalMutation = structuredClone(events.at(-1)!);
+  terminalMutation.event_id = "cc:work-order-event:terminal-mutation";
+  terminalMutation.event_version = order.version + 1;
+  terminalMutation.expected_version = order.version;
+  terminalMutation.event_type = "OWNER_ASSIGNED";
+  terminalMutation.idempotency_key = "terminal-mutation-event";
+  terminalMutation.transition = null;
+  terminalMutation.data = { owner: "new-owner" };
+  assert.throws(() => applyWorkOrderEvent(order, terminalMutation), /terminal/i);
+});
+
+test("Control Center marks future-dated source observations stale", () => {
+  contextSequence = 0;
+  const created = createWorkOrder(COMMAND, context("2026-08-25T12:00:00Z"));
+  assert.equal(projectWorkOrder(created.work_order, "2026-08-25T11:59:59Z").freshness_status, "STALE");
 });
 
 test("financial, readiness, owner, input, QA and human delivery guards are fail-closed", () => {

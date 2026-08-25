@@ -15,6 +15,7 @@ export type WorkOrderHoldReason =
   | "VERSION_CONFLICT"
   | "IDEMPOTENCY_CONFLICT"
   | "ACTIVE_IDENTITY_CONFLICT"
+  | "TEMPORAL_CONFLICT"
   | "PROJECTION_CONFLICT";
 
 export type AppendWorkOrderResult =
@@ -212,6 +213,9 @@ export async function appendWorkOrderEvent(
         return hold(tx, "VERSION_CONFLICT", currentVersion, event, projection);
       }
       const current = mapOrder(currentResult.rows[0]?.projection_json);
+      if (new Date(event.occurred_at).getTime() < new Date(current.provenance.observed_at).getTime()) {
+        return hold(tx, "TEMPORAL_CONFLICT", currentVersion, event, projection);
+      }
       if (!immutableIdentityMatches(current, projection)) {
         return hold(tx, "PROJECTION_CONFLICT", currentVersion, event, projection);
       }

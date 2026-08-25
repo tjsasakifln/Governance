@@ -198,3 +198,32 @@ test("persistence holds a contract-valid projection that was not derived from it
   if (result.status === "HELD") assert.equal(result.reason, "PROJECTION_CONFLICT");
   assert.equal(await getWorkOrder(pool, created.work_order.work_order_id), null);
 });
+
+test("persistence retains a same-version event whose timestamp regresses", async () => {
+  const temporalCommand = {
+    ...command,
+    proposal_id: "proposal_temporal_sbx",
+    order_id: "order_temporal_sbx",
+    accepted_snapshot_hash: "sha256:abababababababababababababababababababababababababababababababab",
+  };
+  const created = createWorkOrder(temporalCommand, {
+    ...context(12),
+    occurred_at: "2026-08-25T12:30:00Z",
+    idempotency_key: "store-temporal-create",
+  });
+  assert.equal((await appendWorkOrderEvent(pool, created.event, created.work_order)).status, "APPENDED");
+
+  const owner = decideWorkOrder(created.work_order, "OWNER_ASSIGNED", { owner: "delivery-owner-sbx" }, {
+    ...context(13),
+    occurred_at: "2026-08-25T12:31:00Z",
+    idempotency_key: "store-temporal-owner",
+  });
+  const regressedEvent = structuredClone(owner.event);
+  regressedEvent.occurred_at = "2026-08-25T12:29:00Z";
+  const regressedProjection = structuredClone(owner.work_order);
+  regressedProjection.provenance.observed_at = regressedEvent.occurred_at;
+  const result = await appendWorkOrderEvent(pool, regressedEvent, regressedProjection);
+  assert.equal(result.status, "HELD");
+  if (result.status === "HELD") assert.equal(result.reason, "TEMPORAL_CONFLICT");
+  assert.deepEqual(await getWorkOrder(pool, created.work_order.work_order_id), created.work_order);
+});

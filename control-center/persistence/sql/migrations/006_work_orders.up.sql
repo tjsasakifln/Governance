@@ -114,7 +114,7 @@ CREATE TABLE control_center.work_order_event_holds (
   work_order_id TEXT NOT NULL CHECK (control_center.is_resource_id(work_order_id)),
   reason TEXT NOT NULL CHECK (reason IN (
     'MISSING_ORDER', 'VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT',
-    'ACTIVE_IDENTITY_CONFLICT', 'PROJECTION_CONFLICT'
+    'ACTIVE_IDENTITY_CONFLICT', 'TEMPORAL_CONFLICT', 'PROJECTION_CONFLICT'
   )),
   current_version INTEGER CHECK (current_version IS NULL OR current_version >= 1),
   idempotency_key TEXT NOT NULL CHECK (char_length(btrim(idempotency_key)) BETWEEN 8 AND 512),

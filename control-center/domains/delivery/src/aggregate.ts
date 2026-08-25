@@ -231,6 +231,39 @@ function requireClockAuthority(order: WorkOrder, event: WorkOrderEvent, data: Re
   text(data, "authority_ref");
 }
 
+function assertInitialSnapshot(event: WorkOrderEvent, snapshot: WorkOrder): void {
+  invariant(event.data.financial_gate === "RECONCILED", "MISSING_AUTHORITY", "creation event requires a reconciled financial gate");
+  invariant(event.data.readiness_state === "READY", "MISSING_AUTHORITY", "creation event requires READY delivery readiness");
+  invariant(snapshot.created_at === event.occurred_at, "INVALID_EVENT", "creation snapshot timestamp must match its event");
+  invariant(snapshot.current_stage === "AWAITING_INPUTS", "INVALID_EVENT", "creation snapshot must start at AWAITING_INPUTS");
+  invariant(snapshot.clock_state === "NOT_STARTED" && snapshot.clock_reason_version === null, "INVALID_EVENT", "creation snapshot clock must be NOT_STARTED");
+  invariant(snapshot.started_at === null && snapshot.due_at === null && snapshot.delivered_at === null, "INVALID_EVENT", "creation snapshot cannot contain lifecycle timestamps");
+  invariant(snapshot.inputs_required.length > 0, "MISSING_AUTHORITY", "creation snapshot requires at least one input");
+  invariant(
+    snapshot.inputs_required.every((input) => input.status === "REQUIRED" && input.evidence_ref === null && input.verified_at === null && input.verified_by === null),
+    "INVALID_EVENT",
+    "creation snapshot inputs must be unresolved",
+  );
+  invariant(snapshot.inputs_received.length === 0, "INVALID_EVENT", "creation snapshot cannot contain received inputs");
+  invariant(snapshot.blockers.length === 0, "INVALID_EVENT", "creation snapshot cannot contain blockers");
+  invariant(snapshot.actual_effort_minutes === 0, "INVALID_EVENT", "creation snapshot cannot contain actual effort");
+  invariant(snapshot.QA_state === "NOT_STARTED" && snapshot.QA_checklist_version === null, "INVALID_EVENT", "creation snapshot QA must be NOT_STARTED");
+  invariant(snapshot.delivery_artifact_refs.length === 0, "INVALID_EVENT", "creation snapshot cannot contain artifacts");
+  invariant(snapshot.client_acceptance_state === "PENDING", "INVALID_EVENT", "creation snapshot acceptance must be PENDING");
+  invariant(snapshot.nonconformities.length === 0 && snapshot.change_requests.length === 0, "INVALID_EVENT", "creation snapshot cannot contain review records");
+  invariant(snapshot.outcome === "UNKNOWN" && snapshot.expansion_candidate === null, "INVALID_EVENT", "creation snapshot cannot contain an outcome");
+  invariant(
+    isDeepStrictEqual(snapshot.provenance, {
+      source: { system: event.source_system, kind: "work-order-event", locator: event.correlation_id },
+      observed_at: event.occurred_at,
+      freshness_status: "FRESH",
+      confidence: 1,
+    }),
+    "INVALID_EVENT",
+    "creation snapshot provenance must match its event",
+  );
+}
+
 export function createWorkOrder(command: CreateWorkOrderCommand, context: EventContext): WorkOrderDecision {
   assertContext(context);
   invariant(command.financial_gate === "RECONCILED", "MISSING_AUTHORITY", "financial gate must be RECONCILED");
@@ -383,13 +416,20 @@ export function applyWorkOrderEvent(current: WorkOrder | null, event: WorkOrderE
     assertContract("WorkOrder", snapshot);
     invariant(snapshot.work_order_id === event.work_order_id, "INVALID_EVENT", "creation snapshot belongs to another Work Order");
     invariant(snapshot.version === 1 && snapshot.last_event_id === event.event_id, "INVALID_EVENT", "creation snapshot version/event mismatch");
+    assertInitialSnapshot(event, snapshot);
     return cloneOrder(snapshot);
   }
 
+  invariant(!TERMINAL_STAGES.has(current.current_stage), "ILLEGAL_TRANSITION", `Work Order is terminal: ${current.current_stage}`);
   invariant(event.event_type !== "WORK_ORDER_CREATED", "INVALID_EVENT", "Work Order can only be created once");
   invariant(event.work_order_id === current.work_order_id, "INVALID_EVENT", "event belongs to another Work Order");
   invariant(event.expected_version === current.version, "VERSION_CONFLICT", `expected version ${event.expected_version}, current ${current.version}`);
   invariant(event.event_version === current.version + 1, "VERSION_CONFLICT", "event_version must be expected_version + 1");
+  invariant(
+    new Date(event.occurred_at).getTime() >= new Date(current.provenance.observed_at).getTime(),
+    "INVALID_EVENT",
+    "event occurred_at precedes the current Work Order event",
+  );
   const data = record(event.data, "data");
   const transition = expectedTransition(current, event.event_type, data);
   invariant(isDeepStrictEqual(event.transition, transition), "INVALID_EVENT", "event transition does not match its type/current stage");
