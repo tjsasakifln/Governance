@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/delivery-readiness.v1.schema.json",
+  "title": "confenge.delivery_readiness.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "readiness_ref", "deliverable_id", "deliverable_version",
+    "registry_ref", "registry_hash", "scope", "inputs_required", "exclusions",
+    "public_source_refs", "producer", "production_template_ref", "qa",
+    "responsible_owner", "estimated_effort", "dependencies", "blockers",
+    "readiness_state", "state_reason", "tests", "evidence_refs", "freshness",
+    "constraints", "offer_id", "offer_version", "price_version", "terms_version",
+    "canary_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.delivery_readiness.v1"},
+    "readiness_ref": {"type": "string", "minLength": 1},
+    "deliverable_id": {"type": "string", "minLength": 1},
+    "deliverable_version": {"type": "string", "minLength": 1},
+    "offer_id": {"type": "string", "minLength": 1},
+    "offer_version": {"type": "string", "minLength": 1},
+    "registry_ref": {"type": "string", "minLength": 1},
+    "registry_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "scope": {
+      "type": "object",
+      "required": ["version", "definition_ref", "component_refs"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "definition_ref": {"type": "string", "minLength": 1},
+        "component_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "price_version": {"type": "string", "minLength": 1},
+    "terms_version": {"type": "string", "minLength": 1},
+    "inputs_required": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "exclusions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "public_source_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "producer": {"type": "object"},
+    "production_template_ref": {"type": "string", "minLength": 1},
+    "qa": {"type": "object"},
+    "responsible_owner": {"type": "object"},
+    "estimated_effort": {"type": "object"},
+    "dependencies": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "blockers": {"type": "array", "items": {"type": "object"}},
+    "readiness_state": {"enum": ["UNKNOWN", "SPECIFIED", "DATA_BLOCKED", "PRODUCTION_PATH_MISSING", "PRODUCTION_READY", "DELIVERY_VALIDATED", "PROMOTED"]},
+    "state_reason": {"type": "string", "minLength": 1},
+    "canary_ref": {"type": ["object", "null"]},
+    "tests": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "freshness": {"type": "object"},
+    "constraints": {"type": "object"}
+  }
+}

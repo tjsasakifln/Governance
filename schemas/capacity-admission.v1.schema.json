@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/capacity-admission.v1.schema.json",
+  "title": "confenge.capacity_admission.v1",
+  "type": "object",
+  "required": [
+    "schema_version", "decision_id", "decision", "reason_codes", "request_id",
+    "evaluated_at", "synthetic", "capacity_snapshot_id", "readiness_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.capacity_admission.v1"},
+    "decision_id": {"type": "string", "pattern": "^cadm_[0-9a-f]{32}$"},
+    "decision": {"enum": ["CAN_ACCEPT", "CANNOT_ACCEPT", "UNKNOWN"]},
+    "reason_codes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "request_id": {"type": ["string", "null"]},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "synthetic": {"type": "boolean"},
+    "capacity_snapshot_id": {"type": ["string", "null"]},
+    "readiness_ref": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

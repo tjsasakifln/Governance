@@ -1,0 +1,25 @@
+{
+  "schema_version": "confenge.delivery_qa_checklist.v1",
+  "checklist_id": "CFG-DIAG-EXP-QA-v1",
+  "checklist_version": "v1",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "deliverable_version": "v1",
+  "checks": [
+    {"check_id": "SYNTHETIC_SANDBOX_ONLY", "required": true},
+    {"check_id": "DELIVERABLE_BINDING", "required": true},
+    {"check_id": "REQUIRED_INPUT_REFS", "required": true},
+    {"check_id": "SOURCE_EVIDENCE_REFS", "required": true},
+    {"check_id": "SECTION_COMPLETENESS", "required": true},
+    {"check_id": "ARTIFACT_INTEGRITY", "required": true},
+    {"check_id": "REAL_WORLD_SIDE_EFFECT", "required": true}
+  ],
+  "expected_sections": [
+    {"section_id": "canonical_quantitative_base"},
+    {"section_id": "executive_decision_narrative"},
+    {"section_id": "public_buyer_map"},
+    {"section_id": "expiring_contract_signals"},
+    {"section_id": "competitor_panel"},
+    {"section_id": "public_price_panel"},
+    {"section_id": "executive_recommendations"}
+  ]
+}

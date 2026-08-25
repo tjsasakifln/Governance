@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/delivery-readiness-inventory.v1.schema.json",
+  "title": "confenge.delivery_readiness_inventory.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry_authority", "generated_at", "record_count", "records"],
+  "properties": {
+    "schema_version": {"const": "confenge.delivery_readiness_inventory.v1"},
+    "registry_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "source_revision", "registry_version", "content_hash"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
+        "registry_version": {"type": "string", "minLength": 1},
+        "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "generated_at": {"type": "string", "format": "date-time"},
+    "record_count": {"const": 54},
+    "records": {
+      "type": "array",
+      "minItems": 54,
+      "maxItems": 54,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deliverable_id", "deliverable_version", "registry_pointer",
+          "registry_record_hash", "readiness_state", "state_reason",
+          "blockers", "evidence_refs"
+        ],
+        "properties": {
+          "deliverable_id": {"type": "string", "pattern": "^CFG-D[0-9]{2}$"},
+          "deliverable_version": {"type": "string", "minLength": 1},
+          "registry_pointer": {"type": "string", "pattern": "^/deliverables/[0-9]+$"},
+          "registry_record_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "readiness_state": {"const": "UNKNOWN"},
+          "state_reason": {"const": "NOT_OPERATIONALLY_EVALUATED"},
+          "blockers": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+          "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

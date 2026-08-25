@@ -27,6 +27,8 @@ jobs:
       - name: Unit tests
         working-directory: control-center
         run: npm test
+      - name: Delivery vertical-slice canary
+        run: npm --prefix control-center run test:delivery-canary
 
   integration:
     runs-on: ubuntu-latest

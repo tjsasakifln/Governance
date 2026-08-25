@@ -1,0 +1,23 @@
+{
+  "schema_version": "confenge.cross_repo_canary_pins.v1",
+  "pinned_at": "2026-08-25T12:27:00Z",
+  "repos": {
+    "warmbly": {
+      "repo": "tjsasakifln/warmbly",
+      "sha": "30b84a4eefbc279c22ea31dec7e6996c2b84f1f3",
+      "pr": "https://github.com/tjsasakifln/warmbly/pull/173",
+      "fixture": "docs/contracts/proposal-v1/fixtures/delivery-order-requested.synthetic.v1.json"
+    },
+    "web_cfg": {
+      "repo": "tjsasakifln/web-cfg",
+      "sha": "5df5c4fa5b86362bb070c254fea1442239fe9c4a",
+      "pr": "https://github.com/tjsasakifln/web-cfg/pull/366",
+      "fixture": "data/offers/fixtures/delivery-gate/delivery-order-requested.synthetic.v1.json"
+    }
+  },
+  "contract_fingerprints": {
+    "confenge.delivery_order_requested.v1": "6464c124040bbadea9f719dcecacdcd3faa85febfa4610950f3791bb224fb0ba",
+    "confenge.financial_gate.v1": "5c0bdecf80fdfe1101ba1606f8a5462f035aae7c2a2b0d262af86de7b6d4a903",
+    "delivery_order_requested_semantic_fixture": "c3de0cfe6648ca576f86be930fc9a9313e4a32961eee9d33cafe6f9b9cddbe03"
+  }
+}

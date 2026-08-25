@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/staffed-capacity-snapshot.v1.schema.json",
+  "title": "confenge.staffed_capacity_snapshot.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "capacity_snapshot_id", "version", "synthetic", "as_of",
+    "expires_at", "staffed_capacity_units", "unit", "evidence_refs",
+    "working_calendar", "policy_ceiling_used_as_staffed_capacity", "real_checkout_enabled"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.staffed_capacity_snapshot.v1"},
+    "capacity_snapshot_id": {"type": "string", "minLength": 1},
+    "version": {"type": "integer", "minimum": 1},
+    "synthetic": {"type": "boolean"},
+    "as_of": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "staffed_capacity_units": {"type": ["integer", "null"], "minimum": 0},
+    "unit": {"const": "delivery_slot"},
+    "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "working_calendar": {
+      "type": "object",
+      "required": ["version", "timezone", "valid_from", "valid_until", "working_weekdays", "holidays"],
+      "properties": {
+        "version": {"type": "string"},
+        "timezone": {"type": "string"},
+        "valid_from": {"type": "string", "format": "date"},
+        "valid_until": {"type": "string", "format": "date"},
+        "working_weekdays": {"type": "array", "items": {"type": "integer", "minimum": 0, "maximum": 6}},
+        "holidays": {"type": "array", "items": {"type": "string", "format": "date"}}
+      },
+      "additionalProperties": false
+    },
+    "policy_ceiling_used_as_staffed_capacity": {"const": false},
+    "real_checkout_enabled": {"const": false}
+  }
+}

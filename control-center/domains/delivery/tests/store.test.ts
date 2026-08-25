@@ -76,6 +76,8 @@ const command: CreateWorkOrderCommand = {
   input_ids: ["brief"],
   business_calendar_version: "BR-SP-business-days.v1",
   estimated_effort_minutes: 4800,
+  estimated_capacity_units: 1,
+  capacity_commitment_id: "hold_store_sbx_001",
   financial_gate: "RECONCILED",
   readiness_state: "READY",
   synthetic: true,

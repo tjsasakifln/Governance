@@ -39,6 +39,8 @@ const COMMAND: CreateWorkOrderCommand = {
   input_ids: ["brief-alinhamento"],
   business_calendar_version: CALENDAR.version,
   estimated_effort_minutes: 4800,
+  estimated_capacity_units: 1,
+  capacity_commitment_id: "hold_diag_sbx_001",
   financial_gate: "RECONCILED",
   readiness_state: "READY",
   synthetic: true,
@@ -77,7 +79,12 @@ function buildClosedCanary(): { order: WorkOrder; events: WorkOrderEvent[] } {
   };
   advance("INPUT_RECEIVED", { input_id: "brief-alinhamento", evidence_ref: "extra-cli:artifact:brief-sbx" }, "2026-08-25T12:05:00Z");
   advance("OWNER_ASSIGNED", { owner: "delivery-owner-sbx" }, "2026-08-25T12:10:00Z");
-  advance("PRODUCTION_STARTED", { business_days: 10 }, "2026-08-25T12:15:00Z", CALENDAR);
+  advance("PRODUCTION_STARTED", {
+    business_days: 10,
+    capacity_commitment_id: COMMAND.capacity_commitment_id,
+    capacity_state: "COMMITTED",
+    capacity_evidence_ref: "capacity:commit:diag-sbx-001",
+  }, "2026-08-25T12:15:00Z", CALENDAR);
   advance("EFFORT_RECORDED", { effort_minutes: 120 }, "2026-08-26T12:00:00Z");
   advance("QA_SUBMITTED", {
     QA_checklist_version: "diag-qa.v1",
@@ -205,10 +212,25 @@ test("financial, readiness, owner, input, QA and human delivery guards are fail-
     () => decideWorkOrder(ready, "PRODUCTION_STARTED", { business_days: 10 }, context("2026-08-25T12:04:00Z"), CALENDAR),
     /owner/i,
   );
+  const owned = decideWorkOrder(ready, "OWNER_ASSIGNED", { owner: "delivery-owner-sbx" }, context("2026-08-25T12:05:00Z")).work_order;
+  assert.throws(
+    () => decideWorkOrder(owned, "PRODUCTION_STARTED", {
+      business_days: 10,
+      capacity_commitment_id: COMMAND.capacity_commitment_id,
+      capacity_state: "HELD",
+      capacity_evidence_ref: "capacity:hold:diag-sbx-001",
+    }, context("2026-08-25T12:05:30Z"), CALENDAR),
+    /COMMITTED/i,
+  );
   const started = decideWorkOrder(
-    decideWorkOrder(ready, "OWNER_ASSIGNED", { owner: "delivery-owner-sbx" }, context("2026-08-25T12:05:00Z")).work_order,
+    owned,
     "PRODUCTION_STARTED",
-    { business_days: 10 },
+    {
+      business_days: 10,
+      capacity_commitment_id: COMMAND.capacity_commitment_id,
+      capacity_state: "COMMITTED",
+      capacity_evidence_ref: "capacity:commit:diag-sbx-001",
+    },
     context("2026-08-25T12:06:00Z"),
     CALENDAR,
   ).work_order;
@@ -236,7 +258,7 @@ test("every stage-changing event rejects every illegal source stage", () => {
   }> = [
     { type: "INPUT_RECEIVED", allowed: "AWAITING_INPUTS", data: { input_id: "brief-alinhamento", evidence_ref: "evidence:input" } },
     { type: "INPUT_WAIVED", allowed: "AWAITING_INPUTS", data: { input_id: "brief-alinhamento", evidence_ref: "evidence:waiver" } },
-    { type: "PRODUCTION_STARTED", allowed: "READY", data: { business_days: 2 }, calendar: CALENDAR },
+    { type: "PRODUCTION_STARTED", allowed: "READY", data: { business_days: 2, capacity_commitment_id: COMMAND.capacity_commitment_id, capacity_state: "COMMITTED", capacity_evidence_ref: "capacity:commit:diag-sbx-001" }, calendar: CALENDAR },
     { type: "WORK_BLOCKED", allowed: "IN_PROGRESS", data: { blocker_id: "blocker-1", blocker_reason_code: "INPUT_DELAY.v1", owner: null, evidence_ref: "evidence:blocker" } },
     { type: "WORK_RESUMED", allowed: "BLOCKED", data: { blocker_id: "blocker-1" } },
     { type: "QA_SUBMITTED", allowed: "IN_PROGRESS", data: { QA_checklist_version: "qa.v1", artifact_refs: [] } },
@@ -268,7 +290,12 @@ test("pause/resume records distinct causes and change requests never alter scope
   order = decideWorkOrder(order, "INPUT_RECEIVED", {
     input_id: "brief-alinhamento", evidence_ref: "extra-cli:brief:1",
   }, context("2026-08-25T12:01:00Z")).work_order;
-  order = decideWorkOrder(order, "PRODUCTION_STARTED", { business_days: 10 }, context("2026-08-25T12:02:00Z"), CALENDAR).work_order;
+  order = decideWorkOrder(order, "PRODUCTION_STARTED", {
+    business_days: 10,
+    capacity_commitment_id: COMMAND.capacity_commitment_id,
+    capacity_state: "COMMITTED",
+    capacity_evidence_ref: "capacity:commit:diag-sbx-001",
+  }, context("2026-08-25T12:02:00Z"), CALENDAR).work_order;
   order = decideWorkOrder(order, "CLOCK_PAUSED_CLIENT", {
     clock_reason_version: "CLIENT_INPUT_DELAY.v1",
   }, context("2026-08-26T12:00:00Z")).work_order;

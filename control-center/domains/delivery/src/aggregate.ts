@@ -53,6 +53,8 @@ export interface CreateWorkOrderCommand {
   input_ids: string[];
   business_calendar_version: string;
   estimated_effort_minutes: number | null;
+  estimated_capacity_units: number;
+  capacity_commitment_id: string;
   responsible_owner?: string | null;
   financial_gate: "RECONCILED" | "UNKNOWN" | "HELD";
   readiness_state: "READY" | "BLOCKED" | "UNKNOWN";
@@ -72,7 +74,7 @@ function eventId(idempotencyKey: string): string {
   return `cc:work-order-event:${fingerprint(idempotencyKey)}`;
 }
 
-function orderId(command: CreateWorkOrderCommand): string {
+export function deriveWorkOrderId(command: CreateWorkOrderCommand): string {
   const identity = [
     command.proposal_id,
     command.accepted_snapshot_hash,
@@ -275,7 +277,9 @@ export function createWorkOrder(command: CreateWorkOrderCommand, context: EventC
   if (command.estimated_effort_minutes !== null) {
     invariant(Number.isInteger(command.estimated_effort_minutes) && command.estimated_effort_minutes >= 0, "INVALID_COMMAND", "estimated effort must be non-negative integer minutes");
   }
-  const workOrderId = command.work_order_id ?? orderId(command);
+  invariant(Number.isInteger(command.estimated_capacity_units) && command.estimated_capacity_units > 0, "MISSING_AUTHORITY", "estimated capacity must be a positive integer");
+  invariant(command.capacity_commitment_id.trim() !== "", "MISSING_AUTHORITY", "capacity commitment is required");
+  const workOrderId = command.work_order_id ?? deriveWorkOrderId(command);
   const firstEventId = eventId(context.idempotency_key);
   const inputs: WorkOrderInput[] = command.input_ids.map((inputId) => ({
     input_id: inputId,
@@ -315,6 +319,8 @@ export function createWorkOrder(command: CreateWorkOrderCommand, context: EventC
     current_stage: "AWAITING_INPUTS",
     responsible_owner: command.responsible_owner ?? null,
     estimated_effort_minutes: command.estimated_effort_minutes,
+    estimated_capacity_units: command.estimated_capacity_units,
+    capacity_commitment_id: command.capacity_commitment_id,
     actual_effort_minutes: 0,
     QA_state: "NOT_STARTED",
     QA_checklist_version: null,
@@ -463,6 +469,9 @@ export function applyWorkOrderEvent(current: WorkOrder | null, event: WorkOrderE
       invariant(event.actor.kind === "human", "MISSING_AUTHORITY", "production start requires a human actor");
       invariant(next.responsible_owner !== null, "MISSING_AUTHORITY", "responsible owner is required before production starts");
       invariant(allInputsComplete(next), "MISSING_AUTHORITY", "all inputs must be received or waived");
+      invariant(text(data, "capacity_commitment_id") === next.capacity_commitment_id, "MISSING_AUTHORITY", "capacity commitment differs from the accepted Work Order");
+      invariant(data.capacity_state === "COMMITTED", "MISSING_AUTHORITY", "capacity must be COMMITTED before production starts");
+      text(data, "capacity_evidence_ref");
       next.current_stage = "IN_PROGRESS";
       next.started_at = event.occurred_at;
       next.due_at = text(data, "due_at");
