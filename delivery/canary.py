@@ -28,6 +28,7 @@ HANDOFF_FIXTURE = FIXTURES / "delivery_order_requested.synthetic.v1.json"
 READINESS_FIXTURE = FIXTURES / "cfg-diag-exp-v1.production-ready.json"
 CAPACITY_FIXTURE = FIXTURES / "capacity-synthetic-one.v1.json"
 CAPACITY_REQUEST_FIXTURE = FIXTURES / "canary-capacity-request.v1.json"
+CROSS_REPO_PINS_FIXTURE = FIXTURES / "cross-repo-canary-pins.v1.json"
 QA_FIXTURE = ROOT / "delivery" / "qa" / "cfg-diag-exp-v1.qa-checklist.json"
 
 TIMES = {
@@ -56,7 +57,11 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _repo_sha(path: Path) -> str:
+def _repo_sha(path: Path, fallback: str | None = None) -> str:
+    if not path.exists():
+        if fallback is None or len(fallback) != 40:
+            raise RuntimeError(f"repository unavailable and no valid SHA pin exists: {path}")
+        return fallback
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=path, check=True, text=True, capture_output=True
     )
@@ -261,6 +266,7 @@ def run_canary(
     handoff: dict[str, Any],
     state_dir: Path,
     repo_paths: dict[str, Path],
+    repo_sha_fallbacks: dict[str, str] | None = None,
     projector: str = "typescript",
     producer_mode: str = "warmbly-go-canary",
 ) -> dict[str, Any]:
@@ -435,7 +441,10 @@ def run_canary(
         "received_revenue": False,
         "producer_mode": producer_mode,
         "projection_engine": projection_engine,
-        "repo_shas": {name: _repo_sha(path) for name, path in repo_paths.items()},
+        "repo_shas": {
+            name: _repo_sha(path, (repo_sha_fallbacks or {}).get(name))
+            for name, path in repo_paths.items()
+        },
         "schema_versions": [
             "confenge.proposal.v1",
             "confenge.delivery_order_requested.v1",
@@ -536,6 +545,7 @@ def main() -> int:
         warmbly_repo = ROOT.parent / "warmbly"
         producer_mode = "warmbly-byte-pinned-golden"
     output = args.output or state_dir / "canary-manifest.json"
+    pins = _load(CROSS_REPO_PINS_FIXTURE)
     manifest = run_canary(
         handoff=handoff,
         state_dir=state_dir,
@@ -543,6 +553,10 @@ def main() -> int:
             "warmbly": warmbly_repo,
             "governance": args.governance_repo,
             "web_cfg": args.web_cfg_repo,
+        },
+        repo_sha_fallbacks={
+            "warmbly": pins["repos"]["warmbly"]["sha"],
+            "web_cfg": pins["repos"]["web_cfg"]["sha"],
         },
         projector=args.projector,
         producer_mode=producer_mode,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from delivery.canary import HANDOFF_FIXTURE, run_canary
+from delivery.canary import CROSS_REPO_PINS_FIXTURE, HANDOFF_FIXTURE, _repo_sha, run_canary
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,3 +70,9 @@ def test_repeated_canary_command_converges_on_the_same_ids_and_state(tmp_path: P
     assert second["duplicate_business_mutations"] == 0
     assert second["work_order_count"] == 1
     assert second["replay_converged"] is True
+
+
+def test_absent_cross_repo_checkout_uses_explicit_sha_evidence_pin(tmp_path: Path):
+    pins = json.loads(CROSS_REPO_PINS_FIXTURE.read_text(encoding="utf-8"))
+    missing = tmp_path / "not-checked-out"
+    assert _repo_sha(missing, pins["repos"]["warmbly"]["sha"]) == pins["repos"]["warmbly"]["sha"]
