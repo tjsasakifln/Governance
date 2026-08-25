@@ -6,6 +6,8 @@ Este gate transforma a parte reproduzível da #112 em orçamento bloqueante. Ele
 
 `apps/web-shell/performance-budgets.json` é a fonte versionada dos limites. O build falha quando JavaScript ou CSS cru/gzip ultrapassa o orçamento. O laboratório abre `Hoje`, `Comercial > Rascunhos` e `Warmbly > Coortes` quatro vezes cada em `390 × 844`, com 120 ms de latência, 1,6 Mbps de download, 750 kbps de upload e CPU 4× mais lenta.
 
+O contrato global de continuidade acrescenta restauração validada, isolamento por ator, retomada de foco, deep link de cliente e proteção do rascunho volátil. Depois de deduplicar os atributos de fila, o artefato integrado mede 111.999 bytes de JavaScript gzip; por isso o subteto explícito passou de 110.000 para 113.000 bytes, com margem para variação do compressor. O teto de entrega agregado permanece 120.000 bytes gzip, sem aumento, e continua sendo a barreira contra transferir custo entre JavaScript e CSS.
+
 Por rota, o p75 precisa respeitar:
 
 - INP de laboratório ≤ 200 ms;

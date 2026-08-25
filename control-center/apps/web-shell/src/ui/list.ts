@@ -39,7 +39,13 @@ export interface ListChromeInput {
   readonly intro?: string;
   readonly card: (
     row: Record<string, unknown>,
-    position: { index: number; total: number; writesAllowed: boolean },
+    position: {
+      index: number;
+      total: number;
+      writesAllowed: boolean;
+      next?: { row: Record<string, unknown>; index: number };
+      nextPageHash?: string;
+    },
   ) => string;
   /** Server-filtered bounded page. Omitted by the mock adapter. */
   readonly remote?: unknown;
@@ -229,7 +235,17 @@ export function renderFilteredList(input: ListChromeInput): string {
       ${unavailableNote}
       ${reference}
       <div class="stack">${view.items
-        .map((row, index) => input.card(row, { index: view.rangeStart + index, total: view.matched, writesAllowed }))
+        .map((row, index) => input.card(row, {
+          index: view.rangeStart + index,
+          total: view.matched,
+          writesAllowed,
+          ...(view.items[index + 1]
+            ? { next: { row: view.items[index + 1]!, index: view.rangeStart + index + 1 } }
+            : {}),
+          ...(index === view.items.length - 1 && view.page < view.pageCount
+            ? { nextPageHash: listHref(hash, { pagina: String(view.page + 1) }) }
+            : {}),
+        }))
         .join("")}</div>
       ${emptyState}
       ${pagination(view, hash, heading, spec.id)}

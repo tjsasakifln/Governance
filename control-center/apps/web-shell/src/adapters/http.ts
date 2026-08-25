@@ -1173,7 +1173,10 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
   }
 
   private async loadDomain(id: DestinationId, fallback: Provenance, location?: string): Promise<DestinationPage> {
-    const paths = readPathsFor(id);
+    const clientResource = id === "clientes" ? parseHash(location ?? "#/clientes").resource : null;
+    const paths = clientResource
+      ? [`/v1/domains/clients?${new URLSearchParams({ scope: `client:${clientResource}` }).toString()}`]
+      : readPathsFor(id);
     const listPath = this.commercialListPath(id, location);
     const payloads = await Promise.all([
       ...paths.map((path) => this.getJson(path)),
@@ -1274,11 +1277,18 @@ export class HttpControlCenterAdapter implements ControlCenterReadAdapter {
       // "Cliente" / every source UNKNOWN: the card reported in issue #70.
       // A snapshot with no clients has no clients.
       const list = itemsOf(inner.clients);
-      const rows = list.length > 0 ? list : itemsOf(payload);
+      const rows = list.length > 0 ? list : clientResource ? [inner] : itemsOf(payload);
       const clients: ClientStatus[] = [];
       const gaps: ClientIdentityException[] = [];
       rows.forEach((row, index) => {
-        const rec = asRecord(row) ?? {};
+        const raw = asRecord(row) ?? {};
+        // A client-scoped domain snapshot has an operational-snapshot id, not a
+        // client-status id. Promote the identity from the requested scope only
+        // when the payload echoes the exact same slug; disagreement still fails
+        // closed into the data-quality queue.
+        const rec = clientResource && raw.client_slug === clientResource
+          ? { ...raw, id: `cc:client-status:${clientResource}`, scope: `client:${clientResource}` }
+          : raw;
         const client = maybeClientFrom(rec, fallback);
         if (client !== null) {
           clients.push(client);

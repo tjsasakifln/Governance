@@ -93,6 +93,7 @@ test("performance budget owns exact mobile targets and critical routes", () => {
   assert.equal(budget.budgets.css_raw_bytes, 26000);
   assert.equal(budget.budgets.css_gzip_bytes, 7000);
   assert.equal(budget.budgets.bundle_gzip_bytes, 120000);
+  assert.equal(budget.budgets.javascript_gzip_bytes, 113000);
   assert.deepEqual(budget.routes.map((route: { id: string }) => route.id), ["hoje", "rascunhos", "coortes"]);
   const probe = readFileSync(join(app, "scripts/performance-probe.mjs"), "utf8");
   assert.match(probe, /performance_event_timing/);

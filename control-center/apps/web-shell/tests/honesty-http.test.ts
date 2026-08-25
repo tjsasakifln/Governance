@@ -249,6 +249,25 @@ test("HTTP client 360 paints per-source absence for omitted Warmbly/Asaas/Govern
   assert.match(root.innerHTML, /data-client-source="governance"[^>]*data-absent="true"/);
 });
 
+test("HTTP client deep link reads the exact client scope instead of the empty roll-up", async () => {
+  const seen: string[] = [];
+  const { adapter } = httpAdapterFor((url) => {
+    seen.push(url);
+    return {
+      schema_version: "control-center.clients-snapshot.v1",
+      client_slug: "acme",
+      display_name: "ACME",
+      lifecycle: "active",
+      id: "cc:operational-snapshot:01M0WXAZ0Y0MS54HTACEA9RA0R",
+    };
+  });
+  const result = await adapter.readDestination("clientes", "#/clientes/acme");
+  assert.equal(result.ok, true);
+  if (!result.ok || result.loading) throw new Error("clientes/acme");
+  assert.equal(result.page.clients?.[0]?.client_slug, "acme");
+  assert.ok(seen.some((url) => url.includes("scope=client%3Aacme")));
+});
+
 test("operatorAction confirmation and error paint on the shipped HTTP path", async () => {
   const { adapter } = httpAdapterFor();
   const accepted = await adapter.operatorAction({

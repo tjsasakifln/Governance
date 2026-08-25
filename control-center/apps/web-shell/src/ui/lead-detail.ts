@@ -28,6 +28,7 @@
 
 import { formatLocal } from "../datetime";
 import { escapeHtml } from "../escape";
+import { operatorActionDraft, operatorActionDraftKey } from "../action-draft";
 import { formatMoney, isMoney } from "../money";
 import { ownMapValue } from "../own-map";
 import { sourcePresentationLabel, sourceSystemLabel } from "../provenance";
@@ -813,15 +814,16 @@ function confirmationControls(action: LeadAction): string {
   return `${checkbox}<label>Digite RECONHECER para liberar <input name="palavra_de_confirmacao" required pattern="RECONHECER" title="Digite RECONHECER" /></label>`;
 }
 
-function localActionForm(action: LeadAction, resource: string, canonicalId: string): string {
+function localActionForm(action: LeadAction, resource: string, canonicalId: string, returnHash: string): string {
   const riskLabel = ownMapValue(RISK_LABEL, action.risk) ?? "risco não reconhecido";
+  const note = operatorActionDraft(operatorActionDraftKey(action.id, canonicalId, resource));
   return `
-    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" class="operator-form lead-action">
+    <form data-operator-form="${escapeHtml(action.id)}" data-writes-to="control-center" data-action-risk="${escapeHtml(action.risk)}" data-continuity-action="queue" data-continuity-next="${escapeHtml(returnHash)}" class="operator-form lead-action">
       <h4>${escapeHtml(action.label)} <span class="pill" data-risk="${escapeHtml(action.risk)}">${escapeHtml(riskLabel)}</span></h4>
       <p class="constraint">${escapeHtml(action.effect)}</p>
       <input type="hidden" name="target_canonical_id" value="${escapeHtml(canonicalId)}" />
       <input type="hidden" name="target_source_id" value="${escapeHtml(resource)}" />
-      <label>Nota de auditoria <textarea name="note" required minlength="2" maxlength="500"></textarea></label>
+      <label>Nota de auditoria <textarea name="note" required minlength="2" maxlength="500">${escapeHtml(note)}</textarea></label>
       ${confirmationControls(action)}
       <button type="submit">${escapeHtml(action.label)}</button>
     </form>`;
@@ -946,7 +948,7 @@ export function leadDetailBlock(input: LeadDetailInput): string {
       <section class="stack lead-actions" aria-labelledby="lead-actions-title" data-action-scope="control-center-only">
         <h3 id="lead-actions-title">Registros no Control Center (não gravam no Warmbly)</h3>
         <p class="constraint" data-operator-scope="control-center-only">Estas ações gravam apenas um registro de auditoria local. Nada muda no Warmbly, e o item continua na fila até a origem mudar.</p>
-        ${model.localActions.map((action) => localActionForm(action, model.resource, model.canonicalId)).join("")}
+        ${model.localActions.map((action) => localActionForm(action, model.resource, model.canonicalId, model.backHash)).join("")}
       </section>
 
       <section class="stack lead-actions" aria-labelledby="lead-warmbly-title" data-action-scope="warmbly-write">
