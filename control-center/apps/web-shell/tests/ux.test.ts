@@ -110,11 +110,13 @@ test("loading, empty, stale and error remain distinct view states", () => {
   }
 });
 
-test("viewport overflow is confined to nav/subnav; html/body clip accidental horizontal scroll", () => {
+test("global and contextual navigation need no horizontal discovery", () => {
   const css = readFileSync(join(rootDir, "src/styles.css"), "utf8");
   assert.match(css, /html,\s*body\s*\{[^}]*overflow-x:\s*hidden/s);
-  assert.match(css, /\.nav\s*\{[^}]*overflow-x:\s*auto/s);
-  assert.match(css, /\.subnav\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.doesNotMatch(css, /\.nav\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.doesNotMatch(css, /\.subnav\s*\{[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /\.task-nav\s*\{[^}]*grid-template-columns:\s*repeat\(5,/s);
+  assert.match(css, /\.subnav\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
   assert.match(css, /min-height:\s*44px/);
 });
 

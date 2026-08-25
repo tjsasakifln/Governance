@@ -35,6 +35,7 @@ import {
   memoriaGroups,
 } from "./domains";
 import { warmblyBlock } from "./warmbly";
+import { renderDesktopNavigation, renderMobileTaskNavigation } from "./navigation";
 import {
   pendingResumeConfirmation,
   resumeObservationFingerprint,
@@ -363,16 +364,12 @@ function mockLab(destination: DestinationId, current: ViewKind): string {
 export function renderShell(model: ShellModel): string {
   const dest = DESTINATIONS.find((item) => item.id === model.destination);
   const label = dest?.label ?? model.destination;
-  const nav = DESTINATIONS.map((item) => {
-    const current = item.id === model.destination;
-    return `
-      <a
-        href="${hashFor(item.id, model.viewKind === "ready" ? null : model.viewKind)}"
-        data-nav="${item.id}"
-        aria-current="${current ? "page" : "false"}"
-      >${escapeHtml(item.label)}</a>
-    `;
-  }).join("");
+  const navigationLocation = {
+    destination: model.destination,
+    ...(model.surface !== undefined ? { surface: model.surface } : {}),
+    ...(model.hash !== undefined ? { currentHref: model.hash } : {}),
+  };
+  const preserveNavigationViewState = model.adapterMode !== "http";
 
   const page =
     model.view.kind === "ready" || model.view.kind === "stale" ? model.view.data : null;
@@ -421,9 +418,8 @@ export function renderShell(model: ShellModel): string {
         </a>
         <p class="operator" title="${escapeHtml(operatorId)}">${escapeHtml(operator)}${model.adapterMode === "http" ? "" : " · modo mock"}</p>
       </header>
-      <nav class="nav" aria-label="Áreas do Control Center">
-        ${nav}
-      </nav>
+      ${renderMobileTaskNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
+      ${renderDesktopNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
       <main id="conteudo" tabindex="-1">
         <header class="page-head">
           <h1>${escapeHtml(label)}</h1>
