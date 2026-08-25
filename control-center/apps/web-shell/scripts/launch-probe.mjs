@@ -90,6 +90,16 @@ const visualManifest = {
     .map(({ name, width, height }) => ({ id: name, width, height })),
   states: ["ready", ...viewStates],
   checks: [],
+  catalog: {
+    id: "operational-component-catalog",
+    components: 10,
+    state: "extreme-fixtures",
+    viewports: [
+      { id: "390", width: 390, height: 844 },
+      { id: "desktop-1440", width: 1440, height: 1000 },
+    ],
+    checks: [],
+  },
   safety: {
     observed_request_count: 0,
     observed_write_requests: [],
@@ -167,7 +177,7 @@ function networkSafetySnapshot() {
   };
 }
 
-async function assertAxe(page, route, viewport, state) {
+async function assertAxe(page, route, viewport, state, checks = visualManifest.checks) {
   const where = `${viewport}/${route}/${state}`;
   await page.waitForFunction(() => typeof globalThis.axe?.run === "function");
   const result = await page.evaluate(async () => {
@@ -189,7 +199,7 @@ async function assertAxe(page, route, viewport, state) {
   const blockers = result.filter(
     (violation) => violation.impact === "serious" || violation.impact === "critical",
   );
-  visualManifest.checks.push({
+  checks.push({
     kind: "axe",
     where,
     route,
@@ -836,6 +846,56 @@ try {
       }
     }
   }
+
+  let catalogComponentCount = 0;
+  let catalogAxeChecks = 0;
+  for (const vp of viewports.filter((viewport) => viewport.name === "390" || viewport.name === "desktop-1440")) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
+    await page.waitForSelector('[data-destination="hoje"][data-view-state="ready"]');
+    const componentCount = await page.evaluate(() => {
+      const designSystem = window.__CONFENGE_CONTROL_CENTER__?.designSystem;
+      const main = document.querySelector("main");
+      if (!designSystem || !main) throw new Error("operational design-system catalog is unavailable");
+      main.innerHTML = designSystem.renderCatalog();
+      return designSystem.components.length;
+    });
+    if (componentCount !== 10) {
+      throw new Error(`operational component contract expected 10 entries, got ${componentCount}`);
+    }
+    catalogComponentCount = componentCount;
+    const catalogOverflow = await overflowPx();
+    if (catalogOverflow > 1) {
+      throw new Error(`${vp.name}/component-catalog horizontal overflow ${catalogOverflow}px`);
+    }
+    const catalogMetrics = await layoutMetrics(page);
+    assertSingleScrollContext(catalogMetrics, `${vp.name}/component-catalog`);
+    assertContentColumn(catalogMetrics, `${vp.name}/component-catalog`);
+    const axeViolations = await assertAxe(
+      page,
+      visualManifest.catalog.id,
+      vp.name,
+      visualManifest.catalog.state,
+      visualManifest.catalog.checks,
+    );
+    catalogAxeChecks += 1;
+    visualManifest.catalog.checks.push({
+      kind: "geometry",
+      route: visualManifest.catalog.id,
+      viewport: vp.name,
+      state: visualManifest.catalog.state,
+      horizontal_overflow_px: catalogOverflow,
+      main_horizontal_overflow_px: catalogMetrics.mainOverflowX,
+      document_scroll_range_px: catalogMetrics.documentScrollRange,
+      competing_scroll_owners: catalogMetrics.owners
+        .filter((owner) => owner.isDocument || owner.insideMain)
+        .map((owner) => owner.label),
+    });
+    const catalogShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-component-catalog-${vp.name}$1`);
+    await page.screenshot({ path: catalogShot, fullPage: true });
+    console.log(`component_catalog viewport=${vp.name} components=${componentCount} overflow=${catalogOverflow} axe_violations=${axeViolations} screenshot=${catalogShot}`);
+  }
+  console.log(`component_catalog=PASS components=${catalogComponentCount} viewports=2 axe_checks=${catalogAxeChecks}`);
 
   if (errors.length > 0) {
     throw new Error(`page errors: ${errors.join(" | ")}`);

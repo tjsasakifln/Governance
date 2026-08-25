@@ -4,6 +4,10 @@ const EXPECTED_VIEWPORTS = [
   { id: "desktop-1440", width: 1440, height: 1000 },
 ];
 const EXPECTED_STATES = ["ready", "loading", "empty", "stale", "error"];
+const EXPECTED_CATALOG_VIEWPORTS = [
+  { id: "390", width: 390, height: 844 },
+  { id: "desktop-1440", width: 1440, height: 1000 },
+];
 
 function fail(message) {
   throw new Error(`invalid visual gate manifest: ${message}`);
@@ -80,6 +84,61 @@ function assertSafety(safety) {
   }
 }
 
+function assertCatalog(catalog) {
+  if (!catalog || typeof catalog !== "object"
+    || catalog.id !== "operational-component-catalog"
+    || catalog.components !== 10
+    || catalog.state !== "extreme-fixtures"
+    || JSON.stringify(catalog.viewports) !== JSON.stringify(EXPECTED_CATALOG_VIEWPORTS)
+    || !Array.isArray(catalog.checks)) {
+    fail("operational component catalog contract is absent or malformed");
+  }
+  const required = new Set(EXPECTED_CATALOG_VIEWPORTS.map((viewport) => viewport.id));
+  const axeByViewport = new Map();
+  const geometryByViewport = new Map();
+  for (const check of catalog.checks) {
+    if (!check || typeof check !== "object"
+      || check.route !== catalog.id
+      || check.state !== catalog.state
+      || !required.has(check.viewport)) {
+      fail("component catalog check contains an unknown route, viewport or state");
+    }
+    if (check.kind === "axe") {
+      if (axeByViewport.has(check.viewport)
+        || check.serious_or_critical !== 0
+        || !Array.isArray(check.violations)
+        || check.violations.some((item) => item?.impact === "serious" || item?.impact === "critical")) {
+        fail("component catalog axe result is duplicated or contains a blocker");
+      }
+      axeByViewport.set(check.viewport, check);
+    } else if (check.kind === "geometry") {
+      if (geometryByViewport.has(check.viewport)
+        || !Number.isFinite(check.horizontal_overflow_px)
+        || !Number.isFinite(check.main_horizontal_overflow_px)
+        || !Number.isFinite(check.document_scroll_range_px)
+        || check.horizontal_overflow_px > 1
+        || check.main_horizontal_overflow_px > 1
+        || check.document_scroll_range_px > 1
+        || !Array.isArray(check.competing_scroll_owners)
+        || check.competing_scroll_owners.length > 0) {
+        fail("component catalog geometry result is duplicated, malformed or failing");
+      }
+      geometryByViewport.set(check.viewport, check);
+    } else {
+      fail("component catalog contains an unknown check kind");
+    }
+  }
+  for (const viewport of required) {
+    if (!axeByViewport.has(viewport) || !geometryByViewport.has(viewport)) {
+      fail(`component catalog evidence is absent for ${viewport}`);
+    }
+  }
+  if (axeByViewport.size !== required.size || geometryByViewport.size !== required.size) {
+    fail("component catalog matrix contains unexpected extra cells");
+  }
+  return { axe: axeByViewport.size, geometry: geometryByViewport.size };
+}
+
 export function assertVisualGateManifest(manifest, expectedRuntimeSha) {
   if (!manifest || typeof manifest !== "object"
     || manifest.schema_version !== "control-center.visual-gate.v1"
@@ -143,11 +202,13 @@ export function assertVisualGateManifest(manifest, expectedRuntimeSha) {
     }
   }
   if (axeByCell.size !== required.size) fail("axe matrix has unexpected extra cells");
+  const catalog = assertCatalog(manifest.catalog);
   assertSafety(manifest.safety);
   return {
     routes: manifest.routes.length,
     axe: axeByCell.size,
     geometry: geometryByCell.size,
+    catalogAxe: catalog.axe,
+    catalogGeometry: catalog.geometry,
   };
 }
-

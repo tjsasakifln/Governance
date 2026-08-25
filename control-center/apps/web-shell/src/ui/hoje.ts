@@ -255,7 +255,7 @@ function renderSection(section: HojeSection): string {
     body = `<ol class="priorities">${section.rows
       .map(
         (row) =>
-          `<li class="card priority" data-rank="${escapeHtml(row.kind?.replace("rank-", "") ?? "")}" data-id="${escapeHtml(row.id)}">${rowCard(section.id, row)}</li>`,
+          `<li class="card priority" data-operational-component="priority" data-rank="${escapeHtml(row.kind?.replace("rank-", "") ?? "")}" data-id="${escapeHtml(row.id)}">${rowCard(section.id, row)}</li>`,
       )
       .join("")}</ol>`;
   } else {

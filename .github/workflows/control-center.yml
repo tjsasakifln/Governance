@@ -131,6 +131,7 @@ jobs:
           grep -E "visual_gate=PASS routes=[1-9][0-9]* axe_checks=[1-9]" /tmp/cc-e2e.log
           grep -E "performance_build=PASS" /tmp/cc-e2e.log
           grep -E "performance_lab=PASS routes=3 samples=12 canonical_sampled=false" /tmp/cc-e2e.log
+          grep -E "component_catalog=PASS components=10 viewports=2 axe_checks=2" /tmp/cc-e2e.log
       - name: Upload visual gate artifacts
         if: always()
         uses: actions/upload-artifact@v4

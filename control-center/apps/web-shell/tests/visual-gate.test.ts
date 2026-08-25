@@ -65,6 +65,26 @@ function completeManifest(): Record<string, unknown> {
     path: "/v1/operator-actions",
     action_type: "START_EXCEPTION_WORK",
   };
+  const catalogChecks = ["390", "desktop-1440"].flatMap((viewport) => [
+    {
+      kind: "axe",
+      route: "operational-component-catalog",
+      viewport,
+      state: "extreme-fixtures",
+      violations: [],
+      serious_or_critical: 0,
+    },
+    {
+      kind: "geometry",
+      route: "operational-component-catalog",
+      viewport,
+      state: "extreme-fixtures",
+      horizontal_overflow_px: 0,
+      main_horizontal_overflow_px: 0,
+      document_scroll_range_px: 0,
+      competing_scroll_owners: [],
+    },
+  ]);
   return {
     schema_version: "control-center.visual-gate.v1",
     execution: "ISOLATED_AUTHENTICATED_E2E",
@@ -75,6 +95,16 @@ function completeManifest(): Record<string, unknown> {
     viewports,
     states,
     checks,
+    catalog: {
+      id: "operational-component-catalog",
+      components: 10,
+      state: "extreme-fixtures",
+      viewports: [
+        { id: "390", width: 390, height: 844 },
+        { id: "desktop-1440", width: 1440, height: 1000 },
+      ],
+      checks: catalogChecks,
+    },
     safety: {
       observed_request_count: 50,
       observed_write_requests: [allowedWrite],
@@ -137,7 +167,32 @@ test("manifest reducer accepts the complete route/state/viewport cross-product",
     completeManifest(),
     "8a2eb1f012345678901234567890123456789012",
   );
-  assert.deepEqual(result, { routes: 10, axe: 78, geometry: 78 });
+  assert.deepEqual(result, {
+    routes: 10,
+    axe: 78,
+    geometry: 78,
+    catalogAxe: 2,
+    catalogGeometry: 2,
+  });
+});
+
+test("manifest reducer requires the operational catalog in mobile and desktop", () => {
+  const missing = completeManifest();
+  delete missing.catalog;
+  assert.throws(
+    () => assertVisualGateManifest(missing, String(missing.runtime_sha)),
+    /component catalog contract is absent/,
+  );
+
+  const failing = completeManifest();
+  const catalog = failing.catalog as { checks: Array<Record<string, unknown>> };
+  const geometry = catalog.checks.find((check) => check.kind === "geometry");
+  assert.ok(geometry);
+  geometry.horizontal_overflow_px = 2;
+  assert.throws(
+    () => assertVisualGateManifest(failing, String(failing.runtime_sha)),
+    /component catalog geometry result.*failing/,
+  );
 });
 
 test("manifest reducer rejects omitted coverage, lying axe counts and runtime drift", () => {
