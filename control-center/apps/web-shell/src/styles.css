@@ -167,21 +167,14 @@ a {
 
 .nav {
   grid-area: nav;
-  display: flex;
-  gap: 0.25rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
-  background: var(--bg-elev);
-  border-top: 1px solid var(--line);
+  display: none;
 }
 
 .subnav {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.35rem;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   margin: 0 0 0.85rem;
   position: sticky;
   top: 0;
@@ -199,7 +192,9 @@ a {
   border-radius: 999px;
   color: var(--fg);
   text-decoration: none;
-  white-space: nowrap;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
 }
 
 .subnav a[aria-current="page"] {
@@ -218,6 +213,133 @@ a {
   position: static;
   margin: 0.5rem 0 0.2rem;
   padding: 0;
+}
+
+/* Mobile global navigation is a task launcher, not a sideways list of the
+   repository's ten domains. Four frequent/risky tasks remain visible; the
+   native details panel exposes every other area without swipe, hover or JS. */
+.task-nav {
+  grid-area: nav;
+  position: relative;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.35rem 0.35rem calc(0.35rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+.task-nav > a,
+.task-nav-more > summary {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0.35rem 0.15rem;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  color: var(--fg);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.task-nav > a[aria-current="page"],
+.task-nav-more > summary[data-contains-current="true"] {
+  border-color: var(--accent);
+  background: #2a2620;
+}
+
+.task-nav-label,
+.task-nav-context {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.task-nav-label {
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.task-nav-context {
+  color: var(--fg-muted);
+  font-size: 0.61rem;
+  line-height: 1.05;
+}
+
+.task-nav-more {
+  position: static;
+  min-width: 0;
+}
+
+.task-nav-more > summary {
+  list-style: none;
+}
+
+.task-nav-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.task-nav-more-panel {
+  position: absolute;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: calc(100% + 0.35rem);
+  max-height: min(65dvh, 30rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--bg-elev);
+  box-shadow: 0 -0.5rem 2rem rgb(0 0 0 / 35%);
+}
+
+.task-nav-more-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.task-nav-more-panel a {
+  min-height: 44px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.task-nav-more-panel a[aria-current="page"] {
+  border-color: var(--accent);
+  background: #2a2620;
+}
+
+.task-nav-more-panel .task-nav-label {
+  font-size: 0.86rem;
+}
+
+.task-nav-more-panel .task-nav-context {
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
 }
 
 .operator-form {
@@ -874,8 +996,8 @@ h2 {
   }
 
   .nav {
+    display: flex;
     flex-direction: column;
-    overflow-x: hidden;
     /* Stretches to its grid row instead of a hardcoded calc(100dvh - 3rem)
        that never matched the real topbar height and pushed the shell past the
        viewport. Scrolls internally when the link list is taller than the row. */
@@ -884,6 +1006,16 @@ h2 {
     border-right: 1px solid var(--line);
     padding: 0.8rem 0.55rem;
     min-height: 0;
+  }
+
+  .task-nav {
+    display: none;
+  }
+
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   .nav a {
