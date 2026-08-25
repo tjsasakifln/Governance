@@ -1069,7 +1069,73 @@ function reviewRows(text: string, min: number, max: number): number {
   return Math.min(max, Math.max(min, lines + 1));
 }
 
-function reviewDraftCard(item: unknown): string {
+type ReviewInspectorMode = "inspect" | "edit" | "reject";
+
+function reviewInspectorMode(query: string | null): ReviewInspectorMode {
+  const mode = new URLSearchParams(query ?? "").get("mode");
+  return mode === "edit" || mode === "reject" ? mode : "inspect";
+}
+
+function reviewDraftRow(item: unknown): Record<string, unknown> {
+  return item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+}
+
+function reviewDraftId(item: unknown): string {
+  return String(reviewDraftRow(item).id ?? "");
+}
+
+function reviewDraftActionable(item: unknown): boolean {
+  const row = reviewDraftRow(item);
+  return readEditorialState({ ...row, actionable: row.editorial_actionable }).actionable;
+}
+
+function reviewDraftHref(id: string, mode: ReviewInspectorMode = "inspect"): string {
+  const params = new URLSearchParams({ resource: id });
+  if (mode !== "inspect") params.set("mode", mode);
+  return `#/comercial/rascunhos?${params.toString()}`;
+}
+
+function selectedReviewIndex(items: readonly unknown[], resource: string | null): number {
+  const requested = resource === null ? -1 : items.findIndex((item) => reviewDraftId(item) === resource);
+  if (requested >= 0) return requested;
+  const actionable = items.findIndex((item) => reviewDraftActionable(item));
+  return actionable >= 0 ? actionable : 0;
+}
+
+function nextActionableReviewId(items: readonly unknown[], selected: number): string | null {
+  for (let offset = 1; offset < items.length; offset += 1) {
+    const item = items[(selected + offset) % items.length];
+    if (item !== undefined && reviewDraftActionable(item)) return reviewDraftId(item);
+  }
+  return null;
+}
+
+function reviewDraftListItem(item: unknown, selected: boolean): string {
+  const row = reviewDraftRow(item);
+  const account = reviewDraftRow(row.account);
+  const id = reviewDraftId(item);
+  const routeClass = reviewText(row.route_class);
+  const factUsed = reviewText(row.fact_used);
+  const editorial = readEditorialState({ ...row, actionable: row.editorial_actionable });
+  const company = String(account.nome_fantasia ?? account.razao_social ?? row.account_id ?? "Lead");
+  const recipient = String(row.recipient ?? "destinatário ausente");
+  const route = reviewRouteClass(routeClass) ?? REVIEW_UNREPORTED;
+  return `<li class="review-queue-item" data-review-list-item="${escapeHtml(id)}" data-editorial-actionable="${editorial.actionable ? "true" : "false"}">
+            <a data-review-row="${escapeHtml(id)}" href="${escapeHtml(reviewDraftHref(id))}" aria-current="${selected ? "page" : "false"}">
+              <strong>${escapeHtml(company)}</strong>
+              <span>${escapeHtml(recipient)}</span>
+              <span>${escapeHtml(route)}</span>
+              <span>${escapeHtml(factUsed ?? "fato observado ausente")}</span>
+              ${editorial.actionable ? "" : `<span>${escapeHtml(ownMapValue(EDITORIAL_STATE_LABELS, editorial.state) ?? editorial.state)}</span>`}
+            </a>
+          </li>`;
+}
+
+function reviewDraftInspector(
+  item: unknown,
+  nextReviewId: string | null,
+  mode: ReviewInspectorMode,
+): string {
   const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
   const account = row.account && typeof row.account === "object" ? (row.account as Record<string, unknown>) : {};
   const id = String(row.id ?? "");
@@ -1135,27 +1201,51 @@ function reviewDraftCard(item: unknown): string {
     ],
     "review-draft",
   );
-  const decision = actionable
-    ? `<form data-review-form="${escapeHtml(id)}" class="operator-form">
-                <input type="hidden" name="expected_content_hash" value="${escapeHtml(contentHash)}" />
+  const commonHidden = `<input type="hidden" name="expected_content_hash" value="${escapeHtml(contentHash)}" />
+                <input type="hidden" name="next_review_id" value="${escapeHtml(nextReviewId ?? "")}" />
                 <textarea name="original_subject" hidden>${escapeHtml(subject)}</textarea>
-                <textarea name="original_body_text" hidden>${escapeHtml(bodyText)}</textarea>
+                <textarea name="original_body_text" hidden>${escapeHtml(bodyText)}</textarea>`;
+  const readOnlyMessage = `<section class="review-message" aria-labelledby="review-subject-${escapeHtml(id)}">
+                <h4 id="review-subject-${escapeHtml(id)}">${escapeHtml(subject || "Assunto ausente")}</h4>
+                <p data-exact-body="true">${escapeHtml(bodyText || "Corpo ausente")}</p>
+              </section>`;
+  const decision = !actionable
+    ? `<div class="review-readonly" data-review-readonly="${escapeHtml(id)}">${readOnlyMessage}</div>`
+    : mode === "edit"
+      ? `<form data-review-form="${escapeHtml(id)}" data-review-mode="edit" class="operator-form review-decision-form">
+                ${commonHidden}
+                <input type="hidden" name="action" value="SAVE_ADJUSTMENT" />
                 <label>Assunto <textarea name="subject" rows="${subjectRows}">${escapeHtml(subject)}</textarea></label>
                 <label>Corpo <textarea name="body_text" rows="${bodyRows}">${escapeHtml(bodyText)}</textarea></label>
-                <label>Decisão <select name="action">
-                  <option value="SAVE_ADJUSTMENT">Salvar ajuste</option>
-                  <option value="APPROVE">Aprovar e agendar</option>
-                  <option value="REJECT">Rejeitar e reescrever</option>
-                </select></label>
-                <label>Motivo da rejeição <textarea name="reason"></textarea></label>
-                <label>Caixa genérica/departamental <select name="generic_ack"><option value="false">não confirmar</option><option value="true">confirmo conscientemente</option></select></label>
-                <button type="submit">Registrar decisão</button>
+                <div class="review-actions">
+                  <button type="submit" data-review-save="true">Salvar ajuste</button>
+                  <a class="button" href="${escapeHtml(reviewDraftHref(id))}">Cancelar edição</a>
+                </div>
               </form>`
-    : `<div class="operator-form review-readonly" data-review-readonly="${escapeHtml(id)}">
-                <label>Assunto <textarea name="subject" rows="${subjectRows}" readonly>${escapeHtml(subject)}</textarea></label>
-                <label>Corpo <textarea name="body_text" rows="${bodyRows}" readonly>${escapeHtml(bodyText)}</textarea></label>
-              </div>`;
-  return `<article class="card review-draft" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}" data-editorial-state="${escapeHtml(editorial.state)}" data-editorial-actionable="${actionable ? "true" : "false"}" data-composer-version="${escapeHtml(composerVersion ?? "")}">
+      : mode === "reject"
+        ? `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="reject" class="operator-form review-decision-form">
+                ${commonHidden}
+                <input type="hidden" name="action" value="REJECT" />
+                <textarea name="subject" hidden>${escapeHtml(subject)}</textarea>
+                <textarea name="body_text" hidden>${escapeHtml(bodyText)}</textarea>
+                <label>Motivo para reescrita <textarea name="reason" rows="4" required></textarea></label>
+                <div class="review-actions">
+                  <button type="submit" data-review-reject="true">Rejeitar e solicitar reescrita</button>
+                  <a class="button" href="${escapeHtml(reviewDraftHref(id))}">Cancelar rejeição</a>
+                </div>
+              </form>`
+        : `${readOnlyMessage}<form data-review-form="${escapeHtml(id)}" data-review-mode="approve" class="operator-form review-decision-form approve-form">
+                ${commonHidden}
+                <input type="hidden" name="action" value="APPROVE" />
+                <textarea name="subject" hidden>${escapeHtml(subject)}</textarea>
+                <textarea name="body_text" hidden>${escapeHtml(bodyText)}</textarea>
+                <div class="review-actions">
+                  <button type="submit" data-approve-submit="true">Aprovar e agendar para ${escapeHtml(String(row.recipient ?? "destinatário ausente"))}</button>
+                  <a class="button" data-review-edit="true" href="${escapeHtml(reviewDraftHref(id, "edit"))}">Editar</a>
+                  <a class="button" data-review-reject="true" href="${escapeHtml(reviewDraftHref(id, "reject"))}">Rejeitar/segurar</a>
+                </div>
+              </form>`;
+  return `<article class="card review-draft review-inspector" tabindex="-1" data-review-inspector="${escapeHtml(id)}" data-draft-id="${escapeHtml(id)}" data-state="${escapeHtml(String(row.state ?? ""))}" data-editorial-state="${escapeHtml(editorial.state)}" data-editorial-actionable="${actionable ? "true" : "false"}" data-composer-version="${escapeHtml(composerVersion ?? "")}">
               <p class="kicker">${escapeHtml(String(row.state ?? ""))} · ${escapeHtml(String(row.purpose ?? ""))} · toque ${escapeHtml(String(row.ordinal ?? ""))}</p>
               <h3>${escapeHtml(String(account.nome_fantasia ?? account.razao_social ?? row.account_id ?? "Lead"))}</h3>
               <p>Destinatário: ${escapeHtml(String(row.recipient ?? "ausente"))}</p>
@@ -1192,11 +1282,24 @@ function commercialOps(
   const availability = snapshot.availability ?? "UNKNOWN";
   let body = "";
   if (current === "rascunhos") {
-    body = `<section aria-labelledby="rascunhos-title"><h2 id="rascunhos-title">Revisão editorial</h2>
+    const selectedIndex = reviewDrafts.length === 0 ? -1 : selectedReviewIndex(reviewDrafts, resource);
+    const selectedDraft = selectedIndex >= 0 ? reviewDrafts[selectedIndex] : undefined;
+    const selectedId = selectedDraft === undefined ? null : reviewDraftId(selectedDraft);
+    const selectionFellBack = resource !== null && resource !== selectedId;
+    const nextReviewId = selectedIndex < 0 ? null : nextActionableReviewId(reviewDrafts, selectedIndex);
+    const mode = reviewInspectorMode(query);
+    body = `<section aria-labelledby="rascunhos-title" data-review-workbench-count="${reviewDrafts.length}"><h2 id="rascunhos-title">Revisão editorial</h2>
       <p class="constraint">Aprovar vincula o hash exato e agenda a próxima janela útil. Nenhum botão envia imediatamente.</p>
-      <div class="stack">${reviewDrafts.length === 0
+      <p><strong>${reviewDrafts.length}</strong> mensagem(ns) carregada(s) neste recorte. A lista não afirma o total do servidor.</p>
+      ${selectionFellBack ? `<p class="banner stale" role="status" data-review-selection-fallback="true">A mensagem solicitada não está neste recorte; mostrando a próxima mensagem disponível.</p>` : ""}
+      ${reviewDrafts.length === 0
         ? `<p class="banner empty">Nenhum rascunho aguardando revisão.</p>`
-        : reviewDrafts.map((item) => reviewDraftCard(item)).join("")}</div>
+        : `<div class="review-workbench">
+            <nav class="review-queue-panel" aria-label="Mensagens aguardando revisão">
+              <ol class="review-queue">${reviewDrafts.map((item, index) => reviewDraftListItem(item, index === selectedIndex)).join("")}</ol>
+            </nav>
+            ${selectedDraft === undefined ? "" : reviewDraftInspector(selectedDraft, nextReviewId, mode)}
+          </div>`}
     </section>`;
   } else if (current === "cohorts") {
     const acquisition = Array.isArray(cohorts.acquisition) ? cohorts.acquisition : [];

@@ -123,6 +123,7 @@ export interface MountableRoot {
       checked?: boolean;
       disabled?: boolean;
       textContent?: string | null;
+      setAttribute?(name: string, value: string): void;
     }>;
     focus?(options?: { preventScroll?: boolean }): void;
     scrollIntoView?(options?: { block?: "center"; inline?: "nearest" }): void;
@@ -187,12 +188,13 @@ function applyPaint(
     ),
   );
   bindWarmblyHumanGate(root, adapter, repaint, navigate);
-  bindReviewActions(root, adapter, repaint);
+  bindReviewActions(root, adapter, repaint, navigate, renderHash);
   bindWarmblyGateFilters(root, renderHash, navigate);
   bindMessageToggle(root, renderHash, navigate);
   bindCopyControls(root);
   bindListFilters(root, renderHash, navigate);
   bindReviewQueueShortcut();
+  consumeReviewFocus(root, hash, replaceLocation);
   consumeQueueFocus(
     root,
     hash,
@@ -260,6 +262,26 @@ function bindCopyControls(root: MountableRoot): void {
 export type Navigate = (hash: string) => void;
 export type ReplaceLocation = (hash: string) => void;
 
+const REVIEW_FOCUS_PARAM = "focus";
+const REVIEW_FOCUS_VALUE = "review";
+
+export function consumeReviewFocus(
+  root: MountableRoot,
+  hash: string,
+  replaceLocation: ReplaceLocation,
+): void {
+  const stripped = hash.startsWith("#") ? hash.slice(1) : hash;
+  const [path = "/comercial/rascunhos", query = ""] = stripped.split("?");
+  const params = new URLSearchParams(query);
+  if (params.get(REVIEW_FOCUS_PARAM) !== REVIEW_FOCUS_VALUE) return;
+  params.delete(REVIEW_FOCUS_PARAM);
+  const nextQuery = params.toString();
+  replaceLocation(`#${path}${nextQuery ? `?${nextQuery}` : ""}`);
+  const inspector = root.querySelectorAll?.("[data-review-inspector]")[0];
+  inspector?.focus?.({ preventScroll: true });
+  inspector?.scrollIntoView?.({ block: "center", inline: "nearest" });
+}
+
 function defaultNavigate(hash: string): void {
   if (typeof window !== "undefined") {
     window.location.hash = hash;
@@ -288,6 +310,10 @@ export function consumeQueueFocus(
     consumedQueueFocus.delete(root);
     return false;
   }
+  // Comercial → Rascunhos shares the generic query-param name but owns this
+  // exact marker. Its inspector consumer already focused the next message; the
+  // list-row consumer must not steal that focus as an "invalid" activity token.
+  if (token === REVIEW_FOCUS_VALUE) return false;
   if (consumedQueueFocus.get(root) === hash) return false;
   consumedQueueFocus.set(root, hash);
   replaceLocation(stripQueueFocus(hash));
@@ -400,6 +426,8 @@ export function bindReviewActions(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
+  navigate?: Navigate,
+  currentHash?: string,
 ): void {
   if (!adapter.reviewDraftAction || typeof root.querySelectorAll !== "function") return;
   const forms = root.querySelectorAll("[data-review-form]");
@@ -413,6 +441,7 @@ export function bindReviewActions(
       const id = form.getAttribute("data-review-form") ?? "";
       const action = form.querySelector('[name="action"]')?.value as "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT" | undefined;
       const expected = form.querySelector('[name="expected_content_hash"]')?.value ?? "";
+      const nextReviewId = form.querySelector('[name="next_review_id"]')?.value ?? "";
       if (!id || !action || !expected) return;
       const subject = form.querySelector('[name="subject"]')?.value ?? "";
       const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
@@ -437,6 +466,10 @@ export function bindReviewActions(
         const control = controls[controlIndex];
         if (control) control.disabled = true;
       }
+      const actionLinks = form.querySelectorAll?.("a") ?? [];
+      for (let linkIndex = 0; linkIndex < actionLinks.length; linkIndex += 1) {
+        actionLinks[linkIndex]?.setAttribute?.("aria-disabled", "true");
+      }
       const submit = form.querySelector('button[type="submit"]');
       if (submit) submit.textContent = "Confirmando no servidor…";
       const request = {
@@ -447,9 +480,18 @@ export function bindReviewActions(
         reason: form.querySelector('[name="reason"]')?.value ?? "",
         generic_recipient_acknowledged: form.querySelector('[name="generic_ack"]')?.value === "true",
       };
+      let completionHash: string | null = null;
       void Promise.resolve(adapter.reviewDraftAction?.(request))
         .then((result) => {
-          if (result) adapter.lastOperatorResult = result;
+          if (result) {
+            adapter.lastOperatorResult = result;
+            if (result.ok) {
+              const destinationId = action === "SAVE_ADJUSTMENT" ? id : nextReviewId;
+              completionHash = destinationId
+                ? `#/comercial/rascunhos?resource=${encodeURIComponent(destinationId)}&${REVIEW_FOCUS_PARAM}=${REVIEW_FOCUS_VALUE}`
+                : `#/comercial/rascunhos?${REVIEW_FOCUS_PARAM}=${REVIEW_FOCUS_VALUE}`;
+            }
+          }
         })
         .catch((err: unknown) => {
           adapter.lastOperatorResult = {
@@ -461,7 +503,10 @@ export function bindReviewActions(
             code: "browser_transport",
           };
         })
-        .finally(onDone);
+        .finally(() => {
+          if (completionHash !== null && navigate && completionHash !== currentHash) navigate(completionHash);
+          else onDone();
+        });
     });
   }
 }

@@ -114,6 +114,25 @@ diz isso e desabilita o editor em vez de oferecer um controle que não escreve.
 
 Hoje is an attention cockpit: open exceptions plus **at most three** current priorities. There is no chat composer. `Comercial → Rascunhos` is the founder's exact-copy review surface: adjust, approve for the next eligible business window, or reject back into editorial recovery. Financial mutations and immediate commercial send are not offered.
 
+### Comercial → Rascunhos: lista + inspector
+
+`#/comercial/rascunhos?resource=<draft-id>` mantém o backlog como linhas compactas
+e renderiza assunto, corpo, contexto e controles somente no inspector selecionado.
+Mesmo com 500 linhas existe no máximo um `data-review-form` no DOM. Sem
+`resource`, a primeira mensagem acionável é selecionada; um deep link ausente
+falha para a próxima disponível com aviso explícito.
+
+No caminho feliz há um único CTA: **Aprovar e agendar para <e-mail>**. A classe de
+rota não abre checkbox ou modal. Editar e Rejeitar/segurar são links secundários
+que abrem modos explícitos do mesmo inspector; não existe dropdown genérico
+“Registrar decisão”. Depois de receipt/readback confirmado, a URL seleciona a
+próxima mensagem e o foco acompanha o inspector. No mobile o inspector vem antes
+da lista completa, e no desktop os dois formam colunas sem um segundo scroll.
+
+Este recorte não afirma total do servidor: mostra somente quantas mensagens estão
+carregadas. Total/cursor, carregamento incremental, filtros e batch pertencem aos
+incrementos seguintes da fila escalável.
+
 ## Cards de alerta
 
 Alertas (top 3 e incidentes) usam um card com duas metades, montado em
