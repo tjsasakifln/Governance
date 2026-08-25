@@ -79,10 +79,7 @@ export function injectIdentity(html, config) {
     next = next.replace(/name="cc-actor-kind" content="[^"]*"/, `name="cc-actor-kind" content="${config.actorKind}"`);
   }
   const releaseSha = config.runtimeIdentity.release_sha;
-  const releaseLabel = releaseSha ?? "não verificado";
   next = next.replace(/name="cc-release-sha" content="[^"]*"/, `name="cc-release-sha" content="${releaseSha ?? ""}"`);
-  next = next.replace(/data-runtime-identity="true" data-release-sha="[^"]*"/, `data-runtime-identity="true" data-release-sha="${releaseSha ?? ""}"`);
-  next = next.replace(/data-runtime-release-sha="true">[^<]*/, `data-runtime-release-sha="true">${releaseLabel}`);
   return next;
 }
 

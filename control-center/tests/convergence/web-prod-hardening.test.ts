@@ -104,8 +104,6 @@ test("web identity endpoint and authenticated cockpit carry the exact pinned SHA
     runtimeIdentity,
   });
   assert.match(rendered, new RegExp(`name="cc-release-sha" content="${RELEASE_SHA}"`));
-  assert.match(rendered, new RegExp(`data-release-sha="${RELEASE_SHA}"`));
-  assert.match(rendered, new RegExp(`data-runtime-release-sha="true">${RELEASE_SHA}`));
 
   await withProductionWeb({ CONTROL_CENTER_ENV: "production", CC_RELEASE_SHA: RELEASE_SHA }, async (base) => {
     const identity = await fetch(`${base}/runtime-identity`);

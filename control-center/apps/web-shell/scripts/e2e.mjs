@@ -125,9 +125,8 @@ try {
     throw new Error(`runtime identity diverged: context=${contextIdentity.release_sha} web=${webIdentity.release_sha}`);
   }
   const cockpitHtml = await fetch(`${webBase}/`).then((response) => response.text());
-  if (!cockpitHtml.includes(`data-release-sha="${E2E_RELEASE_SHA}"`)
-    || !cockpitHtml.includes(`data-runtime-release-sha="true">${E2E_RELEASE_SHA}`)) {
-    throw new Error("authenticated cockpit does not render the immutable release SHA");
+  if (!cockpitHtml.includes(`name="cc-release-sha" content="${E2E_RELEASE_SHA}"`)) {
+    throw new Error("authenticated cockpit does not receive the immutable release SHA");
   }
   const proxied = await fetch(`${webBase}/v1/context?scope=company`, {
     headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },
