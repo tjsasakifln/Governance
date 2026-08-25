@@ -4,6 +4,7 @@ import { createMockAdapter } from "../src/adapters/mock";
 import {
   operatorActionDraft,
   operatorActionDraftKey,
+  rememberOperatorActionDraft,
   resetOperatorActionDrafts,
 } from "../src/action-draft";
 import {
@@ -20,6 +21,7 @@ import {
   CONTINUITY_SURFACE_CONTRACTS,
   actionContinuationHash,
   continuitySubrouteHref,
+  continuitySubjectFromDocument,
   durableContinuityHash,
   rememberContinuity,
   restoreContinuity,
@@ -50,14 +52,32 @@ test("durable continuity stores route context but never typed or unsubmitted dec
 test("reload and reauthentication restore bounded context until explicit expiry", () => {
   const storage = new MemoryStorage();
   const now = Date.UTC(2026, 7, 25, 12, 0, 0);
-  assert.equal(rememberContinuity(storage, "#/comercial/excecoes?q=owner&pagina=4&focus=queue-first", now), true);
-  assert.equal(restoreContinuity(storage, now + 1_000), "#/comercial/excecoes?q=owner&pagina=4");
-  assert.equal(restoreContinuity(storage, now + CONTINUITY_MAX_AGE_MS + 1), null);
+  assert.equal(rememberContinuity(storage, "#/comercial/excecoes?q=owner&pagina=4&focus=queue-first", "human:founder", now), true);
+  assert.equal(restoreContinuity(storage, "human:founder", now + 1_000), "#/comercial/excecoes?q=owner&pagina=4");
+  assert.equal(restoreContinuity(storage, "human:founder", now + CONTINUITY_MAX_AGE_MS + 1), null);
   assert.equal(storage.getItem(CONTINUITY_STORAGE_KEY), null);
 
   storage.setItem(CONTINUITY_STORAGE_KEY, "not-json");
-  assert.equal(restoreContinuity(storage, now), null);
+  assert.equal(restoreContinuity(storage, "human:founder", now), null);
   assert.equal(storage.getItem(CONTINUITY_STORAGE_KEY), null);
+});
+
+test("reauthentication never restores another actor's local context", () => {
+  const storage = new MemoryStorage();
+  const now = Date.UTC(2026, 7, 25, 12, 0, 0);
+  assert.equal(rememberContinuity(storage, "#/clientes/acme-industria?q=privado", "human:alice", now), true);
+  assert.equal(restoreContinuity(storage, "human:bob", now + 1_000), null);
+  assert.equal(storage.getItem(CONTINUITY_STORAGE_KEY), null);
+  assert.equal(rememberContinuity(storage, "#/hoje", "", now), false);
+
+  const metas: Record<string, string> = { "cc-actor-id": "alice", "cc-actor-kind": "human" };
+  const doc = { querySelector(selector: string) {
+    const name = /name="([^"]+)"/.exec(selector)?.[1] ?? "";
+    return metas[name] ? { getAttribute: () => metas[name] ?? null } : null;
+  } };
+  assert.equal(continuitySubjectFromDocument(doc), "human:alice");
+  metas["cc-actor-kind"] = "browser-asserted";
+  assert.equal(continuitySubjectFromDocument(doc), null);
 });
 
 test("mount restores a session location and invalid deep links recover to Hoje", () => {
@@ -77,7 +97,19 @@ test("mount restores a session location and invalid deep links recover to Hoje",
   const invalid = mount(invalidRoot, createMockAdapter(), invalidRuntime);
   assert.equal(invalidRuntime.getHash(), "#/hoje?continuity=recovered");
   assert.match(invalidRoot.innerHTML, /data-continuity-recovered="true"/);
+  invalidRuntime.setHash("#/tambem-nao-existe");
+  assert.equal(invalidRuntime.getHash(), "#/hoje?continuity=recovered");
+  assert.match(invalidRoot.innerHTML, /data-continuity-recovered="true"/);
   invalid.unmount();
+});
+
+test("clearing an unresolved note cannot resurrect its previous sensitive value", () => {
+  resetOperatorActionDrafts();
+  const key = operatorActionDraftKey("START_EXCEPTION_WORK", "cc:exception:1", "exception-1");
+  rememberOperatorActionDraft(key, "contexto privado");
+  assert.equal(operatorActionDraft(key), "contexto privado");
+  rememberOperatorActionDraft(key, "");
+  assert.equal(operatorActionDraft(key), "");
 });
 
 test("sibling routes preserve compatible filters and selection without carrying stale pages", () => {
@@ -201,4 +233,15 @@ test("the global contract names every required operational queue family", () => 
     ["messages", "inbound", "exceptions", "leads", "clients", "activities"],
   );
   assert.equal(new Set(CONTINUITY_SURFACE_CONTRACTS.map((surface) => surface.route)).size, 6);
+  const clientHtml = mountClientContract();
+  assert.match(clientHtml, /data-client="acme-industria"/);
 });
+
+function mountClientContract(): string {
+  const runtime = createMemoryRuntime("#/clientes/acme-industria");
+  const root = { innerHTML: "" };
+  const mounted = mount(root, createMockAdapter(), runtime);
+  const html = root.innerHTML;
+  mounted.unmount();
+  return html;
+}

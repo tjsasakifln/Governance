@@ -54,7 +54,7 @@ export const CONTINUITY_SURFACE_CONTRACTS = [
   { id: "inbound", route: "#/comercial/atividade?condicao=unread", selector: "[data-activity-id]" },
   { id: "exceptions", route: "#/comercial/excecoes", selector: "[data-exception-id]" },
   { id: "leads", route: "#/comercial/atividade?resource=lead", selector: "[data-lead-detail]" },
-  { id: "clients", route: "#/clientes/client-slug", selector: "[data-client]" },
+  { id: "clients", route: "#/clientes/acme-industria", selector: "[data-client]" },
   { id: "activities", route: "#/comercial/atividade", selector: "[data-list='atividade']" },
 ] as const;
 
@@ -66,11 +66,30 @@ export interface ContinuityStorage {
 
 interface StoredContinuity {
   readonly schema: typeof CONTINUITY_SCHEMA;
+  readonly subject: string;
   readonly hash: string;
   readonly savedAt: number;
 }
 
 const durableParams = new Set<string>(DURABLE_CONTINUITY_PARAMS);
+
+function isValidContinuitySubject(subject: string): boolean {
+  return subject.length > 0 && subject.length <= 320 && !/[\u0000-\u001f<>]/.test(subject);
+}
+
+/** Bind browser continuity to the authenticated actor represented by server-injected metadata. */
+export function continuitySubjectFromDocument(
+  doc: { querySelector(selector: string): { getAttribute(name: string): string | null } | null } | undefined =
+    typeof document !== "undefined" ? document : undefined,
+): string | null {
+  const id = doc?.querySelector('meta[name="cc-actor-id"]')?.getAttribute("content")?.trim() ?? "";
+  const kind = doc?.querySelector('meta[name="cc-actor-kind"]')?.getAttribute("content")?.trim() ?? "";
+  const subject = `${kind}:${id}`;
+  return (kind === "human" || kind === "agent" || kind === "system")
+    && isValidContinuitySubject(subject)
+    ? subject
+    : null;
+}
 
 function pathIsRecognized(path: string): boolean {
   const segments = path.replace(/^\/+/, "").split("/").filter(Boolean);
@@ -112,11 +131,13 @@ export function durableContinuityHash(hash: string): string | null {
 export function rememberContinuity(
   storage: ContinuityStorage,
   hash: string,
+  subject: string,
   now = Date.now(),
 ): boolean {
+  if (!isValidContinuitySubject(subject)) return false;
   const durable = durableContinuityHash(hash);
   if (!durable) return false;
-  const value: StoredContinuity = { schema: CONTINUITY_SCHEMA, hash: durable, savedAt: now };
+  const value: StoredContinuity = { schema: CONTINUITY_SCHEMA, subject, hash: durable, savedAt: now };
   try {
     storage.setItem(CONTINUITY_STORAGE_KEY, JSON.stringify(value));
     return true;
@@ -127,6 +148,7 @@ export function rememberContinuity(
 
 export function restoreContinuity(
   storage: ContinuityStorage,
+  subject: string,
   now = Date.now(),
 ): string | null {
   try {
@@ -137,7 +159,13 @@ export function restoreContinuity(
       && parsed.savedAt <= now
       && now - parsed.savedAt <= CONTINUITY_MAX_AGE_MS;
     const hash = typeof parsed.hash === "string" ? durableContinuityHash(parsed.hash) : null;
-    if (parsed.schema !== CONTINUITY_SCHEMA || !validAge || !hash) {
+    if (
+      !isValidContinuitySubject(subject)
+      || parsed.schema !== CONTINUITY_SCHEMA
+      || parsed.subject !== subject
+      || !validAge
+      || !hash
+    ) {
       storage.removeItem(CONTINUITY_STORAGE_KEY);
       return null;
     }

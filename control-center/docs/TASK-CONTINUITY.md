@@ -15,11 +15,11 @@ O foco programático só é movido depois de um paint pronto: para a linha exata
 
 ## Reload, reautenticação e privacidade
 
-`sessionStorage` guarda por até 12 horas apenas uma projeção validada da rota. Podem persistir: busca, facetas, ordenação, página, tamanho da página, offset, `resource`, posição de retorno, freshness e preferência de expansão.
+`sessionStorage` guarda por até 12 horas apenas uma projeção validada da rota, vinculada à identidade de ator que o servidor injeta no documento. Podem persistir: busca, facetas, ordenação, página, tamanho da página, offset, `resource`, posição de retorno, freshness e preferência de expansão. Reautenticar como outro ator na mesma aba descarta o recorte anterior; metadado de identidade ausente ou inválido desabilita a persistência.
 
 Nunca persistem em storage: texto de notas, motivo, assunto, corpo, confirmação, decisão não submetida, modo de edição, estado sintético de vista ou marcador de foco. Uma nota de ação sem resultado definitivo permanece somente em memória volátil para sobreviver ao repaint e permitir readback/repetição consciente; sucesso a apaga e reload/reauth também. O servidor continua sendo a autoridade para qualquer efeito. Storage ausente/corrompido/expirado é descartado; rota inválida recupera `Hoje` com aviso, em vez de renderizar vazio.
 
-O armazenamento é de sessão, não compartilhado entre abas e não promovido para `localStorage`. Uma nova autenticação na mesma aba pode recuperar o recorte; fechar a sessão do navegador encerra essa continuidade local.
+O armazenamento é de sessão, não compartilhado entre abas e não promovido para `localStorage`. Uma nova autenticação do mesmo ator na mesma aba pode recuperar o recorte; fechar a sessão do navegador encerra essa continuidade local.
 
 ## Matriz automatizada
 

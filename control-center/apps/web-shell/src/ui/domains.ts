@@ -1716,7 +1716,7 @@ export function clientCard(item: ClientStatus): string {
     : "";
   const sources = item.sources ?? {};
   return `
-    <article class="card client" data-lifecycle="${escapeHtml(item.lifecycle)}" data-id="${escapeHtml(item.id)}">
+    <article class="card client" data-client="${escapeHtml(item.client_slug)}" data-lifecycle="${escapeHtml(item.lifecycle)}" data-id="${escapeHtml(item.id)}">
       <header>
         <p class="kicker">${statusPill(item.lifecycle, clientLifecycleLabel(item.lifecycle))} <span class="scope" data-scope="${escapeHtml(item.scope)}">${escapeHtml(scopeLabel(item.scope))}</span></p>
         <h3>${escapeHtml(item.display_name)}</h3>

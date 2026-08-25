@@ -18,6 +18,7 @@ import {
   CONTINUITY_FIRST_FOCUS,
   CONTINUITY_RECOVERY_HASH,
   actionContinuationHash,
+  continuitySubjectFromDocument,
   isRecognizedContinuityHash,
   rememberContinuity,
   restoreContinuity,
@@ -80,6 +81,7 @@ export interface ShellRuntime {
 }
 
 export function browserRuntime(): ShellRuntime {
+  const continuitySubject = continuitySubjectFromDocument();
   return {
     getHash(): string {
       return window.location.hash;
@@ -91,15 +93,17 @@ export function browserRuntime(): ShellRuntime {
       window.history.replaceState(window.history.state, "", hash);
     },
     restoreHash(): string | null {
+      if (!continuitySubject) return null;
       try {
-        return restoreContinuity(window.sessionStorage);
+        return restoreContinuity(window.sessionStorage, continuitySubject);
       } catch {
         return null;
       }
     },
     rememberHash(hash: string): void {
+      if (!continuitySubject) return;
       try {
-        rememberContinuity(window.sessionStorage, hash);
+        rememberContinuity(window.sessionStorage, hash, continuitySubject);
       } catch {
         // A browser that blocks sessionStorage still has full URL continuity.
       }
@@ -1599,14 +1603,29 @@ export function mount(
   runtime: ShellRuntime = browserRuntime(),
 ): { unmount: () => void } {
   let generation = 0;
+  let initialized = false;
+  const normalizedHash = (): string => {
+    let hash = runtime.getHash();
+    if (!hash) {
+      hash = initialized ? "#/hoje" : (runtime.restoreHash?.() ?? "#/hoje");
+      if (!isRecognizedContinuityHash(hash)) hash = CONTINUITY_RECOVERY_HASH;
+      runtime.replaceHash(hash);
+    } else if (!isRecognizedContinuityHash(hash)) {
+      hash = CONTINUITY_RECOVERY_HASH;
+      runtime.replaceHash(hash);
+    }
+    initialized = true;
+    return hash;
+  };
   const paint = (): void => {
-    runtime.rememberHash?.(runtime.getHash());
+    const hash = normalizedHash();
+    runtime.rememberHash?.(hash);
     generation += 1;
     const current = generation;
     paintShell(
       root,
       adapter,
-      runtime.getHash(),
+      hash,
       current,
       (g) => g === generation,
       (next) => runtime.setHash(next),
@@ -1614,12 +1633,6 @@ export function mount(
     );
   };
   const stop = runtime.onHashChange(paint);
-  const initialHash = runtime.getHash();
-  if (!initialHash) {
-    runtime.setHash(runtime.restoreHash?.() ?? "#/hoje");
-  } else if (!isRecognizedContinuityHash(initialHash)) {
-    runtime.replaceHash(CONTINUITY_RECOVERY_HASH);
-  }
   paint();
   return {
     unmount(): void {

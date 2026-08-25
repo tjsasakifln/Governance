@@ -12,7 +12,11 @@ export function operatorActionDraftKey(action: string, canonicalId: string, sour
 }
 
 export function rememberOperatorActionDraft(key: string, note: string): void {
-  if (!key || !note) return;
+  if (!key) return;
+  if (!note) {
+    notes.delete(key);
+    return;
+  }
   notes.set(key, note.slice(0, 500));
 }
 
