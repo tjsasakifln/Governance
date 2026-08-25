@@ -21,6 +21,7 @@ import { alertBody, alertDataAttributes } from "./alert-card";
 import { isOperationalClient } from "../client-identity";
 import { composeHoje } from "../hoje-compose";
 import { renderHoje } from "./hoje";
+import { buildOrientationSummary, renderOrientationSummary } from "./orientation";
 import {
   activityCard,
   clientCard,
@@ -391,6 +392,10 @@ export function renderShell(model: ShellModel): string {
           model.operatorResult,
         )
       : "";
+  const orientation = buildOrientationSummary({
+    destination: model.destination,
+    view: model.view,
+  });
 
   return `
     <a class="skip-link" href="#conteudo">Saltar para o conteúdo</a>
@@ -417,10 +422,11 @@ export function renderShell(model: ShellModel): string {
           <h1>${escapeHtml(label)}</h1>
           <p>${escapeHtml(headline)}</p>
         </header>
+        ${renderOrientationSummary(orientation)}
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${viewBanner(model.view)}
         ${model.destination === "warmbly" ? "" : operatorBanner(model.operatorResult)}
-        ${body}
+        <div id="orientacao-conteudo">${body}</div>
       </main>
       <footer class="runtime-identity" data-runtime-identity="true" data-release-sha="${escapeHtml(model.releaseSha ?? "")}">
         Release em execução: <code data-runtime-release-sha="true">${escapeHtml(model.releaseSha ?? "não verificado")}</code>
