@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bindReviewActions } from "../src/app";
+import { bindReviewActions, consumeQueueFocus, consumeReviewFocus } from "../src/app";
 import { createHttpAdapter } from "../src/adapters";
 import { commercialBlock } from "../src/ui/domains";
 import { operatorBanner } from "../src/ui/render";
@@ -35,7 +35,7 @@ function confirmedDecision(overrides: Record<string, unknown> = {}): Record<stri
   };
 }
 
-test("commercial review surface renders editable exact-hash decisions without an immediate-send control", async () => {
+test("commercial review surface renders one exact-hash approval inspector without an immediate-send control", async () => {
   const router = operationalRouter();
   const { fetchImpl } = recordingFetch((path) => {
     if (path.startsWith("/v1/commercial/review-drafts")) {
@@ -60,9 +60,10 @@ test("commercial review surface renders editable exact-hash decisions without an
   if (!result.ok || result.loading) return;
   const html = commercialBlock(result.page.commercial!, "rascunhos");
   assert.match(html, new RegExp(`data-review-form="${DRAFT_ID}"`));
-  assert.match(html, /SAVE_ADJUSTMENT/);
-  assert.match(html, /APPROVE/);
-  assert.match(html, /REJECT/);
+  assert.match(html, /name="action" value="APPROVE"/);
+  assert.match(html, /Aprovar e agendar para contato@example\.test/);
+  assert.match(html, /data-review-edit="true"/);
+  assert.match(html, /data-review-reject="true"/);
   assert.match(html, /sha256:exact/);
   assert.doesNotMatch(html, /enviar agora|dispatch-now/i);
 });
@@ -225,6 +226,84 @@ test("review submit disables every control immediately and ignores a second clic
   assert.equal(painted, 1);
 });
 
+test("a confirmed decision navigates to the next actionable draft", async () => {
+  const nextId = "22222222-3333-4444-8555-666666666666";
+  const controls = Array.from({ length: 5 }, () => ({ value: "", disabled: false, textContent: "" }));
+  const fields: Record<string, { value: string; disabled?: boolean; textContent?: string }> = {
+    action: { value: "APPROVE" },
+    expected_content_hash: { value: HASH },
+    next_review_id: { value: nextId },
+    subject: { value: "Assunto" },
+    body_text: { value: "Corpo" },
+    original_subject: { value: "Assunto" },
+    original_body_text: { value: "Corpo" },
+    reason: { value: "" },
+    submit: controls[0]!,
+  };
+  let listener: ((event: Event) => void) | undefined;
+  const form = {
+    addEventListener(_type: string, next: (event: Event) => void): void { listener = next; },
+    getAttribute(name: string): string | null { return name === "data-review-form" ? DRAFT_ID : null; },
+    setAttribute(): void {},
+    querySelector(selector: string) {
+      if (selector === 'button[type="submit"]') return fields.submit!;
+      const name = selector.match(/name="([^"]+)"/)?.[1] ?? "";
+      return fields[name] ?? null;
+    },
+    querySelectorAll(): typeof controls { return controls; },
+  };
+  let painted = 0;
+  let destination = "";
+  let submitted: { generic_recipient_acknowledged?: boolean } | undefined;
+  const adapter = {
+    reviewDraftAction: async (input: { generic_recipient_acknowledged?: boolean }) => {
+      submitted = input;
+      return { ok: true, path: "/review", kind: "nota" as const, message: "confirmado" };
+    },
+  };
+  bindReviewActions(
+    { innerHTML: "", querySelectorAll: () => [form] } as never,
+    adapter as never,
+    () => { painted += 1; },
+    (hash) => { destination = hash; },
+  );
+  listener?.({ preventDefault(): void {} } as unknown as Event);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(destination, `#/comercial/rascunhos?resource=${nextId}&focus=review`);
+  assert.equal(submitted?.generic_recipient_acknowledged, true);
+  assert.equal(painted, 0);
+});
+
+test("the post-decision focus marker focuses the inspector once and is removed", () => {
+  let focused = 0;
+  let scrolled = 0;
+  let replaced = "";
+  const inspector = {
+    addEventListener(): void {},
+    getAttribute(): string | null { return null; },
+    focus(): void { focused += 1; },
+    scrollIntoView(): void { scrolled += 1; },
+  };
+  consumeReviewFocus(
+    { innerHTML: "", querySelectorAll: () => [inspector] } as never,
+    `#/comercial/rascunhos?resource=${DRAFT_ID}&focus=review`,
+    (hash) => { replaced = hash; },
+  );
+  assert.equal(focused, 1);
+  assert.equal(scrolled, 1);
+  assert.equal(replaced, `#/comercial/rascunhos?resource=${DRAFT_ID}`);
+  assert.equal(
+    consumeQueueFocus(
+      { innerHTML: "", querySelectorAll: () => [inspector] } as never,
+      `#/comercial/rascunhos?resource=${DRAFT_ID}&focus=review`,
+      true,
+      () => { throw new Error("activity focus must not consume review focus"); },
+    ),
+    false,
+  );
+  assert.equal(focused, 1);
+});
+
 test("unsaved edits must be persisted and reread before APPROVE", () => {
   let called = false;
   let painted = 0;
@@ -257,7 +336,7 @@ test("unsaved edits must be persisted and reread before APPROVE", () => {
 
 const LEGACY_ID = "99999999-8888-4777-8666-555555555555";
 
-function reviewSurface(rows: unknown[]): Promise<string> {
+function reviewSurface(rows: unknown[], resource: string | null = null, query: string | null = null): Promise<string> {
   const router = operationalRouter();
   const { fetchImpl } = recordingFetch((path) => {
     if (path.startsWith("/v1/commercial/review-drafts")) return { data: rows };
@@ -267,7 +346,7 @@ function reviewSurface(rows: unknown[]): Promise<string> {
   return adapter.readDestination("comercial").then((result) => {
     assert.equal(result.ok, true);
     if (!result.ok || result.loading) throw new Error("comercial não carregou");
-    return commercialBlock(result.page.commercial!, "rascunhos");
+    return commercialBlock(result.page.commercial!, "rascunhos", resource, query);
   });
 }
 
@@ -319,20 +398,39 @@ test("review surface renders the judging context inline, with no details disclos
   assert.doesNotMatch(html, /<details[^>]*>\s*<summary>Mensagem/);
 });
 
-test("a CURRENT row keeps the full editable decision form", async () => {
+test("a CURRENT row exposes approval as the primary action without a decision dropdown", async () => {
   const html = await reviewSurface([RICH_DRAFT]);
   assert.match(html, new RegExp(`data-review-form="${DRAFT_ID}"`));
   assert.match(html, /name="expected_content_hash" value="sha256:exact"/);
-  assert.match(html, /<option value="SAVE_ADJUSTMENT">/);
-  assert.match(html, /<option value="APPROVE">/);
-  assert.match(html, /<option value="REJECT">/);
-  assert.match(html, /name="reason"/);
-  assert.match(html, /name="generic_ack"/);
-  assert.match(html, /<button type="submit">Registrar decisão<\/button>/);
+  assert.match(html, /name="action" value="APPROVE"/);
+  assert.match(html, /data-approve-submit="true">Aprovar e agendar para obras@construtora\.test<\/button>/);
+  assert.match(html, /data-review-edit="true"/);
+  assert.match(html, /data-review-reject="true"/);
+  assert.doesNotMatch(html, /<select name="action">/);
+  assert.doesNotMatch(html, /name="reason"/);
+  assert.doesNotMatch(html, /name="generic_ack"/);
   assert.match(html, /data-editorial-actionable="true"/);
-  // Only subject and body are editable; the judging context is plain text.
-  assert.doesNotMatch(html, /<textarea name="subject"[^>]*readonly/);
+  assert.match(html, /data-review-mode="approve"/);
   assert.match(html, /Aprovar vincula o hash exato e agenda a próxima janela útil\./);
+});
+
+test("edit and reject modes keep one explicit exact-hash form", async () => {
+  const edit = await reviewSurface([RICH_DRAFT], DRAFT_ID, `resource=${DRAFT_ID}&mode=edit`);
+  assert.equal(edit.match(/data-review-form=/g)?.length, 1);
+  assert.match(edit, /data-review-mode="edit"/);
+  assert.match(edit, /name="action" value="SAVE_ADJUSTMENT"/);
+  assert.match(edit, /<textarea name="subject" rows="\d+">Laudo estrutural/);
+  assert.match(edit, /<textarea name="body_text" rows="\d+">Olá,/);
+  assert.match(edit, /Salvar ajuste/);
+  assert.doesNotMatch(edit, /name="generic_ack"/);
+
+  const reject = await reviewSurface([RICH_DRAFT], DRAFT_ID, `resource=${DRAFT_ID}&mode=reject`);
+  assert.equal(reject.match(/data-review-form=/g)?.length, 1);
+  assert.match(reject, /data-review-mode="reject"/);
+  assert.match(reject, /name="action" value="REJECT"/);
+  assert.match(reject, /Motivo para reescrita/);
+  assert.match(reject, /Rejeitar e solicitar reescrita/);
+  assert.doesNotMatch(reject, /<select name="action">/);
 });
 
 test("absent editorial fields render an explicit word instead of undefined", async () => {
@@ -400,8 +498,8 @@ test("a LEGACY_SUPERSEDED row is auditable but offers no decision control at all
   assert.match(html, /<dt>Reason codes<\/dt><dd>SUPERSEDED_BY_NEWER_DRAFT<\/dd>/);
   // History stays readable.
   assert.match(html, /Corpo histórico que segue auditável\./);
-  assert.match(html, /<textarea name="body_text" rows="\d+" readonly>/);
-  assert.match(html, /<textarea name="subject" rows="\d+" readonly>/);
+  assert.match(html, /data-review-readonly=/);
+  assert.match(html, /data-exact-body="true"/);
   // No decision surface is emitted, not even disabled.
   assert.doesNotMatch(html, new RegExp(`data-review-form="${LEGACY_ID}"`));
   assert.doesNotMatch(html, /SAVE_ADJUSTMENT/);
@@ -495,9 +593,41 @@ test("mixed rows keep decidable and historical drafts side by side", async () =>
     RICH_DRAFT,
     { ...RICH_DRAFT, id: LEGACY_ID, editorial_state: "LEGACY_SUPERSEDED", editorial_actionable: false },
   ]);
-  assert.equal(html.match(/class="card review-draft"/g)?.length, 2);
+  assert.equal(html.match(/data-review-list-item=/g)?.length, 2);
+  assert.equal(html.match(/data-review-inspector=/g)?.length, 1);
   assert.equal(html.match(/data-review-form=/g)?.length, 1);
-  assert.equal(html.match(/<button type="submit">/g)?.length, 1);
+  assert.equal(html.match(/<button type="submit"/g)?.length, 1);
+});
+
+test("a deep link selects one inspector and an absent resource falls back safely", async () => {
+  const secondId = "22222222-3333-4444-8555-666666666666";
+  const rows = [RICH_DRAFT, { ...RICH_DRAFT, id: secondId, recipient: "segunda@empresa.test" }];
+  const selected = await reviewSurface(rows, secondId, `resource=${secondId}`);
+  assert.match(selected, new RegExp(`data-review-row="${secondId}"[^>]+aria-current="page"`));
+  assert.match(selected, new RegExp(`data-review-inspector="${secondId}"`));
+  assert.doesNotMatch(selected, /data-review-selection-fallback/);
+
+  const missing = await reviewSurface(rows, "draft-inexistente", "resource=draft-inexistente");
+  assert.match(missing, /data-review-selection-fallback="true"/);
+  assert.match(missing, new RegExp(`data-review-inspector="${DRAFT_ID}"`));
+});
+
+test("0, 1, 55, 100 and 500 rows never create a form per backlog item", async () => {
+  for (const size of [0, 1, 55, 100, 500]) {
+    const rows = Array.from({ length: size }, (_, index) => ({
+      ...RICH_DRAFT,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      account_id: `account-${index}`,
+      account: { nome_fantasia: `Empresa ${index}` },
+      recipient: `contato-${index}@example.test`,
+      content_hash: `sha256:${index}`,
+    }));
+    const html = await reviewSurface(rows);
+    assert.equal(html.match(/data-review-list-item=/g)?.length ?? 0, size, `${size} linhas`);
+    assert.equal(html.match(/data-review-inspector=/g)?.length ?? 0, size === 0 ? 0 : 1, `${size} inspectors`);
+    assert.equal(html.match(/data-review-form=/g)?.length ?? 0, size === 0 ? 0 : 1, `${size} forms`);
+    assert.ok((html.match(/<textarea/g)?.length ?? 0) <= 4, `${size} linhas não multiplicam textareas`);
+  }
 });
 
 test("um rascunho com fato e proveniência não ganha alerta de evidência inventado", async () => {

@@ -70,6 +70,7 @@ const destinations = [
 ];
 
 const extraHashes = [
+  "comercial/rascunhos",
   "comercial/cohorts",
   "comercial/atividade",
   "comercial/pipeline",
@@ -132,6 +133,36 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 page.on("crash", () => errors.push("page crashed"));
+
+// The isolated Context harness has no Warmbly token, so its review proxy is
+// deliberately unavailable. Intercept only the read endpoint with a realistic
+// backlog to exercise the production-built list + inspector at volume without
+// enabling any write or outbound side effect.
+const reviewRows = Array.from({ length: 55 }, (_, index) => ({
+  id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  account_id: `account-e2e-${index}`,
+  recipient: `contato-${index}@empresa-exemplo.test`,
+  subject: `Revisão do primeiro toque ${index}`,
+  body_text: `Olá,\n\nObservamos o edital público ${index} e gostaríamos de conversar com a pessoa responsável.\n\nPode nos encaminhar?`,
+  state: "NEEDS_REVIEW",
+  purpose: "INITIAL",
+  ordinal: 1,
+  content_hash: `sha256:e2e-${index}`,
+  account: { nome_fantasia: `Empresa de infraestrutura ${index}` },
+  fact_used: `Edital público ${index} observado no recorte atual`,
+  evidence_ids: [`evidence-e2e-${index}`],
+  fact_source: "e2e_fixture",
+  route_class: "GENERIC_COMPANY",
+  editorial_state: "CURRENT",
+  editorial_actionable: true,
+}));
+await page.route(/\/v1\/commercial\/review-drafts(?:\?|$)/, async (route) => {
+  await route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ data: reviewRows }),
+  });
+});
 
 /**
  * Geometry of the content column plus every element that currently owns a
@@ -258,6 +289,15 @@ async function assertBrand(page) {
   if (!(await logo.isVisible())) {
     throw new Error("CONFENGE mark is not visible in the topbar");
   }
+  // Hash and viewport matrix navigation repaint the shell asynchronously. Wait
+  // for the same image to be decoded and laid out, rather than sampling the
+  // brief 0px box between the old and new paint. A genuinely missing/collapsed
+  // mark still times out and fails this gate.
+  await page.waitForFunction(() => {
+    const image = document.querySelector("header.topbar img.brand-logo");
+    if (!(image instanceof HTMLImageElement)) return false;
+    return image.complete && image.naturalWidth > 0 && image.getBoundingClientRect().height >= 14;
+  }, undefined, { timeout: 5_000 });
   const alt = await logo.getAttribute("alt");
   if (alt !== "CONFENGE") {
     throw new Error(`brand logo alt is ${JSON.stringify(alt)}, expected "CONFENGE"`);
@@ -395,6 +435,40 @@ try {
     console.log(`hash=${hash} filled_chars=${destFilled.filled}`);
   }
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}#/comercial/rascunhos`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-review-workbench-count="55"]');
+  const reviewListCount = await page.locator("[data-review-list-item]").count();
+  const reviewInspectorCount = await page.locator("[data-review-inspector]").count();
+  const reviewFormCount = await page.locator("[data-review-form]").count();
+  if (reviewListCount !== 55 || reviewInspectorCount !== 1 || reviewFormCount !== 1) {
+    throw new Error(
+      `review workbench multiplied controls: rows=${reviewListCount} inspectors=${reviewInspectorCount} forms=${reviewFormCount}`,
+    );
+  }
+  const approveLabel = await page.locator("[data-approve-submit]").innerText();
+  if (!approveLabel.includes("Aprovar e agendar para contato-0@empresa-exemplo.test")) {
+    throw new Error(`review primary action is not explicit: ${approveLabel}`);
+  }
+  const reviewOverflow = await page.evaluate(
+    () => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  );
+  if (reviewOverflow > 1) {
+    throw new Error(`review workbench overflows 390px viewport by ${reviewOverflow}px`);
+  }
+  const reviewTitleBox = await page.locator("#rascunhos-title").boundingBox();
+  const approveBox = await page.locator("[data-approve-submit]").boundingBox();
+  if (!reviewTitleBox || !approveBox || approveBox.y - reviewTitleBox.y > 844) {
+    throw new Error(
+      `review primary action is more than one 390x844 viewport from the task heading: title=${JSON.stringify(reviewTitleBox)} approve=${JSON.stringify(approveBox)}`,
+    );
+  }
+  const reviewShot = screenshotPath.replace(/(\.[a-z]+)$/i, "-review-workbench$1");
+  await page.screenshot({ path: reviewShot, fullPage: true });
+  console.log(
+    `critical_path=review_list_to_inspector rows=${reviewListCount} forms=${reviewFormCount} viewport=390 overflow=${reviewOverflow} action_distance=${Math.round(approveBox.y - reviewTitleBox.y)} screenshot=${reviewShot}`,
+  );
+
   // Critical operator journey (#65/#67): daily triage → detail → exception →
   // authorized sandbox action → receipt. Navigation into the detail is done
   // with Enter so a mouse-only implementation cannot satisfy this proof.
@@ -478,7 +552,7 @@ try {
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
-    await page.waitForSelector('[data-destination="hoje"]');
+    await page.waitForSelector('[data-destination="hoje"][data-view-state="ready"]');
     const vpFilled = await assertFilled(page, 40);
     if (vpFilled.box.width < Math.min(300, vp.width - 24)) {
       throw new Error(`viewport ${vp.name} width ${vpFilled.box.width} too small for ${vp.width}`);
