@@ -326,6 +326,7 @@ services:
     image: confenge-control-center-web:${CC_RELEASE_SHA:-local}
     environment:
       CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
+      CONTROL_CENTER_ENV: production
       HOST: 0.0.0.0
       PORT: "8080"
       CC_TRUSTED_PROXY_CIDRS: "${CC_TRUSTED_PROXY_CIDRS:?CC_TRUSTED_PROXY_CIDRS must be set}"

@@ -62,6 +62,8 @@ export interface ShellModel {
   operatorResult?: AdapterWriteResult;
   /** Full current location. List chrome reflects search/filters/sort/page in it. */
   hash?: string;
+  /** Immutable release identity injected into the document by the production server. */
+  releaseSha?: string | null;
 }
 
 function attentionCard(item: AttentionItem, now: string): string {
@@ -420,6 +422,9 @@ export function renderShell(model: ShellModel): string {
         ${model.destination === "warmbly" ? "" : operatorBanner(model.operatorResult)}
         ${body}
       </main>
+      <footer class="runtime-identity" data-runtime-identity="true" data-release-sha="${escapeHtml(model.releaseSha ?? "")}">
+        Release em execução: <code data-runtime-release-sha="true">${escapeHtml(model.releaseSha ?? "não verificado")}</code>
+      </footer>
     </div>
   `;
 }

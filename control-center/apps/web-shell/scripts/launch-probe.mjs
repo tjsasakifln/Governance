@@ -581,9 +581,20 @@ try {
       throw new Error(`viewport ${vp.name} accidental horizontal overflow ${overflow}px`);
     }
     const vpBrand = await assertBrand(page);
+    const releaseIdentity = await page.locator('[data-runtime-identity="true"]').evaluate((footer) => ({
+      sha: footer.getAttribute("data-release-sha") ?? "",
+      label: footer.querySelector('[data-runtime-release-sha="true"]')?.textContent?.trim() ?? "",
+      meta: document.querySelector('meta[name="cc-release-sha"]')?.getAttribute("content") ?? "",
+    }));
+    if (!/^[0-9a-f]{40}$/.test(releaseIdentity.sha)
+      || releaseIdentity.sha !== releaseIdentity.label
+      || releaseIdentity.sha !== releaseIdentity.meta) {
+      throw new Error(`viewport ${vp.name}: runtime release identity diverged ${JSON.stringify(releaseIdentity)}`);
+    }
     console.log(
       `brand_logo viewport=${vp.name} rendered=${Math.round(vpBrand.width)}x${Math.round(vpBrand.height)}`,
     );
+    console.log(`runtime_release viewport=${vp.name} sha=${releaseIdentity.sha}`);
     const metrics = await layoutMetrics(page);
     assertSingleScrollContext(metrics, `viewport ${vp.name}`);
     assertContentColumn(metrics, `viewport ${vp.name}`);

@@ -16,6 +16,12 @@ export type { PersistencePort, PersistenceAdapter } from "./store/adapter.ts";
 export { bootFromEnv, bootFromEnvAsync, actorFromEnv } from "./boot.ts";
 export { createRequestListener } from "./http.ts";
 export { startServer } from "./server.ts";
+export {
+  REQUIRED_RUNTIME_BASELINE_SHA,
+  runtimeIdentityAllowsReady,
+  runtimeIdentityFromEnv,
+} from "./runtime-identity.ts";
+export type { RuntimeIdentity } from "./runtime-identity.ts";
 export { createOperationalService } from "./operational/service.ts";
 export {
   createMemoryOperatorActionService,

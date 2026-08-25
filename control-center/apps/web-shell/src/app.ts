@@ -134,6 +134,15 @@ function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
   return typeof (value as Promise<T>).then === "function";
 }
 
+function browserReleaseSha(): string | null {
+  if (typeof document === "undefined") return null;
+  const candidate = document
+    .querySelector('meta[name="cc-release-sha"]')
+    ?.getAttribute("content")
+    ?.trim() ?? "";
+  return /^[0-9a-f]{40}$/.test(candidate) ? candidate : null;
+}
+
 function applyPaint(
   root: MountableRoot,
   adapter: ControlCenterReadAdapter & {
@@ -172,6 +181,7 @@ function applyPaint(
     resource: parsed.resource,
     query: queryOf(renderHash),
     hash: renderHash,
+    releaseSha: browserReleaseSha(),
     ...(adapter.lastOperatorResult ? { operatorResult: adapter.lastOperatorResult } : {}),
   });
   const repaint = (): void => {

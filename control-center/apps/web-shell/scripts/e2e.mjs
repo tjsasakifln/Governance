@@ -10,6 +10,19 @@ import { isOsLibLauncherFailure } from "../src/playwright-env.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const app = join(here, "..");
 const ccRoot = join(app, "../..");
+const E2E_RELEASE_SHA = "8a2eb1f012345678901234567890123456789012";
+const REQUIRED_RUNTIME_BASELINE_SHA = "64ece7d38abacd3adeaa02735b4f22af66caab0f";
+
+function assertRuntimeIdentity(identity, service) {
+  if (identity.schema_version !== "control-center.runtime-identity.v1"
+    || identity.service !== service
+    || identity.release_sha !== E2E_RELEASE_SHA
+    || identity.required_baseline_sha !== REQUIRED_RUNTIME_BASELINE_SHA
+    || identity.release_status !== "PINNED"
+    || identity.production_required !== true) {
+    throw new Error(`invalid runtime identity for ${service}: ${JSON.stringify(identity)}`);
+  }
+}
 
 async function freePort() {
   const probe = createServer();
@@ -91,6 +104,8 @@ const context = spawn("npx", ["tsx", "scripts/boot-production-context.ts"], {
     HOST: "127.0.0.1",
     PORT: String(contextPort),
     NODE_ENV: "test",
+    CONTROL_CENTER_ENV: "production",
+    CC_RELEASE_SHA: E2E_RELEASE_SHA,
     CONTROL_CENTER_FOUNDER_ACTOR_ID: "founder-local",
   },
   stdio: "ignore",
@@ -104,6 +119,8 @@ const web = spawn("node", [join(here, "serve-prod.mjs")], {
     CC_CONTEXT_UPSTREAM: contextBase,
     CC_ACTOR_ID: "founder-local",
     CC_ACTOR_KIND: "human",
+    CONTROL_CENTER_ENV: "production",
+    CC_RELEASE_SHA: E2E_RELEASE_SHA,
   },
   stdio: "ignore",
 });
@@ -112,6 +129,16 @@ let exitCode = 1;
 try {
   await waitHttp(`${contextBase}/healthz`, 45_000);
   await waitHttp(`${webBase}/healthz`, 15_000);
+  await waitHttp(`${contextBase}/ready`, 15_000);
+  await waitHttp(`${webBase}/ready`, 15_000);
+  const contextIdentity = await fetch(`${contextBase}/v1/runtime-identity`).then((response) => response.json());
+  const webIdentity = await fetch(`${webBase}/runtime-identity`).then((response) => response.json());
+  assertRuntimeIdentity(contextIdentity, "control-center-context");
+  assertRuntimeIdentity(webIdentity, "control-center-web");
+  const cockpitHtml = await fetch(`${webBase}/`).then((response) => response.text());
+  if (!cockpitHtml.includes(`name="cc-release-sha" content="${E2E_RELEASE_SHA}"`)) {
+    throw new Error("authenticated cockpit does not receive the immutable release SHA");
+  }
   const proxied = await fetch(`${webBase}/v1/context?scope=company`, {
     headers: { "x-actor-id": "founder-local", "x-actor-kind": "human" },
   });
