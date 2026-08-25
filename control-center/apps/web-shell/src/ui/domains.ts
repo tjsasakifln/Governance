@@ -650,8 +650,10 @@ function controlledEmailCohort(ops: Record<string, unknown>): string {
     return `<article class="card" data-controlled-email="unknown">
       <h3>Cohort controlado de e-mail</h3>
       <p class="constraint">Nenhuma autorização limitada foi observada. Ausência não é autorização.</p>
-      ${fact("Telemetria", escapeHtml(availabilityLabel(String(root.availability ?? "UNKNOWN"))))}
-      ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
+      <dl class="facts">
+        ${fact("Telemetria", escapeHtml(availabilityLabel(String(root.availability ?? "UNKNOWN"))))}
+        ${fact("Instante de coleta/observação", escapeHtml(String(root.last_update_at ?? "desconhecido")))}
+      </dl>
     </article>`;
   }
   const dispatch = current.dispatch && typeof current.dispatch === "object"

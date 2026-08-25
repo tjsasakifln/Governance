@@ -3,6 +3,7 @@ import { createProductionAdapter } from "./adapters/http";
 import { createMockAdapter } from "./adapters/mock";
 import { mount, type MountableRoot } from "./app";
 import { DESTINATION_IDS, PRIMARY_SURFACE } from "./destinations";
+import { registeredVisualRoutes, type VisualRoute } from "./visual-matrix";
 
 export const SHELL_VERSION = "0.1.0";
 export const SHELL_GLOBAL_KEY = "__CONFENGE_CONTROL_CENTER__";
@@ -14,6 +15,7 @@ export const FILE_PROTOCOL_PREVIEW = "npm run preview";
 export interface ShellGlobals {
   version: string;
   destinations: readonly string[];
+  visualRoutes: readonly VisualRoute[];
   primarySurface: typeof PRIMARY_SURFACE;
   mount: typeof mount;
 }
@@ -28,6 +30,7 @@ export function installShellGlobals(win: ShellWindow): ShellGlobals {
   const globals: ShellGlobals = {
     version: SHELL_VERSION,
     destinations: DESTINATION_IDS,
+    visualRoutes: registeredVisualRoutes(),
     primarySurface: PRIMARY_SURFACE,
     mount,
   };

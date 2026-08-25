@@ -244,3 +244,27 @@ test("cohort view does not present unproven telemetry as real outcomes", () => {
   assert.doesNotMatch(root.innerHTML, /SHOULD_NOT_RENDER/);
   assert.doesNotMatch(root.innerHTML, /Primeira coorte real de e-mail/);
 });
+
+test("a missing controlled-email grant keeps definition items inside a list", () => {
+  const base = createMockAdapter();
+  const initial = base.readDestination("comercial");
+  assert.ok(initial.ok && !initial.loading && initial.page.commercial);
+  if (!initial.ok || initial.loading || !initial.page.commercial) return;
+  const page = structuredClone(initial.page);
+  const commercial = page.commercial;
+  if (!commercial) return;
+  commercial.operations = {
+    cohorts: { acquisition: [] },
+    controlled_outbound: {
+      availability: "UNKNOWN",
+      last_update_at: "2026-08-22T18:00:00.000Z",
+    },
+  };
+  const root = { innerHTML: "" };
+  paintShell(root, {
+    mode: "mock" as const,
+    readDestination: () => ({ ok: true as const, loading: false as const, page }),
+  } as never, "#/comercial/cohorts");
+  const card = root.innerHTML.match(/<article class="card" data-controlled-email="unknown">([\s\S]*?)<\/article>/)?.[1] ?? "";
+  assert.match(card, /<dl class="facts">[\s\S]*<dt>Telemetria<\/dt>[\s\S]*<\/dl>/);
+});

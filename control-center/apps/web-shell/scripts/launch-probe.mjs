@@ -5,9 +5,11 @@
  * Usage: node scripts/launch-probe.mjs <baseUrl> <screenshotPath>
  */
 import { createRequire } from "node:module";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+
+const require = createRequire(import.meta.url);
 
 function chromiumFrom(mod) {
   const chromium = mod?.chromium ?? mod?.default?.chromium;
@@ -21,7 +23,6 @@ async function loadPlaywright() {
   } catch {
     // fall through to npx cache
   }
-  const require = createRequire(import.meta.url);
   const npxRoot = join(homedir(), ".npm/_npx");
   if (existsSync(npxRoot)) {
     for (const entry of readdirSync(npxRoot)) {
@@ -43,46 +44,9 @@ if (!baseUrl || !screenshotPath) {
   process.exit(2);
 }
 
-const labels = [
-  "Hoje",
-  "Comercial",
-  "Operação Warmbly",
-  "Clientes",
-  "Financeiro",
-  "Engenharia",
-  "Infra",
-  "Crescimento",
-  "Memória/Decisões",
-  "Agentes",
-];
-
-const destinations = [
-  "hoje",
-  "comercial",
-  "warmbly",
-  "clientes",
-  "financeiro",
-  "engenharia",
-  "infra",
-  "crescimento",
-  "memoria",
-  "agentes",
-];
-
-const extraHashes = [
-  "comercial/rascunhos",
-  "comercial/cohorts",
-  "comercial/atividade",
-  "comercial/pipeline",
-  "comercial/excecoes",
-  "warmbly/operacao",
-  // The gate surfaces are part of the layout matrix now that they carry tables,
-  // a stepper and a message body. `revisao` with no resource is a real page —
-  // the version selector — so it is probe-safe without a fixture id.
-  "warmbly/cohorts",
-  "warmbly/revisao",
-  "clientes/acme",
-];
+// Resource routes are journey evidence, not registry entries. The route matrix
+// itself is read from the shipped browser global after boot.
+const journeyHashes = ["clientes/acme"];
 const minimalEvidence = process.env.CC_EVIDENCE_MINIMAL === "1";
 
 /**
@@ -91,13 +55,14 @@ const minimalEvidence = process.env.CC_EVIDENCE_MINIMAL === "1";
  * required by the layout acceptance criteria do not triple the artifact size.
  */
 const viewports = [
-  { name: "360", width: 360, height: 800, matrixShots: true },
-  { name: "390", width: 390, height: 844, matrixShots: true },
-  { name: "430", width: 430, height: 932, matrixShots: true },
-  { name: "desktop", width: 1280, height: 800, matrixShots: true },
-  { name: "desktop-1366", width: 1366, height: 768, matrixShots: false },
-  { name: "desktop-1440", width: 1440, height: 900, matrixShots: false },
-  { name: "desktop-1920", width: 1920, height: 1080, matrixShots: false },
+  { name: "360", width: 360, height: 800, matrixShots: true, visualGate: false },
+  { name: "390", width: 390, height: 844, matrixShots: true, visualGate: true },
+  { name: "430", width: 430, height: 932, matrixShots: true, visualGate: false },
+  { name: "tablet-768", width: 768, height: 1024, matrixShots: true, visualGate: true },
+  { name: "desktop", width: 1280, height: 800, matrixShots: true, visualGate: false },
+  { name: "desktop-1366", width: 1366, height: 768, matrixShots: false, visualGate: false },
+  { name: "desktop-1440", width: 1440, height: 1000, matrixShots: true, visualGate: true },
+  { name: "desktop-1920", width: 1920, height: 1080, matrixShots: false, visualGate: false },
 ];
 
 /** Matches the `--main-gutter` of the >=880px branch in src/styles.css. */
@@ -113,6 +78,27 @@ const DESKTOP_MIN_WIDTH = 880;
 const MIN_CONTENT_RATIO = 0.55;
 
 const viewStates = ["loading", "error", "stale", "empty"];
+const visualManifestPath = join(dirname(screenshotPath), "visual-gate-manifest.json");
+const visualManifest = {
+  schema_version: "control-center.visual-gate.v1",
+  execution: "ISOLATED_AUTHENTICATED_E2E",
+  live_production_claimed: false,
+  runtime_sha: null,
+  routes: [],
+  viewports: viewports
+    .filter((viewport) => viewport.visualGate)
+    .map(({ name, width, height }) => ({ id: name, width, height })),
+  states: ["ready", ...viewStates],
+  checks: [],
+  safety: {
+    real_email_sent: false,
+    go_issued: false,
+    outbound_resumed: false,
+    irreversible_action: false,
+  },
+  result: "FAIL",
+};
+const axeSource = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 
 const cachedChrome = join(
   homedir(),
@@ -130,9 +116,46 @@ try {
   process.exit(1);
 }
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await page.addInitScript({ content: axeSource });
 const errors = [];
 page.on("pageerror", (err) => errors.push(String(err)));
 page.on("crash", () => errors.push("page crashed"));
+
+async function assertAxe(page, where) {
+  await page.waitForFunction(() => typeof globalThis.axe?.run === "function");
+  const result = await page.evaluate(async () => {
+    const report = await globalThis.axe.run(document, {
+      resultTypes: ["violations"],
+      runOnly: {
+        type: "tag",
+        values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+      },
+    });
+    return report.violations.map((violation) => ({
+      id: violation.id,
+      impact: violation.impact,
+      help: violation.help,
+      targets: violation.nodes.slice(0, 5).map((node) => node.target.join(" ")),
+      node_count: violation.nodes.length,
+    }));
+  });
+  const blockers = result.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
+  visualManifest.checks.push({
+    kind: "axe",
+    where,
+    violations: result,
+    serious_or_critical: blockers.length,
+  });
+  if (blockers.length > 0) {
+    const detail = blockers
+      .map((violation) => `${violation.id}[${violation.impact}](${violation.targets.join(",")})`)
+      .join(" | ");
+    throw new Error(`${where}: axe serious/critical violations: ${detail}`);
+  }
+  return result.length;
+}
 
 // The isolated Context harness has no Warmbly token, so its review proxy is
 // deliberately unavailable. Intercept only the read endpoint with a realistic
@@ -195,6 +218,8 @@ async function layoutMetrics(page) {
     const padRight = parseFloat(cs.paddingRight);
     const remPx = parseFloat(getComputedStyle(de).fontSize);
     const contentMax = getComputedStyle(de).getPropertyValue("--content-max").trim();
+    const contentLeft = rect.left + padLeft;
+    const contentRight = rect.right - padRight;
     const owners = [];
     for (const el of document.querySelectorAll("html, body, *")) {
       const style = getComputedStyle(el);
@@ -204,6 +229,20 @@ async function layoutMetrics(page) {
       const label = tag + (el.id ? `#${el.id}` : "") + (el.className ? `.${String(el.className).trim().split(/\s+/).join(".")}` : "");
       owners.push({ label, insideMain: main.contains(el) && el !== main, isMain: el === main, isDocument: tag === "html" || tag === "body" });
     }
+    const horizontalOffenders = [...main.querySelectorAll("*")]
+      .map((el) => {
+        const box = el.getBoundingClientRect();
+        const ownOverflow = el.scrollWidth - el.clientWidth;
+        const outsideLeft = Math.max(0, contentLeft - box.left);
+        const outsideRight = Math.max(0, box.right - contentRight);
+        const excess = Math.max(ownOverflow, outsideLeft, outsideRight);
+        const tag = el.tagName.toLowerCase();
+        const label = tag + (el.id ? `#${el.id}` : "") + (el.className ? `.${String(el.className).trim().split(/\s+/).join(".")}` : "");
+        return { label, excess: Math.round(excess), scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+      })
+      .filter((item) => item.excess > 1)
+      .sort((a, b) => b.excess - a.excess)
+      .slice(0, 8);
     const restore = window.scrollY;
     window.scrollTo(0, 1_000_000);
     const documentScrollRange = window.scrollY;
@@ -218,6 +257,7 @@ async function layoutMetrics(page) {
       padRight: Math.round(padRight),
       deadRight: Math.round(window.innerWidth - (rect.right - padRight)),
       mainOverflowX: main.scrollWidth - main.clientWidth,
+      horizontalOffenders,
       documentScrollRange,
       documentScrollHeightRange: de.scrollHeight - de.clientHeight,
       owners,
@@ -241,7 +281,12 @@ function assertSingleScrollContext(m, where) {
     throw new Error(`${where}: competing vertical scroll owners ${stray.map((o) => o.label).join(", ")}`);
   }
   if (m.mainOverflowX > 1) {
-    throw new Error(`${where}: content column clips ${m.mainOverflowX}px horizontally`);
+    const offenders = m.horizontalOffenders
+      .map((item) => `${item.label}:${item.excess}px(${item.scrollWidth}/${item.clientWidth})`)
+      .join(", ");
+    throw new Error(
+      `${where}: content column clips ${m.mainOverflowX}px horizontally; offenders=${offenders || "unresolved"}`,
+    );
   }
 }
 
@@ -387,12 +432,31 @@ try {
   console.log(`surface=${Math.round(filled.box.width)}x${Math.round(filled.box.height)}`);
   console.log(`filled_chars=${filled.filled}`);
 
-  for (const label of labels) {
+  const routeInventory = await page.evaluate(() => {
+    const routes = globalThis.__CONFENGE_CONTROL_CENTER__?.visualRoutes;
+    return Array.isArray(routes) ? routes : null;
+  });
+  if (!routeInventory || routeInventory.length < 10) {
+    throw new Error("browser did not expose the registry-derived visual route inventory");
+  }
+  if (new Set(routeInventory.map((route) => route.key)).size !== routeInventory.length
+    || new Set(routeInventory.map((route) => route.hash)).size !== routeInventory.length) {
+    throw new Error("registry-derived visual route inventory contains duplicates");
+  }
+  const destinationRoutes = routeInventory.filter((route) => route.kind === "destination");
+  const destinations = destinationRoutes.map((route) => route.key.replace(/^destination:/, ""));
+  const surfaceHashes = routeInventory
+    .filter((route) => route.kind === "surface")
+    .map((route) => route.hash.replace(/^#\//, ""));
+  visualManifest.routes = routeInventory;
+  console.log(`visual_routes=${routeInventory.length} source=browser_registry`);
+
+  for (const { label } of destinationRoutes) {
     const nav = page.locator("nav[aria-label='Áreas do Control Center'] a", { hasText: label });
     const count = await nav.count();
     if (count < 1) throw new Error(`missing nav label ${label}`);
   }
-  console.log(`nav_labels=${labels.length}`);
+  console.log(`nav_labels=${destinationRoutes.length}`);
 
   const brand = await assertBrand(page);
   console.log(
@@ -451,7 +515,7 @@ try {
     console.log(`dest=${id} filled_chars=${destFilled.filled}`);
   }
 
-  for (const hash of extraHashes) {
+  for (const hash of [...surfaceHashes, ...journeyHashes]) {
     await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
     const destFilled = await assertFilled(page, 40);
     console.log(`hash=${hash} filled_chars=${destFilled.filled}`);
@@ -577,7 +641,7 @@ try {
     return page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth));
   }
 
-  const matrixHashes = [...destinations.map((id) => id), ...extraHashes];
+  const matrixRoutes = routeInventory;
   for (const vp of viewports) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
@@ -601,6 +665,7 @@ try {
       || releaseIdentity.sha !== releaseIdentity.meta) {
       throw new Error(`viewport ${vp.name}: runtime release identity diverged ${JSON.stringify(releaseIdentity)}`);
     }
+    visualManifest.runtime_sha = releaseIdentity.sha;
     console.log(
       `brand_logo viewport=${vp.name} rendered=${Math.round(vpBrand.width)}x${Math.round(vpBrand.height)}`,
     );
@@ -618,10 +683,11 @@ try {
     console.log(
       `layout viewport=${vp.name} content_width=${metrics.contentWidth} gutters=${metrics.padLeft}/${metrics.padRight} dead_right=${metrics.deadRight} doc_scroll_range=${metrics.documentScrollRange} scroll_owners=${metrics.owners.map((o) => o.label).join("|") || "none"}`,
     );
-    for (const hash of matrixHashes) {
-      await page.goto(`${baseUrl}#/${hash}`, { waitUntil: "networkidle" });
+    for (const route of matrixRoutes) {
+      await page.goto(`${baseUrl}${route.hash}`, { waitUntil: "networkidle" });
+      const hash = route.hash.replace(/^#\//, "");
       const surface = hash.includes("/") ? hash.split("/")[1] : null;
-      if (hash.startsWith("comercial/") && surface) {
+      if ((hash.startsWith("comercial/") || hash.startsWith("warmbly/")) && surface) {
         await page.waitForFunction(
           (wanted) => document.querySelector("[data-destination]")?.getAttribute("data-surface") === wanted,
           surface,
@@ -634,42 +700,94 @@ try {
       const hashMetrics = await layoutMetrics(page);
       assertSingleScrollContext(hashMetrics, `viewport ${vp.name} hash ${hash}`);
       assertContentColumn(hashMetrics, `viewport ${vp.name} hash ${hash}`);
+      let axeViolations = "not-run";
+      if (vp.visualGate) {
+        axeViolations = await assertAxe(page, `${vp.name}/${route.key}/ready`);
+      }
+      visualManifest.checks.push({
+        kind: "geometry",
+        route: route.key,
+        viewport: vp.name,
+        state: "ready",
+        horizontal_overflow_px: pageOverflow,
+        document_scroll_range_px: hashMetrics.documentScrollRange,
+        competing_scroll_owners: hashMetrics.owners
+          .filter((owner) => owner.isDocument || owner.insideMain)
+          .map((owner) => owner.label),
+      });
       let hashShot = "skipped";
       if (vp.matrixShots && !minimalEvidence) {
-        hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${hash.replaceAll("/", "-")}$1`);
+        hashShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-${vp.name}-${route.key.replaceAll(":", "-")}$1`);
         await page.screenshot({ path: hashShot, fullPage: true });
       }
       console.log(
-        `matrix viewport=${vp.name} hash=${hash} overflow=${pageOverflow} content_width=${hashMetrics.contentWidth} dead_right=${hashMetrics.deadRight} doc_scroll_range=${hashMetrics.documentScrollRange} screenshot=${hashShot}`,
+        `matrix viewport=${vp.name} route=${route.key} hash=${hash} overflow=${pageOverflow} axe_violations=${axeViolations} content_width=${hashMetrics.contentWidth} dead_right=${hashMetrics.deadRight} doc_scroll_range=${hashMetrics.documentScrollRange} screenshot=${hashShot}`,
       );
     }
   }
 
-  for (const kind of viewStates) {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.evaluate((hash) => {
-      window.location.hash = hash;
-    }, `#/hoje?view=${kind}`);
-    await page.waitForFunction(
-      (expected) =>
-        document.querySelector('[data-destination="hoje"]')?.getAttribute("data-view-state") ===
-        expected,
-      kind,
-    );
-    const kindState = await page.locator("[data-destination]").getAttribute("data-view-state");
-    if (kindState !== kind) {
-      throw new Error(`view ${kind} rendered data-view-state=${kindState}`);
+  const hojeRoute = routeInventory.find((route) => route.key === "destination:hoje");
+  if (!hojeRoute) throw new Error("visual route inventory omitted Hoje");
+  for (const vp of viewports.filter((viewport) => viewport.visualGate)) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    const stateRoutes = vp.name === "390" ? routeInventory : [hojeRoute];
+    for (const route of stateRoutes) {
+      for (const kind of viewStates) {
+        await page.goto(`${baseUrl}${route.hash}?view=${kind}`, { waitUntil: "networkidle" });
+        await page.waitForFunction(
+          (expected) =>
+            document.querySelector("[data-destination]")?.getAttribute("data-view-state") ===
+            expected,
+          kind,
+        );
+        const kindState = await page.locator("[data-destination]").getAttribute("data-view-state");
+        if (kindState !== kind) {
+          throw new Error(`${vp.name}/${route.key} view ${kind} rendered data-view-state=${kindState}`);
+        }
+        const banner = await page.locator(".banner").count();
+        if (banner < 1) throw new Error(`${vp.name}/${route.key} view ${kind} did not show a banner`);
+        const stateOverflow = await overflowPx();
+        if (stateOverflow > 1) {
+          throw new Error(`${vp.name}/${route.key}/${kind} horizontal overflow ${stateOverflow}px`);
+        }
+        const stateMetrics = await layoutMetrics(page);
+        assertSingleScrollContext(stateMetrics, `${vp.name}/${route.key}/${kind}`);
+        const axeViolations = await assertAxe(page, `${vp.name}/${route.key}/${kind}`);
+        let stateShot = "skipped";
+        if (route.key === "destination:hoje" && !minimalEvidence) {
+          stateShot = screenshotPath.replace(
+            /(\.[a-z]+)$/i,
+            `-${vp.name}-state-${kind}$1`,
+          );
+          await page.screenshot({ path: stateShot, fullPage: true });
+        }
+        visualManifest.checks.push({
+          kind: "geometry",
+          route: route.key,
+          viewport: vp.name,
+          state: kind,
+          horizontal_overflow_px: stateOverflow,
+          document_scroll_range_px: stateMetrics.documentScrollRange,
+          competing_scroll_owners: stateMetrics.owners
+            .filter((owner) => owner.isDocument || owner.insideMain)
+            .map((owner) => owner.label),
+        });
+        console.log(
+          `view_state_driven=${kind} viewport=${vp.name} route=${route.key} banner=${banner} axe_violations=${axeViolations} screenshot=${stateShot}`,
+        );
+      }
     }
-    const banner = await page.locator(".banner").count();
-    if (banner < 1) throw new Error(`view ${kind} did not show a banner`);
-    console.log(`view_state_driven=${kind} banner=${banner}`);
   }
 
   if (errors.length > 0) {
     throw new Error(`page errors: ${errors.join(" | ")}`);
   }
   console.log("page_errors=0");
+  visualManifest.result = "PASS";
+  console.log(`visual_gate_manifest=${visualManifestPath}`);
   console.log("launch-probe ok");
 } finally {
+  visualManifest.completed_at = new Date().toISOString();
+  writeFileSync(visualManifestPath, `${JSON.stringify(visualManifest, null, 2)}\n`);
   await browser.close();
 }

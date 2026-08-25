@@ -69,6 +69,50 @@ function patchIdentity(html) {
     );
 }
 
+function assertVisualGateManifest(path) {
+  const manifest = JSON.parse(readFileSync(path, "utf8"));
+  const expectedViewports = [
+    [390, 844],
+    [768, 1024],
+    [1440, 1000],
+  ];
+  if (manifest.schema_version !== "control-center.visual-gate.v1"
+    || manifest.execution !== "ISOLATED_AUTHENTICATED_E2E"
+    || manifest.live_production_claimed !== false
+    || manifest.result !== "PASS"
+    || !/^[0-9a-f]{40}$/.test(manifest.runtime_sha ?? "")
+    || !Array.isArray(manifest.routes)
+    || manifest.routes.length < 10
+    || !Array.isArray(manifest.checks)) {
+    throw new Error(`invalid visual gate manifest envelope: ${JSON.stringify(manifest).slice(0, 500)}`);
+  }
+  const actualViewports = manifest.viewports.map((viewport) => [viewport.width, viewport.height]);
+  if (JSON.stringify(actualViewports) !== JSON.stringify(expectedViewports)) {
+    throw new Error(`visual gate viewport drift: ${JSON.stringify(actualViewports)}`);
+  }
+  const axeChecks = manifest.checks.filter((check) => check.kind === "axe");
+  const geometryChecks = manifest.checks.filter((check) => check.kind === "geometry");
+  if (axeChecks.length === 0
+    || axeChecks.some((check) => check.serious_or_critical !== 0)
+    || geometryChecks.length === 0
+    || geometryChecks.some((check) =>
+      check.horizontal_overflow_px > 1
+      || check.document_scroll_range_px > 1
+      || check.competing_scroll_owners.length > 0)) {
+    throw new Error("visual gate manifest contains a concrete accessibility or layout failure");
+  }
+  const expectedSafety = {
+    real_email_sent: false,
+    go_issued: false,
+    outbound_resumed: false,
+    irreversible_action: false,
+  };
+  if (JSON.stringify(manifest.safety) !== JSON.stringify(expectedSafety)) {
+    throw new Error("visual gate manifest reports a forbidden side effect");
+  }
+  return { routes: manifest.routes.length, axe: axeChecks.length, geometry: geometryChecks.length };
+}
+
 async function tryPlaywright(baseUrl, screenshot) {
   const probe = spawnSync("node", [join(here, "launch-probe.mjs"), baseUrl, screenshot], {
     cwd: app,
@@ -166,7 +210,11 @@ try {
   const screenshot = join(shotDir, "web-shell.png");
   const probe = await tryPlaywright(`${webBase}/`, screenshot);
   if (probe.ok) {
+    const visual = assertVisualGateManifest(join(shotDir, "visual-gate-manifest.json"));
     process.stdout.write(`screenshot=${screenshot}\n`);
+    process.stdout.write(
+      `visual_gate=PASS routes=${visual.routes} axe_checks=${visual.axe} geometry_checks=${visual.geometry}\n`,
+    );
     exitCode = 0;
   } else if (probe.launcher) {
     process.stdout.write("playwright launcher unavailable; adapter unit tests remain the e2e fallback\n");
