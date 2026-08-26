@@ -44,6 +44,7 @@ test("runtime Dockerfiles are real images, not the deploy stub", () => {
     collector: join(root, "connectors/runner/Dockerfile"),
     web: join(root, "apps/web-shell/Dockerfile"),
     postgres: join(root, "deploy/docker/postgres.Dockerfile"),
+    nats: join(root, "deploy/docker/nats.Dockerfile"),
     compose: join(root, "deploy/docker-compose.yml"),
   };
   const context = readFileSync(files.context, "utf8");
@@ -51,6 +52,7 @@ test("runtime Dockerfiles are real images, not the deploy stub", () => {
   const collector = readFileSync(files.collector, "utf8");
   const web = readFileSync(files.web, "utf8");
   const postgres = readFileSync(files.postgres, "utf8");
+  const nats = readFileSync(files.nats, "utf8");
   const compose = readFileSync(files.compose, "utf8");
 
   assert.match(lastStage(context), /"node"/);
@@ -58,6 +60,7 @@ test("runtime Dockerfiles are real images, not the deploy stub", () => {
   assert.match(lastStage(collector), /"node"/);
   assert.match(web, /serve-prod\.mjs/);
   assert.match(postgres, /postgres:16-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(nats, /nats:2\.12\.6-alpine@sha256:[0-9a-f]{64}/);
   assert.doesNotMatch(context, /stub-health-server/);
   assert.doesNotMatch(mcp, /stub-health-server/);
   assert.doesNotMatch(collector, /stub-health-server/);
@@ -248,6 +251,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
     "deploy/docker/ops.Dockerfile",
     "deploy/docker/postgres.Dockerfile",
     "deploy/docker/caddy.Dockerfile",
+    "deploy/docker/nats.Dockerfile",
   ];
   for (const rel of dockerfiles) {
     const text = read(rel);
@@ -270,18 +274,32 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
 
   const natsRef = pins.images["nats-2.12.6-alpine"]?.ref;
   assert.ok(natsRef && natsRef.includes("nats:2.12.6-alpine@sha256:"));
+  assert.match(read("deploy/docker/nats.Dockerfile"), new RegExp(escapeRegExp(natsRef)));
   const prodOverlay = read("deploy/overlays/production-edge/docker-compose.production-edge.yml");
-  assert.match(prodOverlay, new RegExp(escapeRegExp(natsRef)));
-  assert.match(prodOverlay, new RegExp(escapeRegExp(pgRef)));
+  assert.match(prodOverlay, /image: confenge-control-center-nats:2\.12\.6/);
+  assert.match(prodOverlay, /image: confenge-control-center-postgres:16/);
+  assert.match(prodOverlay, /image: confenge-control-center-caddy:2\.11/);
   assert.match(prodOverlay, new RegExp(escapeRegExp(autheliaRef)));
   assert.match(prodOverlay, new RegExp(escapeRegExp(redisRef)));
-  assert.match(prodOverlay, new RegExp(escapeRegExp(pins.images["caddy-2.9-alpine"].ref)));
   for (const line of prodOverlay.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("image:")) continue;
     if (trimmed.includes("confenge-control-center-")) continue;
     assert.match(trimmed, /@sha256:[0-9a-f]{64}/, trimmed);
     assert.doesNotMatch(trimmed, /:latest(?:\s|$)/);
+  }
+});
+
+test("Alpine runtime images fail closed below the CVE-2026-14456 fixed floor", () => {
+  for (const rel of [
+    "deploy/docker/caddy.Dockerfile",
+    "deploy/docker/postgres.Dockerfile",
+    "deploy/docker/nats.Dockerfile",
+  ]) {
+    const dockerfile = read(rel);
+    assert.match(dockerfile, /libcrypto3>=3\.5\.8-r0/);
+    assert.match(dockerfile, /libssl3>=3\.5\.8-r0/);
+    assert.match(dockerfile, /apk add --no-cache --upgrade/);
   }
 });
 
