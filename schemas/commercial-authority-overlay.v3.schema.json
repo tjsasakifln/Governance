@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/commercial-authority-overlay.v3.schema.json",
+  "title": "commercial-authority-overlay.v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "authority_id", "status", "effective_at", "source_issues", "supersedes", "catalog_boundary", "canary_selection", "payment_semantics", "boundaries"],
+  "properties": {
+    "schema_version": {"const": "commercial-authority-overlay.v3"},
+    "authority_id": {"const": "CFG-COMMERCIAL-AUTHORITY-OVERLAY-v3"},
+    "status": {"const": "ACTIVE"},
+    "effective_at": {"type": "string", "format": "date-time"},
+    "source_issues": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "supersedes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "preserved", "reason"],
+      "properties": {
+        "path": {"const": "commercial/authority/authority-overlay.v2.json"},
+        "preserved": {"const": true}, "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "catalog_boundary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["governance_catalog_role", "no_parallel_catalog", "deliverables_registry", "naming_authority"],
+      "properties": {
+        "governance_catalog_role": {"const": "NONE"},
+        "no_parallel_catalog": {"const": true},
+        "deliverables_registry": {"$ref": "#/$defs/registry_pin"},
+        "naming_authority": {"$ref": "#/$defs/naming_pin"}
+      }
+    },
+    "canary_selection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["offer_id", "offer_version", "deliverable_id", "deliverable_version", "container_pointer", "plan_pointer", "amount_cents", "currency", "synthetic_only", "catalog_promoted"],
+      "properties": {
+        "offer_id": {"const": "CFG-DIAG-EXP-v1"}, "offer_version": {"const": "v1"},
+        "deliverable_id": {"const": "CFG-DIAG-EXP-v1"}, "deliverable_version": {"const": "v1"},
+        "container_pointer": {"const": "/containers/0"}, "plan_pointer": {"const": "/containers/0/plans/0"},
+        "amount_cents": {"const": 800000}, "currency": {"const": "BRL"},
+        "synthetic_only": {"const": true}, "catalog_promoted": {"const": false}
+      }
+    },
+    "payment_semantics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["UNKNOWN", "PAYMENT_CREATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED", "OVERDUE", "REFUNDED", "CANCELED"],
+      "properties": {
+        "UNKNOWN": {"const": "PRESERVE_AND_HOLD"},
+        "PAYMENT_CREATED": {"const": "NOT_PAID_NOT_RECEIVED"},
+        "PAYMENT_CONFIRMED": {"const": "PAID_NOT_RECEIVED"},
+        "PAYMENT_RECEIVED": {"const": "RECEIVED_REVENUE_ONLY_WITH_REAL_PROVIDER_PROOF"},
+        "OVERDUE": {"const": "NOT_RECEIVED"}, "REFUNDED": {"const": "REVERSED"},
+        "CANCELED": {"const": "TERMINAL_NOT_RECEIVED"}
+      }
+    },
+    "boundaries": {
+      "type": "object", "additionalProperties": false,
+      "required": ["financial_ledger_owner", "provider_fact_owner", "provider_lookup_performed", "provider_object_id", "production_checkout_enabled", "real_money_mutation_approved", "smtp_used", "outbound_mutated", "second_catalog_created", "second_ledger_created"],
+      "properties": {
+        "financial_ledger_owner": {"const": "tjsasakifln/warmbly"}, "provider_fact_owner": {"const": "asaas"},
+        "provider_lookup_performed": {"const": false}, "provider_object_id": {"type": "null"},
+        "production_checkout_enabled": {"const": false}, "real_money_mutation_approved": {"const": false},
+        "smtp_used": {"const": false}, "outbound_mutated": {"const": false},
+        "second_catalog_created": {"const": false}, "second_ledger_created": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "external_pin": {
+      "type": "object",
+      "required": ["repository", "ref", "path", "main_sha_observed", "blob_sha", "content_sha256", "source_issue", "authority_state"],
+      "properties": {
+        "repository": {"const": "tjsasakifln/web-cfg"}, "ref": {"const": "main"},
+        "path": {"type": "string", "minLength": 1}, "main_sha_observed": {"pattern": "^[a-f0-9]{40}$"},
+        "blob_sha": {"pattern": "^[a-f0-9]{40}$"}, "content_sha256": {"pattern": "^[a-f0-9]{64}$"},
+        "source_issue": {"type": "string", "minLength": 1}, "authority_state": {"const": "PINNED"}
+      }
+    },
+    "registry_pin": {
+      "allOf": [
+        {"$ref": "#/$defs/external_pin"},
+        {"type": "object", "additionalProperties": false,
+          "required": ["repository", "ref", "path", "main_sha_observed", "blob_sha", "content_sha256", "registry_version", "deliverable_count", "container_count", "source_issue", "authority_state"],
+          "properties": {
+            "repository": {}, "ref": {}, "path": {}, "main_sha_observed": {}, "blob_sha": {}, "content_sha256": {}, "source_issue": {}, "authority_state": {},
+            "registry_version": {"const": "CFG-DELIVERABLES-2026-08-25-v2"}, "deliverable_count": {"const": 54}, "container_count": {"const": 2}
+          }
+        }
+      ]
+    },
+    "naming_pin": {
+      "allOf": [
+        {"$ref": "#/$defs/external_pin"},
+        {"type": "object", "additionalProperties": false,
+          "required": ["repository", "ref", "path", "main_sha_observed", "blob_sha", "content_sha256", "naming_version", "source_issue", "authority_state", "effective_at", "publication_state", "human_test_state"],
+          "properties": {
+            "repository": {}, "ref": {}, "path": {}, "main_sha_observed": {}, "blob_sha": {}, "content_sha256": {}, "source_issue": {}, "authority_state": {},
+            "naming_version": {"const": "CFG-NAMING-2026-08-25-v2"}, "effective_at": {"const": "2026-08-25"},
+            "publication_state": {"const": "PUBLISHED_UNVALIDATED"}, "human_test_state": {"const": "NOT_PROVEN"}
+          }
+        }
+      ]
+    }
+  }
+}

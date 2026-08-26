@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/financial-reconciliation.v1.schema.json",
+  "title": "confenge.financial_reconciliation.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "correlation_id", "synthetic", "provider_environment",
+    "current_state", "received_revenue_cents", "last_applied_event_id", "receipts",
+    "event_deduplication_ids", "applied_event_count", "second_ledger_created"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.financial_reconciliation.v1"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "synthetic": {"const": true},
+    "provider_environment": {"const": "STUB"},
+    "current_state": {"enum": ["UNKNOWN", "PAYMENT_CREATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED", "OVERDUE", "REFUNDED", "CANCELED"]},
+    "received_revenue_cents": {"const": 0},
+    "last_applied_event_id": {"type": ["string", "null"]},
+    "receipts": {"type": "array", "items": {"$ref": "semantic-receipt.v1.schema.json"}},
+    "event_deduplication_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "applied_event_count": {"type": "integer", "minimum": 0},
+    "second_ledger_created": {"const": false}
+  }
+}

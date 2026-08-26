@@ -29,6 +29,8 @@ jobs:
         run: npm test
       - name: Delivery vertical-slice canary
         run: npm --prefix control-center run test:delivery-canary
+      - name: Commercial-to-closeout synthetic E2E
+        run: npm --prefix control-center run test:commercial-e2e
 
   integration:
     runs-on: ubuntu-latest

@@ -1,0 +1,24 @@
+{
+  "schema_version": "confenge.checkout_fixture.v1",
+  "checkout_attempt_id": "checkout_stub_governance_120",
+  "correlation_id": "corr_fixture",
+  "acceptance_id": "acc_synthetic_governance_120",
+  "offer_id": "CFG-DIAG-EXP-v1",
+  "offer_version": "v1",
+  "amount_cents": 800000,
+  "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+  "provider": "asaas",
+  "environment": "STUB",
+  "mode": "DETACHED_STUB",
+  "provider_checkout_id": null,
+  "synthetic": true,
+  "production_checkout_enabled": false,
+  "real_money_mutation_approved": false,
+  "created_at": "2026-08-17T12:00:00Z",
+  "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/checkout-detached-response.json",
+  "source_fixture_hash": "sha256:20664da395f5d92c3e2824d2a2c4020dcdc94483f8a4f3c48ce5185639bc0e04",
+  "evidence_refs": [
+    "fixture:governance:120:checkout-stub",
+    "source:checkout-detached-response:sha256:20664da395f5d92c3e2824d2a2c4020dcdc94483f8a4f3c48ce5185639bc0e04"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/commercial-e2e-evidence.v1.schema.json",
+  "title": "confenge.commercial_e2e_evidence.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "evidence_pack_id", "correlation_id", "canary", "authority_pins",
+    "chain_hops", "financial_semantics", "reliability", "gates",
+    "commercial_reconciliation", "delivery_manifest", "control_center", "invariants"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.commercial_e2e_evidence.v1"},
+    "evidence_pack_id": {"const": "CFG-COMMERCIAL-E2E-SYNTHETIC-120-v1"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "canary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["offer_id", "offer_version", "deliverable_id", "deliverable_version", "synthetic"],
+      "properties": {
+        "offer_id": {"const": "CFG-DIAG-EXP-v1"}, "offer_version": {"const": "v1"},
+        "deliverable_id": {"const": "CFG-DIAG-EXP-v1"}, "deliverable_version": {"const": "v1"},
+        "synthetic": {"const": true}
+      }
+    },
+    "authority_pins": {"type": "object"},
+    "chain_hops": {
+      "type": "array", "minItems": 14, "maxItems": 14,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["hop", "id", "version", "hash", "state", "proof_status", "live_residual", "receipt"],
+        "properties": {
+          "hop": {"type": "string", "minLength": 1}, "id": {"type": "string", "minLength": 1},
+          "version": {"type": "string", "minLength": 1},
+          "hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "state": {"type": "string", "minLength": 1},
+          "proof_status": {"enum": ["PROVEN_SYNTHETIC", "PROVEN_SANDBOX", "PROVEN_LIVE", "MISSING", "BLOCKED_EXTERNAL"]},
+          "live_residual": {"enum": ["PROVEN_SYNTHETIC", "PROVEN_SANDBOX", "PROVEN_LIVE", "MISSING", "BLOCKED_EXTERNAL"]},
+          "receipt": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "financial_semantics": {"type": "object"},
+    "reliability": {"type": "object"},
+    "gates": {
+      "type": "object",
+      "required": ["production_checkout_enabled", "real_money_mutation_approved"],
+      "properties": {
+        "production_checkout_enabled": {"const": false},
+        "real_money_mutation_approved": {"const": false}
+      }
+    },
+    "commercial_reconciliation": {"type": "object"},
+    "delivery_manifest": {
+      "type": "object",
+      "required": ["correlation_id", "work_order_count", "real_money", "real_checkout", "received_revenue"],
+      "properties": {
+        "real_money": {"const": false}, "real_checkout": {"const": false},
+        "received_revenue": {"const": false}, "work_order_count": {"const": 1}
+      }
+    },
+    "control_center": {"type": "object"},
+    "invariants": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "single_correlation_identity", "second_catalog_created", "second_ledger_created",
+        "provider_event_idempotent", "work_order_exactly_once", "unknown_preserved",
+        "qa_delivery_closeout_not_inferred_by_silence", "synthetic_never_customer_revenue_or_real_delivery"
+      ],
+      "properties": {
+        "single_correlation_identity": {"const": true},
+        "second_catalog_created": {"const": false},
+        "second_ledger_created": {"const": false},
+        "provider_event_idempotent": {"const": true},
+        "work_order_exactly_once": {"const": true},
+        "unknown_preserved": {"const": true},
+        "qa_delivery_closeout_not_inferred_by_silence": {"const": true},
+        "synthetic_never_customer_revenue_or_real_delivery": {"const": true}
+      }
+    }
+  }
+}

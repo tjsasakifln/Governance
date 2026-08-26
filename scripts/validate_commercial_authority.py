@@ -111,6 +111,8 @@ COMPATIBILITY_CONTRACT_PATH = "commercial/compatibility/consumer-compatibility.v
 COMPATIBILITY_FIXTURE_PATH = "commercial/fixtures/consumer-compatibility.ci.v1.json"
 AUTHORITY_OVERLAY_V2_PATH = "commercial/authority/authority-overlay.v2.json"
 AUTHORITY_OVERLAY_V2_SCHEMA_PATH = "schemas/commercial-authority-overlay.v2.schema.json"
+AUTHORITY_OVERLAY_V3_PATH = "commercial/authority/authority-overlay.v3.json"
+AUTHORITY_OVERLAY_V3_SCHEMA_PATH = "schemas/commercial-authority-overlay.v3.schema.json"
 WEB_CFG_DELIVERABLES_BLOB = "99e77f51336e7fe63af0446d7577b3b20fe9a9b0"
 WEB_CFG_NAMING_BLOB = "5f39620c0488625648aa9c3919a9eea3b8ce2004"
 REQUIRED_COMPAT_DRIFTS = (
@@ -855,6 +857,36 @@ def assert_authority_overlay_v2(
         "staffed_capacity_published",
     )):
         raise ValidationError("overlay v2 activation gates must remain false")
+
+
+def assert_authority_overlay_v3(
+    overlay: Mapping[str, Any], catalog: Mapping[str, Any], gates: Mapping[str, Any]
+) -> None:
+    """Cross-check the current external pins without turning the overlay into a catalog."""
+
+    boundary = overlay.get("catalog_boundary") or {}
+    if boundary.get("governance_catalog_role") != "NONE" or boundary.get("no_parallel_catalog") is not True:
+        raise ValidationError("authority overlay v3 must not create a parallel catalog")
+    selected = overlay.get("canary_selection") or {}
+    offer = next(
+        (item for item in catalog.get("offers") or () if item.get("offer_id") == selected.get("offer_id")),
+        None,
+    )
+    if not offer or selected.get("amount_cents") != offer.get("amount_cents"):
+        raise ValidationError("authority overlay v3 canary price diverges from the preserved financial subset")
+    if selected.get("synthetic_only") is not True or selected.get("catalog_promoted") is not False:
+        raise ValidationError("authority overlay v3 canary must remain synthetic and unpromoted")
+    boundaries = overlay.get("boundaries") or {}
+    false_fields = (
+        "provider_lookup_performed", "production_checkout_enabled", "real_money_mutation_approved",
+        "smtp_used", "outbound_mutated", "second_catalog_created", "second_ledger_created",
+    )
+    if any(boundaries.get(field) is not False for field in false_fields):
+        raise ValidationError("authority overlay v3 safety boundaries must remain false")
+    if boundaries.get("provider_object_id") is not None:
+        raise ValidationError("authority overlay v3 must not invent a provider object")
+    if gates.get("production_checkout_enabled") is not False or gates.get("real_money_mutation_approved") is not False:
+        raise ValidationError("production gates unexpectedly diverged from authority overlay v3")
 
 
 def recurring_checkout_allowed(
@@ -1878,6 +1910,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     overlay_schema = load_json(root / "schemas" / "diagnostico-limited-production.v1.schema.json")
     compat_schema = load_json(root / "schemas" / "consumer-compatibility.v1.schema.json")
     authority_overlay_v2_schema = load_json(root / AUTHORITY_OVERLAY_V2_SCHEMA_PATH)
+    authority_overlay_v3_schema = load_json(root / AUTHORITY_OVERLAY_V3_SCHEMA_PATH)
 
     catalog = load_json(root / "commercial" / "offers" / "catalog.v1.json")
     public = load_json(root / "commercial" / "offers" / "catalog.public.v1.json")
@@ -1894,6 +1927,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     terms_text = load_text(root / "commercial" / "terms" / "CFG-TERMS-B2B-2026-08-17-v1.md")
     manifest = load_json(root / "commercial" / "authority" / "authority-manifest.v1.json")
     authority_overlay_v2 = load_json(root / AUTHORITY_OVERLAY_V2_PATH)
+    authority_overlay_v3 = load_json(root / AUTHORITY_OVERLAY_V3_PATH)
 
     schema_validate(catalog, catalog_schema)
     schema_validate(public, catalog_schema)
@@ -1903,6 +1937,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     schema_validate(overlay, overlay_schema)
     schema_validate(compat, compat_schema)
     schema_validate(authority_overlay_v2, authority_overlay_v2_schema)
+    schema_validate(authority_overlay_v3, authority_overlay_v3_schema)
 
     assert_catalog_invariants(catalog)
     assert_catalog_invariants(public)
@@ -1914,6 +1949,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     assert_no_active_while_gates_pending(public, gates)
     assert_capacity_invariants(capacity)
     assert_authority_overlay_v2(authority_overlay_v2, catalog, mapping, capacity)
+    assert_authority_overlay_v3(authority_overlay_v3, catalog, gates)
     assert_mapping_invariants(mapping, catalog)
     assert_pending_founder_inputs(pending, catalog)
     assert_consumer_fixture(fixture, mapping)
@@ -1937,6 +1973,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
         "root": str(root),
         "authority_hash": digest,
         "authority_overlay_v2_hash": content_hash_json(authority_overlay_v2),
+        "authority_overlay_v3_hash": content_hash_json(authority_overlay_v3),
         "compatibility_hash": compatibility_hash(compat),
         "legal_package_hash": legal["prior_package_hash"],
         "founder_decided_hash": legal["founder_decided_hash"],
@@ -1990,6 +2027,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         return 1
     print(f"AUTHORITY_HASH {result['authority_hash']}")
     print(f"AUTHORITY_OVERLAY_V2_HASH {result['authority_overlay_v2_hash']}")
+    print(f"AUTHORITY_OVERLAY_V3_HASH {result['authority_overlay_v3_hash']}")
     print(f"COMPATIBILITY_HASH {result['compatibility_hash']}")
     print(f"LEGAL_PACKAGE_HASH {result['legal_package_hash']}")
     print(f"FOUNDER_DECIDED_HASH {result['founder_decided_hash']}")

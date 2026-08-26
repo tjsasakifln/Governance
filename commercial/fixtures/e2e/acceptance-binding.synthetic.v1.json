@@ -1,0 +1,23 @@
+{
+  "schema_version": "confenge.acceptance_binding.v1",
+  "acceptance_id": "acc_synthetic_governance_120",
+  "correlation_id": "corr_fixture",
+  "proposal_id": "320f817a-5b2b-5799-b403-2ce8c731e120",
+  "proposal_version": 1,
+  "accepted_snapshot_hash": "sha256:69254bd6ca91b91ddb1c4bc25afdbc3f5b4b7e2bff120864ef32cf7e9929d257",
+  "offer_id": "CFG-DIAG-EXP-v1",
+  "offer_version": "v1",
+  "deliverable_id": "CFG-DIAG-EXP-v1",
+  "deliverable_version": "v1",
+  "terms_version": "CFG-TERMS-B2B-2026-08-17-v1",
+  "amount_cents": 800000,
+  "accepted_at": "2026-08-17T11:54:00Z",
+  "synthetic": true,
+  "immutable": true,
+  "record_hash": "sha256:673536abb9edb4fe6372134d8fa23802db1bc9b3e7931b36ec42376c5cb75233",
+  "evidence_refs": [
+    "fixture:governance:120:acceptance-binding",
+    "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/scripts/offers/acceptance.cjs",
+    "gap:web-cfg:88:proposal-version-hash-binding"
+  ]
+}
