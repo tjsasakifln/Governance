@@ -37,7 +37,10 @@ x-app-base: &app-base
 
 services:
   postgres:
-    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    build:
+      context: ../..
+      dockerfile: docker/postgres.Dockerfile
+    image: confenge-control-center-postgres:16
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 1g
@@ -112,7 +115,10 @@ services:
       - no-new-privileges:true
 
   nats:
-    image: nats:2.12.6-alpine@sha256:1cfc36e2e5e638243d8c722f72c954cd0ec4b15ee82fadbc718ce12e2b3c1652
+    build:
+      context: ../..
+      dockerfile: docker/nats.Dockerfile
+    image: confenge-control-center-nats:2.12.6
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m
@@ -346,7 +352,10 @@ services:
         condition: service_healthy
 
   caddy:
-    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+    build:
+      context: ../..
+      dockerfile: docker/caddy.Dockerfile
+    image: confenge-control-center-caddy:2.11
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m

@@ -37,7 +37,7 @@
       "title": "Staffed recurring capacity inventory and delivery owner",
       "state": "UNKNOWN",
       "approver": "service_delivery_owner + executive",
-      "required_evidence": "Published staffed inventory of 50 active Full slots, collision policy, hold/release/overbooking controls and named delivery owner.",
+      "required_evidence": "Published staffed inventory independently declared by the delivery owner, versioned working calendar, complete Work Order WIP, collision policy and model-only hold/release reconciliation. The commercial ceiling of 50 is not staffed inventory.",
       "approve_consequence": "Release recurring quantity for holds after other gates allow checkout.",
       "reject_consequence": "No recurring checkout; waitlist, Diagnóstico or fit conversation only.",
       "blocks": ["recurring_checkout", "production_checkout", "ACTIVE"]

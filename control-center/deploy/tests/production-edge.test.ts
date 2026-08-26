@@ -77,9 +77,12 @@ test("production-edge compose publishes loopback Caddy only, unpublished datasto
   assert.doesNotMatch(text, /published: "443"/);
   assert.match(text, /image:\s+redis:7-alpine@sha256:[0-9a-f]{64}/);
   assert.match(text, /image:\s+authelia\/authelia:4.39@sha256:[0-9a-f]{64}/);
-  assert.match(text, /image:\s+nats:2\.12\.6-alpine@sha256:[0-9a-f]{64}/);
-  assert.match(text, /image:\s+postgres:16-alpine@sha256:[0-9a-f]{64}/);
-  assert.match(text, /image:\s+caddy:2\.9-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(text, /dockerfile:\s+docker\/nats\.Dockerfile/);
+  assert.match(text, /image:\s+confenge-control-center-nats:2\.12\.6/);
+  assert.match(text, /dockerfile:\s+docker\/postgres\.Dockerfile/);
+  assert.match(text, /image:\s+confenge-control-center-postgres:16/);
+  assert.match(text, /dockerfile:\s+docker\/caddy\.Dockerfile/);
+  assert.match(text, /image:\s+confenge-control-center-caddy:2\.11/);
   assert.doesNotMatch(text, /image:\s+\S+:latest(?:\s|$)/);
   assert.match(text, /internal:\s+true/);
   assert.match(text, /name:\s+confenge-cc-edge/);

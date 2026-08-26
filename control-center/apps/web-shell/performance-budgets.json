@@ -22,14 +22,14 @@
     "cls_p75": 0.1,
     "long_task_max_ms": 350,
     "initial_request_count": 16,
-    "javascript_raw_bytes": 387000,
-    "javascript_gzip_bytes": 117500,
-    "css_raw_bytes": 26000,
-    "css_gzip_bytes": 7000,
-    "bundle_gzip_bytes": 123500
+    "javascript_raw_bytes": 403000,
+    "javascript_gzip_bytes": 123000,
+    "css_raw_bytes": 30000,
+    "css_gzip_bytes": 6700,
+    "bundle_gzip_bytes": 130000
   },
   "budget_change": {
-    "previous_bundle_gzip_bytes": 120000,
-    "reason": "The founder operating-truth viewport adds five source-attributed fail-closed decisions and a complete exception projection; the new ceiling is bounded to the measured feature delta rather than an open-ended allowance."
+    "previous_bundle_gzip_bytes": 123500,
+    "reason": "The existing founder operating-truth viewport now includes the source-attributed outbound runway, 33 progressive readbacks and fail-closed reconciliation; the bounded ceiling follows the measured feature delta while mobile LCP and INP targets remain unchanged."
   }
 }

@@ -46,7 +46,8 @@ The versioned compatibility contract is `commercial/compatibility/consumer-compa
 |---|---|
 | Price change | New `offer_version` (and a new `offer_id` / `offer_code` suffix). Same version + different cents is invalid. |
 | `RETIRED` | Remains historical in the catalog. It must not vanish and must not return to `ACTIVE`. |
-| `PAUSED` or `sold_out=true` | Blocks checkout. Capacity exhaustion pauses contracting; it does not change price. |
+| `PAUSED` or `sold_out=true` | Static kill switch that blocks checkout. Capacity exhaustion pauses contracting; it does not change price. |
+| `sold_out=false` | Means only “no static catalog block”. It is **not** dynamic availability and never yields `CAN_ACCEPT` without a fresh `confenge.capacity_admission.v2` decision for the exact deliverable/version/deadline. |
 | `DRAFT` | Not checkoutable. |
 | `APPROVED` | Catalog authority only. Not portfolio `ACTIVE`. |
 | `ACTIVE` | Illegal while required portfolio gates are `UNKNOWN`/`PENDING`. |
@@ -84,6 +85,8 @@ Provider mapping IDs may be null. Null mapping means the founder has not copied 
 **Internal (consumers may read; do not render to visitors):**
 
 `internal_code`, `description_asaas`, `provider_mapping_status`, `approval_state`, `change_reason`, `capacity_required`, `capacity_units`, `effective_from`, `effective_to`, `sold_out`, `funnel_role`, `upsell_policy`, `offer_code` (alias of `offer_id`), mapping table IDs, Extra exception, pending founder inputs.
+
+`sold_out` is retained only for v1 compatibility as a manual/static block. Consumers MUST NOT persist or derive `available`, staffed inventory, WIP, deadline feasibility or checkout eligibility from it. Dynamic admission comes only from Governance's versioned read-only decision; an absent, invalid or expired decision is `UNKNOWN` and fail-closed.
 
 `catalog.public.v1.json` is the public-candidate machine file. It is still `NOT_PUBLISHED`. It must never contain Extra `1000000` cents/month.
 

@@ -24,7 +24,8 @@
     { "method": "GET", "path": "/v1/confenge/today", "notes": "feature-flagged executable human work" },
     { "method": "GET", "path": "/v1/confenge/inbound", "notes": "feature-flagged inbound-now queue (lead surface)" },
     { "method": "GET", "path": "/v1/confenge/dispatch/status", "notes": "authoritative pause, kill-switch-adjacent scheduling and queue readback surface" },
-    { "method": "GET", "path": "/v1/confenge/first-touch/status", "notes": "authoritative CFG-FIRST-TOUCH-ROUTING-v1 delegated decisions, HOLD exceptions, approval source, evidence/reason codes and QUEUED readback; Control Center displays but never re-evaluates it" }
+    { "method": "GET", "path": "/v1/confenge/first-touch/status", "notes": "authoritative CFG-FIRST-TOUCH-ROUTING-v1 delegated decisions, HOLD exceptions, approval source, evidence/reason codes and QUEUED readback; Control Center displays but never re-evaluates it" },
+    { "method": "GET", "path": "/v1/confenge/working-overview", "notes": "authoritative aggregate working lanes, current reservoir, suppression and feed age; theoretical_slots_24h is planning-only and is never used as actual runway capacity" }
   ],
   "operator_actions": {
     "note": "Amended boundary. Three named, individually typed operational controls are the ONLY writes this connector may issue. Verified against the live Warmbly backend on the VPS (warmbly-confenge-backend-1, 127.0.0.1:8080) on 2026-08-22: each route answers 401 unauthenticated (registered) and 404 on the wrong method (not registered for it). Discovered in Warmbly internal/api/routes.go lines 594-604 under the feature-flagged `confengeWrite` group.",

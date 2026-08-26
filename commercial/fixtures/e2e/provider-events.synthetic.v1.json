@@ -1,0 +1,93 @@
+{
+  "schema_version": "confenge.provider_event_fixture_set.v1",
+  "correlation_id": "corr_fixture",
+  "provider": "asaas",
+  "environment": "STUB",
+  "synthetic": true,
+  "events": [
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_created_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_CREATED", "raw_status": "PENDING", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T12:00:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-created.json",
+      "source_fixture_hash": "sha256:8902814e89c3b0ec93b05e127704669f767bda6fabdb8a13ba48b853b26cd106",
+      "evidence_refs": ["source:web-cfg:webhook-payment-created:sha256:8902814e89c3b0ec93b05e127704669f767bda6fabdb8a13ba48b853b26cd106"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_confirmed_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_CONFIRMED", "raw_status": "CONFIRMED", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T12:04:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-confirmed.json",
+      "source_fixture_hash": "sha256:2f8ed2f14d972531076106a35b595a9f7312c58cec119375ba33b887bc136e99",
+      "evidence_refs": ["source:web-cfg:webhook-payment-confirmed:sha256:2f8ed2f14d972531076106a35b595a9f7312c58cec119375ba33b887bc136e99"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_received_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_RECEIVED", "raw_status": "RECEIVED", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T12:05:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-received.json",
+      "source_fixture_hash": "sha256:00bccce995d203392569b3cbacc47222ddaeebeb903907b531002e2c2367bdcf",
+      "evidence_refs": ["source:web-cfg:webhook-payment-received:sha256:00bccce995d203392569b3cbacc47222ddaeebeb903907b531002e2c2367bdcf"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_overdue_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_OVERDUE", "raw_status": "OVERDUE", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T13:00:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-overdue.json",
+      "source_fixture_hash": "sha256:fd94e9fc973c1f1414848d6c8778ee8bdc63f47c3ecaa608c14eb4236e734c0e",
+      "evidence_refs": ["source:web-cfg:webhook-payment-overdue:sha256:fd94e9fc973c1f1414848d6c8778ee8bdc63f47c3ecaa608c14eb4236e734c0e"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_refunded_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_REFUNDED", "raw_status": "REFUNDED", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T14:00:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-refunded.json",
+      "source_fixture_hash": "sha256:9bb3b2b2cd444f46d6d07dade2234d1352be18d56bd689591d35e0f6a657f980",
+      "evidence_refs": ["source:web-cfg:webhook-payment-refunded:sha256:9bb3b2b2cd444f46d6d07dade2234d1352be18d56bd689591d35e0f6a657f980"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_payment_deleted_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "PAYMENT_DELETED", "raw_status": "DELETED", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T15:00:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-deleted.json",
+      "source_fixture_hash": "sha256:b2516334f81a0aca385c3594c24c00a5bab8a2dbbd829979cc5ba5f3dd26f26b",
+      "evidence_refs": ["source:web-cfg:webhook-payment-deleted:sha256:b2516334f81a0aca385c3594c24c00a5bab8a2dbbd829979cc5ba5f3dd26f26b"]
+    },
+    {
+      "schema_version": "confenge.provider_event_fixture.v1",
+      "provider": "asaas", "environment": "STUB",
+      "provider_event_id": "evt_sbx_checkout_created_001", "provider_object_id": null,
+      "correlation_id": "corr_fixture", "offer_id": "CFG-DIAG-EXP-v1",
+      "external_reference": "cfg:CFG-DIAG-EXP-v1:corr_fixture",
+      "raw_event_type": "CHECKOUT_CREATED", "raw_status": "ACTIVE", "amount_cents": 800000,
+      "occurred_at": "2026-08-17T12:00:00Z", "synthetic": true, "real_money": false,
+      "source_fixture_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-checkout-created.json",
+      "source_fixture_hash": "sha256:f623d74b14cc198b2198fe453fded3195a6792c31202ddb8eeb2682804f512d6",
+      "evidence_refs": ["source:web-cfg:webhook-checkout-created:sha256:f623d74b14cc198b2198fe453fded3195a6792c31202ddb8eeb2682804f512d6"]
+    }
+  ]
+}

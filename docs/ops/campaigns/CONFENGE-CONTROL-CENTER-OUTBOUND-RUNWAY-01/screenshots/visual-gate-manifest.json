@@ -1,0 +1,3869 @@
+{
+  "schema_version": "control-center.visual-gate.v1",
+  "execution": "ISOLATED_AUTHENTICATED_E2E",
+  "live_production_claimed": false,
+  "runtime_sha": "8a2eb1f012345678901234567890123456789012",
+  "routes": [
+    {
+      "key": "destination:hoje",
+      "hash": "#/hoje",
+      "label": "Hoje",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:comercial",
+      "hash": "#/comercial",
+      "label": "Comercial",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:warmbly",
+      "hash": "#/warmbly",
+      "label": "Operação Warmbly",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:clientes",
+      "hash": "#/clientes",
+      "label": "Clientes",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:financeiro",
+      "hash": "#/financeiro",
+      "label": "Financeiro",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:engenharia",
+      "hash": "#/engenharia",
+      "label": "Engenharia",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:infra",
+      "hash": "#/infra",
+      "label": "Infra",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:crescimento",
+      "hash": "#/crescimento",
+      "label": "Crescimento",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:memoria",
+      "hash": "#/memoria",
+      "label": "Memória/Decisões",
+      "kind": "destination"
+    },
+    {
+      "key": "destination:agentes",
+      "hash": "#/agentes",
+      "label": "Agentes",
+      "kind": "destination"
+    },
+    {
+      "key": "commercial:visao",
+      "hash": "#/comercial/visao",
+      "label": "Comercial / visao",
+      "kind": "surface"
+    },
+    {
+      "key": "commercial:rascunhos",
+      "hash": "#/comercial/rascunhos",
+      "label": "Comercial / rascunhos",
+      "kind": "surface"
+    },
+    {
+      "key": "commercial:cohorts",
+      "hash": "#/comercial/cohorts",
+      "label": "Comercial / cohorts",
+      "kind": "surface"
+    },
+    {
+      "key": "commercial:atividade",
+      "hash": "#/comercial/atividade",
+      "label": "Comercial / atividade",
+      "kind": "surface"
+    },
+    {
+      "key": "commercial:pipeline",
+      "hash": "#/comercial/pipeline",
+      "label": "Comercial / pipeline",
+      "kind": "surface"
+    },
+    {
+      "key": "commercial:excecoes",
+      "hash": "#/comercial/excecoes",
+      "label": "Comercial / excecoes",
+      "kind": "surface"
+    },
+    {
+      "key": "warmbly:operacao",
+      "hash": "#/warmbly/operacao",
+      "label": "Operação Warmbly / operacao",
+      "kind": "surface"
+    },
+    {
+      "key": "warmbly:cohorts",
+      "hash": "#/warmbly/cohorts",
+      "label": "Operação Warmbly / cohorts",
+      "kind": "surface"
+    },
+    {
+      "key": "warmbly:revisao",
+      "hash": "#/warmbly/revisao",
+      "label": "Operação Warmbly / revisao",
+      "kind": "surface"
+    }
+  ],
+  "viewports": [
+    {
+      "id": "390",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "id": "tablet-768",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "id": "desktop-1440",
+      "width": 1440,
+      "height": 1000
+    }
+  ],
+  "states": [
+    "ready",
+    "loading",
+    "empty",
+    "stale",
+    "error"
+  ],
+  "checks": [
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "360",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:hoje/ready",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:comercial/ready",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:warmbly/ready",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:clientes/ready",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:financeiro/ready",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:engenharia/ready",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:infra/ready",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:crescimento/ready",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:memoria/ready",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:agentes/ready",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:visao/ready",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:rascunhos/ready",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:cohorts/ready",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:atividade/ready",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:pipeline/ready",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:excecoes/ready",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:operacao/ready",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:cohorts/ready",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:revisao/ready",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "430",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:hoje/ready",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:comercial/ready",
+      "route": "destination:comercial",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:warmbly/ready",
+      "route": "destination:warmbly",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:clientes/ready",
+      "route": "destination:clientes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:financeiro/ready",
+      "route": "destination:financeiro",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:engenharia/ready",
+      "route": "destination:engenharia",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:infra/ready",
+      "route": "destination:infra",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:crescimento/ready",
+      "route": "destination:crescimento",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:memoria/ready",
+      "route": "destination:memoria",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:agentes/ready",
+      "route": "destination:agentes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:visao/ready",
+      "route": "commercial:visao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:rascunhos/ready",
+      "route": "commercial:rascunhos",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:cohorts/ready",
+      "route": "commercial:cohorts",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:atividade/ready",
+      "route": "commercial:atividade",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:pipeline/ready",
+      "route": "commercial:pipeline",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/commercial:excecoes/ready",
+      "route": "commercial:excecoes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/warmbly:operacao/ready",
+      "route": "warmbly:operacao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/warmbly:cohorts/ready",
+      "route": "warmbly:cohorts",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/warmbly:revisao/ready",
+      "route": "warmbly:revisao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "tablet-768",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "desktop",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "desktop-1366",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:hoje/ready",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:comercial/ready",
+      "route": "destination:comercial",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:warmbly/ready",
+      "route": "destination:warmbly",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:clientes/ready",
+      "route": "destination:clientes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:financeiro/ready",
+      "route": "destination:financeiro",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:engenharia/ready",
+      "route": "destination:engenharia",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:infra/ready",
+      "route": "destination:infra",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:crescimento/ready",
+      "route": "destination:crescimento",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:memoria/ready",
+      "route": "destination:memoria",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:agentes/ready",
+      "route": "destination:agentes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:visao/ready",
+      "route": "commercial:visao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:rascunhos/ready",
+      "route": "commercial:rascunhos",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:cohorts/ready",
+      "route": "commercial:cohorts",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:atividade/ready",
+      "route": "commercial:atividade",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:pipeline/ready",
+      "route": "commercial:pipeline",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/commercial:excecoes/ready",
+      "route": "commercial:excecoes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/warmbly:operacao/ready",
+      "route": "warmbly:operacao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/warmbly:cohorts/ready",
+      "route": "warmbly:cohorts",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/warmbly:revisao/ready",
+      "route": "warmbly:revisao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "desktop-1440",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "desktop-1920",
+      "state": "ready",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:hoje/loading",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:hoje/empty",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:hoje/stale",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:hoje/error",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:comercial/loading",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:comercial/empty",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:comercial/stale",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:comercial/error",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:comercial",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:warmbly/loading",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:warmbly/empty",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:warmbly/stale",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:warmbly/error",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:warmbly",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:clientes/loading",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:clientes/empty",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:clientes/stale",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:clientes/error",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:clientes",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:financeiro/loading",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:financeiro/empty",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:financeiro/stale",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:financeiro/error",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:financeiro",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:engenharia/loading",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:engenharia/empty",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:engenharia/stale",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:engenharia/error",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:engenharia",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:infra/loading",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:infra/empty",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:infra/stale",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:infra/error",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:infra",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:crescimento/loading",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:crescimento/empty",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:crescimento/stale",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:crescimento/error",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:crescimento",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:memoria/loading",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:memoria/empty",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:memoria/stale",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:memoria/error",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:memoria",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:agentes/loading",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:agentes/empty",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:agentes/stale",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/destination:agentes/error",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:agentes",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:visao/loading",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:visao/empty",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:visao/stale",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:visao/error",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:visao",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:rascunhos/loading",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:rascunhos/empty",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:rascunhos/stale",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:rascunhos/error",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:rascunhos",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:cohorts/loading",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:cohorts/empty",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:cohorts/stale",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:cohorts/error",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:cohorts",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:atividade/loading",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:atividade/empty",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:atividade/stale",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:atividade/error",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:atividade",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:pipeline/loading",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:pipeline/empty",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:pipeline/stale",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:pipeline/error",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:pipeline",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:excecoes/loading",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:excecoes/empty",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:excecoes/stale",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/commercial:excecoes/error",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "commercial:excecoes",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:operacao/loading",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:operacao/empty",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:operacao/stale",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:operacao/error",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:operacao",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:cohorts/loading",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:cohorts/empty",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:cohorts/stale",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:cohorts/error",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:cohorts",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:revisao/loading",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:revisao/empty",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:revisao/stale",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "390/warmbly:revisao/error",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "warmbly:revisao",
+      "viewport": "390",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:hoje/loading",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:hoje/empty",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:hoje/stale",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "tablet-768/destination:hoje/error",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "tablet-768",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:hoje/loading",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "loading",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "loading",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:hoje/empty",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "empty",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "empty",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:hoje/stale",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "stale",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "stale",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    },
+    {
+      "kind": "axe",
+      "where": "desktop-1440/destination:hoje/error",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "error",
+      "violations": [],
+      "serious_or_critical": 0
+    },
+    {
+      "kind": "geometry",
+      "route": "destination:hoje",
+      "viewport": "desktop-1440",
+      "state": "error",
+      "horizontal_overflow_px": 0,
+      "main_horizontal_overflow_px": 0,
+      "document_scroll_range_px": 0,
+      "competing_scroll_owners": []
+    }
+  ],
+  "catalog": {
+    "id": "operational-component-catalog",
+    "components": [
+      "page-header",
+      "state-summary",
+      "priority",
+      "action-bar",
+      "queue-item",
+      "form",
+      "feedback",
+      "view-state",
+      "technical-detail",
+      "confirmation"
+    ],
+    "state": "extreme-fixtures",
+    "viewports": [
+      {
+        "id": "390",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "id": "desktop-1440",
+        "width": 1440,
+        "height": 1000
+      }
+    ],
+    "checks": [
+      {
+        "kind": "axe",
+        "where": "390/operational-component-catalog/extreme-fixtures",
+        "route": "operational-component-catalog",
+        "viewport": "390",
+        "state": "extreme-fixtures",
+        "violations": [],
+        "serious_or_critical": 0
+      },
+      {
+        "kind": "geometry",
+        "route": "operational-component-catalog",
+        "viewport": "390",
+        "state": "extreme-fixtures",
+        "horizontal_overflow_px": 0,
+        "main_horizontal_overflow_px": 0,
+        "document_scroll_range_px": 0,
+        "competing_scroll_owners": []
+      },
+      {
+        "kind": "axe",
+        "where": "desktop-1440/operational-component-catalog/extreme-fixtures",
+        "route": "operational-component-catalog",
+        "viewport": "desktop-1440",
+        "state": "extreme-fixtures",
+        "violations": [],
+        "serious_or_critical": 0
+      },
+      {
+        "kind": "geometry",
+        "route": "operational-component-catalog",
+        "viewport": "desktop-1440",
+        "state": "extreme-fixtures",
+        "horizontal_overflow_px": 0,
+        "main_horizontal_overflow_px": 0,
+        "document_scroll_range_px": 0,
+        "competing_scroll_owners": []
+      }
+    ]
+  },
+  "safety": {
+    "observed_request_count": 1002,
+    "observed_write_requests": [
+      {
+        "method": "POST",
+        "path": "/v1/operator-actions",
+        "action_type": "START_EXCEPTION_WORK"
+      }
+    ],
+    "allowed_local_control_center_writes": [
+      {
+        "method": "POST",
+        "path": "/v1/operator-actions",
+        "action_type": "START_EXCEPTION_WORK"
+      }
+    ],
+    "unsafe_write_requests": [],
+    "real_email_sent": false,
+    "go_issued": false,
+    "outbound_resumed": false,
+    "irreversible_action": false
+  },
+  "result": "PASS",
+  "completed_at": "2026-08-26T13:09:20.484Z"
+}

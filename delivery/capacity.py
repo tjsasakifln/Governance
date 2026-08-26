@@ -18,7 +18,9 @@ class CapacityError(ValueError):
 
 
 TERMINAL_WORK_ORDER_STAGES = frozenset({"CLOSED", "CANCELLED"})
-ALLOCATION_STATES = frozenset({"HELD", "COMMITTED", "RELEASED", "EXPIRED"})
+ALLOCATION_STATES = frozenset(
+    {"HELD", "COMMITTED", "RELEASED", "EXPIRED", "RECONCILIATION_REQUIRED"}
+)
 WORK_ORDER_STAGES = frozenset(
     {
         "AWAITING_INPUTS",
@@ -33,6 +35,145 @@ WORK_ORDER_STAGES = frozenset(
         *TERMINAL_WORK_ORDER_STAGES,
     }
 )
+
+V2_ALLOCATION_STATES = frozenset(
+    {"HELD", "COMMITTED", "RELEASED", "EXPIRED", "RECONCILIATION_REQUIRED"}
+)
+
+_REASON_DETAILS: dict[str, tuple[str, str]] = {
+    "POLICY_CEILING_UNKNOWN": (
+        "commercial/capacity/capacity-policy.v1.json",
+        "Publicar uma policy ceiling versionada; não substituí-la por capacidade staffed.",
+    ),
+    "CAPACITY_REQUEST_INVALID": (
+        "schemas/capacity-admission.v2.schema.json",
+        "Corrigir request_id/correlation/deliverable/version/scope/deadline antes de avaliar.",
+    ),
+    "STAFFED_CAPACITY_UNKNOWN": (
+        "tjsasakifln/Governance#123",
+        "Delivery owner deve publicar snapshot staffed real, datado e com evidência; não estimar capacidade humana.",
+    ),
+    "CAPACITY_SNAPSHOT_INVALID": (
+        "schemas/staffed-capacity-snapshot.v2.schema.json",
+        "Corrigir ou republicar o snapshot staffed sem copiar o teto comercial.",
+    ),
+    "CAPACITY_SNAPSHOT_FROM_FUTURE": (
+        "schemas/staffed-capacity-snapshot.v2.schema.json",
+        "Reconciliar o relógio e republicar o snapshot antes de prometer prazo.",
+    ),
+    "CAPACITY_SNAPSHOT_STALE": (
+        "tjsasakifln/Governance#123",
+        "Delivery owner deve renovar o snapshot staffed expirado.",
+    ),
+    "WORKING_CALENDAR_UNKNOWN": (
+        "schemas/working-calendar.v1.schema.json",
+        "Publicar o calendário operacional versionado aplicável ao prazo solicitado.",
+    ),
+    "WORKING_CALENDAR_INVALID": (
+        "schemas/working-calendar.v1.schema.json",
+        "Corrigir o calendário versionado e sua janela de validade.",
+    ),
+    "CALENDAR_VERSION_DIVERGED": (
+        "schemas/working-calendar.v1.schema.json",
+        "Reconciliar a versão do calendário entre request e snapshot staffed.",
+    ),
+    "WORKING_CALENDAR_OUT_OF_RANGE": (
+        "schemas/working-calendar.v1.schema.json",
+        "Publicar calendário que cubra a avaliação e o prazo solicitado.",
+    ),
+    "READINESS_UNKNOWN": (
+        "tjsasakifln/Governance#122",
+        "Materializar ou atualizar readiness do deliverable/version exato; UNKNOWN permanece fail-closed.",
+    ),
+    "READINESS_NOT_READY": (
+        "tjsasakifln/Governance#122",
+        "Resolver os blockers de readiness antes de aceitar o trabalho.",
+    ),
+    "READINESS_EVIDENCE_INVALID": (
+        "schemas/delivery-readiness.v1.schema.json",
+        "Corrigir evidência, effort versionado e dependências da readiness.",
+    ),
+    "READINESS_FROM_FUTURE": (
+        "schemas/delivery-readiness.v1.schema.json",
+        "Reconciliar o relógio da avaliação de readiness.",
+    ),
+    "READINESS_STALE": (
+        "tjsasakifln/Governance#122",
+        "Reavaliar a readiness expirada do deliverable/version.",
+    ),
+    "DELIVERABLE_BINDING_DIVERGED": (
+        "tjsasakifln/web-cfg#329",
+        "Reconciliar deliverable/version/scope com os pins do catálogo antes de avaliar capacidade.",
+    ),
+    "ESTIMATED_EFFORT_UNKNOWN": (
+        "tjsasakifln/Governance#122",
+        "Publicar estimated effort e sua versão na readiness; não inferir esforço humano.",
+    ),
+    "WORK_ORDER_SNAPSHOT_UNKNOWN": (
+        "tjsasakifln/Governance#121",
+        "Publicar snapshot completo e read-only das Work Orders canônicas.",
+    ),
+    "WORK_ORDER_SNAPSHOT_INVALID": (
+        "schemas/work-order-capacity-snapshot.v1.schema.json",
+        "Reconstruir o snapshot de WIP a partir das Work Orders canônicas.",
+    ),
+    "WORK_ORDER_SNAPSHOT_STALE": (
+        "tjsasakifln/Governance#121",
+        "Atualizar a projeção de todas as Work Orders antes da admissão.",
+    ),
+    "WORK_ORDER_INVENTORY_INCOMPLETE": (
+        "tjsasakifln/Governance#121",
+        "Reexecutar a leitura completa; 100% das Work Orders não terminais devem entrar no WIP.",
+    ),
+    "ACTIVE_WIP_INVALID": (
+        "schemas/work-order.v1.schema.json",
+        "Corrigir identidade/stage da Work Order na fonte canônica.",
+    ),
+    "ACTIVE_WIP_EFFORT_UNKNOWN": (
+        "schemas/work-order.v1.schema.json",
+        "Registrar estimated_capacity_units na Work Order; não inferir esforço.",
+    ),
+    "ALLOCATION_SNAPSHOT_UNKNOWN": (
+        "schemas/capacity-allocation-snapshot.v1.schema.json",
+        "Publicar o snapshot completo do modelo de holds ou declarar explicitamente que está vazio.",
+    ),
+    "ALLOCATION_SNAPSHOT_INVALID": (
+        "schemas/capacity-allocation-snapshot.v1.schema.json",
+        "Reconciliar o snapshot de holds model-only antes de nova admissão.",
+    ),
+    "ALLOCATION_SNAPSHOT_STALE": (
+        "schemas/capacity-allocation-snapshot.v1.schema.json",
+        "Atualizar o snapshot de holds antes de nova admissão.",
+    ),
+    "ALLOCATION_INVENTORY_INCOMPLETE": (
+        "tjsasakifln/Governance#123",
+        "Reconstruir todos os holds/commits modelados antes de calcular available.",
+    ),
+    "RECONCILIATION_REQUIRED": (
+        "tjsasakifln/Governance#123",
+        "Resolver cancellation/refund/timeout ambíguo por evidência humana antes de liberar ou consumir capacidade.",
+    ),
+    "REQUESTED_DEADLINE_UNKNOWN": (
+        "schemas/capacity-admission.v2.schema.json",
+        "Obter prazo solicitado explícito e versionado; não prometer por default.",
+    ),
+    "REQUESTED_DEADLINE_INFEASIBLE": (
+        "tjsasakifln/Governance#123",
+        "Negociar prazo posterior à primeira data viável ou recusar a admissão.",
+    ),
+    "INSUFFICIENT_STAFFED_CAPACITY": (
+        "tjsasakifln/Governance#123",
+        "Aguardar capacidade staffed comprovada ou recusar; não usar o teto 50 como inventário.",
+    ),
+    "POLICY_CEILING_REACHED": (
+        "commercial/capacity/capacity-policy.v1.json",
+        "Não admitir além do teto comercial; alteração exige nova decisão de autoridade.",
+    ),
+    "ADMISSION_GATES_SATISFIED": (
+        "delivery/capacity.py:evaluate_admission_v2",
+        "Consumir esta decisão somente no escopo e até o expiry publicados.",
+    ),
+}
 
 
 def _parse_instant(value: str, field: str) -> datetime:
@@ -390,6 +531,645 @@ def evaluate_admission(
     }
 
 
+def _valid_non_negative_integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _freshness(
+    value: Mapping[str, Any], *, now: datetime, label: str
+) -> tuple[str, datetime | None, datetime | None]:
+    try:
+        observed = _parse_instant(value.get("as_of"), f"{label}.as_of")
+        expiry = _parse_instant(value.get("expires_at"), f"{label}.expires_at")
+    except CapacityError:
+        return "INVALID", None, None
+    if observed >= expiry:
+        return "INVALID", observed, expiry
+    if observed > now:
+        return "FUTURE", observed, expiry
+    if now >= expiry:
+        return "STALE", observed, expiry
+    return "FRESH", observed, expiry
+
+
+def _v2_blockers(reason_codes: Sequence[str]) -> list[dict[str, str]]:
+    blockers: list[dict[str, str]] = []
+    for code in reason_codes:
+        if code == "ADMISSION_GATES_SATISFIED":
+            continue
+        source_ref, next_action = _REASON_DETAILS.get(
+            code,
+            (
+                "tjsasakifln/Governance#123",
+                "Reconciliar a evidência na autoridade canônica antes de admitir.",
+            ),
+        )
+        blockers.append(
+            {"code": code, "source_ref": source_ref, "next_action": next_action}
+        )
+    return blockers
+
+
+def evaluate_admission_v2(
+    *,
+    request: Mapping[str, Any],
+    readiness: Mapping[str, Any] | None,
+    policy_ceiling: Mapping[str, Any] | None,
+    capacity_snapshot: Mapping[str, Any] | None,
+    working_calendar: Mapping[str, Any] | None,
+    work_order_snapshot: Mapping[str, Any] | None,
+    allocation_snapshot: Mapping[str, Any] | None,
+    evaluated_at: str,
+) -> dict[str, Any]:
+    """Evaluate admission from versioned authorities without mutating them.
+
+    This is the canonical v2 evaluator.  The v1 evaluator above remains intact
+    for existing canary consumers.  Policy ceiling constrains admission but is
+    never used as staffed inventory.  Work Orders are read as a complete,
+    freshness-bounded snapshot; every non-terminal row consumes its canonical
+    ``estimated_capacity_units`` exactly once.
+    """
+
+    now = _parse_instant(evaluated_at, "evaluated_at")
+    unknown_reasons: list[str] = []
+    cannot_reasons: list[str] = []
+
+    def unknown(code: str) -> None:
+        if code not in unknown_reasons:
+            unknown_reasons.append(code)
+
+    def cannot(code: str) -> None:
+        if code not in cannot_reasons:
+            cannot_reasons.append(code)
+
+    request_view = {
+        "request_id": request.get("request_id"),
+        "correlation_id": request.get("correlation_id"),
+        "deliverable_id": request.get("deliverable_id"),
+        "deliverable_version": request.get("deliverable_version"),
+        "scope_version": request.get("scope_version"),
+        "requested_deadline": request.get("requested_deadline"),
+    }
+    if (
+        request.get("schema_version") != "confenge.capacity_request.v1"
+        or not all(
+            isinstance(request.get(field), str) and bool(request.get(field))
+            for field in (
+                "request_id",
+                "correlation_id",
+                "deliverable_id",
+                "deliverable_version",
+                "scope_version",
+            )
+        )
+    ):
+        unknown("CAPACITY_REQUEST_INVALID")
+
+    policy_version: str | None = None
+    policy_units: int | None = None
+    policy_unit: str | None = None
+    policy_evidence: str | None = None
+    if not isinstance(policy_ceiling, Mapping):
+        unknown("POLICY_CEILING_UNKNOWN")
+    else:
+        policy_version = policy_ceiling.get("version")
+        policy_units = policy_ceiling.get("ceiling_units")
+        policy_unit = policy_ceiling.get("unit")
+        policy_evidence = policy_ceiling.get("evidence_ref")
+        if (
+            not isinstance(policy_version, str)
+            or not policy_version
+            or not _valid_non_negative_integer(policy_units)
+            or policy_unit != "delivery_slot"
+            or not isinstance(policy_evidence, str)
+            or not policy_evidence
+        ):
+            policy_version = policy_version if isinstance(policy_version, str) else None
+            policy_units = None
+            policy_unit = None
+            policy_evidence = None
+            unknown("POLICY_CEILING_UNKNOWN")
+
+    staffed_units: int | None = None
+    capacity_id: str | None = None
+    capacity_version: int | None = None
+    capacity_as_of: str | None = None
+    capacity_expires_at: str | None = None
+    capacity_freshness = "UNKNOWN"
+    capacity_calendar_version: str | None = None
+    capacity_synthetic = False
+    expiry_candidates: list[datetime] = []
+    if not isinstance(capacity_snapshot, Mapping):
+        unknown("STAFFED_CAPACITY_UNKNOWN")
+    elif capacity_snapshot.get("schema_version") != "confenge.staffed_capacity_snapshot.v2":
+        unknown("CAPACITY_SNAPSHOT_INVALID")
+    else:
+        capacity_id = capacity_snapshot.get("capacity_snapshot_id")
+        capacity_version = capacity_snapshot.get("version")
+        capacity_as_of = capacity_snapshot.get("as_of")
+        capacity_expires_at = capacity_snapshot.get("expires_at")
+        capacity_calendar_version = capacity_snapshot.get("working_calendar_version")
+        capacity_synthetic = capacity_snapshot.get("synthetic") is True
+        staffed_units = capacity_snapshot.get("staffed_capacity_units")
+        freshness_policy = capacity_snapshot.get("freshness")
+        if (
+            not isinstance(capacity_id, str)
+            or not capacity_id
+            or not isinstance(capacity_version, int)
+            or isinstance(capacity_version, bool)
+            or capacity_version < 1
+            or not _valid_non_negative_integer(staffed_units)
+            or capacity_snapshot.get("unit") != "delivery_slot"
+            or capacity_snapshot.get("policy_ceiling_used_as_staffed_capacity") is not False
+            or capacity_snapshot.get("mutation_mode") != "MODEL_ONLY"
+            or not capacity_snapshot.get("evidence_refs")
+            or not isinstance(capacity_calendar_version, str)
+            or not capacity_calendar_version
+            or not isinstance(freshness_policy, Mapping)
+            or freshness_policy.get("basis") != "EXPLICIT_EXPIRY"
+            or not isinstance(freshness_policy.get("max_age_seconds"), int)
+            or isinstance(freshness_policy.get("max_age_seconds"), bool)
+            or freshness_policy.get("max_age_seconds") <= 0
+        ):
+            staffed_units = None
+            unknown("CAPACITY_SNAPSHOT_INVALID")
+        freshness, _, expiry = _freshness(
+            capacity_snapshot, now=now, label="capacity_snapshot"
+        )
+        capacity_freshness = freshness if freshness in {"FRESH", "STALE"} else "UNKNOWN"
+        if freshness == "INVALID":
+            unknown("CAPACITY_SNAPSHOT_INVALID")
+        elif freshness == "FUTURE":
+            unknown("CAPACITY_SNAPSHOT_FROM_FUTURE")
+        elif freshness == "STALE":
+            unknown("CAPACITY_SNAPSHOT_STALE")
+        elif expiry is not None:
+            expiry_candidates.append(expiry)
+        if (
+            expiry is not None
+            and capacity_as_of is not None
+            and isinstance(freshness_policy, Mapping)
+            and isinstance(freshness_policy.get("max_age_seconds"), int)
+        ):
+            try:
+                observed = _parse_instant(capacity_as_of, "capacity_snapshot.as_of")
+            except CapacityError:
+                pass
+            else:
+                if int((expiry - observed).total_seconds()) != freshness_policy["max_age_seconds"]:
+                    unknown("CAPACITY_SNAPSHOT_INVALID")
+
+    readiness_verdict = readiness_for_admission(readiness, evaluated_at=evaluated_at)
+    if readiness_verdict["verdict"] == "UNKNOWN":
+        for reason in readiness_verdict["reason_codes"]:
+            unknown(reason)
+    elif readiness_verdict["verdict"] == "CANNOT_ACCEPT":
+        for reason in readiness_verdict["reason_codes"]:
+            cannot(reason)
+
+    readiness_ref = readiness_verdict.get("readiness_ref")
+    readiness_hash = readiness_verdict.get("readiness_hash")
+    readiness_state = readiness_verdict.get("readiness_state")
+    requested_effort_units: int | None = None
+    effort_version: str | None = None
+    lead_time: int | None = None
+    if readiness_verdict.get("verdict") == "READY" and isinstance(readiness, Mapping):
+        if (
+            request.get("deliverable_id") != readiness.get("deliverable_id")
+            or request.get("deliverable_version") != readiness.get("deliverable_version")
+            or request.get("scope_version") != readiness.get("scope", {}).get("version")
+        ):
+            unknown("DELIVERABLE_BINDING_DIVERGED")
+        effort = readiness.get("estimated_effort")
+        if isinstance(effort, Mapping):
+            requested_effort_units = effort.get("amount")
+            effort_version = effort.get("version")
+            lead_time = effort.get("lead_time_business_days")
+        if (
+            not isinstance(effort, Mapping)
+            or not isinstance(requested_effort_units, int)
+            or isinstance(requested_effort_units, bool)
+            or requested_effort_units <= 0
+            or effort.get("unit") != "delivery_slot"
+            or not isinstance(effort_version, str)
+            or not effort_version
+            or not isinstance(lead_time, int)
+            or isinstance(lead_time, bool)
+            or lead_time <= 0
+        ):
+            requested_effort_units = None
+            effort_version = None
+            lead_time = None
+            unknown("ESTIMATED_EFFORT_UNKNOWN")
+        try:
+            readiness_expiry = _parse_instant(
+                readiness.get("freshness", {}).get("expires_at"),
+                "readiness.freshness.expires_at",
+            )
+        except CapacityError:
+            pass
+        else:
+            expiry_candidates.append(readiness_expiry)
+
+    calendar_version: str | None = None
+    calendar_freshness = "UNKNOWN"
+    calendar: Mapping[str, Any] | None = None
+    if not isinstance(working_calendar, Mapping):
+        unknown("WORKING_CALENDAR_UNKNOWN")
+    elif working_calendar.get("schema_version") != "confenge.working_calendar.v1":
+        unknown("WORKING_CALENDAR_INVALID")
+    else:
+        calendar = working_calendar
+        calendar_version = working_calendar.get("version")
+        if (
+            not isinstance(calendar_version, str)
+            or not calendar_version
+            or not isinstance(working_calendar.get("calendar_id"), str)
+            or not working_calendar.get("calendar_id")
+            or working_calendar.get("unit") != "business_day"
+            or working_calendar.get("timezone") != "America/Sao_Paulo"
+            or (
+                capacity_id is not None
+                and working_calendar.get("synthetic") != capacity_synthetic
+            )
+            or not working_calendar.get("evidence_refs")
+        ):
+            calendar = None
+            unknown("WORKING_CALENDAR_INVALID")
+        if calendar is not None and (
+            request.get("calendar_version") != calendar_version
+            or (
+                capacity_calendar_version is not None
+                and capacity_calendar_version != calendar_version
+            )
+        ):
+            unknown("CALENDAR_VERSION_DIVERGED")
+        calendar_freshness = "FRESH" if calendar is not None else "UNKNOWN"
+
+    wip_snapshot_id: str | None = None
+    wip_as_of: str | None = None
+    wip_freshness = "UNKNOWN"
+    wip_complete = False
+    non_terminal_ids: list[str] = []
+    active_wip_units: int | None = None
+    blocked_effort_units: int | None = None
+    if not isinstance(work_order_snapshot, Mapping):
+        unknown("WORK_ORDER_SNAPSHOT_UNKNOWN")
+    elif work_order_snapshot.get("schema_version") != "confenge.work_order_capacity_snapshot.v1":
+        unknown("WORK_ORDER_SNAPSHOT_INVALID")
+    else:
+        wip_snapshot_id = work_order_snapshot.get("snapshot_id")
+        wip_as_of = work_order_snapshot.get("as_of")
+        wip_complete = work_order_snapshot.get("complete") is True
+        freshness, _, expiry = _freshness(
+            work_order_snapshot, now=now, label="work_order_snapshot"
+        )
+        wip_freshness = freshness if freshness in {"FRESH", "STALE"} else "UNKNOWN"
+        if freshness == "INVALID" or freshness == "FUTURE":
+            unknown("WORK_ORDER_SNAPSHOT_INVALID")
+        elif freshness == "STALE":
+            unknown("WORK_ORDER_SNAPSHOT_STALE")
+        elif expiry is not None:
+            expiry_candidates.append(expiry)
+        if not wip_complete:
+            unknown("WORK_ORDER_INVENTORY_INCOMPLETE")
+        rows = work_order_snapshot.get("work_orders")
+        if (
+            not isinstance(wip_snapshot_id, str)
+            or not wip_snapshot_id
+            or not isinstance(work_order_snapshot.get("source_ref"), str)
+            or not work_order_snapshot.get("source_ref")
+            or not isinstance(rows, list)
+        ):
+            unknown("WORK_ORDER_SNAPSHOT_INVALID")
+        else:
+            active_wip_units = 0
+            blocked_effort_units = 0
+            seen: set[str] = set()
+            for row in rows:
+                work_order_id = row.get("work_order_id") if isinstance(row, Mapping) else None
+                stage = row.get("current_stage") if isinstance(row, Mapping) else None
+                effort_units = row.get("estimated_capacity_units") if isinstance(row, Mapping) else None
+                if (
+                    not isinstance(work_order_id, str)
+                    or not work_order_id
+                    or work_order_id in seen
+                    or stage not in WORK_ORDER_STAGES
+                ):
+                    unknown("ACTIVE_WIP_INVALID")
+                    continue
+                seen.add(work_order_id)
+                if stage in TERMINAL_WORK_ORDER_STAGES:
+                    continue
+                non_terminal_ids.append(work_order_id)
+                if (
+                    not isinstance(effort_units, int)
+                    or isinstance(effort_units, bool)
+                    or effort_units <= 0
+                ):
+                    unknown("ACTIVE_WIP_EFFORT_UNKNOWN")
+                    active_wip_units = None
+                    blocked_effort_units = None
+                    continue
+                if active_wip_units is not None:
+                    active_wip_units += effort_units
+                if blocked_effort_units is not None and (
+                    stage == "BLOCKED" or bool(row.get("blockers"))
+                ):
+                    blocked_effort_units += effort_units
+
+    allocation_snapshot_id: str | None = None
+    allocation_freshness = "UNKNOWN"
+    held_units: int | None = None
+    reconciliation_units: int | None = None
+    if not isinstance(allocation_snapshot, Mapping):
+        unknown("ALLOCATION_SNAPSHOT_UNKNOWN")
+    elif allocation_snapshot.get("schema_version") != "confenge.capacity_allocation_snapshot.v1":
+        unknown("ALLOCATION_SNAPSHOT_INVALID")
+    else:
+        allocation_snapshot_id = allocation_snapshot.get("snapshot_id")
+        freshness, _, expiry = _freshness(
+            allocation_snapshot, now=now, label="allocation_snapshot"
+        )
+        allocation_freshness = freshness if freshness in {"FRESH", "STALE"} else "UNKNOWN"
+        if freshness == "INVALID" or freshness == "FUTURE":
+            unknown("ALLOCATION_SNAPSHOT_INVALID")
+        elif freshness == "STALE":
+            unknown("ALLOCATION_SNAPSHOT_STALE")
+        elif expiry is not None:
+            expiry_candidates.append(expiry)
+        if allocation_snapshot.get("complete") is not True:
+            unknown("ALLOCATION_INVENTORY_INCOMPLETE")
+        allocations = allocation_snapshot.get("allocations")
+        if (
+            not isinstance(allocation_snapshot_id, str)
+            or not allocation_snapshot_id
+            or allocation_snapshot.get("mutation_mode") != "MODEL_ONLY"
+            or not isinstance(allocations, list)
+        ):
+            unknown("ALLOCATION_SNAPSHOT_INVALID")
+        else:
+            held_units = 0
+            reconciliation_units = 0
+            seen_allocations: set[str] = set()
+            active_ids = set(non_terminal_ids)
+            for row in allocations:
+                allocation_id = row.get("allocation_id") if isinstance(row, Mapping) else None
+                state = row.get("state") if isinstance(row, Mapping) else None
+                effort_units = row.get("effort_units") if isinstance(row, Mapping) else None
+                if (
+                    not isinstance(allocation_id, str)
+                    or not allocation_id
+                    or allocation_id in seen_allocations
+                    or state not in V2_ALLOCATION_STATES
+                    or not isinstance(effort_units, int)
+                    or isinstance(effort_units, bool)
+                    or effort_units <= 0
+                ):
+                    unknown("ALLOCATION_SNAPSHOT_INVALID")
+                    continue
+                seen_allocations.add(allocation_id)
+                if state == "HELD":
+                    held_units += effort_units
+                elif state == "RECONCILIATION_REQUIRED":
+                    if row.get("ambiguity_reason") not in {
+                        "CANCELLATION_AMBIGUOUS",
+                        "REFUND_AMBIGUOUS",
+                        "CHECKOUT_TIMEOUT_AMBIGUOUS",
+                    }:
+                        unknown("ALLOCATION_SNAPSHOT_INVALID")
+                    reconciliation_units += effort_units
+                    unknown("RECONCILIATION_REQUIRED")
+                elif state == "COMMITTED" and row.get("work_order_id") not in active_ids:
+                    reconciliation_units += effort_units
+                    unknown("RECONCILIATION_REQUIRED")
+
+    earliest_due: str | None = None
+    deadline_day: date | None = None
+    deadline_risk = "UNKNOWN"
+    requested_deadline = request.get("requested_deadline")
+    if not isinstance(requested_deadline, str) or not requested_deadline:
+        unknown("REQUESTED_DEADLINE_UNKNOWN")
+    else:
+        try:
+            deadline_day = _parse_day(requested_deadline, "requested_deadline")
+        except CapacityError:
+            unknown("REQUESTED_DEADLINE_UNKNOWN")
+    if calendar is not None and deadline_day is not None and lead_time is not None:
+        try:
+            valid_from = _parse_day(calendar.get("valid_from"), "calendar.valid_from")
+            valid_until = _parse_day(calendar.get("valid_until"), "calendar.valid_until")
+            earliest = add_business_days(now.date(), lead_time, calendar)
+        except CapacityError:
+            unknown("WORKING_CALENDAR_INVALID")
+        else:
+            if not valid_from <= now.date() <= valid_until or deadline_day > valid_until:
+                unknown("WORKING_CALENDAR_OUT_OF_RANGE")
+                calendar_freshness = "UNKNOWN"
+            else:
+                earliest_due = earliest.isoformat()
+                if earliest > deadline_day:
+                    deadline_risk = "INFEASIBLE"
+                    cannot("REQUESTED_DEADLINE_INFEASIBLE")
+                else:
+                    deadline_risk = "FEASIBLE"
+
+    available_units: int | None = None
+    if all(
+        value is not None
+        for value in (
+            policy_units,
+            staffed_units,
+            active_wip_units,
+            held_units,
+            reconciliation_units,
+        )
+    ):
+        effective_limit = min(policy_units, staffed_units)
+        consumed = active_wip_units + held_units + reconciliation_units
+        available_units = max(0, effective_limit - consumed)
+        if requested_effort_units is not None and available_units < requested_effort_units:
+            if policy_units <= staffed_units and policy_units - consumed < requested_effort_units:
+                cannot("POLICY_CEILING_REACHED")
+            if staffed_units <= policy_units and staffed_units - consumed < requested_effort_units:
+                cannot("INSUFFICIENT_STAFFED_CAPACITY")
+
+    if unknown_reasons:
+        decision = "UNKNOWN"
+        reason_codes = unknown_reasons + [code for code in cannot_reasons if code not in unknown_reasons]
+    elif cannot_reasons:
+        decision = "CANNOT_ACCEPT"
+        reason_codes = cannot_reasons
+    else:
+        decision = "CAN_ACCEPT"
+        reason_codes = ["ADMISSION_GATES_SATISFIED"]
+
+    evidence_class = (
+        "ABSENT"
+        if capacity_snapshot is None
+        else "SYNTHETIC"
+        if capacity_synthetic
+        or bool(isinstance(readiness, Mapping) and readiness.get("constraints", {}).get("synthetic_only"))
+        else "REAL"
+    )
+    expires_at = min(expiry_candidates).isoformat().replace("+00:00", "Z") if expiry_candidates else None
+    blockers = _v2_blockers(reason_codes)
+    if blockers:
+        next_action = blockers[0]["next_action"]
+    else:
+        next_action = _REASON_DETAILS["ADMISSION_GATES_SATISFIED"][1]
+    basis = {
+        "request": request_view,
+        "policy": policy_ceiling,
+        "capacity_snapshot": capacity_snapshot,
+        "working_calendar": working_calendar,
+        "work_order_snapshot": work_order_snapshot,
+        "allocation_snapshot": allocation_snapshot,
+        "readiness_hash": readiness_hash,
+        "evaluated_at": evaluated_at,
+    }
+    return {
+        "schema_version": "confenge.capacity_admission.v2",
+        "decision_id": _stable_id("cadm", basis),
+        "decision": decision,
+        "reason_codes": reason_codes,
+        "blockers": blockers,
+        "request": request_view,
+        "evaluated_at": evaluated_at,
+        "expires_at": expires_at,
+        "evidence_class": evidence_class,
+        "policy": {
+            "version": policy_version,
+            "ceiling_units": policy_units,
+            "unit": policy_unit,
+            "evidence_ref": policy_evidence,
+        },
+        "staffed": {
+            "snapshot_id": capacity_id,
+            "version": capacity_version,
+            "capacity_units": staffed_units,
+            "state": "KNOWN" if staffed_units is not None else "UNKNOWN",
+            "as_of": capacity_as_of,
+            "expires_at": capacity_expires_at,
+            "freshness": capacity_freshness,
+            "calendar_version": capacity_calendar_version,
+        },
+        "wip": {
+            "snapshot_id": wip_snapshot_id,
+            "as_of": wip_as_of,
+            "freshness": wip_freshness,
+            "complete": wip_complete,
+            "non_terminal_work_orders": len(non_terminal_ids) if active_wip_units is not None else None,
+            "work_order_refs": sorted(non_terminal_ids),
+            "committed_effort_units": active_wip_units,
+            "blocked_effort_units": blocked_effort_units,
+        },
+        "allocations": {
+            "snapshot_id": allocation_snapshot_id,
+            "freshness": allocation_freshness,
+            "held_effort_units": held_units,
+            "reconciliation_required_effort_units": reconciliation_units,
+        },
+        "available_effort_units": available_units,
+        "requested_effort": {
+            "amount": requested_effort_units,
+            "unit": "delivery_slot" if requested_effort_units is not None else None,
+            "version": effort_version,
+            "readiness_state": readiness_state,
+            "readiness_ref": readiness_ref,
+            "readiness_hash": readiness_hash,
+        },
+        "deadline": {
+            "requested": deadline_day.isoformat() if deadline_day is not None else None,
+            "earliest_feasible": earliest_due,
+            "calendar_version": calendar_version,
+            "calendar_freshness": calendar_freshness,
+            "risk": deadline_risk,
+        },
+        "actionability": {
+            "read_only": True,
+            "hold_mode": "MODEL_ONLY",
+            "real_reservation_created": False,
+            "checkout_enabled": False,
+            "promise_allowed": decision == "CAN_ACCEPT" and evidence_class == "REAL",
+        },
+        "next_action": next_action,
+    }
+
+
+def project_capacity_read_only_v2(admission: Mapping[str, Any] | None, *, projected_at: str) -> dict[str, Any]:
+    """Create the single Control Center projection from a v2 decision.
+
+    No capacity arithmetic is recalculated here.  The projection is a redacted
+    aggregate view of the pure evaluator output and is never a ledger.
+    """
+
+    _parse_instant(projected_at, "projected_at")
+    valid = isinstance(admission, Mapping) and admission.get("schema_version") == "confenge.capacity_admission.v2"
+    policy = admission.get("policy", {}) if valid else {}
+    staffed = admission.get("staffed", {}) if valid else {}
+    wip = admission.get("wip", {}) if valid else {}
+    allocations = admission.get("allocations", {}) if valid else {}
+    deadline = admission.get("deadline", {}) if valid else {}
+    actionability = admission.get("actionability", {}) if valid else {}
+    decision = admission.get("decision") if valid else "UNKNOWN"
+    if decision not in {"CAN_ACCEPT", "CANNOT_ACCEPT", "UNKNOWN"}:
+        decision = "UNKNOWN"
+    reason_codes = list(admission.get("reason_codes", [])) if valid else ["STAFFED_CAPACITY_UNKNOWN"]
+    if not reason_codes:
+        reason_codes = ["STAFFED_CAPACITY_UNKNOWN"]
+        decision = "UNKNOWN"
+    staffed_state = staffed.get("state") if staffed.get("state") == "KNOWN" else "UNKNOWN"
+    if staffed_state == "UNKNOWN":
+        decision = "UNKNOWN"
+    return {
+        "schema_version": "confenge.capacity_projection.v2",
+        "projected_at": projected_at,
+        "decision_id": admission.get("decision_id") if valid else None,
+        "deliverable_id": admission.get("request", {}).get("deliverable_id") if valid else None,
+        "deliverable_version": admission.get("request", {}).get("deliverable_version") if valid else None,
+        "requested_deadline": admission.get("request", {}).get("requested_deadline") if valid else None,
+        "policy_ceiling": policy.get("ceiling_units"),
+        "staffed_capacity": staffed.get("capacity_units") if staffed_state == "KNOWN" else None,
+        "staffed_capacity_state": staffed_state,
+        "committed": wip.get("committed_effort_units") if staffed_state == "KNOWN" else None,
+        "held": allocations.get("held_effort_units") if staffed_state == "KNOWN" else None,
+        "available": admission.get("available_effort_units") if staffed_state == "KNOWN" else None,
+        "freshness": staffed.get("freshness") if staffed.get("freshness") in {"FRESH", "STALE"} else "UNKNOWN",
+        "admission": decision,
+        "deadline_risk": deadline.get("risk") if deadline.get("risk") in {"FEASIBLE", "INFEASIBLE", "UNKNOWN"} else "UNKNOWN",
+        "blockers": list(admission.get("blockers", [])) if valid else _v2_blockers(reason_codes),
+        "next_action": admission.get("next_action") if valid else _REASON_DETAILS["STAFFED_CAPACITY_UNKNOWN"][1],
+        "evidence_class": admission.get("evidence_class") if valid else "ABSENT",
+        "can_accept": decision == "CAN_ACCEPT" and actionability.get("promise_allowed") is True,
+        "checkout_enabled": False,
+        "source": {
+            "capacity_snapshot_id": staffed.get("snapshot_id") if valid else None,
+            "work_order_snapshot_id": wip.get("snapshot_id") if valid else None,
+            "as_of": staffed.get("as_of") if valid else None,
+            "expires_at": admission.get("expires_at") if valid else None,
+        },
+        "reason_codes": reason_codes,
+    }
+
+
+def evaluate_catalog_availability(
+    *, catalog_sold_out: bool | None, admission: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """Apply static catalog blocks without treating ``sold_out=false`` as capacity."""
+
+    if catalog_sold_out is True:
+        return {"decision": "CANNOT_ACCEPT", "reason_codes": ["CATALOG_STATIC_BLOCK"]}
+    if not isinstance(admission, Mapping) or admission.get("schema_version") != "confenge.capacity_admission.v2":
+        return {"decision": "UNKNOWN", "reason_codes": ["ADMISSION_DECISION_MISSING"]}
+    decision = admission.get("decision")
+    if decision == "CAN_ACCEPT" and admission.get("actionability", {}).get("promise_allowed") is not True:
+        return {"decision": "UNKNOWN", "reason_codes": ["ADMISSION_NOT_ACTIONABLE"]}
+    if decision not in {"CAN_ACCEPT", "CANNOT_ACCEPT", "UNKNOWN"}:
+        return {"decision": "UNKNOWN", "reason_codes": ["ADMISSION_DECISION_INVALID"]}
+    return {"decision": decision, "reason_codes": list(admission.get("reason_codes", []))}
+
+
 def project_capacity_read_only(
     *,
     policy_ceiling: int | None,
@@ -518,11 +1298,12 @@ def project_capacity_read_only(
 
 
 class CapacityLedger:
-    """SQLite-backed idempotent hold/commit/release ledger.
+    """SQLite-backed idempotent model for hold/commit/release/expire.
 
-    This is not a billing ledger.  It stores only operational capacity
-    allocations and their command results.  SQLite ``BEGIN IMMEDIATE`` plus a
-    process lock makes hold acquisition atomic for local/canary concurrency.
+    This is not a production reservation service or a billing ledger.  It only
+    exercises synthetic/model-only lifecycle invariants.  SQLite ``BEGIN
+    IMMEDIATE`` plus a process lock makes acquisition atomic for local/canary
+    concurrency; real decisions are rejected.
     """
 
     def __init__(self, path: str | Path):
@@ -554,7 +1335,7 @@ class CapacityLedger:
                     correlation_id TEXT NOT NULL,
                     capacity_snapshot_id TEXT NOT NULL,
                     effort_units INTEGER NOT NULL CHECK (effort_units > 0),
-                    state TEXT NOT NULL CHECK (state IN ('HELD','COMMITTED','RELEASED','EXPIRED')),
+                    state TEXT NOT NULL CHECK (state IN ('HELD','COMMITTED','RELEASED','EXPIRED','RECONCILIATION_REQUIRED')),
                     created_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
                     committed_at TEXT,
@@ -625,18 +1406,55 @@ class CapacityLedger:
     ) -> dict[str, Any]:
         if decision.get("decision") != "CAN_ACCEPT":
             raise CapacityError("capacity hold requires CAN_ACCEPT")
+        if decision.get("synthetic") is not True and decision.get("evidence_class") != "SYNTHETIC":
+            raise CapacityError("capacity ledger is MODEL_ONLY and rejects real reservations")
+        v2 = decision.get("schema_version") == "confenge.capacity_admission.v2"
         created = _parse_instant(created_at, "created_at")
         expires = _parse_instant(expires_at, "expires_at")
         if expires <= created:
             raise CapacityError("hold expiry must be after creation")
-        if decision.get("correlation_id") != correlation_id:
+        decision_correlation = (
+            decision.get("request", {}).get("correlation_id")
+            if v2
+            else decision.get("correlation_id")
+        )
+        if decision_correlation != correlation_id:
             raise CapacityError("hold correlation diverges from admission")
-        effort_units = decision.get("requested_effort_units")
-        capacity_limit = decision.get("capacity_limit_after_wip_units")
-        staffed_units = decision.get("staffed_capacity_units")
-        active_wip_units = decision.get("active_wip_units")
-        reserved_units = decision.get("reserved_effort_units")
-        available_units = decision.get("available_effort_units")
+        if v2:
+            effort_units = decision.get("requested_effort", {}).get("amount")
+            staffed_units = decision.get("staffed", {}).get("capacity_units")
+            policy_units = decision.get("policy", {}).get("ceiling_units")
+            active_wip_units = decision.get("wip", {}).get("committed_effort_units")
+            held = decision.get("allocations", {}).get("held_effort_units")
+            reconciliation = decision.get("allocations", {}).get(
+                "reconciliation_required_effort_units"
+            )
+            reserved_units = (
+                held + reconciliation
+                if _valid_non_negative_integer(held)
+                and _valid_non_negative_integer(reconciliation)
+                else None
+            )
+            capacity_limit = (
+                max(0, min(policy_units, staffed_units) - active_wip_units)
+                if all(
+                    _valid_non_negative_integer(item)
+                    for item in (policy_units, staffed_units, active_wip_units)
+                )
+                else None
+            )
+            available_units = decision.get("available_effort_units")
+            capacity_snapshot_id = decision.get("staffed", {}).get("snapshot_id")
+            active_work_order_ids = set(decision.get("wip", {}).get("work_order_refs", []))
+        else:
+            effort_units = decision.get("requested_effort_units")
+            capacity_limit = decision.get("capacity_limit_after_wip_units")
+            staffed_units = decision.get("staffed_capacity_units")
+            active_wip_units = decision.get("active_wip_units")
+            reserved_units = decision.get("reserved_effort_units")
+            available_units = decision.get("available_effort_units")
+            capacity_snapshot_id = decision.get("capacity_snapshot_id")
+            active_work_order_ids = set(decision.get("active_work_order_ids", []))
         if (
             not isinstance(effort_units, int)
             or effort_units <= 0
@@ -644,8 +1462,15 @@ class CapacityLedger:
                 isinstance(item, int) and not isinstance(item, bool) and item >= 0
                 for item in (capacity_limit, staffed_units, active_wip_units, reserved_units, available_units)
             )
-            or capacity_limit != max(0, staffed_units - active_wip_units)
-            or available_units != max(0, staffed_units - active_wip_units - reserved_units)
+            or not isinstance(capacity_snapshot_id, str)
+            or not capacity_snapshot_id
+            or capacity_limit
+            != (
+                max(0, min(policy_units, staffed_units) - active_wip_units)
+                if v2
+                else max(0, staffed_units - active_wip_units)
+            )
+            or available_units != max(0, capacity_limit - reserved_units)
             or effort_units > available_units
         ):
             raise CapacityError("admission lacks effort/capacity basis")
@@ -667,22 +1492,22 @@ class CapacityLedger:
                     """
                     SELECT effort_units, state, work_order_id
                     FROM capacity_allocations
-                    WHERE capacity_snapshot_id = ? AND state IN ('HELD', 'COMMITTED')
+                    WHERE capacity_snapshot_id = ? AND state IN ('HELD', 'COMMITTED', 'RECONCILIATION_REQUIRED')
                     """,
-                    (decision["capacity_snapshot_id"],),
+                    (capacity_snapshot_id,),
                 ).fetchall()
-                active_work_order_ids = set(decision.get("active_work_order_ids", []))
                 active = sum(
                     row["effort_units"]
                     for row in active_rows
-                    if row["state"] == "HELD" or row["work_order_id"] not in active_work_order_ids
+                    if row["state"] in {"HELD", "RECONCILIATION_REQUIRED"}
+                    or row["work_order_id"] not in active_work_order_ids
                 )
                 if active + effort_units > capacity_limit:
                     raise CapacityError("capacity exhausted while acquiring hold")
                 hold_id = _stable_id(
                     "hold",
                     {
-                        "capacity_snapshot_id": decision["capacity_snapshot_id"],
+                        "capacity_snapshot_id": capacity_snapshot_id,
                         "idempotency_key": idempotency_key,
                         "correlation_id": correlation_id,
                     },
@@ -698,7 +1523,7 @@ class CapacityLedger:
                         hold_id,
                         idempotency_key,
                         correlation_id,
-                        decision["capacity_snapshot_id"],
+                        capacity_snapshot_id,
                         effort_units,
                         created_at,
                         expires_at,
@@ -784,7 +1609,7 @@ class CapacityLedger:
                     raise CapacityError("release timestamp precedes the allocation")
                 if allocation["state"] == "RELEASED":
                     result = allocation
-                elif allocation["state"] not in {"HELD", "COMMITTED"}:
+                elif allocation["state"] not in {"HELD", "COMMITTED", "RECONCILIATION_REQUIRED"}:
                     raise CapacityError(f"cannot release allocation in {allocation['state']}")
                 else:
                     self._connection.execute(
@@ -797,6 +1622,65 @@ class CapacityLedger:
                     )
                     result = self.get(hold_id)
                 self._record_command(idempotency_key, "RELEASE", command, result)
+                self._connection.commit()
+                return result
+            except Exception:
+                self._connection.rollback()
+                raise
+
+    def mark_reconciliation_required(
+        self,
+        *,
+        hold_id: str,
+        ambiguity: str,
+        idempotency_key: str,
+        observed_at: str,
+    ) -> dict[str, Any]:
+        """Hold capacity fail-closed when cancellation/refund/timeout is ambiguous."""
+
+        allowed = {
+            "CANCELLATION_AMBIGUOUS",
+            "REFUND_AMBIGUOUS",
+            "CHECKOUT_TIMEOUT_AMBIGUOUS",
+        }
+        if ambiguity not in allowed:
+            raise CapacityError("unsupported reconciliation ambiguity")
+        observed = _parse_instant(observed_at, "observed_at")
+        command = {
+            "hold_id": hold_id,
+            "ambiguity": ambiguity,
+            "observed_at": observed_at,
+        }
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                replay = self._command_result(idempotency_key, "RECONCILE", command)
+                if replay is not None:
+                    self._connection.commit()
+                    return replay
+                allocation = self.get(hold_id)
+                lower_bound = allocation["committed_at"] or allocation["created_at"]
+                if observed < _parse_instant(lower_bound, "allocation timestamp"):
+                    raise CapacityError("reconciliation timestamp precedes the allocation")
+                if allocation["state"] == "RECONCILIATION_REQUIRED":
+                    if allocation["release_reason"] != ambiguity:
+                        raise CapacityError("allocation already has a different ambiguity")
+                    result = allocation
+                elif allocation["state"] not in {"HELD", "COMMITTED"}:
+                    raise CapacityError(
+                        f"cannot require reconciliation in {allocation['state']}"
+                    )
+                else:
+                    self._connection.execute(
+                        """
+                        UPDATE capacity_allocations
+                        SET state = 'RECONCILIATION_REQUIRED', release_reason = ?
+                        WHERE hold_id = ?
+                        """,
+                        (ambiguity, hold_id),
+                    )
+                    result = self.get(hold_id)
+                self._record_command(idempotency_key, "RECONCILE", command, result)
                 self._connection.commit()
                 return result
             except Exception:
@@ -851,14 +1735,15 @@ class CapacityLedger:
             """
             SELECT effort_units, state, work_order_id
             FROM capacity_allocations
-            WHERE capacity_snapshot_id = ? AND state IN ('HELD', 'COMMITTED')
+            WHERE capacity_snapshot_id = ? AND state IN ('HELD', 'COMMITTED', 'RECONCILIATION_REQUIRED')
             """,
             (capacity_snapshot_id,),
         ).fetchall()
         return sum(
             row["effort_units"]
             for row in rows
-            if row["state"] == "HELD" or row["work_order_id"] not in active_ids
+            if row["state"] in {"HELD", "RECONCILIATION_REQUIRED"}
+            or row["work_order_id"] not in active_ids
         )
 
     def projection(
@@ -898,7 +1783,13 @@ class CapacityLedger:
             "SELECT effort_units, state, work_order_id FROM capacity_allocations WHERE capacity_snapshot_id = ?",
             (capacity_snapshot_id,),
         ).fetchall()
-        held_units = sum(row["effort_units"] for row in rows if row["state"] == "HELD")
+        # v1 has no reconciliation field; count ambiguous allocations as held
+        # so the compatibility projection remains fail-closed.
+        held_units = sum(
+            row["effort_units"]
+            for row in rows
+            if row["state"] in {"HELD", "RECONCILIATION_REQUIRED"}
+        )
         committed_units = sum(row["effort_units"] for row in rows if row["state"] == "COMMITTED")
         unprojected_commit_units = sum(
             row["effort_units"]

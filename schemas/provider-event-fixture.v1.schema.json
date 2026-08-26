@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/provider-event-fixture.v1.schema.json",
+  "title": "confenge.provider_event_fixture.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "provider", "environment", "provider_event_id",
+    "provider_object_id", "correlation_id", "offer_id", "external_reference",
+    "raw_event_type", "raw_status", "amount_cents", "occurred_at", "synthetic",
+    "real_money", "source_fixture_ref", "source_fixture_hash", "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "confenge.provider_event_fixture.v1"},
+    "provider": {"const": "asaas"},
+    "environment": {"const": "STUB"},
+    "provider_event_id": {"type": "string", "minLength": 1},
+    "provider_object_id": {"type": "null"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "offer_id": {"type": "string", "minLength": 1},
+    "external_reference": {"type": "string", "minLength": 1},
+    "raw_event_type": {"type": "string", "minLength": 1},
+    "raw_status": {"type": "string", "minLength": 1},
+    "amount_cents": {"type": "integer", "minimum": 0},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "synthetic": {"const": true},
+    "real_money": {"const": false},
+    "source_fixture_ref": {"type": "string", "minLength": 1},
+    "source_fixture_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "evidence_refs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

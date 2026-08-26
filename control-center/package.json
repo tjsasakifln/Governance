@@ -42,6 +42,7 @@
     "test:integration": "node scripts/integration.mjs",
     "test:e2e": "node scripts/e2e.mjs",
     "test:delivery-canary": "PYTHONPATH=.. python3 -m delivery.canary --handoff ../delivery/fixtures/delivery_order_requested.synthetic.v1.json --state-dir /tmp/confenge-delivery-canary-ci --output /tmp/confenge-delivery-canary-ci/manifest.json",
+    "test:commercial-e2e": "PYTHONPATH=.. python3 -m commercial.e2e_canary --state-dir /tmp/confenge-commercial-e2e-ci --output /tmp/confenge-commercial-e2e-ci/EVIDENCE.json",
     "qa": "npm run gate --workspace=@confenge/control-center-qa",
     "qa:live": "npx tsx tests/convergence/live-runtime/run-gate.ts"
   }

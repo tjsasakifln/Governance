@@ -119,6 +119,36 @@ test("production allowlist binds canonical health URL and split identity", () =>
   assert.equal(identity.httpHost, CANONICAL_HTTP_HOST);
   assert.equal(identity.tlsServerName, CANONICAL_TLS_SERVER_NAME);
   assert.equal(identity.connectHost, CANONICAL_CONNECT_HOST);
+  const prepared = allowlist.targets.find((target) => target.id === "confenge-public-edge");
+  assert.ok(prepared);
+  assert.equal(prepared.lifecycle_state, "PREPARED/NOT_LIVE");
+  assert.equal(prepared.connect_host, CANONICAL_CONNECT_HOST);
+  assert.equal(prepared.http_host, "confenge.com.br");
+  assert.equal(prepared.tls_server_name, "confenge.com.br");
+});
+
+test("prepared public edge is visible without probes or false incidents", async () => {
+  const allowlist = loadProductionAllowlist();
+  const ports = recordingPorts({});
+  const result = await collect({ allowlist, ports });
+  const preparedHealth = result.service_health.find(
+    (item) => item.service_id === "confenge-public-edge",
+  );
+  assert.ok(preparedHealth);
+  assert.equal(preparedHealth.lifecycle_state, "PREPARED/NOT_LIVE");
+  assert.equal(preparedHealth.status, "unknown");
+  assert.equal(preparedHealth.freshness_status, "UNKNOWN");
+  assert.deepEqual(preparedHealth.checks, []);
+  assert.equal(
+    result.observations.some((item) => item.target_id === "confenge-public-edge"),
+    false,
+  );
+  assert.equal(
+    result.exceptions.some((item) => item.target_id === "confenge-public-edge"),
+    false,
+  );
+  assert.equal(ports.tlsCalls.length, 1);
+  assert.equal(ports.httpCalls.length, 1);
 });
 
 test("runProbes passes canonical Host/SNI even when connect host is the raw IP", async () => {

@@ -1,0 +1,18 @@
+{
+  "schema_version": "confenge.staffed_capacity_snapshot.v2",
+  "capacity_snapshot_id": "cap_synthetic_diag_one_20260826_v2",
+  "version": 2,
+  "synthetic": true,
+  "as_of": "2026-08-26T12:00:00Z",
+  "expires_at": "2026-09-30T23:59:59Z",
+  "freshness": {
+    "basis": "EXPLICIT_EXPIRY",
+    "max_age_seconds": 3067199
+  },
+  "staffed_capacity_units": 1,
+  "unit": "delivery_slot",
+  "working_calendar_version": "CFG-CALENDAR-SYNTHETIC-BR-2026-v1",
+  "evidence_refs": ["fixture://Governance/delivery/fixtures/capacity-synthetic-one.v2.json"],
+  "policy_ceiling_used_as_staffed_capacity": false,
+  "mutation_mode": "MODEL_ONLY"
+}

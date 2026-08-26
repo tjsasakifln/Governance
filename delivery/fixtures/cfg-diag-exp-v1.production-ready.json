@@ -5,8 +5,8 @@
   "deliverable_version": "v1",
   "offer_id": "CFG-DIAG-EXP-v1",
   "offer_version": "v1",
-  "registry_ref": "github://tjsasakifln/web-cfg@6c3415cb05b3423d87592eba39d3a0ec61bde0b1/data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
-  "registry_hash": "sha256:b4d85f4d32244e2d27c8a68b68e02041c7621bc23060ad4046217a35f86606cc",
+  "registry_ref": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
+  "registry_hash": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
   "scope": {
     "version": "CFG-SCOPE-DIAG-EXP-v1",
     "definition_ref": "commercial/legal/founder-approved-v1/TERMOS_B2B_DIAGNOSTICO.md#3-entregaveis",
@@ -57,11 +57,12 @@
   "estimated_effort": {
     "amount": 1,
     "unit": "delivery_slot",
+    "version": "CFG-EFFORT-DIAG-SYNTHETIC-v1",
     "lead_time_business_days": 10,
     "basis": "SYNTHETIC_CANARY_UNIT"
   },
   "dependencies": [
-    {"dependency_id": "WEB_CFG_REGISTRY_PIN", "state": "AVAILABLE", "evidence_ref": "sha256:b4d85f4d32244e2d27c8a68b68e02041c7621bc23060ad4046217a35f86606cc"},
+    {"dependency_id": "WEB_CFG_REGISTRY_PIN", "state": "AVAILABLE", "evidence_ref": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2"},
     {"dependency_id": "FOUNDER_APPROVED_SCOPE", "state": "AVAILABLE", "evidence_ref": "commercial/legal/founder-approved-v1/manifest.json"},
     {"dependency_id": "PUBLIC_SOURCE_CONTRACTS", "state": "AVAILABLE", "evidence_ref": "github://tjsasakifln/extra-cli@eb2b9c4b3532d17cbc09975dd0b7da66a25060b9/docs/contracts/public-read-v1.md"},
     {"dependency_id": "SANDBOX_PRODUCER_AND_QA", "state": "AVAILABLE", "evidence_ref": "tests/test_delivery_readiness.py"}

@@ -57,7 +57,7 @@
     {
       "path": "commercial/gates/production-gates.v1.json",
       "schema_version": "production-gates.v1",
-      "content_hash": "sha256:69b008a60563acc7201529efeae9c46f3ad1a8936cf8af2d7ef10337a1cae7e8",
+      "content_hash": "sha256:3fa596e288fd157fecc459452d61b232dc916a821c86a04e715e6f99ed78f8e2",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
@@ -93,13 +93,13 @@
     {
       "path": "commercial/CONSUMER-HANDOFF.md",
       "schema_version": "consumer-handoff.v1",
-      "content_hash": "sha256:0f77634faae6f5bb89f29790233f6c5cf9f03aab9486a59af63da3c95185d9f1",
+      "content_hash": "sha256:df09249eb35b0a84040278b8a9fcaf4ee6ebd19a2fdda500ebc6c7a917ffbd56",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/CONSUMER-CONTRACT.md",
       "schema_version": "consumer-contract.v1",
-      "content_hash": "sha256:41fd1ee8cb0f517da929576130f7c22cbedabda480eb61c73cf06b355be3e069",
+      "content_hash": "sha256:3b32baf8e9f48d361279c0dd67da442f0095a96f2edb32f0f26861e59924b2d2",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {

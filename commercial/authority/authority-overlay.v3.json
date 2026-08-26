@@ -1,0 +1,79 @@
+{
+  "schema_version": "commercial-authority-overlay.v3",
+  "authority_id": "CFG-COMMERCIAL-AUTHORITY-OVERLAY-v3",
+  "status": "ACTIVE",
+  "effective_at": "2026-08-26T12:00:00Z",
+  "source_issues": [
+    "https://github.com/tjsasakifln/Governance/issues/1",
+    "https://github.com/tjsasakifln/Governance/issues/120"
+  ],
+  "supersedes": {
+    "path": "commercial/authority/authority-overlay.v2.json",
+    "preserved": true,
+    "reason": "web-cfg main advanced the registry and naming authority blobs"
+  },
+  "catalog_boundary": {
+    "governance_catalog_role": "NONE",
+    "no_parallel_catalog": true,
+    "deliverables_registry": {
+      "repository": "tjsasakifln/web-cfg",
+      "ref": "main",
+      "path": "data/commercial/deliverables-registry.v1.json",
+      "main_sha_observed": "bad3f7c71f817bbbb3605b5a7214e0fd9784111b",
+      "blob_sha": "32576ad2e704881368699ceacdefc6c783dcfa00",
+      "content_sha256": "7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
+      "registry_version": "CFG-DELIVERABLES-2026-08-25-v2",
+      "deliverable_count": 54,
+      "container_count": 2,
+      "source_issue": "https://github.com/tjsasakifln/web-cfg/issues/329",
+      "authority_state": "PINNED"
+    },
+    "naming_authority": {
+      "repository": "tjsasakifln/web-cfg",
+      "ref": "main",
+      "path": "data/commercial/offer-naming.v1.json",
+      "main_sha_observed": "bad3f7c71f817bbbb3605b5a7214e0fd9784111b",
+      "blob_sha": "ee97d54155536378041693153d0c9316baa6596b",
+      "content_sha256": "856fed4281a48c3704c204f7f2109142f992d8f0d73d6a144c6ca50d76237419",
+      "naming_version": "CFG-NAMING-2026-08-25-v2",
+      "source_issue": "https://github.com/tjsasakifln/web-cfg/issues/343",
+      "authority_state": "PINNED",
+      "effective_at": "2026-08-25",
+      "publication_state": "PUBLISHED_UNVALIDATED",
+      "human_test_state": "NOT_PROVEN"
+    }
+  },
+  "canary_selection": {
+    "offer_id": "CFG-DIAG-EXP-v1",
+    "offer_version": "v1",
+    "deliverable_id": "CFG-DIAG-EXP-v1",
+    "deliverable_version": "v1",
+    "container_pointer": "/containers/0",
+    "plan_pointer": "/containers/0/plans/0",
+    "amount_cents": 800000,
+    "currency": "BRL",
+    "synthetic_only": true,
+    "catalog_promoted": false
+  },
+  "payment_semantics": {
+    "UNKNOWN": "PRESERVE_AND_HOLD",
+    "PAYMENT_CREATED": "NOT_PAID_NOT_RECEIVED",
+    "PAYMENT_CONFIRMED": "PAID_NOT_RECEIVED",
+    "PAYMENT_RECEIVED": "RECEIVED_REVENUE_ONLY_WITH_REAL_PROVIDER_PROOF",
+    "OVERDUE": "NOT_RECEIVED",
+    "REFUNDED": "REVERSED",
+    "CANCELED": "TERMINAL_NOT_RECEIVED"
+  },
+  "boundaries": {
+    "financial_ledger_owner": "tjsasakifln/warmbly",
+    "provider_fact_owner": "asaas",
+    "provider_lookup_performed": false,
+    "provider_object_id": null,
+    "production_checkout_enabled": false,
+    "real_money_mutation_approved": false,
+    "smtp_used": false,
+    "outbound_mutated": false,
+    "second_catalog_created": false,
+    "second_ledger_created": false
+  }
+}

@@ -4,6 +4,8 @@
 
 Auditoria read-only concluída em `2026-08-26T04:03:43Z` sobre os estados correntes de `main`, issues, PRs e superfícies públicas. Este documento é evidência datada, não uma fonte live e não deve ser promovido a catálogo ou read model. Qualquer observação sem identidade e freshness próprias continua `UNKNOWN` no Control Center.
 
+Implementação sucessora: a extensão Outbound Runway da mesma primeira viewport está documentada em `docs/ops/campaigns/CONFENGE-CONTROL-CENTER-OUTBOUND-RUNWAY-01/EVIDENCE.md`. Os valores do harness são sintéticos e sanitizados; esta auditoria histórica não foi convertida em ledger live.
+
 Não houve mutação na campanha Warmbly, envio, pause/resume, requeue, reschedule, feed refresh, chamada Asaas, habilitação de checkout ou mutação de dinheiro real.
 
 ## Identidades auditadas

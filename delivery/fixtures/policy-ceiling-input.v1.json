@@ -1,0 +1,6 @@
+{
+  "version": "capacity-policy.v1",
+  "ceiling_units": 50,
+  "unit": "delivery_slot",
+  "evidence_ref": "commercial/capacity/capacity-policy.v1.json#/recurring/global_active_slots"
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/delivery-readiness-inventory.v2.schema.json",
+  "title": "confenge.delivery_readiness_inventory.v2",
+  "description": "54/54 identity matrix with per-row owner, blocker, evidence, next action and expiry. Observation freshness never promotes readiness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "registry_authority", "naming_authority", "as_of", "expires_at", "record_count", "records"],
+  "properties": {
+    "schema_version": { "const": "confenge.delivery_readiness_inventory.v2" },
+    "registry_authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issue_ref", "blob", "identity_inventory_ref"],
+      "properties": {
+        "issue_ref": { "const": "tjsasakifln/web-cfg#329" },
+        "blob": { "const": "99e77f51336e7fe63af0446d7577b3b20fe9a9b0" },
+        "identity_inventory_ref": { "const": "delivery/fixtures/readiness-54.fail-closed.v1.json" }
+      }
+    },
+    "naming_authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issue_ref", "blob", "effective_at", "human_test_state"],
+      "properties": {
+        "issue_ref": { "const": "tjsasakifln/web-cfg#343" },
+        "blob": { "const": "5f39620c0488625648aa9c3919a9eea3b8ce2004" },
+        "effective_at": { "type": "null" },
+        "human_test_state": { "const": "NOT_STARTED" }
+      }
+    },
+    "as_of": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "record_count": { "const": 54 },
+    "records": {
+      "type": "array", "minItems": 54, "maxItems": 54,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["deliverable_id", "deliverable_version", "identity_ref", "readiness_state", "owner_ref", "blocker_code", "evidence_refs", "next_action", "freshness", "expires_at"],
+        "properties": {
+          "deliverable_id": { "type": "string", "pattern": "^CFG-D[0-9]{2}$" },
+          "deliverable_version": { "const": "v1" },
+          "identity_ref": { "type": "string", "pattern": "^delivery/fixtures/readiness-54\\.fail-closed\\.v1\\.json#/records/[0-9]+$" },
+          "readiness_state": { "const": "UNKNOWN" },
+          "owner_ref": { "const": "tjsasakifln/Governance#122" },
+          "blocker_code": { "const": "OPERATIONAL_EVIDENCE_UNKNOWN" },
+          "evidence_refs": {
+            "type": "array", "minItems": 2, "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "next_action": { "const": "materialize template, producer, QA, owner, effort version and current dependencies" },
+          "freshness": { "const": "FRESH_IDENTITY_ONLY" },
+          "expires_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

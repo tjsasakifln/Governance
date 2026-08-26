@@ -304,6 +304,35 @@ export type WarmblyDelegatedFirstTouchStatus = {
   items?: WarmblyDelegatedFirstTouchItem[];
 };
 
+/**
+ * GET /v1/confenge/working-overview. Warmbly owns these aggregate queue lanes.
+ * `theoretical_slots_24h` is deliberately kept distinct from observed future
+ * slots: the Control Center must never use planning theory as runway capacity.
+ */
+export type WarmblyWorkingOverview = {
+  reservoir_monitored?: number;
+  actionable_now?: number;
+  needs_contact?: number;
+  needs_review?: number;
+  approved_scheduled?: number;
+  watch_awaiting?: number;
+  suppressed?: number;
+  stale_context?: number;
+  due_next_24h?: number;
+  theoretical_slots_24h?: number;
+  capacity_load?: number;
+  dynamic_priority_enabled?: boolean;
+  last_feed_sync_at?: string | null;
+  feed_age_seconds?: number | null;
+  /** Additive producer facts. Absent on older Warmbly releases. */
+  prepared?: number;
+  slots_next_24h?: number;
+  slots_next_7d?: number;
+  replenishment_state?: string;
+  stale_retired?: number;
+  queue_fill_blocker?: string;
+};
+
 export type WarmblyObservedText = {
   availability?: "OBSERVED" | "UNKNOWN";
   value?: string;
@@ -370,6 +399,7 @@ export type WarmblyPayload = {
   confenge_inbound?: WarmblyInboundItem[] | WarmblyList<WarmblyInboundItem>;
   confenge_dispatch_status?: WarmblyDispatchStatus | { data: WarmblyDispatchStatus };
   confenge_first_touch_status?: WarmblyDelegatedFirstTouchStatus | { data: WarmblyDelegatedFirstTouchStatus };
+  confenge_working_overview?: WarmblyWorkingOverview | { data: WarmblyWorkingOverview };
   confenge_intel_scoreboard?: Record<string, unknown>;
   confenge_intel_executive?: WarmblyIntelExecutive;
   confenge_intel_report?: Record<string, unknown>;

@@ -514,6 +514,7 @@ export function collectFromWarmblyPayload(
     this_document: "read_model",
     dispatch: dispatchOf(payload),
     delegated_first_touch: delegatedFirstTouchOf(payload),
+    working_overview: workingOverviewOf(payload),
     cap: OPERATIONS_CAP,
     deals: fullOperations.deals.slice(0, OPERATIONS_CAP),
     tasks: fullOperations.tasks.slice(0, OPERATIONS_CAP),
@@ -594,6 +595,19 @@ function delegatedFirstTouchOf(payload: WarmblyPayload): Record<string, unknown>
       observed: false,
       state: "UNKNOWN",
       why: "GET /v1/confenge/first-touch/status não respondeu; a autoridade delegada e as exceções não foram observadas",
+    };
+  }
+  return { ...(raw as Record<string, unknown>), observed: true };
+}
+
+/** Preserve Warmbly's aggregate working lanes; no queue count is recomputed. */
+function workingOverviewOf(payload: WarmblyPayload): Record<string, unknown> {
+  const raw = unwrapData(payload.confenge_working_overview);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {
+      observed: false,
+      state: "UNKNOWN",
+      why: "GET /v1/confenge/working-overview não respondeu; reservoir e refill não foram observados",
     };
   }
   return { ...(raw as Record<string, unknown>), observed: true };

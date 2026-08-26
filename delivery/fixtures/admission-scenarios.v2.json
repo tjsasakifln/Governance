@@ -1,0 +1,30 @@
+{
+  "schema_version": "confenge.capacity_admission_scenarios.v2",
+  "evaluated_at": "2026-08-26T12:00:00Z",
+  "base_refs": {
+    "request": "delivery/fixtures/canary-capacity-request.v1.json",
+    "readiness": "delivery/fixtures/cfg-diag-exp-v1.production-ready.json",
+    "policy_ceiling": "delivery/fixtures/policy-ceiling-input.v1.json",
+    "capacity": "delivery/fixtures/capacity-synthetic-one.v2.json",
+    "calendar": "delivery/fixtures/working-calendar-synthetic.v1.json",
+    "work_orders": "delivery/fixtures/work-orders-empty.capacity-snapshot.v1.json",
+    "allocations": "delivery/fixtures/allocations-empty.model-only.v1.json"
+  },
+  "scenarios": [
+    { "name": "sem_capacity", "override": { "capacity": null }, "expected_decision": "UNKNOWN", "expected_reason": "STAFFED_CAPACITY_UNKNOWN" },
+    { "name": "capacity_zero", "override": { "staffed_capacity_units": 0 }, "expected_decision": "CANNOT_ACCEPT", "expected_reason": "INSUFFICIENT_STAFFED_CAPACITY" },
+    { "name": "uma_vaga", "override": {}, "expected_decision": "CAN_ACCEPT", "expected_reason": "ADMISSION_GATES_SATISFIED" },
+    { "name": "snapshot_stale", "override": { "capacity_as_of": "2026-08-26T11:00:00Z", "capacity_expires_at": "2026-08-26T12:00:00Z" }, "expected_decision": "UNKNOWN", "expected_reason": "CAPACITY_SNAPSHOT_STALE" },
+    { "name": "readiness_missing", "override": { "readiness": null }, "expected_decision": "UNKNOWN", "expected_reason": "READINESS_UNKNOWN" },
+    { "name": "deadline_impossivel", "override": { "requested_deadline": "2026-08-27" }, "expected_decision": "CANNOT_ACCEPT", "expected_reason": "REQUESTED_DEADLINE_INFEASIBLE" },
+    { "name": "work_order_ativo", "override": { "work_orders_ref": "delivery/fixtures/work-orders-active.capacity-snapshot.v1.json" }, "expected_decision": "CANNOT_ACCEPT", "expected_reason": "INSUFFICIENT_STAFFED_CAPACITY" },
+    { "name": "concorrencia_replay_10x", "override": { "attempts": 10, "idempotency_key": "admission-v2-replay-001" }, "expected_unique_allocations": 1 },
+    { "name": "cancellation_refund_timeout_ambiguos", "override": { "allocations_ref": "delivery/fixtures/allocations-reconciliation-required.model-only.v1.json" }, "expected_decision": "UNKNOWN", "expected_reason": "RECONCILIATION_REQUIRED" }
+  ],
+  "safety": {
+    "synthetic_only": true,
+    "real_reservation_created": false,
+    "checkout_enabled": false,
+    "outbound_mutated": false
+  }
+}

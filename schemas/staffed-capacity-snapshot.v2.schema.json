@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/staffed-capacity-snapshot.v2.schema.json",
+  "title": "confenge.staffed_capacity_snapshot.v2",
+  "description": "Time-bounded staffed inventory. Commercial policy ceiling is explicitly forbidden as its source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "capacity_snapshot_id", "version", "synthetic", "as_of",
+    "expires_at", "freshness", "staffed_capacity_units", "unit", "working_calendar_version",
+    "evidence_refs", "policy_ceiling_used_as_staffed_capacity", "mutation_mode"
+  ],
+  "properties": {
+    "schema_version": { "const": "confenge.staffed_capacity_snapshot.v2" },
+    "capacity_snapshot_id": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "synthetic": { "type": "boolean" },
+    "as_of": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "freshness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["basis", "max_age_seconds"],
+      "properties": {
+        "basis": { "const": "EXPLICIT_EXPIRY" },
+        "max_age_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "staffed_capacity_units": { "type": "integer", "minimum": 0 },
+    "unit": { "const": "delivery_slot" },
+    "working_calendar_version": { "type": "string", "minLength": 1 },
+    "evidence_refs": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "policy_ceiling_used_as_staffed_capacity": { "const": false },
+    "mutation_mode": { "const": "MODEL_ONLY" }
+  }
+}
