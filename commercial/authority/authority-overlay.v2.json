@@ -1,0 +1,130 @@
+{
+  "schema_version": "commercial-authority-overlay.v2",
+  "authority_id": "CFG-COMMERCIAL-AUTHORITY-OVERLAY-v2",
+  "status": "ACTIVE",
+  "effective_at": "2026-08-26T00:00:00Z",
+  "source_issue": "https://github.com/tjsasakifln/Governance/issues/1",
+  "v1_history": {
+    "preserved": true,
+    "manifest_path": "commercial/authority/authority-manifest.v1.json",
+    "catalog_path": "commercial/offers/catalog.v1.json",
+    "semantic_status": "HISTORICAL_FINANCIAL_SUBSET_SUPERSEDED_AS_PUBLIC_CATALOG"
+  },
+  "catalog_boundary": {
+    "governance_catalog_role": "NONE",
+    "no_parallel_catalog": true,
+    "deliverables_registry": {
+      "repository": "tjsasakifln/web-cfg",
+      "ref": "main",
+      "path": "data/commercial/deliverables-registry.v1.json",
+      "blob_sha": "99e77f51336e7fe63af0446d7577b3b20fe9a9b0",
+      "main_sha_observed": "41cc328681507159ffdc12417d49e7474e2770a4",
+      "source_issue": "https://github.com/tjsasakifln/web-cfg/issues/329",
+      "registry_version": "CFG-DELIVERABLES-2026-08-24-v1",
+      "deliverable_count": 54,
+      "container_count": 2,
+      "authority_state": "PINNED"
+    },
+    "naming_authority": {
+      "repository": "tjsasakifln/web-cfg",
+      "ref": "main",
+      "path": "data/commercial/offer-naming.v1.json",
+      "blob_sha": "5f39620c0488625648aa9c3919a9eea3b8ce2004",
+      "main_sha_observed": "41cc328681507159ffdc12417d49e7474e2770a4",
+      "source_issue": "https://github.com/tjsasakifln/web-cfg/issues/343",
+      "naming_version": "CFG-NAMING-2026-08-24-v1",
+      "authority_state": "PINNED",
+      "effective_at": null,
+      "human_test_state": "NOT_STARTED",
+      "publication_state": "DECIDED_NOT_PROVEN_EFFECTIVE"
+    }
+  },
+  "historical_financial_subset": {
+    "classification": "HISTORICAL_FINANCIAL_MAPPING_SUBSET",
+    "source_path": "commercial/offers/catalog.v1.json",
+    "offer_ids": [
+      "CFG-DIAG-EXP-v1",
+      "CFG-DIRB2G-FLEX-v1",
+      "CFG-DIRB2G-180-v1",
+      "CFG-DIRB2G-365-v1"
+    ],
+    "complete_public_catalog": false
+  },
+  "provider_boundary": {
+    "provider": "asaas",
+    "mapping_path": "commercial/providers/asaas-mapping.v1.json",
+    "provider_lookup_performed": false,
+    "mappings": [
+      {
+        "offer_id": "CFG-DIAG-EXP-v1",
+        "mapping_state": "MISSING",
+        "provider_object_state": "UNKNOWN",
+        "provider_object_id": null,
+        "evidence_refs": ["commercial/providers/asaas-mapping.v1.json"]
+      },
+      {
+        "offer_id": "CFG-DIRB2G-FLEX-v1",
+        "mapping_state": "MISSING",
+        "provider_object_state": "UNKNOWN",
+        "provider_object_id": null,
+        "evidence_refs": ["commercial/providers/asaas-mapping.v1.json"]
+      },
+      {
+        "offer_id": "CFG-DIRB2G-180-v1",
+        "mapping_state": "MISSING",
+        "provider_object_state": "UNKNOWN",
+        "provider_object_id": null,
+        "evidence_refs": ["commercial/providers/asaas-mapping.v1.json"]
+      },
+      {
+        "offer_id": "CFG-DIRB2G-365-v1",
+        "mapping_state": "MISSING",
+        "provider_object_state": "UNKNOWN",
+        "provider_object_id": null,
+        "evidence_refs": ["commercial/providers/asaas-mapping.v1.json"]
+      }
+    ],
+    "checkout_gate": "BLOCKED"
+  },
+  "capacity_boundary": {
+    "policy_ceiling": {
+      "state": "KNOWN",
+      "units": 50,
+      "unit": "delivery_slot",
+      "source_ref": "commercial/capacity/capacity-policy.v1.json#/recurring/global_active_slots"
+    },
+    "staffed_capacity": {
+      "state": "UNKNOWN",
+      "units": null,
+      "unit": "delivery_slot",
+      "reason": "Nenhum snapshot real de capacidade staffed foi publicado pelo delivery owner."
+    },
+    "committed": {
+      "state": "UNKNOWN",
+      "units": null,
+      "unit": "delivery_slot",
+      "reason": "A projeção real de Work Orders não foi publicada."
+    },
+    "available": {
+      "state": "UNKNOWN",
+      "units": null,
+      "unit": "delivery_slot",
+      "reason": "Disponibilidade não pode ser derivada sem staffed capacity e WIP reais."
+    },
+    "freshness": "UNKNOWN",
+    "admission": "UNKNOWN",
+    "can_accept": false
+  },
+  "payment_semantics": {
+    "proposal_accepted": "NOT_REVENUE",
+    "PAYMENT_CREATED": "PROVIDER_OBJECT_CREATED_NOT_PAID_NOT_RECEIVED",
+    "PAYMENT_CONFIRMED": "PAID_NOT_RECEIVED",
+    "PAYMENT_RECEIVED": "RECEIVED_REVENUE_REQUIRES_PROVIDER_PROOF"
+  },
+  "activation_gates": {
+    "production_checkout_enabled": false,
+    "real_money_mutation_approved": false,
+    "provider_objects_proven": false,
+    "staffed_capacity_published": false
+  }
+}

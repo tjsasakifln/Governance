@@ -21,6 +21,10 @@ import { formatLocal } from "./datetime";
 import { formatMoney } from "./money";
 import { sourceKindLabel, sourceSystemLabel } from "./provenance";
 import { ownMapValue } from "./own-map";
+import {
+  projectFounderOperatingTruth,
+  type FounderOperatingTruth,
+} from "./founder-operating-truth";
 import type { FreshnessStatus, Money, SourceRef } from "./types";
 
 export const DOMAIN_CARD_IDS = [
@@ -130,6 +134,7 @@ export interface HojeDomainSummary {
   cards: HojeDomainCard[];
   integrations: HojeIntegration[];
   outbound: HojeOutbound;
+  founder_truth: FounderOperatingTruth;
   unmapped: HojeUnmappedAlerts[];
   /** Null when the envelope is absent: lack of a reading is not a measured zero. */
   action_total: number | null;
@@ -691,6 +696,7 @@ function emptySummary(): HojeDomainSummary {
     cards,
     integrations: [],
     outbound,
+    founder_truth: projectFounderOperatingTruth(null),
     unmapped: [],
     action_total: null,
     action_total_note:
@@ -744,6 +750,7 @@ export function summarizeDomains(envelopeRaw: unknown): HojeDomainSummary {
     cards,
     integrations: integrationsFrom(envelope),
     outbound,
+    founder_truth: projectFounderOperatingTruth(envelopeRaw),
     unmapped,
     action_total: cardTotal + unmappedTotal,
     action_total_note:

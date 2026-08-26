@@ -106,8 +106,13 @@ MAPPING_ID_FIELDS = ("asaas_product_id", "checkout_id", "subscription_mapping")
 MAPPING_ALLOWED_OFFER_STATUSES = frozenset({"APPROVED", "ACTIVE"})
 VERDICT_READY = "OFFER_CATALOG_AUTHORITY_READY_FOR_ASAAS_REGISTRATION"
 VERDICT_BLOCKED = "OFFER_CATALOG_BLOCKED_ON_NAMED_FOUNDER_FIELDS"
+OVERLAY_V2_VERDICT = "WEB_CFG_CATALOG_PINNED_ASAAS_AND_CAPACITY_BLOCKED"
 COMPATIBILITY_CONTRACT_PATH = "commercial/compatibility/consumer-compatibility.v1.json"
 COMPATIBILITY_FIXTURE_PATH = "commercial/fixtures/consumer-compatibility.ci.v1.json"
+AUTHORITY_OVERLAY_V2_PATH = "commercial/authority/authority-overlay.v2.json"
+AUTHORITY_OVERLAY_V2_SCHEMA_PATH = "schemas/commercial-authority-overlay.v2.schema.json"
+WEB_CFG_DELIVERABLES_BLOB = "99e77f51336e7fe63af0446d7577b3b20fe9a9b0"
+WEB_CFG_NAMING_BLOB = "5f39620c0488625648aa9c3919a9eea3b8ce2004"
 REQUIRED_COMPAT_DRIFTS = (
     "one_off_null_vs_0_1",
     "billing_enum_casing",
@@ -150,7 +155,7 @@ CREATED_PROVIDER_EVENTS = frozenset(
         "payment_created",
     }
 )
-RECEIVED_REVENUE_EVENTS = frozenset({"payment_confirmed", "payment_received"})
+RECEIVED_REVENUE_EVENTS = frozenset({"payment_received", "payment_received_in_cash"})
 MONEY_KEYS = frozenset(
     {
         "amount_cents",
@@ -761,6 +766,95 @@ def assert_capacity_invariants(policy: Mapping[str, Any]) -> None:
     ):
         if revenue.get(key) is not False:
             raise ValidationError(f"{key} must be false")
+
+
+def assert_authority_overlay_v2(
+    overlay: Mapping[str, Any],
+    catalog: Mapping[str, Any],
+    mapping: Mapping[str, Any],
+    legacy_capacity: Mapping[str, Any],
+) -> None:
+    """Validate the additive no-catalog overlay against preserved v1 facts."""
+
+    history = overlay.get("v1_history") or {}
+    if history.get("preserved") is not True:
+        raise ValidationError("authority overlay v2 must preserve v1 history")
+
+    boundary = overlay.get("catalog_boundary") or {}
+    if boundary.get("governance_catalog_role") != "NONE" or boundary.get("no_parallel_catalog") is not True:
+        raise ValidationError("Governance must not claim a parallel public catalog in overlay v2")
+    registry = boundary.get("deliverables_registry") or {}
+    naming = boundary.get("naming_authority") or {}
+    if registry.get("blob_sha") != WEB_CFG_DELIVERABLES_BLOB:
+        raise ValidationError("overlay v2 deliverables registry pin drifted")
+    if registry.get("deliverable_count") != 54 or registry.get("container_count") != 2:
+        raise ValidationError("overlay v2 must pin 54 deliverables and 2 containers")
+    if naming.get("blob_sha") != WEB_CFG_NAMING_BLOB:
+        raise ValidationError("overlay v2 naming authority pin drifted")
+    if (
+        naming.get("effective_at") is not None
+        or naming.get("human_test_state") != "NOT_STARTED"
+        or naming.get("publication_state") != "DECIDED_NOT_PROVEN_EFFECTIVE"
+    ):
+        raise ValidationError("naming decision must not be promoted to proven publication")
+
+    canonical_offer_ids = {item.get("offer_id") for item in catalog.get("offers") or ()}
+    subset = overlay.get("historical_financial_subset") or {}
+    if subset.get("classification") != "HISTORICAL_FINANCIAL_MAPPING_SUBSET":
+        raise ValidationError("four v1 records must be classified as a historical financial subset")
+    if subset.get("complete_public_catalog") is not False:
+        raise ValidationError("historical financial subset must not claim complete catalog authority")
+    if set(subset.get("offer_ids") or ()) != canonical_offer_ids or len(canonical_offer_ids) != 4:
+        raise ValidationError("overlay v2 historical subset must match the four preserved v1 IDs")
+
+    provider = overlay.get("provider_boundary") or {}
+    provider_rows = provider.get("mappings") or []
+    if provider.get("provider_lookup_performed") is not False or provider.get("checkout_gate") != "BLOCKED":
+        raise ValidationError("unproved provider state must keep checkout BLOCKED")
+    if {row.get("offer_id") for row in provider_rows} != canonical_offer_ids:
+        raise ValidationError("overlay v2 provider rows must cover only the historical subset")
+    for row in provider_rows:
+        if row.get("mapping_state") not in {"MISSING", "UNKNOWN", "BLOCKED"}:
+            raise ValidationError("provider mapping state must fail closed")
+        if row.get("provider_object_state") not in {"MISSING", "UNKNOWN", "BLOCKED"}:
+            raise ValidationError("provider object state must fail closed")
+        if row.get("provider_object_id") is not None:
+            raise ValidationError("overlay v2 must not invent or copy an unproved provider object ID")
+    if any(not mapping_ids_pending(row) for row in mapping.get("mappings") or ()):
+        raise ValidationError("checked-in Asaas mapping unexpectedly claims a provider object")
+
+    capacity = overlay.get("capacity_boundary") or {}
+    ceiling = capacity.get("policy_ceiling") or {}
+    legacy_ceiling = (legacy_capacity.get("recurring") or {}).get("global_active_slots")
+    if ceiling.get("units") != legacy_ceiling or ceiling.get("state") != "KNOWN":
+        raise ValidationError("overlay v2 policy ceiling must pin, not reinterpret, v1")
+    for field in ("staffed_capacity", "committed", "available"):
+        fact = capacity.get(field) or {}
+        if fact.get("state") != "UNKNOWN" or fact.get("units") is not None:
+            raise ValidationError(f"{field} must remain UNKNOWN until real evidence is published")
+    if capacity.get("admission") not in {"UNKNOWN", "CANNOT_ACCEPT"} or capacity.get("can_accept") is not False:
+        raise ValidationError("unknown staffed capacity must fail closed for admission")
+    if capacity.get("policy_ceiling") == capacity.get("staffed_capacity"):
+        raise ValidationError("policy ceiling must never be copied into staffed capacity")
+
+    semantics = overlay.get("payment_semantics") or {}
+    if semantics.get("proposal_accepted") != "NOT_REVENUE":
+        raise ValidationError("proposal acceptance must not be revenue")
+    if semantics.get("PAYMENT_CREATED") != "PROVIDER_OBJECT_CREATED_NOT_PAID_NOT_RECEIVED":
+        raise ValidationError("PAYMENT_CREATED semantics drifted")
+    if semantics.get("PAYMENT_CONFIRMED") != "PAID_NOT_RECEIVED":
+        raise ValidationError("PAYMENT_CONFIRMED must not be received revenue")
+    if semantics.get("PAYMENT_RECEIVED") != "RECEIVED_REVENUE_REQUIRES_PROVIDER_PROOF":
+        raise ValidationError("PAYMENT_RECEIVED must require provider proof")
+
+    gates = overlay.get("activation_gates") or {}
+    if any(gates.get(key) is not False for key in (
+        "production_checkout_enabled",
+        "real_money_mutation_approved",
+        "provider_objects_proven",
+        "staffed_capacity_published",
+    )):
+        raise ValidationError("overlay v2 activation gates must remain false")
 
 
 def recurring_checkout_allowed(
@@ -1576,12 +1670,12 @@ def write_derived_artifacts(root: Path) -> None:
 
 
 def is_received_revenue(event_type: str) -> bool:
-    if event_type in CREATED_PROVIDER_EVENTS:
-        return False
     kind = event_type.lower()
+    if kind in CREATED_PROVIDER_EVENTS:
+        return False
     if "partner" in kind or "commission" in kind:
         return False
-    return event_type in RECEIVED_REVENUE_EVENTS
+    return kind in RECEIVED_REVENUE_EVENTS
 
 
 def price_change_requires_new_version(existing: Mapping[str, Any], candidate: Mapping[str, Any]) -> bool:
@@ -1783,6 +1877,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     mapping_schema = load_json(root / "schemas" / "provider-mapping.v1.schema.json")
     overlay_schema = load_json(root / "schemas" / "diagnostico-limited-production.v1.schema.json")
     compat_schema = load_json(root / "schemas" / "consumer-compatibility.v1.schema.json")
+    authority_overlay_v2_schema = load_json(root / AUTHORITY_OVERLAY_V2_SCHEMA_PATH)
 
     catalog = load_json(root / "commercial" / "offers" / "catalog.v1.json")
     public = load_json(root / "commercial" / "offers" / "catalog.public.v1.json")
@@ -1798,6 +1893,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     terms_manifest = load_json(root / "commercial" / "terms" / "CFG-TERMS-B2B-2026-08-17-v1.manifest.json")
     terms_text = load_text(root / "commercial" / "terms" / "CFG-TERMS-B2B-2026-08-17-v1.md")
     manifest = load_json(root / "commercial" / "authority" / "authority-manifest.v1.json")
+    authority_overlay_v2 = load_json(root / AUTHORITY_OVERLAY_V2_PATH)
 
     schema_validate(catalog, catalog_schema)
     schema_validate(public, catalog_schema)
@@ -1806,6 +1902,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     schema_validate(mapping, mapping_schema)
     schema_validate(overlay, overlay_schema)
     schema_validate(compat, compat_schema)
+    schema_validate(authority_overlay_v2, authority_overlay_v2_schema)
 
     assert_catalog_invariants(catalog)
     assert_catalog_invariants(public)
@@ -1816,6 +1913,7 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     assert_no_active_while_gates_pending(catalog, gates)
     assert_no_active_while_gates_pending(public, gates)
     assert_capacity_invariants(capacity)
+    assert_authority_overlay_v2(authority_overlay_v2, catalog, mapping, capacity)
     assert_mapping_invariants(mapping, catalog)
     assert_pending_founder_inputs(pending, catalog)
     assert_consumer_fixture(fixture, mapping)
@@ -1834,17 +1932,20 @@ def validate_package(root: Path | None = None) -> dict[str, Any]:
     digest = authority_hash(manifest)
     legal_mod = load_legal_validator(root)
     legal = legal_mod.validate_all_legal_packages(root)
-    verdict = catalog_verdict(catalog, pending)
+    legacy_verdict = catalog_verdict(catalog, pending)
     return {
         "root": str(root),
         "authority_hash": digest,
+        "authority_overlay_v2_hash": content_hash_json(authority_overlay_v2),
         "compatibility_hash": compatibility_hash(compat),
         "legal_package_hash": legal["prior_package_hash"],
         "founder_decided_hash": legal["founder_decided_hash"],
-        "catalog_authority": manifest["catalog_authority"],
+        "catalog_authority_v1_historical": manifest["catalog_authority"],
+        "public_catalog_authority": "web-cfg",
         "offers": [offer["offer_code"] for offer in catalog["offers"]],
         "pending_gates": gates_pending_for_active(gates),
-        "verdict": verdict,
+        "legacy_verdict": legacy_verdict,
+        "verdict": OVERLAY_V2_VERDICT,
         "overlay_diagnostico_authorized": overlay.get("production_checkout_approved") is True,
         "recurring_checkout_approved": False,
         "production_checkout_enabled": False,
@@ -1888,10 +1989,12 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(f"VALIDATION_ERROR {exc}", file=sys.stderr)
         return 1
     print(f"AUTHORITY_HASH {result['authority_hash']}")
+    print(f"AUTHORITY_OVERLAY_V2_HASH {result['authority_overlay_v2_hash']}")
     print(f"COMPATIBILITY_HASH {result['compatibility_hash']}")
     print(f"LEGAL_PACKAGE_HASH {result['legal_package_hash']}")
     print(f"FOUNDER_DECIDED_HASH {result['founder_decided_hash']}")
-    print(f"CATALOG_AUTHORITY {result['catalog_authority']}")
+    print(f"CATALOG_AUTHORITY_V1_HISTORICAL {result['catalog_authority_v1_historical']}")
+    print(f"PUBLIC_CATALOG_AUTHORITY {result['public_catalog_authority']}")
     print("OFFERS " + ",".join(result["offers"]))
     print("PENDING_GATES " + ",".join(result["pending_gates"]))
     print("PRODUCTION_CHECKOUT_ENABLED false")
@@ -1899,6 +2002,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     print("PUBLIC_ACTIVATION_APPROVED false")
     print("RECURRING_PRODUCTION_CHECKOUT_ENABLED false")
     print(f"VERDICT {result['verdict']}")
+    print(f"V1_HISTORICAL_VERDICT {result['legacy_verdict']}")
     return 0
 
 

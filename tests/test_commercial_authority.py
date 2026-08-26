@@ -299,7 +299,10 @@ def test_onboarding_cannot_precede_confirmed_payment():
 def test_created_provider_objects_are_not_received_revenue():
     for event in ("customer_created", "checkout_created", "subscription_created", "payment_created"):
         assert v.is_received_revenue(event) is False
-    assert v.is_received_revenue("payment_confirmed") is True
+    assert v.is_received_revenue("payment_confirmed") is False
+    assert v.is_received_revenue("PAYMENT_CONFIRMED") is False
+    assert v.is_received_revenue("payment_received") is True
+    assert v.is_received_revenue("PAYMENT_RECEIVED") is True
     revenue = capacity_doc()["revenue"]
     assert revenue["created_customer_is_received_revenue"] is False
     assert revenue["created_checkout_is_received_revenue"] is False
@@ -378,7 +381,10 @@ def test_validate_package_and_cli_twice(tmp_path, capsys):
     verdict1 = [line for line in out1.splitlines() if line.startswith("VERDICT ")][0]
     verdict2 = [line for line in out2.splitlines() if line.startswith("VERDICT ")][0]
     assert verdict1 == verdict2
-    assert verdict1.split(" ", 1)[1] == v.VERDICT_READY
+    assert verdict1.split(" ", 1)[1] == v.OVERLAY_V2_VERDICT
+    assert "PUBLIC_CATALOG_AUTHORITY web-cfg" in out1
+    assert "CATALOG_AUTHORITY_V1_HISTORICAL APPROVED" in out1
+    assert f"V1_HISTORICAL_VERDICT {v.VERDICT_READY}" in out1
 
 
 def overlay():

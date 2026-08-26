@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/commercial-chain-projection.v1.schema.json",
+  "title": "confenge.commercial_chain_projection.v1",
+  "description": "Read-only commercial-to-delivery chain. It never infers provider objects, revenue, Work Orders, delivery, or readiness from an earlier hop.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "chain_id",
+    "projected_at",
+    "synthetic",
+    "chain_identity",
+    "hops",
+    "payment",
+    "readiness",
+    "exceptions",
+    "mutations_performed"
+  ],
+  "properties": {
+    "schema_version": { "const": "confenge.commercial_chain_projection.v1" },
+    "chain_id": { "type": "string", "pattern": "^chain_[0-9a-f]{32}$" },
+    "projected_at": { "type": "string", "format": "date-time" },
+    "synthetic": { "type": "boolean" },
+    "chain_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlation_id", "deliverable_id", "proposal_id", "acceptance_id", "provider_payment_id", "commercial_state_id", "work_order_id", "delivery_id"],
+      "properties": {
+        "correlation_id": { "type": ["string", "null"] },
+        "deliverable_id": { "type": ["string", "null"] },
+        "proposal_id": { "type": ["string", "null"] },
+        "acceptance_id": { "type": ["string", "null"] },
+        "provider_payment_id": { "type": ["string", "null"] },
+        "commercial_state_id": { "type": ["string", "null"] },
+        "work_order_id": { "type": ["string", "null"] },
+        "delivery_id": { "type": ["string", "null"] }
+      }
+    },
+    "hops": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offer", "proposal", "acceptance", "financial_gate", "provider", "commercial_state", "work_order", "delivery"],
+      "properties": {
+        "offer": { "$ref": "#/$defs/hop" },
+        "proposal": { "$ref": "#/$defs/hop" },
+        "acceptance": { "$ref": "#/$defs/hop" },
+        "financial_gate": { "$ref": "#/$defs/hop" },
+        "provider": { "$ref": "#/$defs/hop" },
+        "commercial_state": { "$ref": "#/$defs/hop" },
+        "work_order": { "$ref": "#/$defs/hop" },
+        "delivery": { "$ref": "#/$defs/hop" }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "provider_proven", "paid", "received_revenue"],
+      "properties": {
+        "state": { "enum": ["UNKNOWN", "PAYMENT_CREATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"] },
+        "provider_proven": { "type": "boolean" },
+        "paid": { "type": "boolean" },
+        "received_revenue": { "type": "boolean" }
+      }
+    },
+    "readiness": { "enum": ["PROVEN", "NOT_PROVEN", "BLOCKED"] },
+    "exceptions": {
+      "type": "array",
+      "items": { "$ref": "https://confenge.com.br/schemas/operational-exception.v1.schema.json" }
+    },
+    "mutations_performed": { "const": 0 }
+  },
+  "$defs": {
+    "hop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "evidence_refs"],
+      "properties": {
+        "state": { "enum": ["PROVEN", "SYNTHETIC", "UNKNOWN", "BLOCKED"] },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
