@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/work-order-capacity-snapshot.v1.schema.json",
+  "title": "confenge.work_order_capacity_snapshot.v1",
+  "description": "Complete read-only capacity input derived from canonical Work Orders; no client PII.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot_id", "as_of", "expires_at", "complete", "source_ref", "work_orders"],
+  "properties": {
+    "schema_version": { "const": "confenge.work_order_capacity_snapshot.v1" },
+    "snapshot_id": { "type": "string", "minLength": 1 },
+    "as_of": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "complete": { "type": "boolean" },
+    "source_ref": { "type": "string", "minLength": 1 },
+    "work_orders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["work_order_id", "current_stage", "deliverable_id", "deliverable_version", "estimated_capacity_units", "blockers"],
+        "properties": {
+          "work_order_id": { "type": "string", "minLength": 1 },
+          "current_stage": {
+            "enum": ["AWAITING_INPUTS", "READY", "IN_PROGRESS", "BLOCKED", "QA", "READY_TO_DELIVER", "DELIVERED", "ACCEPTED", "REWORK_REQUIRED", "CLOSED", "CANCELLED"]
+          },
+          "deliverable_id": { "type": "string", "minLength": 1 },
+          "deliverable_version": { "type": "string", "minLength": 1 },
+          "estimated_capacity_units": { "type": "integer", "minimum": 1 },
+          "due_at": { "type": ["string", "null"], "format": "date-time" },
+          "clock_state": { "type": ["string", "null"] },
+          "blockers": {
+            "type": "array", "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

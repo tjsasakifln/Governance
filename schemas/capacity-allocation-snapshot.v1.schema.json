@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/capacity-allocation-snapshot.v1.schema.json",
+  "title": "confenge.capacity_allocation_snapshot.v1",
+  "description": "Model-only hold lifecycle input. It cannot authorize or represent a real reservation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot_id", "as_of", "expires_at", "complete", "mutation_mode", "allocations"],
+  "properties": {
+    "schema_version": { "const": "confenge.capacity_allocation_snapshot.v1" },
+    "snapshot_id": { "type": "string", "minLength": 1 },
+    "as_of": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "complete": { "type": "boolean" },
+    "mutation_mode": { "const": "MODEL_ONLY" },
+    "allocations": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["allocation_id", "state", "effort_units", "ambiguity_reason", "work_order_id"],
+        "properties": {
+          "allocation_id": { "type": "string", "minLength": 1 },
+          "state": { "enum": ["HELD", "COMMITTED", "RELEASED", "EXPIRED", "RECONCILIATION_REQUIRED"] },
+          "effort_units": { "type": "integer", "minimum": 1 },
+          "ambiguity_reason": {
+            "type": ["string", "null"],
+            "enum": [null, "CANCELLATION_AMBIGUOUS", "REFUND_AMBIGUOUS", "CHECKOUT_TIMEOUT_AMBIGUOUS"]
+          },
+          "work_order_id": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

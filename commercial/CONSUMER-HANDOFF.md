@@ -9,8 +9,8 @@ The stable consumer contract is `commercial/CONSUMER-CONTRACT.md`. The compatibi
 
 | Consumer | Role | What to read |
 |---|---|---|
-| `web-cfg#88` | delivery parent — catalog, contracting, capacity, terms | `catalog.public.v1.json` for any public surface; `catalog.v1.json` for the internal registry; `production-gates.v1.json` before any checkout flag; `diagnostico-limited-production.v1.json` for the Diagnóstico overlay; `asaas-mapping.v1.json` for provider IDs; `capacity-policy.v1.json` before a recurring hold |
-| `Warmbly#47` | reconciliation / learning consumer | `authority-manifest.v1.json` plus gates, overlay, mapping and capacity; never treat provider `customer`/`checkout`/`subscription`/`payment` **created** as received revenue |
+| `web-cfg#88` | delivery parent — catalog, contracting, capacity, terms | `catalog.public.v1.json` for any public surface; `catalog.v1.json` for the internal registry; `production-gates.v1.json` before any checkout flag; `diagnostico-limited-production.v1.json` for the Diagnóstico overlay; `asaas-mapping.v1.json` for provider IDs; consume `confenge.capacity_admission.v2` without recalculating WIP |
+| `Warmbly#47` | reconciliation / learning consumer | `authority-manifest.v1.json` plus gates, overlay and mapping; consume decision/correlation/expiry from `confenge.capacity_admission.v2`, never own Work Order/WIP and never treat provider `customer`/`checkout`/`subscription`/`payment` **created** as received revenue |
 | Governance #1 | residual human issue | stays open; not a machine source after this package exists |
 
 ## How to pin (no second truth plane)
@@ -62,7 +62,7 @@ Diagnóstico limited production is a **scoped overlay** (`commercial/gates/diagn
 
 - `terms_version = CFG-TERMS-B2B-2026-08-17-v1`
 - Obligation of means; first confirmed payment before kickoff
-- 50 recurring slots; one standard contract = one slot; 72-hour hold; reservation after confirmed payment
+- commercial policy ceiling of 50 recurring slots; staffed capacity remains independently declared and may be lower or `UNKNOWN`; one standard contract = one slot; 72-hour hold policy does not authorize a real hold in this repository
 - Flex: 30-day billable notice; 180/365: no silent renewal after `max_payments`
 - 6% tax premise ≠ confirmed regime; NFS-e blocked
 

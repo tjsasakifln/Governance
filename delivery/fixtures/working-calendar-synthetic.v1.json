@@ -1,0 +1,13 @@
+{
+  "schema_version": "confenge.working_calendar.v1",
+  "calendar_id": "calendar-confenge-synthetic-br-2026",
+  "version": "CFG-CALENDAR-SYNTHETIC-BR-2026-v1",
+  "synthetic": true,
+  "unit": "business_day",
+  "timezone": "America/Sao_Paulo",
+  "valid_from": "2026-08-01",
+  "valid_until": "2026-12-31",
+  "working_weekdays": [0, 1, 2, 3, 4],
+  "holidays": ["2026-09-07", "2026-10-12", "2026-11-02", "2026-11-20", "2026-12-25"],
+  "evidence_refs": ["fixture://Governance/delivery/fixtures/working-calendar-synthetic.v1.json"]
+}

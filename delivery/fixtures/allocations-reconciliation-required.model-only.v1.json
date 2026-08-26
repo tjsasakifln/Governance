@@ -1,0 +1,31 @@
+{
+  "schema_version": "confenge.capacity_allocation_snapshot.v1",
+  "snapshot_id": "allocations_synthetic_ambiguous_20260826",
+  "as_of": "2026-08-26T12:00:00Z",
+  "expires_at": "2026-08-26T13:00:00Z",
+  "complete": true,
+  "mutation_mode": "MODEL_ONLY",
+  "allocations": [
+    {
+      "allocation_id": "allocation-cancellation-ambiguous",
+      "state": "RECONCILIATION_REQUIRED",
+      "effort_units": 1,
+      "ambiguity_reason": "CANCELLATION_AMBIGUOUS",
+      "work_order_id": null
+    },
+    {
+      "allocation_id": "allocation-refund-ambiguous",
+      "state": "RECONCILIATION_REQUIRED",
+      "effort_units": 1,
+      "ambiguity_reason": "REFUND_AMBIGUOUS",
+      "work_order_id": null
+    },
+    {
+      "allocation_id": "allocation-timeout-ambiguous",
+      "state": "RECONCILIATION_REQUIRED",
+      "effort_units": 1,
+      "ambiguity_reason": "CHECKOUT_TIMEOUT_AMBIGUOUS",
+      "work_order_id": null
+    }
+  ]
+}
