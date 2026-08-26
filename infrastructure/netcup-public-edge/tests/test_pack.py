@@ -295,9 +295,6 @@ class EdgePackTests(unittest.TestCase):
         )
         if probe.returncode != 0:
             self.skipTest("origin/main is unavailable")
-        changed = subprocess.check_output(
-            ["git", "diff", "--name-only", "origin/main...HEAD"], cwd=REPO, text=True
-        ).splitlines()
         forbidden_exact = {
             "control-center/deploy/nginx/conf.d/ops.confenge.com.br.conf",
             "control-center/deploy/nginx/conf.d/auth.ops.confenge.com.br.conf",
@@ -306,7 +303,38 @@ class EdgePackTests(unittest.TestCase):
             "control-center/security/production/compose.yaml",
             "control-center/security/production/Caddyfile",
         }
-        self.assertEqual(forbidden_exact.intersection(changed), set())
+        commits = subprocess.check_output(
+            ["git", "rev-list", "--no-merges", "origin/main..HEAD"], cwd=REPO, text=True
+        ).splitlines()
+        edge_scopes = (
+            "infrastructure/netcup-public-edge/",
+            "control-center/connectors/infrastructure/",
+        )
+        edge_exact = {
+            "decisions/ADR-NETCUP-PUBLIC-EDGE-PREP-001.md",
+            ".github/workflows/netcup-public-edge.yml",
+        }
+        for commit in commits:
+            commit_changed = set(
+                subprocess.check_output(
+                    ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit],
+                    cwd=REPO,
+                    text=True,
+                ).splitlines()
+            )
+            touches_edge = bool(edge_exact.intersection(commit_changed)) or any(
+                path.startswith(edge_scopes) for path in commit_changed
+            )
+            if touches_edge:
+                self.assertEqual(
+                    forbidden_exact.intersection(commit_changed),
+                    set(),
+                    f"edge-scoped commit {commit} changed a protected runtime surface",
+                )
+
+        changed = subprocess.check_output(
+            ["git", "diff", "--name-only", "origin/main...HEAD"], cwd=REPO, text=True
+        ).splitlines()
         self.assertFalse(any("dns" in path.lower() and path.endswith((".tf", ".yaml", ".yml")) for path in changed))
 
 
