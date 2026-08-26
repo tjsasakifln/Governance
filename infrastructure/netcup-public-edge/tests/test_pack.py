@@ -57,9 +57,13 @@ class EdgePackTests(unittest.TestCase):
         self.assertNotIn("mcp.confenge.com.br", body)
 
     def test_multipage_errors_and_www_single_hop(self) -> None:
-        body = uncommented_nginx(read(VHOST))
-        self.assertIn("try_files $uri $uri/ $uri.html =404;", body)
-        self.assertNotRegex(body, r"try_files[^;]*index\.html")
+        body = uncommented_nginx(
+            read(VHOST)
+            + "\n"
+            + read(PACK / "nginx/fixtures/web-cfg/locations.generated.conf")
+        )
+        self.assertIn("try_files $uri $uri/ $uri.html $uri/index.html =404;", body)
+        self.assertNotRegex(body, r"try_files[^;]*\s/index\.html")
         self.assertIn("error_page 404 /404.html;", body)
         self.assertIn("error_page 410 /404.html;", body)
         self.assertGreaterEqual(
@@ -85,32 +89,40 @@ class EdgePackTests(unittest.TestCase):
 
     def test_application_truth_is_included_not_copied(self) -> None:
         body = uncommented_nginx(read(VHOST))
-        application_locations = uncommented_nginx(
-            read(PACK / "nginx" / "fixtures" / "web-cfg" / "40-application-locations.conf")
-        )
         for name in (
-            "10-redirects.conf",
-            "20-security-headers.conf",
-            "30-content-types.conf",
-            "40-application-locations.conf",
-            "50-static-location-policy.conf",
+            "headers.generated.conf",
+            "redirects.generated.conf",
+            "locations.generated.conf",
         ):
             self.assertIn(f"/etc/confenge/web/current/{name}", body)
         self.assertNotIn("Content-Security-Policy", body)
         self.assertNotIn("X-Robots-Tag", body)
-        self.assertNotIn("Strict-Transport-Security", body)
+        self.assertNotIn("max-age=", body)
         self.assertNotIn("/vision", body)
-        # Cache/X-Robots add_header directives inside a location cancel NGINX
-        # server-level inheritance. Repeat the web-cfg-owned include, not its
-        # values, at every structural location and explicit dynamic route.
-        self.assertGreaterEqual(
-            body.count("include /etc/confenge/web/current/20-security-headers.conf;"),
-            5,
-        )
         self.assertIn(
-            "include /etc/confenge/web/current/20-security-headers.conf;",
-            application_locations,
+            "add_header Strict-Transport-Security $confenge_header_strict_transport_security always;",
+            body,
         )
+
+    def test_contemporary_web_cfg_manifest_is_validated_and_tamper_fails(self) -> None:
+        validator = PACK / "bin/validate-web-cfg-contract.py"
+        fixture = PACK / "nginx/fixtures/web-cfg"
+        valid = subprocess.run(
+            [str(validator), str(fixture)], text=True, capture_output=True, check=False
+        )
+        self.assertEqual(valid.returncode, 0, valid.stderr)
+        self.assertIn("confenge.http-host-contract-manifest/v1", valid.stdout)
+
+        with tempfile.TemporaryDirectory(prefix="confenge-web-cfg-contract-") as raw:
+            tampered = Path(raw) / "nginx"
+            shutil.copytree(fixture, tampered)
+            with (tampered / "locations.generated.conf").open("a", encoding="utf-8") as handle:
+                handle.write("location = /invented { return 200; }\n")
+            invalid = subprocess.run(
+                [str(validator), str(tampered)], text=True, capture_output=True, check=False
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("hash/size mismatch", invalid.stderr)
 
     def test_hardening_and_cert_scope(self) -> None:
         body = uncommented_nginx(read(VHOST))

@@ -1,6 +1,10 @@
 # Governance-owned structure for the CONFENGE public site.
 # Disabled on install. Application policy is included from the web-cfg release.
 
+# web-cfg-owned request-URI maps. The versioned manifest and output hashes are
+# validated before any release can become current.
+include /etc/confenge/web/current/headers.generated.conf;
+
 upstream confenge_web_runtime {
     server 127.0.0.1:__RUNTIME_PORT__;
     keepalive 16;
@@ -40,7 +44,8 @@ server {
     ssl_session_cache shared:confenge_web_tls:10m;
     ssl_session_timeout 1d;
 
-    include /etc/confenge/web/current/20-security-headers.conf;
+    # The value stays web-cfg-owned; Governance only consumes its generated map.
+    add_header Strict-Transport-Security $confenge_header_strict_transport_security always;
 
     access_log /var/log/confenge-web/www.access.log;
     error_log  /var/log/confenge-web/www.error.log warn;
@@ -70,27 +75,13 @@ server {
     access_log /var/log/confenge-web/apex.access.log;
     error_log  /var/log/confenge-web/apex.error.log warn;
 
-    # web-cfg application truth. These files move atomically with the release.
-    include /etc/confenge/web/current/10-redirects.conf;
-    include /etc/confenge/web/current/20-security-headers.conf;
-    include /etc/confenge/web/current/30-content-types.conf;
-    include /etc/confenge/web/current/40-application-locations.conf;
-
-    # Structural custom error behavior: retain 404/410 status and use web-cfg body.
-    error_page 404 /404.html;
-    error_page 410 /404.html;
-
-    location = /404.html {
-        try_files /404.html =404;
-        include /etc/confenge/web/current/50-static-location-policy.conf;
-        include /etc/confenge/web/current/20-security-headers.conf;
-    }
+    # web-cfg application truth. These files move atomically with the release;
+    # Governance does not copy redirects, headers, content types or path policy.
+    include /etc/confenge/web/current/redirects.generated.conf;
 
     # Public release provenance and ACME stay available without opening dotfiles.
     location ^~ /.well-known/ {
         try_files $uri $uri/ $uri.html =404;
-        include /etc/confenge/web/current/50-static-location-policy.conf;
-        include /etc/confenge/web/current/20-security-headers.conf;
     }
 
     # Host hardening. Generated application locations are validated not to bypass it.
@@ -102,10 +93,7 @@ server {
         return 404;
     }
 
-    # Multipage static site: no catch-all rewrite and no SPA index fallback.
-    location / {
-        try_files $uri $uri/ $uri.html =404;
-        include /etc/confenge/web/current/50-static-location-policy.conf;
-        include /etc/confenge/web/current/20-security-headers.conf;
-    }
+    # web-cfg owns the static location, real 404/410 behavior, content types,
+    # cache policy and security headers through its normalized contract.
+    include /etc/confenge/web/current/locations.generated.conf;
 }

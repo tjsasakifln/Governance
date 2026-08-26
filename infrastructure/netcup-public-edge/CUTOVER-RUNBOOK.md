@@ -44,39 +44,43 @@ sha256sum \
 ```
 
 Gate: NGINX owns host 80/443; Caddy is only `127.0.0.1:18080/18443`; the web
-runtime port `18100` is either free or already bound only to `127.0.0.1` by the
-certified web-cfg runtime. No public MCP listener exists.
+runtime port configured in `/etc/confenge/web-edge.conf` is either free or
+already bound only to `127.0.0.1` by the certified web-cfg runtime. The
+portable runtime currently documents `127.0.0.1:8787`; using it requires an
+explicit matching installer configuration and is never inferred. No public MCP
+listener exists.
 
 ## 2. Stage the certified web-cfg release
 
-Obtain the immutable artifact and full commit SHA from the approved web-cfg
-release. Do not build from an uncommitted host checkout. The artifact must carry
-`_site/` and the five generated `nginx/*.conf` files documented in `README.md`.
+Obtain the immutable, attested artifact and full commit SHA from the approved
+web-cfg `netcup-release` workflow. Do not build or copy a release from a host
+checkout. The artifact must carry `_site/`, its internal metadata/checksums and
+the generated `confenge.http-host-contract-manifest/v1` pack documented in
+`README.md`. A package that has only the release pipeline or only the HTTP/SEO
+renderer is incomplete and must stay staged/pending.
 
 ```bash
 export WEB_CFG_SHA=<approved-40-hex-web-cfg-sha>
-export WEB_CFG_ARTIFACT_DIR=<verified-extracted-artifact-directory>
-install -d -m 2750 -o confenge-deploy -g confenge-web \
-  "/opt/confenge-web/releases/$WEB_CFG_SHA"
-rsync -a --delete "$WEB_CFG_ARTIFACT_DIR/_site/" \
-  "/opt/confenge-web/releases/$WEB_CFG_SHA/_site/"
-rsync -a --delete "$WEB_CFG_ARTIFACT_DIR/nginx/" \
-  "/opt/confenge-web/releases/$WEB_CFG_SHA/nginx/"
-chown -R confenge-deploy:confenge-web "/opt/confenge-web/releases/$WEB_CFG_SHA"
-find "/opt/confenge-web/releases/$WEB_CFG_SHA" -type d -exec chmod 2750 {} +
-find "/opt/confenge-web/releases/$WEB_CFG_SHA" -type f -exec chmod 0640 {} +
+sudo -u confenge-deploy /opt/confenge-web/bin/stage-release "$WEB_CFG_SHA"
+sudo -u confenge-deploy /opt/confenge-web/bin/verify-release "$WEB_CFG_SHA"
+/usr/local/libexec/confenge-public-edge/validate-web-cfg-contract.py \
+  "/opt/confenge-web/releases/$WEB_CFG_SHA/nginx"
 ```
 
-Record artifact and manifest hashes. Gate: build-info `commit` equals the
-directory SHA; `index.html`, `404.html`, robots, sitemap and all snippets exist;
-snippets are not group/world writable. Do not switch `current` yet.
+The web-cfg controls must already be root-installed from the reviewed web-cfg
+main SHA; Governance does not vendor or reinterpret them. Record the attestation,
+release manifest, artifact hash and HTTP/SEO contract hash. Gate: build-info
+`commit` equals the directory SHA; the internal release tree checksum passes;
+`index.html`, `404.html`, robots, sitemap and all declared generated outputs
+exist; generated files are immutable to group/world. Do not switch `current`.
 
 ## 3. Verify staged origin components
 
 ```bash
 python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["commit"] == sys.argv[2]; print(d["commit"])' \
   "/opt/confenge-web/releases/$WEB_CFG_SHA/_site/.well-known/build-info.json" "$WEB_CFG_SHA"
-curl --fail --silent --show-error --max-time 3 http://127.0.0.1:18100/healthz
+RUNTIME_PORT=$(awk -F= '$1 == "RUNTIME_PORT" { print $2 }' /etc/confenge/web-edge.conf)
+curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:${RUNTIME_PORT}/healthz"
 /usr/local/sbin/confenge-web-readiness --state prepared | tee "$EVIDENCE_DIR/readiness-staged.txt"
 ```
 

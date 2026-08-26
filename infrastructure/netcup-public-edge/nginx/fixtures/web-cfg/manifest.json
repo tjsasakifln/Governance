@@ -1,0 +1,13 @@
+{
+  "contractHash": "ea5081f18e3d75e5a05d8c448ff07e68f97af263282713651c39d143430bfa78",
+  "hostArchitectureVersion": "confenge-static-nginx/v1",
+  "outputs": [
+    {"bytes": 275, "path": "contract.normalized.json", "sha256": "ea5081f18e3d75e5a05d8c448ff07e68f97af263282713651c39d143430bfa78"},
+    {"bytes": 91, "path": "contract.sha256", "sha256": "f7ff90db49ec31fe0ca0f22df1ea71829d9873d2c0a361fc05785c8b4d854aae"},
+    {"bytes": 383, "path": "headers.generated.conf", "sha256": "5379c2c3ae1ee9d1217013b848617f8afa5ef6392bcf0fb5bee255685f8663eb"},
+    {"bytes": 186, "path": "redirects.generated.conf", "sha256": "81f127b5a2f784a7c13a4547f70c7ab84cd3d8e4c40ced68859a11e6b213f97d"},
+    {"bytes": 460, "path": "locations.generated.conf", "sha256": "6e9962483d872b741fd0253cebbbcdcf7e074c4a89d166d0bee28f0aa34ed936"}
+  ],
+  "schema": "confenge.http-host-contract-manifest/v1",
+  "state": "HTTP_SEO_PARITY_GATE_READY / NETCUP_CANDIDATE_NOT_YET_PROMOTED"
+}

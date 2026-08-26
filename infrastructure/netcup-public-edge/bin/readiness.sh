@@ -90,22 +90,13 @@ else
   fi
 fi
 
-required=(
-  10-redirects.conf
-  20-security-headers.conf
-  30-content-types.conf
-  40-application-locations.conf
-  50-static-location-policy.conf
-)
 snippet_root="$(root_path /etc/confenge/web/current)"
-missing_snippets=()
-for name in "${required[@]}"; do
-  [[ -f "$snippet_root/$name" ]] || missing_snippets+=("$name")
-done
-if [[ ${#missing_snippets[@]} -eq 0 ]]; then
-  emit web_cfg_snippets PASS all_required_present
+contract_validator="$SCRIPT_DIR/validate-web-cfg-contract.py"
+if contract_result="$("$contract_validator" "$snippet_root" 2>/dev/null)"; then
+  contract_hash="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["contract_hash"])' <<<"$contract_result")"
+  emit web_cfg_contract PASS "schema=confenge.http-host-contract-manifest/v1,hash=$contract_hash"
 else
-  pending_or_fail web_cfg_snippets "missing=${missing_snippets[*]}"
+  pending_or_fail web_cfg_contract missing_or_invalid
 fi
 
 build_info="$current/_site/.well-known/build-info.json"

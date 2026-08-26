@@ -57,7 +57,10 @@ protected_vhost_snapshot "$before"
 if [[ -z "$EDGE_ROOT_PREFIX" ]]; then
   getent group confenge-web >/dev/null || groupadd --system confenge-web
   if ! id -u confenge-deploy >/dev/null 2>&1; then
-    useradd --system --gid confenge-web --home-dir /opt/confenge-web --shell /usr/sbin/nologin confenge-deploy
+    useradd --system --gid confenge-web --home-dir /opt/confenge-web --shell /bin/bash confenge-deploy
+  elif [[ "$(getent passwd confenge-deploy | cut -d: -f7)" != /bin/bash ]]; then
+    echo "confenge-deploy exists without the web-cfg release shell; refusing to mutate it" >&2
+    exit 1
   fi
   id -u "$nginx_user" >/dev/null 2>&1 || {
     echo "NGINX worker user $nginx_user does not exist; pass --nginx-user explicitly" >&2
@@ -76,10 +79,11 @@ fi
 install -d -m 0755 "$(root_path /opt/confenge-web)"
 install -d -m 2750 -o "$owner" -g "$group" "$(root_path /opt/confenge-web/releases)"
 install -d -m 2770 -o "$owner" -g "$group" "$(root_path /opt/confenge-web/shared)"
-current="$(root_path /opt/confenge-web/current)"
-if [[ ! -e "$current" && ! -L "$current" ]]; then
-  ln -s releases/PREPARED_NOT_LIVE "$current"
-fi
+for release_dir in incoming locks evidence state; do
+  install -d -m 0750 -o "$owner" -g "$group" "$(root_path "/opt/confenge-web/$release_dir")"
+done
+install -d -m 0755 -o "$admin_owner" -g "$admin_owner" \
+  "$(root_path /opt/confenge-web/bin)" "$(root_path /opt/confenge-web/lib)"
 
 install -d -m 0755 "$(root_path /etc/confenge)" "$(root_path /etc/confenge/web)"
 snippet_link="$(root_path /etc/confenge/web/current)"
@@ -140,7 +144,7 @@ install -m 0755 "$PACK_ROOT/certbot/confenge-web-nginx-deploy-hook" \
 libexec="$(root_path /usr/local/libexec/confenge-public-edge)"
 sbin="$(root_path /usr/local/sbin)"
 install -d -m 0755 "$libexec" "$sbin"
-for script in lib.sh switch.sh rollback.sh readiness.sh; do
+for script in lib.sh switch.sh rollback.sh readiness.sh validate-web-cfg-contract.py; do
   install -m 0755 "$PACK_ROOT/bin/$script" "$libexec/$script"
 done
 for command in switch rollback readiness; do

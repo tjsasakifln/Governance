@@ -21,6 +21,7 @@ from commercial.e2e import (
     validate_checkout_fixture,
 )
 from delivery.canary import run_canary
+from delivery.capacity import evaluate_admission_v2
 from delivery.readiness import readiness_for_admission
 
 
@@ -30,7 +31,9 @@ PROPOSAL = FIXTURES / "proposal.accepted.synthetic.v1.json"
 ACCEPTANCE = FIXTURES / "acceptance-binding.synthetic.v1.json"
 CHECKOUT = FIXTURES / "checkout.synthetic.v1.json"
 PROVIDER_EVENTS = FIXTURES / "provider-events.synthetic.v1.json"
+DELIVERY_FIXTURES = ROOT / "delivery" / "fixtures"
 PROJECTED_AT = "2026-08-25T12:27:00Z"
+ADMISSION_EVALUATED_AT = "2026-08-26T12:00:00Z"
 
 WEB_CFG_SHA = "bad3f7c71f817bbbb3605b5a7214e0fd9784111b"
 WARMBLY_SHA = "3368e7d8f46573eef300b42ec214df8844b082d0"
@@ -44,6 +47,56 @@ def _load(path: Path) -> dict[str, Any]:
 def _event_map() -> dict[str, dict[str, Any]]:
     fixture = _load(PROVIDER_EVENTS)
     return {item["raw_event_type"]: item for item in fixture["events"]}
+
+
+def _admission_decision(
+    proposal: Mapping[str, Any], *, include_synthetic_staffed_capacity: bool
+) -> dict[str, Any]:
+    """Consume the canonical v2 evaluator for this exact commercial chain.
+
+    The staffed fixture is admitted only for the synthetic sandbox path.  The
+    production path deliberately supplies no staffed snapshot, matching the
+    repository's current human-owned capacity truth.
+    """
+
+    request = _load(DELIVERY_FIXTURES / "canary-capacity-request.v1.json")
+    request.update(
+        {
+            "request_id": stable_id(
+                "capacity-request",
+                {
+                    "correlation_id": proposal["correlation_id"],
+                    "proposal_id": proposal["proposal_id"],
+                    "proposal_version": proposal["proposal_version"],
+                },
+            ),
+            "correlation_id": proposal["correlation_id"],
+            "proposal_id": proposal["proposal_id"],
+            "deliverable_id": proposal["deliverable_id"],
+            "deliverable_version": proposal["deliverable_version"],
+            "scope_version": proposal["scope_version"],
+        }
+    )
+    return evaluate_admission_v2(
+        request=request,
+        readiness=_load(DELIVERY_FIXTURES / "cfg-diag-exp-v1.production-ready.json"),
+        policy_ceiling=_load(DELIVERY_FIXTURES / "policy-ceiling-input.v1.json"),
+        capacity_snapshot=(
+            _load(DELIVERY_FIXTURES / "capacity-synthetic-one.v2.json")
+            if include_synthetic_staffed_capacity
+            else None
+        ),
+        working_calendar=_load(
+            DELIVERY_FIXTURES / "working-calendar-synthetic.v1.json"
+        ),
+        work_order_snapshot=_load(
+            DELIVERY_FIXTURES / "work-orders-empty.capacity-snapshot.v1.json"
+        ),
+        allocation_snapshot=_load(
+            DELIVERY_FIXTURES / "allocations-empty.model-only.v1.json"
+        ),
+        evaluated_at=ADMISSION_EVALUATED_AT,
+    )
 
 
 def _expect_contract_error(callable_: Any) -> str:
@@ -161,9 +214,38 @@ def run_e2e_canary(*, state_dir: Path) -> dict[str, Any]:
     events = _event_map()
     correlation_id = proposal["correlation_id"]
 
+    production_admission = _admission_decision(
+        proposal, include_synthetic_staffed_capacity=False
+    )
+    synthetic_admission = _admission_decision(
+        proposal, include_synthetic_staffed_capacity=True
+    )
+    production_commit = {
+        "state": "BLOCKED",
+        "admission_decision_id": production_admission["decision_id"],
+        "reason_codes": production_admission["reason_codes"],
+        "work_order_created": False,
+        "real_reservation_created": False,
+        "checkout_enabled": False,
+    }
+    if (
+        production_admission["decision"] != "UNKNOWN"
+        or production_admission["staffed"]["state"] != "UNKNOWN"
+        or production_admission["actionability"]["promise_allowed"] is not False
+        or "STAFFED_CAPACITY_UNKNOWN" not in production_admission["reason_codes"]
+    ):
+        raise RuntimeError("productive commit did not fail closed on UNKNOWN capacity")
+    if (
+        synthetic_admission["decision"] != "CAN_ACCEPT"
+        or synthetic_admission["evidence_class"] != "SYNTHETIC"
+        or synthetic_admission["actionability"]["promise_allowed"] is not False
+        or synthetic_admission["actionability"]["checkout_enabled"] is not False
+    ):
+        raise RuntimeError("synthetic admission evidence became productive authority")
+
     before_financial = onboarding_decision(
         financial_gate={"state": "UNKNOWN", "synthetic": True, "received_revenue": False},
-        capacity_decision="CAN_ACCEPT",
+        capacity_decision=synthetic_admission["decision"],
         acceptance_bound=True,
     )
     readiness_fail_closed = readiness_for_admission(None, evaluated_at="2026-08-25T12:06:00Z")
@@ -188,10 +270,14 @@ def run_e2e_canary(*, state_dir: Path) -> dict[str, Any]:
 
     gate = reconciler.financial_gate()
     before_capacity = onboarding_decision(
-        financial_gate=gate, capacity_decision="UNKNOWN", acceptance_bound=True
+        financial_gate=gate,
+        capacity_decision=production_admission["decision"],
+        acceptance_bound=True,
     )
     eligible = onboarding_decision(
-        financial_gate=gate, capacity_decision="CAN_ACCEPT", acceptance_bound=True
+        financial_gate=gate,
+        capacity_decision=synthetic_admission["decision"],
+        acceptance_bound=True,
     )
     if before_financial["state"] != "BLOCKED" or before_capacity["state"] != "BLOCKED":
         raise RuntimeError("onboarding did not fail closed")
@@ -343,6 +429,12 @@ def run_e2e_canary(*, state_dir: Path) -> dict[str, Any]:
         "gates": {
             "proposal_mutation_rejected": immutable_rejection,
             "readiness_without_profile": readiness_fail_closed,
+            "admission_control": {
+                "contract_version": "confenge.capacity_admission.v2",
+                "production": production_admission,
+                "synthetic": synthetic_admission,
+            },
+            "production_commit": production_commit,
             "onboarding_before_financial": before_financial,
             "onboarding_without_capacity": before_capacity,
             "onboarding_eligible": eligible,

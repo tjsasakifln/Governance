@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PACK_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+web_cfg_contract_dir="${WEB_CFG_CONTRACT_DIR:-$PACK_ROOT/nginx/fixtures/web-cfg}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -27,7 +28,7 @@ run_configtest() {
     -v "$PACK_ROOT/nginx/fixtures/nginx.conf:/etc/nginx/nginx.conf:ro" \
     -v "$config:/etc/nginx/conf.d/confenge.com.br.conf:ro" \
     -v "$PACK_ROOT/nginx/runtime-proxy.conf:/etc/nginx/confenge-public-edge/runtime-proxy.conf:ro" \
-    -v "$PACK_ROOT/nginx/fixtures/web-cfg:/etc/confenge/web/current:ro" \
+    -v "$web_cfg_contract_dir:/etc/confenge/web/current:ro" \
     -v "$work/cert:/etc/letsencrypt/live/confenge.com.br:ro" \
     -v "$work/site:/opt/confenge-web/current/_site:ro" \
     -v "$work/acme:/var/lib/letsencrypt" \

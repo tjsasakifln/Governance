@@ -127,13 +127,6 @@ validate_release() {
   release="$(root_path "/opt/confenge-web/releases/$sha")"
   local site="$release/_site"
   local snippets="$release/nginx"
-  local required=(
-    10-redirects.conf
-    20-security-headers.conf
-    30-content-types.conf
-    40-application-locations.conf
-    50-static-location-policy.conf
-  )
 
   [[ -f "$site/index.html" && -f "$site/404.html" ]] || {
     echo "release must contain _site/index.html and _site/404.html" >&2
@@ -143,67 +136,12 @@ validate_release() {
     echo "release must contain _site/.well-known/build-info.json" >&2
     return 1
   }
-  local name
-  for name in "${required[@]}"; do
-    [[ -f "$snippets/$name" ]] || {
-      echo "release missing nginx/$name" >&2
-      return 1
-    }
-  done
-  if find "$snippets" -type f -perm /022 -print -quit | grep -q .; then
-    echo "release NGINX snippets must not be group/world writable" >&2
+  local validator="$SCRIPT_DIR/validate-web-cfg-contract.py"
+  [[ -x "$validator" ]] || {
+    echo "web-cfg contract validator is missing or not executable" >&2
     return 1
-  fi
-
-  local uncommented
-  uncommented="$(mktemp)"
-  sed 's/[[:space:]]*#.*$//' "$snippets"/*.conf >"$uncommented"
-  if grep -Eiq '(^|[;{}[:space:]])(server|server_name|listen|upstream|root|alias|ssl_certificate|ssl_certificate_key|real_ip_header|set_real_ip_from|default_server)[[:space:]{]' "$uncommented"; then
-    echo "web-cfg snippets attempted to own Governance NGINX structure/hardening" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  if grep -Eiq '(^|/)(\.git|\.env|secrets?|store|storage|private)(/|[^[:alnum:]_-]|$)' "$uncommented"; then
-    echo "web-cfg snippets attempted to bypass protected path policy" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  if grep -E 'proxy_pass[[:space:]]+' "$uncommented" | grep -Ev 'proxy_pass[[:space:]]+http://confenge_web_runtime;' >/dev/null; then
-    echo "dynamic routes may proxy only to confenge_web_runtime" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  local application_locations application_text location_count security_include_count proxy_count proxy_hardening_count
-  application_locations="$snippets/40-application-locations.conf"
-  application_text="$(sed 's/[[:space:]]*#.*$//' "$application_locations")"
-  location_count="$(grep -Ec '^[[:space:]]*location[[:space:]]' <<<"$application_text" || true)"
-  security_include_count="$(grep -Fc 'include /etc/confenge/web/current/20-security-headers.conf;' <<<"$application_text" || true)"
-  proxy_count="$(grep -Ec '^[[:space:]]*proxy_pass[[:space:]]+' <<<"$application_text" || true)"
-  proxy_hardening_count="$(grep -Fc 'include /etc/nginx/confenge-public-edge/runtime-proxy.conf;' <<<"$application_text" || true)"
-  if (( proxy_hardening_count != proxy_count )); then
-    echo "every dynamic proxy route must include Governance runtime proxy hardening" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  if (( security_include_count != location_count )); then
-    echo "every generated application location must include web-cfg security headers explicitly" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  if sed 's/[[:space:]]*#.*$//' \
-    "$snippets/10-redirects.conf" "$snippets/30-content-types.conf" \
-    | grep -Eq '^[[:space:]]*add_header[[:space:]]+'; then
-    echo "redirect/content-type snippets may not shadow security-header inheritance" >&2
-    rm -f "$uncommented"
-    return 1
-  fi
-  rm -f "$uncommented"
-
-  local hsts='Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;'
-  if ! grep -Fq "$hsts" "$snippets/20-security-headers.conf"; then
-    echo "HSTS must remain max-age=31536000; includeSubDomains; preload in this preparation" >&2
-    return 1
-  fi
+  }
+  "$validator" "$snippets" >/dev/null
 
   local observed_sha
   observed_sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("commit", ""))' "$site/.well-known/build-info.json")"

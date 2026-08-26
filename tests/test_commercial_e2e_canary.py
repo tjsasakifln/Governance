@@ -113,6 +113,25 @@ def test_single_reproducible_chain_covers_finance_onboarding_work_order_and_clos
     assert first["gates"]["onboarding_before_financial"]["state"] == "BLOCKED"
     assert first["gates"]["onboarding_without_capacity"]["state"] == "BLOCKED"
     assert first["gates"]["onboarding_eligible"]["starts_automatically"] is False
+    admission = first["gates"]["admission_control"]
+    assert admission["contract_version"] == "confenge.capacity_admission.v2"
+    assert admission["production"]["request"]["correlation_id"] == "corr_fixture"
+    assert admission["production"]["decision"] == "UNKNOWN"
+    assert admission["production"]["staffed"]["state"] == "UNKNOWN"
+    assert "STAFFED_CAPACITY_UNKNOWN" in admission["production"]["reason_codes"]
+    assert admission["production"]["actionability"]["promise_allowed"] is False
+    assert admission["synthetic"]["decision"] == "CAN_ACCEPT"
+    assert admission["synthetic"]["evidence_class"] == "SYNTHETIC"
+    assert admission["synthetic"]["actionability"]["promise_allowed"] is False
+    assert admission["synthetic"]["actionability"]["checkout_enabled"] is False
+    assert first["gates"]["production_commit"] == {
+        "state": "BLOCKED",
+        "admission_decision_id": admission["production"]["decision_id"],
+        "reason_codes": admission["production"]["reason_codes"],
+        "work_order_created": False,
+        "real_reservation_created": False,
+        "checkout_enabled": False,
+    }
     assert first["delivery_manifest"]["work_order_count"] == 1
     assert first["delivery_manifest"]["qa_negative_path"] == "FAILED"
     assert first["delivery_manifest"]["stage"] == "CLOSED"
