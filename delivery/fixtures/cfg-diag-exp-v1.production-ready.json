@@ -57,6 +57,7 @@
   "estimated_effort": {
     "amount": 1,
     "unit": "delivery_slot",
+    "version": "CFG-EFFORT-DIAG-SYNTHETIC-v1",
     "lead_time_business_days": 10,
     "basis": "SYNTHETIC_CANARY_UNIT"
   },

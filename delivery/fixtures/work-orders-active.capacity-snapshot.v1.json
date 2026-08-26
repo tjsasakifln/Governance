@@ -1,0 +1,20 @@
+{
+  "schema_version": "confenge.work_order_capacity_snapshot.v1",
+  "snapshot_id": "wip_synthetic_active_20260826",
+  "as_of": "2026-08-26T12:00:00Z",
+  "expires_at": "2026-08-26T13:00:00Z",
+  "complete": true,
+  "source_ref": "control-center://work-orders/projection?synthetic=true",
+  "work_orders": [
+    {
+      "work_order_id": "cc:work-order:synthetic-active-001",
+      "current_stage": "IN_PROGRESS",
+      "deliverable_id": "CFG-DIAG-EXP-v1",
+      "deliverable_version": "v1",
+      "estimated_capacity_units": 1,
+      "due_at": "2026-09-15T20:59:59Z",
+      "clock_state": "RUNNING",
+      "blockers": []
+    }
+  ]
+}

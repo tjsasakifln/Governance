@@ -227,11 +227,13 @@ const MORNING_TOKEN_LABELS: Record<string, string> = {
   BLOCKED: "bloqueado",
   PROVEN: "comprovado",
   MISSING: "ausente",
+  FEASIBLE: "viável",
+  INFEASIBLE: "inviável",
 };
 
 function morningText(value: string): string {
   return value.replace(
-    /\b(PAUSED_BY_KILL_SWITCH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING)\b/g,
+    /\b(PAUSED_BY_KILL_SWITCH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING|FEASIBLE|INFEASIBLE)\b/g,
     (token) => MORNING_TOKEN_LABELS[token] ?? "estado não reconhecido",
   );
 }
@@ -315,10 +317,15 @@ function founderOperatingTruthBlock(truth: FounderOperatingTruth): string {
       ["Saúde da superfície pública", web.public_surface_health],
     ], web.source),
     morningCard("delivery-finance", "4. Delivery / Finance", [
-      ["Work Orders ativos", delivery.active_work_orders], ["Policy ceiling", delivery.policy_ceiling],
-      ["Capacidade alocada", `${morningValue(delivery.staffed_capacity)} · ${morningText(delivery.staffed_capacity_state)}`],
-      ["Committed / available", `${morningValue(delivery.committed)} / ${morningValue(delivery.available)}`],
+      ["Work Orders ativos", delivery.active_work_orders], ["Teto comercial (não staffed)", delivery.policy_ceiling],
+      ["Capacidade staffed", `${morningValue(delivery.staffed_capacity)} · ${morningText(delivery.staffed_capacity_state)}`],
+      ["Comprometido (Work Orders)", delivery.committed],
+      ["Disponível", delivery.available],
       ["Atualização / admissão", `${morningText(delivery.capacity_freshness)} / ${morningText(delivery.admission)}`],
+      ["Entregável / versão / prazo", delivery.request],
+      ["Risco de prazo", morningText(delivery.deadline_risk)],
+      ["Bloqueios", delivery.blockers.length ? delivery.blockers.join("; ") : null],
+      ["Próxima ação de admissão", delivery.next_action],
       ["Checkout / Asaas", `${morningText(delivery.checkout_gate)} / ${morningText(delivery.asaas_gate)}`], ["Exceções", delivery.exceptions],
     ], delivery.source, ` data-capacity-state="${escapeHtml(delivery.staffed_capacity_state)}"`),
     `<article class="card" data-morning-domain="next-human-action"><h3>5. Próxima ação humana</h3>${action

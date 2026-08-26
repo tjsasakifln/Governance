@@ -148,11 +148,59 @@ test("Hoje renders one primary action and the complete exception evidence fields
   for (const domain of ["outbound", "data", "inbound-web", "delivery-finance", "next-human-action"]) {
     assert.match(html, new RegExp(`data-morning-domain="${domain}"`));
   }
-  assert.match(html, /Capacidade alocada/);
+  assert.match(html, /Teto comercial \(não staffed\)/);
+  assert.match(html, /Capacidade staffed/);
+  assert.match(html, /Comprometido \(Work Orders\)/);
   assert.match(html, /desconhecid[oa]/i);
   assert.match(html, /data-(?:outbound|capacity)-state="UNKNOWN"/);
   assert.match(html, /Owner/);
   assert.match(html, /Idade/);
   assert.match(html, /Evidência/);
   assert.match(html, /freshness/i);
+});
+
+test("capacity v2 stays a read-only projection and exposes deadline blockers in the first viewport", () => {
+  const value = envelope();
+  const snapshots = value.snapshots as Record<string, Record<string, unknown>>;
+  const commercial = snapshots.commercial!.snapshot as Record<string, unknown>;
+  const operations = commercial.operations as Record<string, unknown>;
+  operations.capacity = {
+    schema_version: "confenge.capacity_projection.v2",
+    policy_ceiling: 50,
+    staffed_capacity_state: "KNOWN",
+    staffed_capacity: 1,
+    committed: 1,
+    held: 0,
+    available: 0,
+    freshness: "FRESH",
+    admission: "CANNOT_ACCEPT",
+    deliverable_id: "CFG-DIAG-EXP-v1",
+    deliverable_version: "v1",
+    requested_deadline: "2026-08-27",
+    deadline_risk: "INFEASIBLE",
+    blockers: [{
+      code: "REQUESTED_DEADLINE_INFEASIBLE",
+      next_action: "Negociar prazo posterior à primeira data viável ou recusar a admissão.",
+    }],
+    next_action: "Negociar prazo posterior à primeira data viável ou recusar a admissão.",
+  };
+  const truth = projectFounderOperatingTruth(value);
+  assert.equal(truth.delivery_finance.policy_ceiling, 50);
+  assert.equal(truth.delivery_finance.staffed_capacity, 1);
+  assert.equal(truth.delivery_finance.committed, 1);
+  assert.equal(truth.delivery_finance.available, 0);
+  assert.equal(truth.delivery_finance.deadline_risk, "INFEASIBLE");
+  assert.deepEqual(truth.delivery_finance.blockers, ["Negociar prazo posterior à primeira data viável ou recusar a admissão."]);
+
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: value,
+  }));
+  assert.match(html, /CFG-DIAG-EXP-v1/);
+  assert.match(html, /Negociar prazo posterior à primeira data viável/);
+  assert.match(html, /Risco de prazo/);
+  assert.match(html, /inviável/);
+  assert.doesNotMatch(html, /REQUESTED_DEADLINE_INFEASIBLE/);
 });

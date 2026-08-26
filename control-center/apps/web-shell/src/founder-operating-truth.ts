@@ -69,6 +69,10 @@ export interface FounderOperatingTruth {
     available: number | null;
     capacity_freshness: TruthFreshness;
     admission: "CAN_ACCEPT" | "CANNOT_ACCEPT" | "UNKNOWN";
+    request: string;
+    deadline_risk: "FEASIBLE" | "INFEASIBLE" | "UNKNOWN";
+    blockers: string[];
+    next_action: string | null;
     checkout_gate: "OPEN" | "BLOCKED" | "UNKNOWN";
     asaas_gate: "PROVEN" | "MISSING" | "BLOCKED" | "UNKNOWN";
     exceptions: number | null;
@@ -138,6 +142,11 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const asaasGate = governance.asaas_gate === "PROVEN" || governance.asaas_gate === "MISSING" || governance.asaas_gate === "BLOCKED"
     ? governance.asaas_gate
     : "UNKNOWN";
+  const deadlineRisk = capacity.deadline_risk === "FEASIBLE" || capacity.deadline_risk === "INFEASIBLE"
+    ? capacity.deadline_risk
+    : "UNKNOWN";
+  const capacityBlockers = A(capacity.blockers).map((item) => S(item.next_action)).filter((item): item is string => Boolean(item));
+  const capacityNextAction = S(capacity.next_action);
 
   const exceptions = A(operations.exceptions).map((item) => exception(item, generatedAt));
   if (!exceptions.some((item) => item.bucket === "capacity_unknown") && staffedState === "UNKNOWN") {
@@ -215,8 +224,15 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     delivery_finance: {
       active_work_orders: N(delivery.active_work_orders), policy_ceiling: N(capacity.policy_ceiling), staffed_capacity: staffedState === "KNOWN" ? N(capacity.staffed_capacity) : null,
       staffed_capacity_state: staffedState,
-      committed: staffedState === "KNOWN" ? N(capacity.committed) : null, available: staffedState === "KNOWN" ? N(capacity.available) : null, capacity_freshness: F(capacity.freshness),
+      committed: staffedState === "KNOWN" ? N(capacity.committed) : null,
+      available: staffedState === "KNOWN" ? N(capacity.available) : null,
+      capacity_freshness: F(capacity.freshness),
       admission: staffedState === "KNOWN" ? admission : "UNKNOWN",
+      request: [capacity.deliverable_id, capacity.deliverable_version, capacity.requested_deadline]
+        .map((value) => S(value) ?? "desconhecido").join(" / "),
+      deadline_risk: deadlineRisk,
+      blockers: capacityBlockers,
+      next_action: capacityNextAction,
       checkout_gate: checkoutGate,
       asaas_gate: asaasGate,
       exceptions: N(delivery.exceptions) ?? N(finance.exception_count), source: source(financeSlot, "asaas/governance"),

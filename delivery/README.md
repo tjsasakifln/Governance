@@ -13,7 +13,8 @@ synthetic/redacted `CFG-DIAG-EXP-v1` path.
 - Governance readiness/capacity validates the admission before the canonical
   Control Center Delivery domain creates `confenge.work_order.v1`.
 - PostgreSQL Work Order events are the sole append-only execution truth. The
-  SQLite database in this directory stores capacity allocations only.
+  SQLite database in this directory is a synthetic `MODEL_ONLY` lifecycle; it
+  rejects real reservations and never becomes a production ledger.
 - The policy ceiling of 50 is never treated as staffed capacity.
 - Synthetic evidence always has `received_revenue=false`. No Asaas, checkout,
   email or customer endpoint is called.
@@ -23,6 +24,11 @@ synthetic/redacted `CFG-DIAG-EXP-v1` path.
 `readiness-54.fail-closed.v1.json` contains exactly 54 identity/pointer/hash
 stubs generated from a supplied web-cfg registry. All remain `UNKNOWN`; names,
 prices, public copy, scopes and routes are not copied into a second catalog.
+
+`readiness-54.fail-closed.v2.json` is the additive operational matrix. It pins
+web-cfg #329/#343 and adds owner, blocker, evidence, next action, observation
+freshness and expiry to each of the same 54 identities. All 54 remain
+`UNKNOWN`; freshness of the identity observation does not imply readiness.
 
 Regenerate deterministically with:
 
@@ -58,15 +64,21 @@ locking, deterministic IDs, strict event order and rebuildable projections.
 
 ```python
 from delivery.canary_gate import CanaryGate
-from delivery.capacity import CapacityLedger, evaluate_admission
+from delivery.capacity import CapacityLedger, evaluate_admission, evaluate_admission_v2
 from delivery.production.cfg_diag_exp import produce_sandbox_artifact, run_qa
 from delivery.readiness import promote_to_delivery_validated
 ```
 
-`CapacityLedger` persists only operational
-`HELD -> COMMITTED -> RELEASED | EXPIRED` allocations. It is not a billing or
-Work Order ledger. The Control Center package owns the Work Order and exposes a
-read-only projection.
+`evaluate_admission` is the preserved v1 canary contract.
+`evaluate_admission_v2` is the canonical, pure admission engine documented in
+`ADMISSION-CONTROL.md`; its result directly feeds the only v2 read-only
+capacity projection.
+
+`CapacityLedger` exercises only synthetic/model states:
+`HELD -> COMMITTED -> RELEASED | EXPIRED`, plus
+`RECONCILIATION_REQUIRED` for ambiguous cancellation/refund/timeout. It is not
+a billing, Work Order or production reservation ledger. The Control Center
+owns no truth here; it only renders `confenge.capacity_projection.v2`.
 
 ## Verification
 
@@ -75,6 +87,7 @@ python3 -m pytest -q \
   tests/test_delivery_contracts.py \
   tests/test_delivery_readiness.py \
   tests/test_delivery_capacity.py \
+  tests/test_capacity_admission_v2.py \
   tests/test_delivery_canary_gate.py
 npm --prefix control-center run typecheck --workspace=@confenge/control-center-delivery
 npm --prefix control-center run test --workspace=@confenge/control-center-delivery

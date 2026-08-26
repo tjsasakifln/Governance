@@ -1,0 +1,39 @@
+{
+  "schema_version": "confenge.capacity_consumer_contract.v2",
+  "authority": {
+    "admission_schema": "schemas/capacity-admission.v2.schema.json",
+    "projection_schema": "schemas/capacity-projection.v2.schema.json",
+    "evaluator": "delivery/capacity.py:evaluate_admission_v2",
+    "work_order_authority": "tjsasakifln/Governance#121",
+    "readiness_authority": "tjsasakifln/Governance#122",
+    "capacity_authority": "tjsasakifln/Governance#123"
+  },
+  "consumer_rules": {
+    "web_cfg": {
+      "may": ["submit exact deliverable/version/scope/deadline", "read decision/reason_codes/expiry", "display fail-closed availability"],
+      "must_not": ["recalculate WIP", "copy dynamic availability into catalog", "treat sold_out=false as available", "enable checkout from this contract"]
+    },
+    "warmbly": {
+      "may": ["submit proposal correlation and requested deadline", "store decision_id/decision/expiry", "surface reconciliation state"],
+      "must_not": ["own Work Order", "recalculate committed or available", "create a second capacity ledger", "infer release from cancellation/refund/timeout"]
+    },
+    "control_center": {
+      "may": ["project policy/staffed/committed/held/available/freshness", "display blockers/deadline risk/next action"],
+      "must_not": ["mutate admission inputs", "act as ledger", "create holds or Work Orders"]
+    }
+  },
+  "decision_rules": [
+    { "when": "decision=CAN_ACCEPT AND evidence_class=REAL AND not_expired", "availability": "CAN_ACCEPT", "checkout_enabled": false },
+    { "when": "decision=CANNOT_ACCEPT", "availability": "CANNOT_ACCEPT", "checkout_enabled": false },
+    { "when": "missing_or_expired_or_synthetic_or_UNKNOWN", "availability": "UNKNOWN", "checkout_enabled": false },
+    { "when": "sold_out=true", "availability": "CANNOT_ACCEPT", "checkout_enabled": false },
+    { "when": "sold_out=false AND admission_missing", "availability": "UNKNOWN", "checkout_enabled": false }
+  ],
+  "safety": {
+    "outbound_mutation": false,
+    "real_reservation": false,
+    "checkout_enabled": false,
+    "contains_pii": false,
+    "aggregate_projection_only": true
+  }
+}
