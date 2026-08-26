@@ -465,6 +465,7 @@ export interface ServiceHealth {
   scope: Scope;
   service_name: string;
   status: HealthStatus;
+  lifecycle_state?: "LIVE" | "PREPARED/NOT_LIVE";
   provenance: Provenance;
   checked_at: UtcDateTime;
   latency_ms?: number;

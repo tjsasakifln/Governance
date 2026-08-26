@@ -1,0 +1,10 @@
+#!/bin/sh
+# Certbot deploy hook: reload only a syntactically valid host NGINX config.
+set -eu
+
+if nginx -t; then
+    systemctl reload nginx
+else
+    echo "confenge-web: nginx configtest failed; refusing certificate deploy reload" >&2
+    exit 1
+fi

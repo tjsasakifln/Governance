@@ -1,5 +1,12 @@
 import { hasSecretQueryKey, isSecretKeyName } from "./secret-keys.js";
-import { CHECK_KINDS, type Allowlist, type AllowlistTarget, type CheckKind } from "./types.js";
+import {
+  CHECK_KINDS,
+  TARGET_LIFECYCLE_STATES,
+  type Allowlist,
+  type AllowlistTarget,
+  type CheckKind,
+  type TargetLifecycleState,
+} from "./types.js";
 
 const TARGET_ID = /^[a-z0-9][a-z0-9._-]{0,62}$/;
 const COLLECTOR_ID = /^[a-z0-9][a-z0-9._-]{0,80}$/;
@@ -58,6 +65,16 @@ function asCheck(value: unknown, path: string): CheckKind {
     throw new AllowlistError(`${path} must be one of: ${CHECK_KINDS.join(", ")}`);
   }
   return value as CheckKind;
+}
+
+function asLifecycleState(value: unknown, path: string): TargetLifecycleState {
+  if (
+    typeof value !== "string" ||
+    !TARGET_LIFECYCLE_STATES.includes(value as TargetLifecycleState)
+  ) {
+    throw new AllowlistError(`${path} must be one of: ${TARGET_LIFECYCLE_STATES.join(", ")}`);
+  }
+  return value as TargetLifecycleState;
 }
 
 function assertSafeUrl(raw: string, path: string): URL {
@@ -153,6 +170,12 @@ function parseTarget(raw: unknown, index: number): AllowlistTarget {
     display_name: raw.display_name.trim(),
     checks,
   };
+
+  if (raw.lifecycle_state !== undefined) {
+    Object.assign(target, {
+      lifecycle_state: asLifecycleState(raw.lifecycle_state, `${path}.lifecycle_state`),
+    });
+  }
 
   if (raw.role !== undefined) {
     Object.assign(target, { role: parseRole(raw.role, `${path}.role`) });

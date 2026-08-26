@@ -51,6 +51,24 @@
       "checks": [
         "http"
       ]
+    },
+    {
+      "id": "confenge-public-edge",
+      "display_name": "Confenge public edge (prepared)",
+      "role": "Destino Netcup preparado para o site público; ainda não é a autoridade DNS",
+      "runbook_url": "https://github.com/tjsasakifln/Governance/blob/main/infrastructure/netcup-public-edge/CUTOVER-RUNBOOK.md",
+      "lifecycle_state": "PREPARED/NOT_LIVE",
+      "url": "https://confenge.com.br/.well-known/build-info.json",
+      "host": "159.195.18.88",
+      "connect_host": "159.195.18.88",
+      "http_host": "confenge.com.br",
+      "tls_server_name": "confenge.com.br",
+      "port": 443,
+      "expect_status": 200,
+      "checks": [
+        "tls",
+        "http"
+      ]
     }
   ]
 }

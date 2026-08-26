@@ -1,0 +1,49 @@
+name: netcup-public-edge
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/netcup-public-edge/**"
+      - "decisions/ADR-NETCUP-PUBLIC-EDGE-PREP-001.md"
+      - "control-center/connectors/infrastructure/**"
+      - ".github/workflows/netcup-public-edge.yml"
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/netcup-public-edge/**"
+      - "decisions/ADR-NETCUP-PUBLIC-EDGE-PREP-001.md"
+      - "control-center/connectors/infrastructure/**"
+      - ".github/workflows/netcup-public-edge.yml"
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Structural, idempotency and non-regression tests
+        run: python3 -m unittest discover -s infrastructure/netcup-public-edge/tests -p 'test_*.py' -v
+
+  nginx-configtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test full and HTTP-01 NGINX configs
+        run: bash infrastructure/netcup-public-edge/tests/nginx-configtest.sh
+
+  prepared-allowlist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/connectors/infrastructure/package-lock.json
+      - name: Install connector dependencies
+        working-directory: control-center/connectors/infrastructure
+        run: npm ci
+      - name: Prove PREPARED/NOT_LIVE does not probe or incident
+        working-directory: control-center/connectors/infrastructure
+        run: npm test

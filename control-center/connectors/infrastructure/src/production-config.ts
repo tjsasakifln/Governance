@@ -58,4 +58,17 @@ export function assertProductionIdentity(allowlist: Allowlist): void {
   if (http.url.includes("happysrv.de") || httpHostOf(http) === "happysrv.de") {
     throw new Error("HTTP identity must not use happysrv.de");
   }
+  const preparedPublicEdge = allowlist.targets.find(
+    (target) => target.id === "confenge-public-edge",
+  );
+  if (!preparedPublicEdge || preparedPublicEdge.lifecycle_state !== "PREPARED/NOT_LIVE") {
+    throw new Error("confenge public edge must remain PREPARED/NOT_LIVE before cutover");
+  }
+  if (
+    connectHostOf(preparedPublicEdge) !== CANONICAL_CONNECT_HOST ||
+    httpHostOf(preparedPublicEdge) !== "confenge.com.br" ||
+    tlsServerNameOf(preparedPublicEdge) !== "confenge.com.br"
+  ) {
+    throw new Error("prepared confenge public edge must use canonical Netcup IPv4 with apex Host/SNI");
+  }
 }

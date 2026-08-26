@@ -421,6 +421,9 @@ export async function runProbes(allowlist: Allowlist, ports: ProbePorts): Promis
   const now = ports.now();
   const results: ProbeResult[] = [];
   for (const target of allowlist.targets) {
+    if (target.lifecycle_state === "PREPARED/NOT_LIVE") {
+      continue;
+    }
     const timeoutMs = timeoutFor(allowlist, target);
     for (const check of target.checks) {
       results.push(await runCheck(target, check, ports, now, timeoutMs));

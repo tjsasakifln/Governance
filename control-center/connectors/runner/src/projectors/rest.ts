@@ -85,6 +85,7 @@ interface InfraService {
   readonly slug: string;
   readonly row: Record<string, unknown>;
   readonly status: HealthStatus;
+  readonly lifecycleState: "LIVE" | "PREPARED/NOT_LIVE";
   readonly freshness: FreshnessStatus;
   readonly latency: number | undefined;
   readonly lastError: string | undefined;
@@ -120,6 +121,8 @@ function projectService(
   const slug = anonymous ? `sem-identidade-${index + 1}` : slugify(serviceId ?? String(displayName));
   const freshness = asFreshness(raw.freshness_status, fallbackFreshness);
   const status = normalizeHealthStatus(raw.status);
+  const lifecycleState =
+    raw.lifecycle_state === "PREPARED/NOT_LIVE" ? "PREPARED/NOT_LIVE" : "LIVE";
   const observedAt = isoOr(raw.observed_at, envelope.observed_at);
   const confidence = finiteNumber(raw.confidence) ?? envelope.confidence;
   const latency = finiteNumber(raw.latency_ms);
@@ -140,6 +143,7 @@ function projectService(
     role: textOrUndefined(raw.role) ?? "função não declarada no catálogo",
     endpoint: textOrUndefined(raw.endpoint) ?? "endpoint não declarado no catálogo",
     status,
+    lifecycle_state: lifecycleState,
     freshness_status: freshness,
     observed_at: observedAt,
     checked_at: observedAt,
@@ -169,7 +173,17 @@ function projectService(
     ...(hostMetrics ? { host_metrics: hostMetrics } : {}),
     ...(anonymous ? { catalog_error: "missing_service_identity" } : {}),
   };
-  return { key, slug, row, status, freshness, latency, lastError, anonymous };
+  return {
+    key,
+    slug,
+    row,
+    status,
+    lifecycleState,
+    freshness,
+    latency,
+    lastError,
+    anonymous,
+  };
 }
 
 /**
@@ -195,6 +209,12 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
     (worst, member) => (FRESHNESS_SEVERITY[member.freshness] > FRESHNESS_SEVERITY[worst] ? member.freshness : worst),
     base.freshness,
   );
+  // A conflicting duplicate must never hide a live target behind the prepared
+  // lifecycle. Only a group whose every member is prepared remains excluded
+  // from the live aggregate.
+  const lifecycleState = members.every((member) => member.lifecycleState === "PREPARED/NOT_LIVE")
+    ? "PREPARED/NOT_LIVE"
+    : "LIVE";
   const confidences = members
     .map((member) => finiteNumber(member.row.confidence))
     .filter((value): value is number => value !== undefined);
@@ -237,6 +257,7 @@ function mergeDuplicates(members: readonly InfraService[]): Record<string, unkno
     ...base.row,
     checks: mergedChecks,
     status: worstStatus,
+    lifecycle_state: lifecycleState,
     freshness_status: worstFreshness,
     observed_at: evidenceMember.row.observed_at,
     checked_at: evidenceMember.row.checked_at,
@@ -372,13 +393,16 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
   // Availability is a property of the distinct monitored services, not of raw
   // duplicate catalog rows. UNKNOWN is inconclusive and must not be described
   // as an outage merely because another service is healthy.
-  const statuses = grouped.services.map((service) => normalizeHealthStatus(service.status));
+  const liveServices = grouped.services.filter(
+    (service) => service.lifecycle_state !== "PREPARED/NOT_LIVE",
+  );
+  const statuses = liveServices.map((service) => normalizeHealthStatus(service.status));
   const partial =
     statuses.some((status) => status === "degraded" || status === "down") &&
     statuses.some((status) => status === "healthy");
   const overallStatus = statuses.reduce<HealthStatus>(
     (worst, status) => (STATUS_SEVERITY[status] > STATUS_SEVERITY[worst] ? status : worst),
-    normalizeHealthStatus(first.status),
+    liveServices.length > 0 ? normalizeHealthStatus(liveServices[0]?.status) : "unknown",
   );
   const catalogErrors = projected.filter((service) => service.anonymous).length + grouped.ambiguousIds;
   return {
@@ -395,6 +419,8 @@ export function projectInfrastructure(envelope: CollectorEnvelope): ProjectedSna
       status: partial ? "degraded" : overallStatus,
       partial_outage: partial,
       monitored_service_count: grouped.services.length,
+      live_service_count: liveServices.length,
+      prepared_not_live_count: grouped.services.length - liveServices.length,
       catalog_error_count: catalogErrors,
       duplicate_group_count: grouped.duplicateGroups,
       // Present whenever the run is not fully trustworthy, not only when the

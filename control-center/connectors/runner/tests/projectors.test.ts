@@ -1575,6 +1575,75 @@ test("an unknown service beside a healthy one is inconclusive, not a partial out
   assert.equal(infra.payload.status, "unknown");
 });
 
+test("PREPARED/NOT_LIVE stays visible without degrading live infrastructure", () => {
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        {
+          service_id: "confenge-api-http",
+          display_name: "Confenge API",
+          source: "infrastructure",
+          observed_at: now,
+          freshness_status: "FRESH",
+          status: "healthy",
+          lifecycle_state: "LIVE",
+          confidence: 0.9,
+          checks: [],
+        },
+        {
+          service_id: "confenge-public-edge",
+          display_name: "Confenge public edge (prepared)",
+          source: "infrastructure",
+          observed_at: now,
+          freshness_status: "UNKNOWN",
+          status: "unknown",
+          lifecycle_state: "PREPARED/NOT_LIVE",
+          confidence: 0.2,
+          checks: [],
+        },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  assert.equal(infra.payload.status, "healthy");
+  assert.equal(infra.payload.partial_outage, false);
+  assert.equal(infra.payload.monitored_service_count, 2);
+  assert.equal(infra.payload.live_service_count, 1);
+  assert.equal(infra.payload.prepared_not_live_count, 1);
+  const prepared = infraServices(infra).find(
+    (service) => service.service_id === "confenge-public-edge",
+  );
+  assert.equal(prepared?.lifecycle_state, "PREPARED/NOT_LIVE");
+  assert.equal(prepared?.status, "unknown");
+});
+
+test("a conflicting duplicate cannot hide a LIVE service behind PREPARED/NOT_LIVE", () => {
+  const common = {
+    service_id: "confenge-public-edge",
+    display_name: "Confenge public edge",
+    source: "infrastructure",
+    observed_at: now,
+    freshness_status: "FRESH",
+    confidence: 0.9,
+    checks: [],
+  };
+  const [infra] = projectCollector(
+    infraEnvelope({
+      service_health: [
+        { ...common, status: "unknown", lifecycle_state: "PREPARED/NOT_LIVE" },
+        { ...common, status: "unhealthy", lifecycle_state: "LIVE" },
+      ],
+    }),
+  );
+  assert.ok(infra);
+  const [service] = infraServices(infra);
+  assert.equal(service?.lifecycle_state, "LIVE");
+  assert.equal(service?.status, "down");
+  assert.equal(infra.payload.status, "down");
+  assert.equal(infra.payload.live_service_count, 1);
+  assert.equal(infra.payload.prepared_not_live_count, 0);
+});
+
 test("a service with no identity is flagged as a catalog error, not named 'service'", () => {
   const [infra] = projectCollector(
     infraEnvelope({
