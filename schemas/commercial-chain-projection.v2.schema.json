@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/commercial-chain-projection.v2.schema.json",
+  "title": "confenge.commercial_chain_projection.v2",
+  "description": "Read-only source/freshness/state/receipt/exception projection for the single #120 chain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "correlation_id", "projected_at", "synthetic", "hops", "exceptions", "mutations_performed"],
+  "properties": {
+    "schema_version": {"const": "confenge.commercial_chain_projection.v2"},
+    "correlation_id": {"type": "string", "minLength": 1},
+    "projected_at": {"type": "string", "format": "date-time"},
+    "synthetic": {"const": true},
+    "hops": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offer", "proposal_version", "acceptance", "financial_eligibility",
+        "checkout", "provider_event", "semantic_reconciliation", "commercial_state",
+        "onboarding", "work_order", "qa", "delivery", "closeout", "outcome"
+      ],
+      "properties": {
+        "offer": {"$ref": "#/$defs/hop"},
+        "proposal_version": {"$ref": "#/$defs/hop"},
+        "acceptance": {"$ref": "#/$defs/hop"},
+        "financial_eligibility": {"$ref": "#/$defs/hop"},
+        "checkout": {"$ref": "#/$defs/hop"},
+        "provider_event": {"$ref": "#/$defs/hop"},
+        "semantic_reconciliation": {"$ref": "#/$defs/hop"},
+        "commercial_state": {"$ref": "#/$defs/hop"},
+        "onboarding": {"$ref": "#/$defs/hop"},
+        "work_order": {"$ref": "#/$defs/hop"},
+        "qa": {"$ref": "#/$defs/hop"},
+        "delivery": {"$ref": "#/$defs/hop"},
+        "closeout": {"$ref": "#/$defs/hop"},
+        "outcome": {"$ref": "#/$defs/hop"}
+      }
+    },
+    "exceptions": {"type": "array", "items": {"type": "object"}},
+    "mutations_performed": {"const": 0}
+  },
+  "$defs": {
+    "hop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "freshness", "state", "receipt", "exception"],
+      "properties": {
+        "source": {"type": "object"},
+        "freshness": {"type": "object"},
+        "state": {"type": "string", "minLength": 1},
+        "receipt": {"type": ["string", "null"]},
+        "exception": {"type": ["object", "null"]}
+      }
+    }
+  }
+}

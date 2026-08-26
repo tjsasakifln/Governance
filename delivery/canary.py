@@ -290,6 +290,8 @@ def run_canary(
         raise RuntimeError("Control Center projection diverged from Work Order truth")
     manifest = {
         "schema_version": "confenge.delivery_canary_manifest.v1",
+        "correlation_id": handoff["correlation_id"],
+        "handoff_event_id": handoff["event_id"],
         "proposal_id": handoff["proposal_id"],
         "proposal_version": handoff["proposal_version"],
         "proposal_state": "ACCEPTED",

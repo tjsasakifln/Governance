@@ -1,0 +1,753 @@
+{
+  "authority_pins": {
+    "deliverables_registry_blob": "32576ad2e704881368699ceacdefc6c783dcfa00",
+    "deliverables_registry_hash": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
+    "naming_blob": "ee97d54155536378041693153d0c9316baa6596b",
+    "naming_hash": "sha256:856fed4281a48c3704c204f7f2109142f992d8f0d73d6a144c6ca50d76237419",
+    "warmbly_main_sha": "3368e7d8f46573eef300b42ec214df8844b082d0",
+    "web_cfg_main_sha": "bad3f7c71f817bbbb3605b5a7214e0fd9784111b"
+  },
+  "canary": {
+    "deliverable_id": "CFG-DIAG-EXP-v1",
+    "deliverable_version": "v1",
+    "offer_id": "CFG-DIAG-EXP-v1",
+    "offer_version": "v1",
+    "synthetic": true
+  },
+  "chain_hops": [
+    {
+      "hash": "sha256:853d1dda57b8199e94d67a7eeae5007bc6b655713c91e878883fc30b90b0fb3e",
+      "hop": "offer",
+      "id": "CFG-DIAG-EXP-v1",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
+      "state": "PINNED",
+      "version": "v1"
+    },
+    {
+      "hash": "sha256:c46d1aab1acc715f97bc714c61d4c4928b08bd0c6acb90a470cfec4f834607c8",
+      "hop": "proposal_version",
+      "id": "320f817a-5b2b-5799-b403-2ce8c731e120",
+      "live_residual": "MISSING",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "sha256:69254bd6ca91b91ddb1c4bc25afdbc3f5b4b7e2bff120864ef32cf7e9929d257",
+      "state": "ACCEPTED",
+      "version": "1"
+    },
+    {
+      "hash": "sha256:35f2452d86b275c93aea4804b214586a280ac979d1ec5a665c67892af94088fe",
+      "hop": "acceptance",
+      "id": "acc_synthetic_governance_120",
+      "live_residual": "MISSING",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "sha256:673536abb9edb4fe6372134d8fa23802db1bc9b3e7931b36ec42376c5cb75233",
+      "state": "ACCEPTED_BOUND",
+      "version": "confenge.acceptance_binding.v1"
+    },
+    {
+      "hash": "sha256:6b2ab50675c0707e37440f09816f6e9823917bbb6ee2eb9de4a68f396c11e350",
+      "hop": "financial_eligibility",
+      "id": "evt_sbx_payment_confirmed_001",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "receipt_49812e913bca64ecc947367834c20121",
+      "state": "SYNTHETIC_VALID",
+      "version": "confenge.financial_gate.v1"
+    },
+    {
+      "hash": "sha256:904238312c4f197f4aa8292a8a0eaa73ca6f4523d955ca7c3d202ea55797bce9",
+      "hop": "checkout",
+      "id": "checkout_stub_governance_120",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "checkout_stub_governance_120",
+      "state": "STUB_CREATED",
+      "version": "confenge.checkout_fixture.v1"
+    },
+    {
+      "hash": "sha256:699de85042879f61865778f90a1658b2df5f1942bcbc9f47cfaa6d170f72e6cc",
+      "hop": "provider_event",
+      "id": "evt_sbx_payment_confirmed_001",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "receipt_49812e913bca64ecc947367834c20121",
+      "state": "PAYMENT_CONFIRMED",
+      "version": "confenge.provider_event_fixture.v1"
+    },
+    {
+      "hash": "sha256:3e32fe2b8ffbee0172c8edd8ed5e59de8a8d440484817438ca81809b8c9ed680",
+      "hop": "semantic_reconciliation",
+      "id": "reconciliation_8eebea0a060000522b8201867c59f24a",
+      "live_residual": "MISSING",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "receipt_49812e913bca64ecc947367834c20121",
+      "state": "PAYMENT_CONFIRMED",
+      "version": "confenge.financial_reconciliation.v1"
+    },
+    {
+      "hash": "sha256:9fc0df73f2ae3a49fba1329411c7192ecb0afaea23a8c2206da29694b2561cd4",
+      "hop": "commercial_state",
+      "id": "commercial_8eebea0a060000522b8201867c59f24a",
+      "live_residual": "MISSING",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "receipt_49812e913bca64ecc947367834c20121",
+      "state": "PAYMENT_CONFIRMED",
+      "version": "confenge.commercial_state.v1"
+    },
+    {
+      "hash": "sha256:83669f177a5bad15dd384460bad10d6df37dadac2b165ab207f6f089ca7d62b8",
+      "hop": "onboarding",
+      "id": "onboarding_8eebea0a060000522b8201867c59f24a",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "onboarding_8eebea0a060000522b8201867c59f24a",
+      "state": "STARTED_SYNTHETIC_EXPLICITLY",
+      "version": "CFG-ONBOARDING-SYNTHETIC-CANARY-v1"
+    },
+    {
+      "hash": "sha256:6a4397883a9232e4b28331b11780e67ff7cce5d479aa0a87e19bad3c190b44d6",
+      "hop": "work_order",
+      "id": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1",
+      "state": "CLOSED",
+      "version": "confenge.work_order.v1"
+    },
+    {
+      "hash": "sha256:b3ea6e51d3cc8c371ff95a8a09d2e7e538444c76e2679d26c5885b45ae7c9089",
+      "hop": "qa",
+      "id": "qa_a4fc368468c808ab41a410cd2a9520e8",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SANDBOX",
+      "receipt": "qa_a4fc368468c808ab41a410cd2a9520e8",
+      "state": "PASSED",
+      "version": "CFG-DIAG-EXP-QA-v1"
+    },
+    {
+      "hash": "sha256:d41be323e865e74e0472b0260019cf9248b3936ca55b65b77335b174ee8264d0",
+      "hop": "delivery",
+      "id": "delivery_a4fc368468c808ab41a410cd2a9520e8",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SANDBOX",
+      "receipt": "sha256:ce45fa4c3794dd66b237a53b77b25eba9b97921117b028db32a22e97ffcaa433",
+      "state": "SANDBOX",
+      "version": "CFG-DIAG-EXP-SANDBOX-PRODUCER-v1"
+    },
+    {
+      "hash": "sha256:1b395f0b62e5338d5e8f2470e1930bb1cb4b037502afaf25e83109e114cadab0",
+      "hop": "closeout",
+      "id": "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c",
+      "live_residual": "BLOCKED_EXTERNAL",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c",
+      "state": "CLOSED",
+      "version": "confenge.work_order_event.v1"
+    },
+    {
+      "hash": "sha256:d6126a2904e0bb73afa6e13561732c033ce459453d73eb170cf5527664afd5ee",
+      "hop": "outcome",
+      "id": "outcome_a4fc368468c808ab41a410cd2a9520e8",
+      "live_residual": "MISSING",
+      "proof_status": "PROVEN_SYNTHETIC",
+      "receipt": "outcome_a4fc368468c808ab41a410cd2a9520e8",
+      "state": "UNKNOWN",
+      "version": "control-center.work-order-projection.v1"
+    }
+  ],
+  "commercial_reconciliation": {
+    "applied_event_count": 2,
+    "correlation_id": "corr_fixture",
+    "current_state": "PAYMENT_CONFIRMED",
+    "event_deduplication_ids": [
+      "evt_sbx_checkout_created_001",
+      "evt_sbx_payment_confirmed_001",
+      "evt_sbx_payment_created_001",
+      "evt_synthetic_payment_created_retry_002"
+    ],
+    "last_applied_event_id": "evt_sbx_payment_confirmed_001",
+    "provider_environment": "STUB",
+    "receipts": [
+      {
+        "applied": false,
+        "canonical_state": "UNKNOWN",
+        "correlation_id": "corr_fixture",
+        "duplicate": false,
+        "event_deduplication_id": "evt_sbx_checkout_created_001",
+        "evidence_refs": [
+          "source:web-cfg:webhook-checkout-created:sha256:f623d74b14cc198b2198fe453fded3195a6792c31202ddb8eeb2682804f512d6"
+        ],
+        "freshness": {
+          "observed_at": "2026-08-17T12:00:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "held": true,
+        "provider_event_id": "evt_sbx_checkout_created_001",
+        "raw_event_type": "CHECKOUT_CREATED",
+        "reason": "UNKNOWN_PROVIDER_EVENT",
+        "receipt_id": "receipt_75b21af419ad875d2485a0301516ccd5",
+        "schema_version": "confenge.semantic_receipt.v1",
+        "semantic_status": "HELD",
+        "source": {
+          "environment": "STUB",
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-checkout-created.json",
+          "synthetic": true,
+          "system": "asaas"
+        },
+        "state_after": "UNKNOWN",
+        "state_before": "UNKNOWN"
+      },
+      {
+        "applied": true,
+        "canonical_state": "PAYMENT_CONFIRMED",
+        "correlation_id": "corr_fixture",
+        "duplicate": false,
+        "event_deduplication_id": "evt_sbx_payment_confirmed_001",
+        "evidence_refs": [
+          "source:web-cfg:webhook-payment-confirmed:sha256:2f8ed2f14d972531076106a35b595a9f7312c58cec119375ba33b887bc136e99"
+        ],
+        "freshness": {
+          "observed_at": "2026-08-17T12:04:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "held": false,
+        "provider_event_id": "evt_sbx_payment_confirmed_001",
+        "raw_event_type": "PAYMENT_CONFIRMED",
+        "reason": "SEMANTIC_TRANSITION_APPLIED",
+        "receipt_id": "receipt_49812e913bca64ecc947367834c20121",
+        "schema_version": "confenge.semantic_receipt.v1",
+        "semantic_status": "APPLIED",
+        "source": {
+          "environment": "STUB",
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-confirmed.json",
+          "synthetic": true,
+          "system": "asaas"
+        },
+        "state_after": "PAYMENT_CONFIRMED",
+        "state_before": "PAYMENT_CREATED"
+      },
+      {
+        "applied": true,
+        "canonical_state": "PAYMENT_CREATED",
+        "correlation_id": "corr_fixture",
+        "duplicate": false,
+        "event_deduplication_id": "evt_sbx_payment_created_001",
+        "evidence_refs": [
+          "source:web-cfg:webhook-payment-created:sha256:8902814e89c3b0ec93b05e127704669f767bda6fabdb8a13ba48b853b26cd106"
+        ],
+        "freshness": {
+          "observed_at": "2026-08-17T12:00:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "held": false,
+        "provider_event_id": "evt_sbx_payment_created_001",
+        "raw_event_type": "PAYMENT_CREATED",
+        "reason": "SEMANTIC_TRANSITION_APPLIED",
+        "receipt_id": "receipt_28f317318acc3481ea175e659b9f8c72",
+        "schema_version": "confenge.semantic_receipt.v1",
+        "semantic_status": "APPLIED",
+        "source": {
+          "environment": "STUB",
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-created.json",
+          "synthetic": true,
+          "system": "asaas"
+        },
+        "state_after": "PAYMENT_CREATED",
+        "state_before": "UNKNOWN"
+      },
+      {
+        "applied": false,
+        "canonical_state": "PAYMENT_CREATED",
+        "correlation_id": "corr_fixture",
+        "duplicate": false,
+        "event_deduplication_id": "evt_synthetic_payment_created_retry_002",
+        "evidence_refs": [
+          "source:web-cfg:webhook-payment-created:sha256:8902814e89c3b0ec93b05e127704669f767bda6fabdb8a13ba48b853b26cd106"
+        ],
+        "freshness": {
+          "observed_at": "2026-08-17T12:00:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "held": false,
+        "provider_event_id": "evt_synthetic_payment_created_retry_002",
+        "raw_event_type": "PAYMENT_CREATED",
+        "reason": "OUT_OF_ORDER_STATE_REGRESSION_PREVENTED",
+        "receipt_id": "receipt_ff2cb2958186ec03340a80205e154254",
+        "schema_version": "confenge.semantic_receipt.v1",
+        "semantic_status": "RETAINED",
+        "source": {
+          "environment": "STUB",
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-created.json",
+          "synthetic": true,
+          "system": "asaas"
+        },
+        "state_after": "PAYMENT_CONFIRMED",
+        "state_before": "PAYMENT_CONFIRMED"
+      }
+    ],
+    "received_revenue_cents": 0,
+    "schema_version": "confenge.financial_reconciliation.v1",
+    "second_ledger_created": false,
+    "synthetic": true
+  },
+  "control_center": {
+    "correlation_id": "corr_fixture",
+    "exceptions": [],
+    "hops": {
+      "acceptance": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T11:54:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "sha256:673536abb9edb4fe6372134d8fa23802db1bc9b3e7931b36ec42376c5cb75233",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "acceptance-binding-adapter",
+          "locator": "commercial/fixtures/e2e/acceptance-binding.synthetic.v1.json",
+          "system": "web-cfg"
+        },
+        "state": "ACCEPTED_BOUND"
+      },
+      "checkout": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:00:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "checkout_stub_governance_120",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "detached-checkout-stub",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/checkout-detached-response.json",
+          "system": "web-cfg"
+        },
+        "state": "STUB_CREATED"
+      },
+      "closeout": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T12:24:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "canonical-work-order-event",
+          "locator": "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c",
+          "system": "governance"
+        },
+        "state": "CLOSED"
+      },
+      "commercial_state": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:04:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "receipt_49812e913bca64ecc947367834c20121",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "commercial-state-projection",
+          "locator": "commercial/e2e.py#SemanticReconciler.projection",
+          "system": "warmbly"
+        },
+        "state": "PAYMENT_CONFIRMED"
+      },
+      "delivery": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T12:22:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "delivery_a4fc368468c808ab41a410cd2a9520e8",
+        "source": {
+          "evidence_class": "PROVEN_SANDBOX",
+          "kind": "sandbox-artifact",
+          "locator": "sha256:ce45fa4c3794dd66b237a53b77b25eba9b97921117b028db32a22e97ffcaa433",
+          "system": "governance"
+        },
+        "state": "SANDBOX"
+      },
+      "financial_eligibility": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:04:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "receipt_49812e913bca64ecc947367834c20121",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "financial-gate",
+          "locator": "confenge.financial_gate.v1",
+          "system": "governance"
+        },
+        "state": "SYNTHETIC_VALID"
+      },
+      "offer": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T00:00:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "authority-pin",
+          "locator": "data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
+          "system": "web-cfg"
+        },
+        "state": "PINNED"
+      },
+      "onboarding": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:05:30Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "onboarding_8eebea0a060000522b8201867c59f24a",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "explicit-onboarding-receipt",
+          "locator": "commercial/e2e_canary.py",
+          "system": "governance"
+        },
+        "state": "STARTED_SYNTHETIC_EXPLICITLY"
+      },
+      "outcome": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T12:27:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "outcome_a4fc368468c808ab41a410cd2a9520e8",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "explicit-unknown-projection",
+          "locator": "control-center.work-order-projection.v1",
+          "system": "governance"
+        },
+        "state": "UNKNOWN"
+      },
+      "proposal_version": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T11:54:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "sha256:69254bd6ca91b91ddb1c4bc25afdbc3f5b4b7e2bff120864ef32cf7e9929d257",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "proposal-contract-adapter",
+          "locator": "commercial/fixtures/e2e/proposal.accepted.synthetic.v1.json",
+          "system": "warmbly"
+        },
+        "state": "ACCEPTED"
+      },
+      "provider_event": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:04:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "receipt_49812e913bca64ecc947367834c20121",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "provider-event-stub",
+          "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-payment-confirmed.json",
+          "system": "asaas"
+        },
+        "state": "PAYMENT_CONFIRMED"
+      },
+      "qa": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T12:21:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "qa_a4fc368468c808ab41a410cd2a9520e8",
+        "source": {
+          "evidence_class": "PROVEN_SANDBOX",
+          "kind": "qa-receipt",
+          "locator": "delivery/production/cfg_diag_exp.py#run_qa",
+          "system": "governance"
+        },
+        "state": "PASSED"
+      },
+      "semantic_reconciliation": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-17T12:04:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "receipt_49812e913bca64ecc947367834c20121",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "semantic-contract-adapter",
+          "locator": "commercial/e2e.py#SemanticReconciler",
+          "system": "warmbly"
+        },
+        "state": "PAYMENT_CONFIRMED"
+      },
+      "work_order": {
+        "exception": null,
+        "freshness": {
+          "observed_at": "2026-08-25T12:24:00Z",
+          "state": "FIXED_CLOCK"
+        },
+        "receipt": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1",
+        "source": {
+          "evidence_class": "PROVEN_SYNTHETIC",
+          "kind": "canonical-work-order-event-store",
+          "locator": "control-center/domains/delivery",
+          "system": "governance"
+        },
+        "state": "CLOSED"
+      }
+    },
+    "mutations_performed": 0,
+    "projected_at": "2026-08-25T12:27:00Z",
+    "schema_version": "confenge.commercial_chain_projection.v2",
+    "synthetic": true
+  },
+  "correlation_id": "corr_fixture",
+  "delivery_manifest": {
+    "acceptance": "ACCEPTED_SANDBOX",
+    "accepted_snapshot_hash": "sha256:69254bd6ca91b91ddb1c4bc25afdbc3f5b4b7e2bff120864ef32cf7e9929d257",
+    "capacity": "COMMITTED",
+    "capacity_after_close": "RELEASED",
+    "capacity_hold_replays": 10,
+    "capacity_projections": {
+      "committed": {
+        "active_wip_units": 1,
+        "available_units": 0,
+        "capacity_snapshot_id": "cap_synthetic_diag_one_20260825",
+        "committed_units": 1,
+        "held_units": 0,
+        "released_units": 0,
+        "schema_version": "confenge.capacity_projection.v1",
+        "staffed_capacity_units": 1
+      },
+      "released": {
+        "active_wip_units": 0,
+        "available_units": 1,
+        "capacity_snapshot_id": "cap_synthetic_diag_one_20260825",
+        "committed_units": 0,
+        "held_units": 0,
+        "released_units": 1,
+        "schema_version": "confenge.capacity_projection.v1",
+        "staffed_capacity_units": 1
+      }
+    },
+    "control_center": {
+      "QA_state": "PASSED",
+      "acceptance_state": "ACCEPTED",
+      "actual_effort_minutes": 120,
+      "capacity_commitment_id": "hold_adcc4841efcb564c31839cb2f4e5a8e6",
+      "capacity_consumed": false,
+      "clock_state": "STOPPED",
+      "delay_classification": "NONE",
+      "due_at": "2026-09-09T12:14:00.000Z",
+      "estimated_capacity_units": 1,
+      "freshness_status": "FRESH",
+      "observed_at": "2026-08-25T12:24:00Z",
+      "open_blocker_count": 0,
+      "responsible_owner": "CFG-DELIVERY-CANARY-OWNER-01",
+      "schema_version": "control-center.work-order-projection.v1",
+      "sla_status": "STOPPED",
+      "source": {
+        "event_id": "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c",
+        "locator": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1",
+        "system": "governance-delivery-os"
+      },
+      "stage": "CLOSED",
+      "synthetic": true,
+      "version": 19,
+      "work_order_id": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1"
+    },
+    "correlation_id": "corr_fixture",
+    "delivery": "SANDBOX",
+    "duplicate_business_mutations": 0,
+    "evidence_refs": [
+      "fixture:governance:120:proposal",
+      "github:tjsasakifln/warmbly:3368e7d8f46573eef300b42ec214df8844b082d0:internal/app/confenge/proposal/model.go#AcceptedHash",
+      "github:tjsasakifln/web-cfg:bad3f7c71f817bbbb3605b5a7214e0fd9784111b:data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
+      "onboarding:onboarding_8eebea0a060000522b8201867c59f24a",
+      "receipt:receipt_49812e913bca64ecc947367834c20121",
+      "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/commercial/deliverables-registry.v1.json#/containers/0/plans/0",
+      "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2",
+      "canary://cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1/closed-sandbox-v1",
+      "sha256:ce45fa4c3794dd66b237a53b77b25eba9b97921117b028db32a22e97ffcaa433",
+      "cc:work-order-event:0549c2e995b85cd6dd1da8ead42d548c"
+    ],
+    "financial_gate": "SYNTHETIC_VALID",
+    "fixture_ids": {
+      "artifact_ref": "sha256:ce45fa4c3794dd66b237a53b77b25eba9b97921117b028db32a22e97ffcaa433",
+      "capacity_snapshot_id": "cap_synthetic_diag_one_20260825",
+      "handoff_event_id": "e1200000-0000-4000-8000-000000000001",
+      "registry_hash": "sha256:7d9a3223069cf382f7e645cc17b0a6df859bb48196fe2541d0b882e66fc8bbe2"
+    },
+    "handoff_event_id": "e1200000-0000-4000-8000-000000000001",
+    "initial_business_mutations": 19,
+    "outcome": "UNKNOWN",
+    "producer_mode": "governance-e2e-contract-adapter-v1",
+    "projection_engine": "control-center-typescript-canonical",
+    "proposal_id": "320f817a-5b2b-5799-b403-2ce8c731e120",
+    "proposal_state": "ACCEPTED",
+    "proposal_version": 1,
+    "qa": "PASSED",
+    "qa_negative_path": "FAILED",
+    "readiness": "DELIVERY_VALIDATED",
+    "real_checkout": false,
+    "real_customer": false,
+    "real_email": false,
+    "real_money": false,
+    "received_revenue": false,
+    "replay_converged": true,
+    "repo_shas": {
+      "governance": "bed2a7946d2367b445c671a819ac9d9ba6a8452b",
+      "warmbly": "3368e7d8f46573eef300b42ec214df8844b082d0",
+      "web_cfg": "bad3f7c71f817bbbb3605b5a7214e0fd9784111b"
+    },
+    "schema_fingerprints": {
+      "confenge.delivery_order_requested.v1": "6464c124040bbadea9f719dcecacdcd3faa85febfa4610950f3791bb224fb0ba",
+      "confenge.financial_gate.v1": "5c0bdecf80fdfe1101ba1606f8a5462f035aae7c2a2b0d262af86de7b6d4a903"
+    },
+    "schema_version": "confenge.delivery_canary_manifest.v1",
+    "schema_versions": [
+      "confenge.proposal.v1",
+      "confenge.delivery_order_requested.v1",
+      "confenge.financial_gate.v1",
+      "confenge.delivery_readiness.v1",
+      "confenge.capacity_admission.v1",
+      "confenge.work_order.v1",
+      "confenge.work_order_event.v1",
+      "control-center.work-order-projection.v1"
+    ],
+    "stage": "CLOSED",
+    "tests_executed": [
+      "Warmbly cmd/confenge-proposal-canary",
+      "Governance canonical TypeScript Work Order lifecycle with 3x replay",
+      "Governance QA negative and positive producer paths",
+      "Control Center canonical TypeScript projection"
+    ],
+    "timestamps": {
+      "accepted_at": "2026-08-25T12:23:00Z",
+      "bad_artifact_at": "2026-08-25T12:15:00Z",
+      "capacity_committed_at": "2026-08-25T12:07:00Z",
+      "capacity_evaluated_at": "2026-08-25T12:06:00Z",
+      "capacity_hold_expires_at": "2026-08-28T12:06:00Z",
+      "capacity_released_at": "2026-08-25T12:26:00Z",
+      "closed_at": "2026-08-25T12:24:00Z",
+      "delivered_at": "2026-08-25T12:22:00Z",
+      "good_artifact_at": "2026-08-25T12:18:00Z",
+      "handoff_occurred_at": "2026-08-17T12:06:00.000Z",
+      "owner_assigned_at": "2026-08-25T12:08:00Z",
+      "projected_at": "2026-08-25T12:27:00Z",
+      "qa_passed_at": "2026-08-25T12:21:00Z",
+      "readiness_validated_at": "2026-08-25T12:25:00Z",
+      "work_started_at": "2026-08-25T12:14:00Z"
+    },
+    "work_order_count": 1,
+    "work_order_id": "cc:work-order:67dc4af0e65b9bbe3e0c84f75e6b25b1"
+  },
+  "evidence_pack_id": "CFG-COMMERCIAL-E2E-SYNTHETIC-120-v1",
+  "financial_semantics": {
+    "branches": {
+      "CANCELED": "CANCELED",
+      "OVERDUE": "OVERDUE",
+      "PAYMENT_CONFIRMED": "PAYMENT_CONFIRMED",
+      "PAYMENT_CREATED": "PAYMENT_CREATED",
+      "PAYMENT_RECEIVED": "PAYMENT_RECEIVED",
+      "REFUNDED": "REFUNDED",
+      "UNKNOWN": "UNKNOWN"
+    },
+    "positive_path_terminal_state": "PAYMENT_CONFIRMED",
+    "received_revenue_cents": 0,
+    "synthetic_received_branch_revenue_cents": 0,
+    "unknown_receipt": {
+      "applied": false,
+      "canonical_state": "UNKNOWN",
+      "correlation_id": "corr_fixture",
+      "duplicate": false,
+      "event_deduplication_id": "evt_sbx_checkout_created_001",
+      "evidence_refs": [
+        "source:web-cfg:webhook-checkout-created:sha256:f623d74b14cc198b2198fe453fded3195a6792c31202ddb8eeb2682804f512d6"
+      ],
+      "freshness": {
+        "observed_at": "2026-08-17T12:00:00Z",
+        "state": "FIXED_CLOCK"
+      },
+      "held": true,
+      "provider_event_id": "evt_sbx_checkout_created_001",
+      "raw_event_type": "CHECKOUT_CREATED",
+      "reason": "UNKNOWN_PROVIDER_EVENT",
+      "receipt_id": "receipt_75b21af419ad875d2485a0301516ccd5",
+      "schema_version": "confenge.semantic_receipt.v1",
+      "semantic_status": "HELD",
+      "source": {
+        "environment": "STUB",
+        "evidence_class": "PROVEN_SYNTHETIC",
+        "locator": "github://tjsasakifln/web-cfg@bad3f7c71f817bbbb3605b5a7214e0fd9784111b/data/offers/fixtures/asaas-sandbox/webhook-checkout-created.json",
+        "synthetic": true,
+        "system": "asaas"
+      },
+      "state_after": "UNKNOWN",
+      "state_before": "UNKNOWN"
+    }
+  },
+  "gates": {
+    "onboarding_before_financial": {
+      "policy_version": "CFG-ONBOARDING-SYNTHETIC-CANARY-v1",
+      "reason": "FINANCIAL_ACCEPTANCE_OR_CAPACITY_GATE_MISSING",
+      "starts_automatically": false,
+      "state": "BLOCKED"
+    },
+    "onboarding_eligible": {
+      "policy_version": "CFG-ONBOARDING-SYNTHETIC-CANARY-v1",
+      "reason": "ALL_SYNTHETIC_GATES_SATISFIED",
+      "starts_automatically": false,
+      "state": "ONBOARDING_ELIGIBLE"
+    },
+    "onboarding_without_capacity": {
+      "policy_version": "CFG-ONBOARDING-SYNTHETIC-CANARY-v1",
+      "reason": "FINANCIAL_ACCEPTANCE_OR_CAPACITY_GATE_MISSING",
+      "starts_automatically": false,
+      "state": "BLOCKED"
+    },
+    "production_checkout_enabled": false,
+    "proposal_mutation_rejected": "accepted proposal snapshot hash mismatch",
+    "readiness_without_profile": {
+      "reason_codes": [
+        "READINESS_UNKNOWN"
+      ],
+      "verdict": "UNKNOWN"
+    },
+    "real_money_mutation_approved": false
+  },
+  "invariants": {
+    "provider_event_idempotent": true,
+    "qa_delivery_closeout_not_inferred_by_silence": true,
+    "second_catalog_created": false,
+    "second_ledger_created": false,
+    "single_correlation_identity": true,
+    "synthetic_never_customer_revenue_or_real_delivery": true,
+    "unknown_preserved": true,
+    "work_order_exactly_once": true
+  },
+  "reliability": {
+    "chain_identity_is_deduplication_id": false,
+    "confirmed_before_created": "HELD",
+    "confirmed_replayed_after_created": "APPLIED",
+    "duplicate": "DUPLICATE",
+    "event_deduplication_id": "evt_sbx_payment_confirmed_001",
+    "late_created_retry": "RETAINED",
+    "rollback_replay_converged": true
+  },
+  "schema_version": "confenge.commercial_e2e_evidence.v1"
+}
