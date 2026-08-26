@@ -4,9 +4,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
-
 from commercial.projection import WEB_CFG_DELIVERABLES_BLOB, project_commercial_chain
+from scripts.validate_commercial_authority import schema_validate
 
 
 NOW = "2026-08-26T03:00:00Z"
@@ -122,10 +121,8 @@ def test_projection_and_every_exception_validate_against_versioned_schemas():
     result = project_commercial_chain(base_facts(), projected_at=NOW)
     chain_schema = json.loads((ROOT / "schemas" / "commercial-chain-projection.v1.schema.json").read_text())
     exception_schema = json.loads((ROOT / "schemas" / "operational-exception.v1.schema.json").read_text())
-    Draft202012Validator.check_schema(chain_schema)
-    Draft202012Validator.check_schema(exception_schema)
     for exception in result["exceptions"]:
-        Draft202012Validator(exception_schema).validate(exception)
+        schema_validate(exception, exception_schema)
     locally_resolved = deepcopy(chain_schema)
     locally_resolved["properties"]["exceptions"]["items"] = exception_schema
-    Draft202012Validator(locally_resolved).validate(result)
+    schema_validate(result, locally_resolved)

@@ -6,9 +6,9 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator
 
 from delivery.capacity import CapacityError, CapacityLedger, evaluate_admission, project_capacity_read_only
+from scripts.validate_commercial_authority import schema_validate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -227,7 +227,6 @@ def test_synthetic_capacity_projection_never_becomes_real_readiness():
 
 def test_read_only_capacity_projection_validates_against_versioned_schema():
     schema = json.loads((ROOT / "schemas" / "capacity-projection.v1.schema.json").read_text())
-    Draft202012Validator.check_schema(schema)
     projection = project_capacity_read_only(
         policy_ceiling=50,
         capacity_snapshot=None,
@@ -235,7 +234,7 @@ def test_read_only_capacity_projection_validates_against_versioned_schema():
         committed_allocations=None,
         projected_at=EVALUATED_AT,
     )
-    Draft202012Validator(schema).validate(projection)
+    schema_validate(projection, schema)
 
 
 def test_expiry_reconciliation_and_idempotency_payloads_fail_closed(tmp_path: Path):
