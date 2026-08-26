@@ -15,7 +15,8 @@
     "allowed_methods": ["GET", "HEAD", "POST"],
     "get_read_paths": [
       "/v1/confenge/dispatch/status",
-      "/v1/confenge/first-touch/status"
+      "/v1/confenge/first-touch/status",
+      "/v1/confenge/working-overview"
     ],
     "post_read_paths": [
       "/v1/contacts/search",

@@ -240,5 +240,32 @@ export async function seedOperationalCockpit(persistence: Persistence): Promise<
       inserted += 1;
     }
   }
+  await persistence.recordObservation({
+    scope: "commercial",
+    observationKind: "outbound-inventory",
+    source: { system: "extra-cli", kind: "outbound-inventory", locator: "commercial-reservoir/current" },
+    observedAt: new Date("2026-08-20T11:49:00.000Z"),
+    freshnessStatus: "FRESH",
+    confidence: 1,
+    idempotencyKey: "extra-cli:outbound-inventory:extra-run-e2e-2026-08-20",
+    collectorRunId: null,
+    payload: {
+      current_feed: "full-national-commercial-reservoir",
+      current_run: "extra-run-e2e-2026-08-20",
+      target_confirmed: 2500,
+      recipient_attributed: 1800,
+      eligible_current: 1400,
+      ready_reservoir: 1200,
+      feed_age_seconds: 240,
+      replenishment_state: "WAITING_FOR_EXTRA_CLI_REFRESH",
+      queue_fill_blocker: "WAITING_FOR_ELIGIBLE_BATCH",
+      funnel_rows: [
+        { key: "target_confirmed", count: 2500 },
+        { key: "identity_safe", count: 1800 },
+        { key: "warmbly_eligible", count: 1400 },
+        { key: "email_send_ready", count: 1200 },
+      ],
+    },
+  });
   return inserted;
 }

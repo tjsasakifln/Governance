@@ -439,7 +439,9 @@ export function renderShell(model: ShellModel): string {
       ${renderDesktopNavigation(navigationLocation, model.viewKind, preserveNavigationViewState)}
       <main id="conteudo" tabindex="-1">
         ${operationalPageHeader(label, headline)}
-        ${renderOrientationSummary(orientation)}
+        ${renderOrientationSummary(model.destination === "hoje"
+          ? { ...orientation, action: { ...orientation.action, href: null } }
+          : orientation)}
         ${model.adapterMode === "http" ? "" : mockLab(model.destination, model.viewKind)}
         ${continuityRecoveryBanner(model.query)}
         ${viewBanner(model.view)}
