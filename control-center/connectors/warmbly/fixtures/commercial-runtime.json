@@ -249,6 +249,22 @@
       }
     ]
   },
+  "confenge_working_overview": {
+    "reservoir_monitored": 2500,
+    "actionable_now": 1200,
+    "needs_contact": 700,
+    "needs_review": 8,
+    "approved_scheduled": 140,
+    "watch_awaiting": 452,
+    "suppressed": 12,
+    "stale_context": 2,
+    "due_next_24h": 30,
+    "theoretical_slots_24h": 90,
+    "capacity_load": 0.3333333333,
+    "dynamic_priority_enabled": true,
+    "last_feed_sync_at": "2026-08-20T14:55:00.000Z",
+    "feed_age_seconds": 300
+  },
   "confenge_ops_health": {
     "data": {
       "computed_at": "2026-08-20T14:50:00.000Z",

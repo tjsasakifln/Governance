@@ -39,13 +39,55 @@ function envelope(): Record<string, unknown> {
             sent_today: 0,
             daily_limit: 10,
             transport_health: "PAUSED_BY_KILL_SWITCH",
+            slots_next_24h: 30,
+            slots_next_7d: 210,
+            provider_errors: 0,
           },
           delegated_first_touch: {
             policy_version: "CFG-FIRST-TOUCH-ROUTING-v1",
-            queued_readback: 1,
-            items: [{ state: "QUEUED", source_run_id: "run-current", due_at: "2026-08-26T12:00:00Z" }],
+            runtime_release_sha: "0123456789abcdef0123456789abcdef01234567",
+            source_run_id: "run-current",
+            queued_readback: 140,
+            human_approved: 0,
+            counts: { PREPARED: 180, QUEUED: 140, SENT: 20, HOLD: 8 },
+            items: [{
+              state: "QUEUED",
+              source_run_id: "run-current",
+              runtime_release_sha: "0123456789abcdef0123456789abcdef01234567",
+              due_at: "2026-09-01T12:00:00Z",
+            }],
           },
-          overview: { exceptions: 1, replies: 0, bounces: 0, opt_outs: 0 },
+          working_overview: {
+            reservoir_monitored: 1200,
+            actionable_now: 1200,
+            needs_contact: 1012,
+            needs_review: 8,
+            approved_scheduled: 140,
+            watch_awaiting: 20,
+            suppressed: 50,
+            stale_context: 12,
+            due_next_24h: 30,
+            theoretical_slots_24h: 999,
+            slots_next_24h: 30,
+            slots_next_7d: 210,
+            feed_age_seconds: 300,
+            replenishment_state: "WAITING_FOR_EXTRA_CLI_REFRESH",
+            stale_retired: 12,
+            queue_fill_blocker: "WAITING_FOR_ELIGIBLE_BATCH",
+          },
+          outbound_outcomes: {
+            attempted: 24,
+            sent: 20,
+            provider_accepted: 22,
+            delivered: 18,
+            replies: 3,
+            bounces: 1,
+            complaints: 0,
+            suppressed: 50,
+            provider_errors: 0,
+          },
+          mailbox_health: { healthy: 5, blocked: 1, unknown: 0 },
+          overview: { exceptions: 8, replies: 3, bounces: 1, opt_outs: 0 },
           delivery: { active_work_orders: 0, exceptions: 0 },
           capacity: {
             policy_ceiling: 50,
@@ -78,6 +120,25 @@ function envelope(): Record<string, unknown> {
     today: [],
     source_observations: [
       {
+        source: { system: "extra-cli", kind: "outbound-inventory", locator: "commercial-reservoir/current" },
+        observed_at: "2026-08-26T02:54:00Z",
+        freshness_status: "FRESH",
+        payload: {
+          current_feed: "full-national-commercial-reservoir",
+          current_run: "run-current",
+          target_confirmed: 2500,
+          recipient_attributed: 1800,
+          eligible_current: 1400,
+          ready_reservoir: 1200,
+          funnel_rows: [
+            { key: "target_confirmed", count: 2500 },
+            { key: "identity_safe", count: 1800 },
+            { key: "warmbly_eligible", count: 1400 },
+            { key: "email_send_ready", count: 1200 },
+          ],
+        },
+      },
+      {
         source: { system: "web-cfg", kind: "deploy-read", locator: "public/current" },
         observed_at: "2026-08-26T02:56:00Z",
         freshness_status: "FRESH",
@@ -97,7 +158,7 @@ test("first viewport projects the five founder questions without hiding UNKNOWN"
   assert.equal(truth.outbound.state, "PAUSED");
   assert.equal(truth.outbound.policy_version, "CFG-FIRST-TOUCH-ROUTING-v1");
   assert.equal(truth.outbound.source_run, "run-current");
-  assert.equal(truth.outbound.queued, 1);
+  assert.equal(truth.outbound.queued, 140);
   assert.equal(truth.outbound.sends_today, 0);
   assert.equal(truth.data.target_coverage, "1/1");
   assert.equal(truth.inbound_web.gsc_readiness, "BLOCKED_GAPS");
@@ -108,10 +169,28 @@ test("first viewport projects the five founder questions without hiding UNKNOWN"
   assert.equal(truth.delivery_finance.admission, "UNKNOWN");
   assert.equal(truth.delivery_finance.checkout_gate, "BLOCKED");
   assert.equal(truth.delivery_finance.asaas_gate, "MISSING");
+  assert.equal(truth.outbound_runway.transport.state.value, "PAUSED");
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, 2500);
+  assert.equal(truth.outbound_runway.stock.recipient_attributed.value, 1800);
+  assert.equal(truth.outbound_runway.stock.eligible_current.value, 1400);
+  assert.equal(truth.outbound_runway.stock.prepared.value, 348);
+  assert.equal(truth.outbound_runway.stock.delegated_approved.value, 160);
+  assert.equal(truth.outbound_runway.stock.human_approved.value, 0);
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, 140);
+  assert.equal(truth.outbound_runway.stock.sent.value, 20);
+  assert.equal(truth.outbound_runway.stock.provider_accepted.value, 22);
+  assert.equal(truth.outbound_runway.stock.delivered.value, 18);
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, 40);
+  assert.equal(truth.outbound_runway.runway.estimated_days.source.system, "extra-cli+warmbly");
+  assert.equal(truth.outbound_runway.runway.estimated_days.source.as_of, "2026-08-26T02:54:00Z");
+  assert.equal(truth.outbound_runway.runway.slots_next_24h.value, 30);
+  assert.equal(truth.outbound_runway.runway.slots_next_7d.value, 210);
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, false);
+  assert.equal(truth.outbound_runway.integrity.source_run_match, "MATCH");
   assert.ok(truth.exceptions.some((item) => item.bucket === "capacity_unknown"));
   assert.ok(truth.exceptions.some((item) => item.bucket === "payment_provider_ambiguity"));
   assert.ok(truth.primary_action);
-  assert.equal(truth.primary_action.owner, "delivery_owner");
+  assert.equal(truth.primary_action.label, "Resolver blocker do refill");
 });
 
 test("missing observations remain UNKNOWN and never become zero or healthy", () => {
@@ -124,6 +203,11 @@ test("missing observations remain UNKNOWN and never become zero or healthy", () 
   assert.equal(truth.delivery_finance.staffed_capacity_state, "UNKNOWN");
   assert.equal(truth.delivery_finance.active_work_orders, null);
   assert.equal(truth.delivery_finance.admission, "UNKNOWN");
+  assert.equal(truth.outbound_runway.transport.state.value, "UNKNOWN");
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, null);
 });
 
 test("Hoje renders one primary action and the complete exception evidence fields", () => {
@@ -142,7 +226,7 @@ test("Hoje renders one primary action and the complete exception evidence fields
     operational_envelope: envelope(),
   });
   const html = renderHoje(view);
-  assert.equal(summary.founder_truth.primary_action?.owner, "delivery_owner");
+  assert.equal(summary.founder_truth.primary_action?.label, "Resolver blocker do refill");
   assert.match(html, /data-founder-operating-truth="true"/);
   assert.match(html, /data-primary-action-count="1"/);
   for (const domain of ["outbound", "data", "inbound-web", "delivery-finance", "next-human-action"]) {
@@ -155,4 +239,119 @@ test("Hoje renders one primary action and the complete exception evidence fields
   assert.match(html, /Idade/);
   assert.match(html, /Evidência/);
   assert.match(html, /freshness/i);
+  assert.match(html, /data-outbound-runway="true"/);
+  assert.match(html, /data-runway-group="transport"/);
+  assert.match(html, /data-runway-group="stock"/);
+  assert.match(html, /data-runway-group="runway"/);
+  assert.match(html, /data-runway-group="health"/);
+  assert.match(html, /data-runway-metric="provider-accepted"/);
+  assert.match(html, /data-runway-metric="delivered"/);
+  assert.match(html, />40 dias</);
+  assert.match(html, /aguardando novo lote elegível/);
+  assert.match(html, /href="#\/crescimento\?etapa=target_confirmed"/);
+  assert.match(html, /href="#\/warmbly\/revisao\?filtro=queued"/);
+  assert.doesNotMatch(html, /aprovar tudo/i);
+  assert.equal((html.match(/data-runway-primary-action="true"/g) ?? []).length, 1);
+  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 34);
+});
+
+test("impossible denominators fail closed instead of publishing a plausible zero", () => {
+  const input = envelope();
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  const payload = extra.payload as Record<string, unknown>;
+  payload.recipient_attributed = 2600;
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.integrity.state, "ERROR");
+  assert.ok(truth.outbound_runway.integrity.reason_codes.includes("RECIPIENT_ATTRIBUTED_GT_TARGET_CONFIRMED"));
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(truth.outbound_runway.stock.recipient_attributed.value, null);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.freshness, "ERROR");
+  assert.equal(truth.primary_action?.label, "Resolver divergência do outbound");
+});
+
+test("source-run mismatch blocks runway math and exposes the reconciliation failure", () => {
+  const input = envelope();
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  (extra.payload as Record<string, unknown>).current_run = "run-other";
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.integrity.source_run_match, "MISMATCH");
+  assert.equal(truth.outbound_runway.integrity.state, "ERROR");
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
+  assert.equal(truth.outbound_runway.runway.estimated_days.source.freshness, "UNKNOWN");
+  assert.equal(truth.primary_action?.label, "Resolver divergência do outbound");
+});
+
+test("theoretical capacity never becomes runway when real slots are absent", () => {
+  const input = envelope();
+  const commercial = (((input.snapshots as Record<string, unknown>).commercial as Record<string, unknown>).snapshot as Record<string, unknown>);
+  const operations = commercial.operations as Record<string, unknown>;
+  const working = operations.working_overview as Record<string, unknown>;
+  const dispatch = operations.dispatch as Record<string, unknown>;
+  delete working.slots_next_24h;
+  delete working.slots_next_7d;
+  delete dispatch.slots_next_24h;
+  delete dispatch.slots_next_7d;
+  working.theoretical_slots_24h = 999;
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.runway.slots_next_24h.value, null);
+  assert.equal(truth.outbound_runway.runway.slots_next_7d.value, null);
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
+});
+
+test("stale numeric sources stay unknown and are never rendered as zero", () => {
+  const input = envelope();
+  const commercial = (input.snapshots as Record<string, unknown>).commercial as Record<string, unknown>;
+  commercial.freshness_status = "STALE";
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.transport.state.value, "UNKNOWN");
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
+  assert.equal(truth.outbound_runway.health.provider_errors.value, null);
+  assert.equal(truth.outbound_runway.stock.queued_reserved.source.freshness, "STALE");
+
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  extra.freshness_status = "ERROR";
+  const extraErrorTruth = projectFounderOperatingTruth(input);
+  assert.equal(extraErrorTruth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(extraErrorTruth.outbound_runway.runway.ready_reservoir.value, null);
+  assert.equal(extraErrorTruth.outbound_runway.runway.reservoir_below_1000, null);
+});
+
+test("reservoir threshold and exception-only review are explicit", () => {
+  const input = envelope();
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  (extra.payload as Record<string, unknown>).ready_reservoir = 999;
+  const commercial = (((input.snapshots as Record<string, unknown>).commercial as Record<string, unknown>).snapshot as Record<string, unknown>);
+  const operations = commercial.operations as Record<string, unknown>;
+  (operations.working_overview as Record<string, unknown>).queue_fill_blocker = "NO_BLOCKER";
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, true);
+  assert.equal(truth.primary_action?.label, "Revisar 8 exceção(ões) outbound");
+  assert.match(truth.primary_action?.reason ?? "", /Somente HOLD, NEEDS_REVIEW e EXCEPTION/);
+
+  const view = composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [],
+    incidents: [],
+    clients: [],
+    commercial: null,
+    finance: null,
+    engineering: null,
+    infra: [],
+    activities: [],
+    operational_envelope: input,
+  });
+  const html = renderHoje(view);
+  assert.match(html, /reservoir abaixo de 1 mil/);
+  assert.doesNotMatch(html, /aprovar tudo/i);
 });

@@ -1,0 +1,58 @@
+{
+  "schema_version": "control-center.outbound-runway-evidence.v1",
+  "execution": "ISOLATED_AUTHENTICATED_E2E",
+  "live_production_claimed": false,
+  "pii_present": false,
+  "as_of": "2026-08-20T11:50:00.000Z",
+  "transport": {
+    "state": "PAUSED",
+    "runtime_sha": "8a2eb1f012345678901234567890123456789012",
+    "policy_version": "CFG-FIRST-TOUCH-ROUTING-v1",
+    "source_run_match": "MATCH"
+  },
+  "stock": {
+    "target_confirmed": 2500,
+    "recipient_attributed": 1800,
+    "eligible_current": 1400,
+    "prepared": 341,
+    "delegated_approved": 160,
+    "human_approved": 0,
+    "queued_reserved": 140,
+    "hold_exceptions": 1,
+    "sent": 20,
+    "attempted": 24,
+    "provider_accepted": 22,
+    "delivered": 18,
+    "replies": 3,
+    "suppressed": 50
+  },
+  "runway": {
+    "current_queued": 140,
+    "furthest_due_at": "2026-08-27T17:30:00.000Z",
+    "ready_reservoir": 1200,
+    "slots_next_24h": 30,
+    "slots_next_7d": 210,
+    "estimated_days": 40,
+    "formula": "1200 * 7 / 210",
+    "source_feed_age_seconds": 300,
+    "next_replenishment_state": "WAITING_FOR_EXTRA_CLI_REFRESH"
+  },
+  "health": {
+    "mailboxes_healthy": 5,
+    "mailboxes_blocked": 1,
+    "mailboxes_unknown": 0,
+    "provider_errors": 0,
+    "bounces": 1,
+    "complaints": 0,
+    "stale_retired": 12,
+    "queue_fill_blocker": "WAITING_FOR_ELIGIBLE_BATCH"
+  },
+  "primary_action": "RESOLVE_QUEUE_FILL_BLOCKER",
+  "safety": {
+    "real_email_sent": false,
+    "go_issued": false,
+    "outbound_resumed": false,
+    "kill_switch_changed": false,
+    "irreversible_action": false
+  }
+}

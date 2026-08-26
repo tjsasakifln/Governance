@@ -146,6 +146,9 @@ function assignRoute(payload: WarmblyPayload, key: CollectRouteKey, json: unknow
     case "confenge_first_touch_status":
       payload.confenge_first_touch_status = json as WarmblyPayload["confenge_first_touch_status"];
       break;
+    case "confenge_working_overview":
+      payload.confenge_working_overview = json as WarmblyPayload["confenge_working_overview"];
+      break;
     case "confenge_intel_scoreboard": {
       const rec = asRecordOrUndefined(json);
       if (rec) payload.confenge_intel_scoreboard = rec;

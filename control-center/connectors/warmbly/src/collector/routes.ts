@@ -62,6 +62,12 @@ export const COLLECT_ROUTES: CollectRoute[] = [
     required: false,
   },
   {
+    key: "confenge_working_overview",
+    method: "GET",
+    path: "/v1/confenge/working-overview",
+    required: false,
+  },
+  {
     key: "confenge_intel_scoreboard",
     method: "GET",
     path: "/v1/confenge/intel/scoreboard?include_synthetic=0",

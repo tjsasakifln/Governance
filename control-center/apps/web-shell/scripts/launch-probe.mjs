@@ -217,6 +217,44 @@ async function assertAxe(page, route, viewport, state, checks = visualManifest.c
   return result.length;
 }
 
+async function assertOutboundRunway(page, viewport, requireFirstViewport = false) {
+  const runway = page.locator('[data-outbound-runway="true"]');
+  if (await runway.count() !== 1) {
+    throw new Error(`${viewport}: first viewport must contain exactly one outbound runway block`);
+  }
+  const metrics = runway.locator("[data-runway-metric]");
+  const metricCount = await metrics.count();
+  if (metricCount !== 34) {
+    throw new Error(`${viewport}: outbound runway metric contract changed: ${metricCount}/34`);
+  }
+  const readbacks = await runway.locator(".runway-readback").count();
+  if (readbacks !== metricCount) {
+    throw new Error(`${viewport}: ${metricCount - readbacks} outbound metric(s) lost source/as_of/freshness readback`);
+  }
+  const primaryActions = await runway.locator('[data-runway-primary-action="true"]').count();
+  if (primaryActions > 1) {
+    throw new Error(`${viewport}: outbound runway exposes ${primaryActions} primary actions`);
+  }
+  const viewportPrimaryActions = await page.locator('[data-orientation-primary-action="true"], [data-runway-primary-action="true"]').count();
+  if (viewportPrimaryActions > 1) {
+    throw new Error(`${viewport}: first viewport exposes ${viewportPrimaryActions} competing primary actions`);
+  }
+  if (await runway.locator("form, button").count() !== 0) {
+    throw new Error(`${viewport}: read-only runway unexpectedly exposes a write control`);
+  }
+  const text = await runway.innerText();
+  if (/aprovar\s+tudo|approve\s+all|retomar\s+(?:o\s+)?disparo|resume\s+dispatch/i.test(text)) {
+    throw new Error(`${viewport}: outbound runway exposes a forbidden bulk/resume action`);
+  }
+  const headline = await runway.locator(".runway-headline").boundingBox();
+  const blocker = await runway.locator(".runway-blocker").boundingBox();
+  const viewportHeight = page.viewportSize()?.height ?? 0;
+  if (!headline || !blocker || (requireFirstViewport && (headline.y >= viewportHeight || blocker.y >= viewportHeight))) {
+    throw new Error(`${viewport}: outbound answers/blocker are not in the first viewport: headline=${JSON.stringify(headline)} blocker=${JSON.stringify(blocker)}`);
+  }
+  return { metricCount, primaryActions, headlineY: headline.y, blockerY: blocker.y };
+}
+
 // The isolated Context harness has no Warmbly token, so its review proxy is
 // deliberately unavailable. Intercept only the read endpoint with a realistic
 // backlog to exercise the production-built list + inspector at volume without
@@ -569,6 +607,11 @@ try {
   console.log(`hoje_attention=${attention}`);
   console.log(`hoje_priorities=${priorities}`);
 
+  const initialRunway = await assertOutboundRunway(page, "390", true);
+  console.log(
+    `outbound_runway_initial=PASS viewport=390 metrics=${initialRunway.metricCount} primary_actions=${initialRunway.primaryActions} headline_y=${Math.round(initialRunway.headlineY)} blocker_y=${Math.round(initialRunway.blockerY)}`,
+  );
+
   await page.screenshot({ path: screenshotPath, fullPage: true });
   console.log(`screenshot=${screenshotPath}`);
 
@@ -636,6 +679,12 @@ try {
   }
 
   await page.goto(`${baseUrl}#/comercial/excecoes?q=owner&pagina=2`, { waitUntil: "networkidle" });
+  await page.waitForSelector('[data-destination="comercial"][data-surface="excecoes"]');
+  await page.waitForFunction(() => {
+    const raw = sessionStorage.getItem("confenge.control-center.task-continuity.v1");
+    if (!raw) return false;
+    try { return JSON.parse(raw).hash === "#/comercial/excecoes?q=owner&pagina=2"; } catch { return false; }
+  });
   await page.evaluate(() => history.replaceState(history.state, "", location.pathname));
   await page.reload({ waitUntil: "networkidle" });
   if (page.url().split("#")[1] !== "/comercial/excecoes?q=owner&pagina=2") {
@@ -861,6 +910,11 @@ try {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${baseUrl}#/hoje`, { waitUntil: "networkidle" });
     await page.waitForSelector('[data-destination="hoje"][data-view-state="ready"]');
+    const runwayRequiresFirstViewport = vp.name === "390" || vp.name === "desktop";
+    if (runwayRequiresFirstViewport) {
+      await page.reload({ waitUntil: "networkidle" });
+      await page.waitForSelector('[data-destination="hoje"][data-view-state="ready"]');
+    }
     const vpFilled = await assertFilled(page, 40);
     if (vpFilled.box.width < Math.min(300, vp.width - 24)) {
       throw new Error(`viewport ${vp.name} width ${vpFilled.box.width} too small for ${vp.width}`);
@@ -868,6 +922,14 @@ try {
     const overflow = await overflowPx();
     if (overflow > 1) {
       throw new Error(`viewport ${vp.name} accidental horizontal overflow ${overflow}px`);
+    }
+    const runway = await assertOutboundRunway(page, vp.name, runwayRequiresFirstViewport);
+    if (vp.name === "390" || vp.name === "desktop") {
+      const runwayShot = screenshotPath.replace(/(\.[a-z]+)$/i, `-outbound-runway-${vp.name}$1`);
+      await page.screenshot({ path: runwayShot, fullPage: false });
+      console.log(
+        `outbound_runway=PASS viewport=${vp.name} metrics=${runway.metricCount} primary_actions=${runway.primaryActions} headline_y=${Math.round(runway.headlineY)} blocker_y=${Math.round(runway.blockerY)} screenshot=${runwayShot}`,
+      );
     }
     const vpBrand = await assertBrand(page);
     const releaseIdentity = await page.locator('[data-runtime-identity="true"]').evaluate((footer) => ({

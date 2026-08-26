@@ -29,8 +29,69 @@ export interface MorningException {
   source: MorningSource;
 }
 
+export type TransportDecision = "GO" | "PAUSED" | "NO_GO" | "UNKNOWN";
+
+export interface MorningFact<T extends string | number> {
+  value: T | null;
+  source: MorningSource;
+  href: string;
+  note: string | null;
+}
+
+export interface OutboundRunwayTruth {
+  transport: {
+    state: MorningFact<TransportDecision>;
+    runtime_sha: MorningFact<string>;
+    policy_version: MorningFact<string>;
+    source_run_freshness: MorningFact<TruthFreshness>;
+  };
+  stock: {
+    target_confirmed: MorningFact<number>;
+    recipient_attributed: MorningFact<number>;
+    eligible_current: MorningFact<number>;
+    prepared: MorningFact<number>;
+    delegated_approved: MorningFact<number>;
+    human_approved: MorningFact<number>;
+    queued_reserved: MorningFact<number>;
+    hold_exceptions: MorningFact<number>;
+    sent: MorningFact<number>;
+    attempted: MorningFact<number>;
+    provider_accepted: MorningFact<number>;
+    delivered: MorningFact<number>;
+    replies: MorningFact<number>;
+    suppressed: MorningFact<number>;
+  };
+  runway: {
+    current_queued: MorningFact<number>;
+    furthest_due_at: MorningFact<string>;
+    estimated_days: MorningFact<number>;
+    slots_next_24h: MorningFact<number>;
+    slots_next_7d: MorningFact<number>;
+    ready_reservoir: MorningFact<number>;
+    source_feed_age_seconds: MorningFact<number>;
+    next_replenishment_state: MorningFact<string>;
+    reservoir_below_1000: boolean | null;
+  };
+  health: {
+    mailboxes_healthy: MorningFact<number>;
+    mailboxes_blocked: MorningFact<number>;
+    mailboxes_unknown: MorningFact<number>;
+    provider_errors: MorningFact<number>;
+    bounces: MorningFact<number>;
+    complaints: MorningFact<number>;
+    stale_retired: MorningFact<number>;
+    queue_fill_blocker: MorningFact<string>;
+  };
+  integrity: {
+    state: "OK" | "UNKNOWN" | "ERROR";
+    source_run_match: "MATCH" | "MISMATCH" | "UNKNOWN";
+    reason_codes: string[];
+  };
+}
+
 export interface FounderOperatingTruth {
   generated_at: string | null;
+  outbound_runway: OutboundRunwayTruth;
   outbound: {
     state: "ACTIVE" | "PAUSED" | "UNKNOWN";
     policy_version: string | null;
@@ -90,6 +151,62 @@ const N = (value: unknown): number | null => typeof value === "number" && Number
 const F = (value: unknown): TruthFreshness => value === "FRESH" || value === "STALE" || value === "ERROR" ? value : "UNKNOWN";
 const BUCKETS = new Set<MorningException["bucket"]>(["identity_recipient_conflict", "stale_drift", "party_role_conflict", "outbound_reply_handoff", "payment_provider_ambiguity", "capacity_unknown", "delivery_blocker", "runtime_mismatch", "other"]);
 
+const EXTRA_DRILLDOWN = "#/crescimento";
+const WARMBLY_DRILLDOWN = "#/warmbly/revisao";
+const TRANSPORT_DRILLDOWN = "#/warmbly/operacao";
+
+function sourceWithFreshness(value: MorningSource, freshness: TruthFreshness): MorningSource {
+  return { ...value, freshness };
+}
+
+function countFact(
+  value: number | null,
+  factSource: MorningSource,
+  href: string,
+  note: string | null = null,
+): MorningFact<number> {
+  return {
+    value: factSource.freshness === "FRESH" ? value : null,
+    source: factSource,
+    href,
+    note,
+  };
+}
+
+function textFact<T extends string>(
+  value: T | null,
+  factSource: MorningSource,
+  href: string,
+  note: string | null = null,
+): MorningFact<T> {
+  return { value, source: factSource, href, note };
+}
+
+function newestObservation(
+  rows: Record<string, unknown>[],
+  predicate: (row: Record<string, unknown>) => boolean,
+): Record<string, unknown> {
+  return rows.filter(predicate).sort((left, right) => Date.parse(S(right.observed_at) ?? "") - Date.parse(S(left.observed_at) ?? ""))[0] ?? {};
+}
+
+function countFromFunnel(rows: Record<string, unknown>[], key: string): number | null {
+  return N(rows.find((row) => S(row.key) === key)?.count);
+}
+
+function stateCount(counts: Record<string, unknown>, keys: readonly string[]): number | null {
+  if (Object.keys(counts).length === 0) return null;
+  return keys.reduce((total, key) => total + (N(counts[key]) ?? 0), 0);
+}
+
+function validDate(value: unknown): string | null {
+  const raw = S(value);
+  return raw && !Number.isNaN(Date.parse(raw)) ? raw : null;
+}
+
+function oldestAsOf(...values: Array<string | null>): string | null {
+  return values.filter((item): item is string => Boolean(item)).sort()[0] ?? null;
+}
+
 function source(slot: Record<string, unknown>, system: string, kind?: string, locator?: string): MorningSource {
   const raw = O(slot.source);
   return { system: S(raw.system) ?? system, kind: kind ?? S(raw.kind) ?? "read-model", locator: locator ?? S(raw.locator) ?? "unobserved", as_of: S(slot.observed_at), freshness: F(slot.freshness_status) };
@@ -116,30 +233,210 @@ function exception(row: Record<string, unknown>, generatedAt: string | null): Mo
 
 export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOperatingTruth {
   const envelope = O(envelopeValue), generatedAt = S(envelope.generated_at), snapshots = O(envelope.snapshots);
+  const observations = A(envelope.source_observations);
   const commercialSlot = O(snapshots.commercial), operations = O(O(commercialSlot.snapshot).operations);
-  const dispatch = O(operations.dispatch), delegated = O(operations.delegated_first_touch), overview = O(operations.overview), outcomes = O(operations.outbound_outcomes);
-  const delegatedItems = A(delegated.items), rawDispatchState = S(dispatch.state);
-  const outboundState = dispatch.observed === true && (rawDispatchState === "ACTIVE" || rawDispatchState === "PAUSED") ? rawDispatchState : "UNKNOWN";
-  const sourceRuns = [...new Set(delegatedItems.map((item) => S(item.source_run_id)).filter((item): item is string => Boolean(item)))];
-  const dueDates = [...delegatedItems.filter((item) => item.state === "QUEUED").map((item) => S(item.due_at)), S(dispatch.next_slot_at)]
-    .filter((item): item is string => typeof item === "string" && !Number.isNaN(Date.parse(item))).sort();
+  const dispatch = O(operations.dispatch), delegated = O(operations.delegated_first_touch), working = O(operations.working_overview);
+  const overview = O(operations.overview), outcomes = O(operations.outbound_outcomes), mailboxHealth = O(operations.mailbox_health);
+  const delegatedItems = A(delegated.items), delegatedCounts = O(delegated.counts), rawDispatchState = S(dispatch.state);
+  const warmblySource = source(commercialSlot, "warmbly", "outbound-read-model", "commercial/operations");
+
   const pncpSlot = O(snapshots.pncp), pncp = O(pncpSlot.snapshot), target = O(pncp.target_coverage);
+  const extraObservation = newestObservation(observations, (item) => {
+    const system = S(O(item.source).system) ?? "";
+    const payload = O(item.payload);
+    return system === "extra-cli" && (Array.isArray(payload.funnel_rows) || Object.keys(O(payload.outbound_inventory)).length > 0 || N(payload.target_confirmed) !== null);
+  });
+  const extraPayload = O(extraObservation.payload);
+  const inventory = Object.keys(O(extraPayload.outbound_inventory)).length > 0 ? O(extraPayload.outbound_inventory) : extraPayload;
+  const pncpInventory = Object.keys(O(pncp.outbound_inventory)).length > 0 ? O(pncp.outbound_inventory) : pncp;
+  const inventoryValue = (key: string): unknown => Object.hasOwn(inventory, key) ? inventory[key] : pncpInventory[key];
+  const reservoir = Object.keys(O(inventory.reservoir_health)).length > 0 ? O(inventory.reservoir_health) : O(pncpInventory.reservoir_health);
+  const funnelRows = A(inventory.funnel_rows).length > 0 ? A(inventory.funnel_rows) : A(pncpInventory.funnel_rows);
+  const extraSource = Object.keys(extraObservation).length > 0
+    ? source(extraObservation, "extra-cli", "outbound-inventory", "commercial-reservoir/current")
+    : source(pncpSlot, "extra-cli");
+  const currentFeed = S(inventoryValue("current_feed")) ?? S(inventoryValue("feed_id"));
+  const currentRun = S(inventoryValue("current_run")) ?? S(inventoryValue("run_id")) ?? S(inventoryValue("source_run_id"));
   const targetCoverageText = N(target.covered) !== null && N(target.total) !== null ? `${N(target.covered)}/${N(target.total)}` : S(pncp.target_coverage);
-  const webObservation = A(envelope.source_observations).filter((item) => ["web-cfg", "gsc"].includes(S(O(item.source).system) ?? "")).sort((left, right) => Date.parse(S(right.observed_at) ?? "") - Date.parse(S(left.observed_at) ?? ""))[0] ?? {};
+
+  const transportRaw = S(dispatch.transport_state) ?? rawDispatchState;
+  const reportedTransportDecision: TransportDecision = transportRaw === "GO" || transportRaw === "NO_GO" || transportRaw === "PAUSED"
+    ? transportRaw
+    : transportRaw === "ACTIVE" ? "GO" : "UNKNOWN";
+  const transportDecision: TransportDecision = warmblySource.freshness === "FRESH" ? reportedTransportDecision : "UNKNOWN";
+  const outboundState: FounderOperatingTruth["outbound"]["state"] = transportDecision === "GO" ? "ACTIVE" : transportDecision === "PAUSED" || transportDecision === "NO_GO" ? "PAUSED" : "UNKNOWN";
+  const sourceRuns = [...new Set(delegatedItems.map((item) => S(item.source_run_id)).filter((item): item is string => Boolean(item)))];
+  const delegatedRun = sourceRuns.length === 1 ? sourceRuns[0]! : sourceRuns.length === 0 ? S(delegated.source_run_id) : null;
+  const sourceRunMatch: OutboundRunwayTruth["integrity"]["source_run_match"] = sourceRuns.length > 1
+    ? "MISMATCH"
+    : currentRun && delegatedRun ? currentRun === delegatedRun ? "MATCH" : "MISMATCH" : "UNKNOWN";
+  const dueDates = delegatedItems
+    .filter((item) => item.state === "QUEUED")
+    .map((item) => validDate(item.due_at))
+    .filter((item): item is string => Boolean(item))
+    .sort();
+  const furthestDueDates = [
+    ...dueDates,
+    validDate(working.furthest_due_at),
+    validDate(delegated.furthest_due_at),
+    validDate(dispatch.furthest_due_at),
+  ].filter((item): item is string => Boolean(item)).sort();
+  const nextDueDates = [...dueDates, validDate(dispatch.next_slot_at)].filter((item): item is string => Boolean(item)).sort();
+  const runtimeShas = [...new Set([
+    ...delegatedItems.map((item) => S(item.runtime_release_sha)),
+    S(delegated.runtime_release_sha),
+  ].filter((item): item is string => Boolean(item)))];
+
+  const targetConfirmed = N(inventoryValue("target_confirmed")) ?? N(reservoir.TARGET_CONFIRMED) ?? countFromFunnel(funnelRows, "target_confirmed");
+  const recipientAttributed = N(inventoryValue("recipient_attributed")) ?? N(inventoryValue("identity_safe")) ?? countFromFunnel(funnelRows, "identity_safe");
+  const eligibleCurrent = N(inventoryValue("eligible_current")) ?? N(inventoryValue("warmbly_eligible")) ?? countFromFunnel(funnelRows, "warmbly_eligible");
+  const readyReservoir = N(inventoryValue("ready_reservoir")) ?? N(inventoryValue("email_send_ready_reservoir")) ?? N(reservoir.email_send_ready_reservoir) ?? N(inventoryValue("email_send_ready")) ?? countFromFunnel(funnelRows, "email_send_ready");
+  const prepared = N(working.prepared) ?? N(delegated.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
+  const delegatedApproved = N(delegated.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
+  const humanApproved = N(delegated.human_approved);
+  const queued = N(delegated.queued_readback) ?? N(dispatch.queued_approved);
+  const holdExceptions = N(delegated.hold_exceptions) ?? stateCount(delegatedCounts, ["HOLD", "NEEDS_REVIEW", "EXCEPTION"]) ?? N(overview.outbound_exceptions);
+  const sent = N(outcomes.sent) ?? (Object.hasOwn(delegatedCounts, "SENT") ? N(delegatedCounts.SENT) : null);
+  const attempted = N(outcomes.attempted);
+  const providerAccepted = N(outcomes.provider_accepted);
+  const delivered = N(outcomes.delivered);
+  const replies = N(outcomes.replies) ?? N(overview.replies);
+  const suppressed = N(outcomes.suppressed) ?? N(working.suppressed);
+  const rawSlots24h = N(working.slots_next_24h) ?? N(dispatch.slots_next_24h);
+  const rawSlots7d = N(working.slots_next_7d) ?? N(dispatch.slots_next_7d);
+  const feedAge = N(working.feed_age_seconds) ?? N(inventoryValue("feed_age_seconds"));
+  const feedAgeSource = N(working.feed_age_seconds) !== null ? warmblySource : extraSource;
+  const replenishmentState = S(working.replenishment_state) ?? S(inventoryValue("replenishment_state"));
+  const replenishmentSource = S(working.replenishment_state) ? warmblySource : extraSource;
+  const queueFillBlocker = S(working.queue_fill_blocker) ?? S(inventoryValue("queue_fill_blocker")) ?? S(pncp.blocker);
+  const queueFillSource = S(working.queue_fill_blocker) ? warmblySource : extraSource;
+
+  const integrityReasons: string[] = [];
+  if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_MISMATCH");
+  if (runtimeShas.length > 1) integrityReasons.push("RUNTIME_SHA_MISMATCH");
+  const impossible = (code: string, part: number | null, whole: number | null): void => {
+    if (part !== null && whole !== null && part > whole) integrityReasons.push(code);
+  };
+  impossible("RECIPIENT_ATTRIBUTED_GT_TARGET_CONFIRMED", recipientAttributed, targetConfirmed);
+  impossible("ELIGIBLE_CURRENT_GT_RECIPIENT_ATTRIBUTED", eligibleCurrent, recipientAttributed);
+  impossible("READY_RESERVOIR_GT_ELIGIBLE_CURRENT", readyReservoir, eligibleCurrent);
+  impossible("PREPARED_GT_ELIGIBLE_CURRENT", prepared, eligibleCurrent);
+  impossible("DELEGATED_APPROVED_GT_PREPARED", delegatedApproved, prepared);
+  impossible("HUMAN_APPROVED_GT_PREPARED", humanApproved, prepared);
+  impossible("QUEUED_GT_DELEGATED_APPROVED", queued, delegatedApproved);
+  impossible("SENT_GT_ATTEMPTED", sent, attempted);
+  impossible("PROVIDER_ACCEPTED_GT_ATTEMPTED", providerAccepted, attempted);
+  impossible("DELIVERED_GT_PROVIDER_ACCEPTED", delivered, providerAccepted);
+  impossible("REPLIES_GT_ATTEMPTED", replies, attempted);
+  impossible("SUPPRESSED_GT_TARGET_CONFIRMED", suppressed, targetConfirmed);
+  const hasImpossibleNumbers = integrityReasons.some((code) => code !== "SOURCE_RUN_MISMATCH" && code !== "RUNTIME_SHA_MISMATCH");
+  const reconciledWarmblySource = sourceRunMatch === "MISMATCH" || hasImpossibleNumbers
+    ? sourceWithFreshness(warmblySource, "ERROR")
+    : warmblySource;
+  const reconciledExtraSource = hasImpossibleNumbers ? sourceWithFreshness(extraSource, "ERROR") : extraSource;
+
+  const targetFact = countFact(targetConfirmed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=target_confirmed`);
+  const recipientFact = countFact(recipientAttributed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=recipient_attributed`, "Identidade atribuída à empresa pela origem; nenhuma mailbox é exibida nesta visão.");
+  const eligibleFact = countFact(eligibleCurrent, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=eligible_current`);
+  const preparedFact = countFact(prepared, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=prepared`, "Denominador preparado explícito ou soma conservativa dos estados canônicos que já atravessaram PREPARED no mesmo run.");
+  const approvedFact = countFact(delegatedApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`, "Soma dos buckets canônicos APPROVED, APPROVED_NOT_SCHEDULED, QUEUED e SENT; nenhuma aprovação humana é forjada.");
+  const humanApprovedFact = countFact(humanApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=human_approved`, "Aprovação humana permanece separada da autoridade delegada e não é somada ao delegated approved.");
+  const queuedFact = countFact(queued, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`, "Conta somente QUEUED confirmado por readback canônico.");
+  const holdFact = countFact(holdExceptions, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`, "Revisar mensagens conta somente HOLD, NEEDS_REVIEW e EXCEPTION.");
+  const sentFact = countFact(sent, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=sent`, "SENT é separado de provider accepted e delivered.");
+  const attemptedFact = countFact(attempted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=attempted`);
+  const providerAcceptedFact = countFact(providerAccepted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=provider_accepted`, "Aceite do provider não é SENT nem delivered.");
+  const deliveredFact = countFact(delivered, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delivered`, "Delivered é estágio factual separado de tentativa, aceite do provider e SENT.");
+  const repliesFact = countFact(replies, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=replies`);
+  const suppressedFact = countFact(suppressed, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=suppressed`);
+  const slots24Fact = countFact(rawSlots24h, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; theoretical_slots_24h não entra no cálculo.");
+  const slots7Fact = countFact(rawSlots7d, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; cap ou teto de política não substituem capacidade.");
+  const readyFact = countFact(readyReservoir, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`);
+  const runwayDays = sourceRunMatch === "MATCH" && readyFact.value !== null && slots7Fact.value !== null && slots7Fact.value > 0
+    ? Math.round((readyFact.value * 7 / slots7Fact.value) * 10) / 10
+    : null;
+  const runwaySource: MorningSource = {
+    system: "extra-cli+warmbly",
+    kind: "derived-runway",
+    locator: `${extraSource.locator} + ${warmblySource.locator}`,
+    as_of: oldestAsOf(extraSource.as_of, warmblySource.as_of),
+    freshness: runwayDays === null ? "UNKNOWN" : "FRESH",
+  };
+  const runwayDaysFact = countFact(runwayDays, runwaySource, TRANSPORT_DRILLDOWN, "Fórmula: ready reservoir (extra-cli) × 7 ÷ slots reais dos próximos 7 dias (Warmbly). as_of é o mais antigo das duas fontes. Capacidade zero, ausente ou source-run divergente resulta em UNKNOWN.");
+
+  const outboundRunway: OutboundRunwayTruth = {
+    transport: {
+      state: textFact(transportDecision, warmblySource, TRANSPORT_DRILLDOWN, "GO/PAUSED/NO_GO vem do transporte Warmbly; esta projeção não altera kill switch."),
+      runtime_sha: textFact(runtimeShas.length === 1 ? runtimeShas[0]! : null, runtimeShas.length > 1 ? sourceWithFreshness(warmblySource, "ERROR") : warmblySource, TRANSPORT_DRILLDOWN),
+      policy_version: textFact(S(delegated.policy_version), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
+      source_run_freshness: textFact(sourceRunMatch === "MISMATCH" ? "ERROR" : extraSource.freshness, sourceRunMatch === "MISMATCH" ? sourceWithFreshness(extraSource, "ERROR") : extraSource, EXTRA_DRILLDOWN, `Reconciliação do run extra-cli (${currentRun ?? "UNKNOWN"}) com Warmbly (${delegatedRun ?? "UNKNOWN"}): ${sourceRunMatch}.`),
+    },
+    stock: {
+      target_confirmed: targetFact,
+      recipient_attributed: recipientFact,
+      eligible_current: eligibleFact,
+      prepared: preparedFact,
+      delegated_approved: approvedFact,
+      human_approved: humanApprovedFact,
+      queued_reserved: queuedFact,
+      hold_exceptions: holdFact,
+      sent: sentFact,
+      attempted: attemptedFact,
+      provider_accepted: providerAcceptedFact,
+      delivered: deliveredFact,
+      replies: repliesFact,
+      suppressed: suppressedFact,
+    },
+    runway: {
+      current_queued: queuedFact,
+      furthest_due_at: textFact(furthestDueDates.at(-1) ?? null, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`),
+      estimated_days: runwayDaysFact,
+      slots_next_24h: slots24Fact,
+      slots_next_7d: slots7Fact,
+      ready_reservoir: readyFact,
+      source_feed_age_seconds: countFact(feedAge, feedAgeSource, EXTRA_DRILLDOWN),
+      next_replenishment_state: textFact(replenishmentState, replenishmentSource, EXTRA_DRILLDOWN),
+      reservoir_below_1000: readyFact.value === null ? null : readyFact.value < 1000,
+    },
+    health: {
+      mailboxes_healthy: countFact(N(mailboxHealth.healthy), warmblySource, TRANSPORT_DRILLDOWN),
+      mailboxes_blocked: countFact(N(mailboxHealth.blocked), warmblySource, TRANSPORT_DRILLDOWN),
+      mailboxes_unknown: countFact(N(mailboxHealth.unknown), warmblySource, TRANSPORT_DRILLDOWN),
+      provider_errors: countFact(N(outcomes.provider_errors) ?? N(dispatch.provider_errors), warmblySource, TRANSPORT_DRILLDOWN),
+      bounces: countFact(N(outcomes.bounces) ?? N(overview.bounces), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=bounces`),
+      complaints: countFact(N(outcomes.complaints), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=complaints`),
+      stale_retired: countFact(N(working.stale_retired), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=stale_retired`),
+      queue_fill_blocker: textFact(queueFillBlocker, queueFillSource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`),
+    },
+    integrity: {
+      state: integrityReasons.length > 0 ? "ERROR" : sourceRunMatch === "UNKNOWN" ? "UNKNOWN" : "OK",
+      source_run_match: sourceRunMatch,
+      reason_codes: [...new Set(integrityReasons)],
+    },
+  };
+
+  const webObservation = newestObservation(observations, (item) => ["web-cfg", "gsc"].includes(S(O(item.source).system) ?? ""));
   const webPayload = O(webObservation.payload), inbound = O(operations.inbound), delivery = O(operations.delivery), capacity = O(operations.capacity), governance = O(operations.governance);
   const financeSlot = O(snapshots.finance), finance = O(financeSlot.snapshot);
   const staffedState = capacity.staffed_capacity_state === "KNOWN" ? "KNOWN" : "UNKNOWN";
-  const admission = capacity.admission === "CAN_ACCEPT" || capacity.admission === "CANNOT_ACCEPT"
-    ? capacity.admission
-    : "UNKNOWN";
-  const checkoutGate = governance.checkout_gate === "OPEN" || governance.checkout_gate === "BLOCKED"
-    ? governance.checkout_gate
-    : "UNKNOWN";
-  const asaasGate = governance.asaas_gate === "PROVEN" || governance.asaas_gate === "MISSING" || governance.asaas_gate === "BLOCKED"
-    ? governance.asaas_gate
-    : "UNKNOWN";
+  const admission = capacity.admission === "CAN_ACCEPT" || capacity.admission === "CANNOT_ACCEPT" ? capacity.admission : "UNKNOWN";
+  const checkoutGate = governance.checkout_gate === "OPEN" || governance.checkout_gate === "BLOCKED" ? governance.checkout_gate : "UNKNOWN";
+  const asaasGate = governance.asaas_gate === "PROVEN" || governance.asaas_gate === "MISSING" || governance.asaas_gate === "BLOCKED" ? governance.asaas_gate : "UNKNOWN";
 
   const exceptions = A(operations.exceptions).map((item) => exception(item, generatedAt));
+  if (integrityReasons.length > 0 && !exceptions.some((item) => item.id === "projection-outbound-integrity")) {
+    exceptions.push({
+      id: "projection-outbound-integrity",
+      bucket: integrityReasons.includes("SOURCE_RUN_MISMATCH") || integrityReasons.includes("RUNTIME_SHA_MISMATCH") ? "runtime_mismatch" : "other",
+      owner: "outbound_owner",
+      reason: `Leitura outbound bloqueada por ${integrityReasons.join(", ")}.`,
+      evidence: [`extra_run:${currentRun ?? "UNKNOWN"}`, `warmbly_run:${delegatedRun ?? "UNKNOWN"}`],
+      age_seconds: null,
+      next_action: "Reconciliar source run, runtime e denominadores antes de aumentar volume.",
+      severity: "critical",
+      source: sourceWithFreshness(warmblySource, "ERROR"),
+    });
+  }
   if (!exceptions.some((item) => item.bucket === "capacity_unknown") && staffedState === "UNKNOWN") {
     exceptions.push({
       id: "projection-capacity-unknown",
@@ -177,37 +474,45 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     });
   }
 
-  const explicitToday = A(envelope.today)[0];
-  const capacityException = exceptions.find((item) => item.bucket === "capacity_unknown");
-  const primaryAction = explicitToday
+  const integrityException = exceptions.find((item) => item.id === "projection-outbound-integrity");
+  const materialQueueBlocker = queueFillSource.freshness === "FRESH" && queueFillBlocker && !/^(?:NONE|NO_BLOCKER|UNKNOWN)$/i.test(queueFillBlocker) ? queueFillBlocker : null;
+  const primaryAction = integrityException
     ? {
-        owner: S(explicitToday.owner) ?? "founder",
-        label: S(explicitToday.recommended_action) ?? S(explicitToday.title) ?? "Tratar a prioridade operacional observada.",
-        reason: S(explicitToday.reason) ?? "Prioridade publicada pela fila canônica de hoje.",
-        href: "#/hoje",
+        owner: integrityException.owner,
+        label: "Resolver divergência do outbound",
+        reason: integrityException.reason,
+        href: "#/comercial/excecoes?tipo=runtime_mismatch",
       }
-    : capacityException
+    : materialQueueBlocker
       ? {
-          owner: capacityException.owner,
-          label: capacityException.next_action,
-          reason: capacityException.reason,
-          href: "#/comercial/excecoes?tipo=capacity_unknown",
+          owner: "outbound_owner",
+          label: "Resolver blocker do refill",
+          reason: materialQueueBlocker,
+          href: "#/comercial/excecoes?tipo=queue_fill_blocker",
         }
-      : null;
+      : holdFact.value !== null && holdFact.value > 0
+        ? {
+            owner: "outbound_owner",
+            label: `Revisar ${holdFact.value} exceção(ões) outbound`,
+            reason: "Somente HOLD, NEEDS_REVIEW e EXCEPTION entram nesta revisão; itens elegíveis continuam delegados.",
+            href: "#/warmbly/revisao?filtro=exceptions",
+          }
+        : null;
 
   return {
     generated_at: generatedAt,
+    outbound_runway: outboundRunway,
     outbound: {
       state: outboundState,
-      policy_version: S(delegated.policy_version), source_run: sourceRuns.length === 1 ? sourceRuns[0]! : S(delegated.source_run_id),
-      queued: N(delegated.queued_readback) ?? N(dispatch.queued_approved), next_due: dueDates[0] ?? null,
+      policy_version: S(delegated.policy_version), source_run: delegatedRun,
+      queued: queuedFact.value, next_due: nextDueDates[0] ?? null,
       sends_today: N(dispatch.sent_today), limit: N(dispatch.daily_limit) ?? N(dispatch.cap), replies: N(outcomes.replies) ?? N(overview.replies), bounces: N(outcomes.bounces) ?? N(overview.bounces), opt_outs: N(outcomes.opt_outs) ?? N(overview.opt_outs), exceptions: N(overview.exceptions), transport_health: S(dispatch.transport_health), source: source(commercialSlot, "warmbly"),
     },
     data: {
-      current_feed: S(pncp.current_feed) ?? S(pncp.feed_id),
-      current_run: S(pncp.current_run) ?? S(pncp.run_id) ?? S(pncp.source_run_id),
-      target_coverage: targetCoverageText,
-      blocker: S(pncp.blocker) ?? (pncpSlot.presence === "absent" ? S(pncpSlot.absence_reason) : null), source: source(pncpSlot, "extra-cli/pncp"),
+      current_feed: currentFeed,
+      current_run: currentRun,
+      target_coverage: targetCoverageText ?? (targetConfirmed === null ? null : String(targetConfirmed)),
+      blocker: queueFillBlocker ?? (pncpSlot.presence === "absent" ? S(pncpSlot.absence_reason) : null), source: extraSource,
     },
     inbound_web: {
       deploy_identity: S(webPayload.deploy_identity) ?? S(webPayload.release_sha) ?? S(webPayload.commit_sha), lead_sla_state: S(inbound.lead_sla_state) ?? S(webPayload.lead_sla_state), gsc_readiness: S(webPayload.gsc_readiness), public_surface_health: S(webPayload.public_surface_health), source: source(webObservation, "web-cfg"),

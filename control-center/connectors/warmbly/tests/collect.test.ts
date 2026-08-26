@@ -31,6 +31,12 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     const decisions = delegated.items as Array<Record<string, unknown>>;
     assert.equal(decisions[0]?.approval_source, "DELEGATED_POLICY_APPROVE");
     assert.equal(decisions[1]?.approval_source, "POLICY_EVALUATION_HOLD");
+    const working = snapshot.operations?.working_overview as Record<string, unknown>;
+    assert.equal(working.observed, true);
+    assert.equal(working.reservoir_monitored, 2500);
+    assert.equal(working.actionable_now, 1200);
+    assert.equal(working.feed_age_seconds, 300);
+    assert.equal(working.theoretical_slots_24h, 90);
 
     for (const row of snapshot.attention) {
       assert.equal(row.provenance.source, "warmbly");
@@ -177,6 +183,10 @@ describe("collect() against a local Warmbly-shaped stub", () => {
       );
       assert.equal(
         stub.calls.some((c) => c.method === "GET" && c.path === "/v1/confenge/first-touch/status"),
+        true,
+      );
+      assert.equal(
+        stub.calls.some((c) => c.method === "GET" && c.path === "/v1/confenge/working-overview"),
         true,
       );
       assert.equal(

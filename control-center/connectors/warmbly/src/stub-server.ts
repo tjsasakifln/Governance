@@ -92,6 +92,8 @@ function routeBody(payload: WarmblyPayload, pathname: string): unknown | undefin
       return payload.confenge_dispatch_status;
     case "/v1/confenge/first-touch/status":
       return payload.confenge_first_touch_status;
+    case "/v1/confenge/working-overview":
+      return payload.confenge_working_overview;
     case "/v1/confenge/ops/health":
       return payload.confenge_ops_health ?? { data: { computed_at: new Date().toISOString() } };
     case "/v1/confenge/attention":

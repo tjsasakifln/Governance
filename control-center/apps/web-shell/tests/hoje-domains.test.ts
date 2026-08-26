@@ -199,7 +199,7 @@ test("outbound state is tri-state and an unreported kill switch is not 'ativo'",
 test("critical integrations are rolled up worst-first and an errored source is never saudável", () => {
   const summary = summarizeDomains(OPERATIONAL_ENVELOPE_FIXTURE);
   const systems = summary.integrations.map((row) => row.system);
-  assert.deepEqual(systems, ["github", "asaas", "collector", "warmbly"]);
+  assert.deepEqual(systems, ["github", "asaas", "collector", "extra-cli", "warmbly"]);
   const github = summary.integrations[0]!;
   assert.equal(github.state, "erro_coleta");
   assert.match(github.detail, /Erro na origem/);
