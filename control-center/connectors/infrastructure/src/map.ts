@@ -305,6 +305,7 @@ export function mapServiceHealth(
   allowlist: Allowlist,
   now: Date,
 ): ServiceHealth {
+  const lifecycleState = target.lifecycle_state ?? "LIVE";
   const owned = observations.filter((obs) => obs.target_id === target.id);
   const checks: ServiceCheck[] = owned.map((obs) => {
     const status = obs.payload.service_status;
@@ -319,11 +320,17 @@ export function mapServiceHealth(
       summary: obs.summary,
     };
   });
-  const freshness = worstFreshness(checks.map((c) => c.freshness_status));
-  const status = coalesceServiceStatus(
-    checks.map((c) => c.status),
-    freshness,
-  );
+  const freshness =
+    lifecycleState === "PREPARED/NOT_LIVE"
+      ? "UNKNOWN"
+      : worstFreshness(checks.map((c) => c.freshness_status));
+  const status =
+    lifecycleState === "PREPARED/NOT_LIVE"
+      ? "unknown"
+      : coalesceServiceStatus(
+          checks.map((c) => c.status),
+          freshness,
+        );
   const uptimeObs = owned.find((obs) => obs.check === "uptime");
   const health: ServiceHealth = {
     service_id: target.id,
@@ -334,6 +341,7 @@ export function mapServiceHealth(
     observed_at: owned[0]?.observed_at ?? toUtcIso(now),
     freshness_status: freshness,
     status,
+    lifecycle_state: lifecycleState,
     checks,
     confidence: owned.length
       ? Math.min(...owned.map((obs) => obs.confidence ?? 0.2))

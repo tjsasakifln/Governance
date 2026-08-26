@@ -13,6 +13,9 @@ Ownership path: `control-center/connectors/infrastructure/` only.
 5. **Idempotency** is a stable observation identity (`source + target + check`), not deletion of prior runs.
 6. **Local adapter.** Canonical `control-center/contracts/` is a sibling workstream. This tree ships a local field set documented in `ADAPTER.md` so convergence can ingest without this collector writing that path.
 7. extra-cli remains the origin VPS checker (DB/disk/load/mem, systemd, backup mount). This collector normalizes those *kinds* of signals; it does not rewrite extra-cli.
+8. **Prepared targets are explicit.** A target cataloged as
+   `PREPARED/NOT_LIVE` is visible as `unknown`/`UNKNOWN` but is not probed and
+   cannot create an incident until a separate cutover change marks it `LIVE`.
 
 ## Run
 

@@ -64,3 +64,21 @@ test("allowlist requires unique ids and known checks", () => {
     /must be one of/i,
   );
 });
+
+test("allowlist admits only explicit lifecycle states", () => {
+  const base = loadFixtureFile("healthy.json").allowlist as Record<string, unknown>;
+  const targets = base.targets as Record<string, unknown>[];
+  const prepared = parseAllowlist({
+    ...base,
+    targets: [{ ...targets[0], lifecycle_state: "PREPARED/NOT_LIVE" }],
+  });
+  assert.equal(prepared.targets[0]?.lifecycle_state, "PREPARED/NOT_LIVE");
+  assert.throws(
+    () =>
+      parseAllowlist({
+        ...base,
+        targets: [{ ...targets[0], lifecycle_state: "ASSUMED_LIVE" }],
+      }),
+    /lifecycle_state must be one of/i,
+  );
+});

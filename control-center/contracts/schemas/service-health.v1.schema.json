@@ -32,6 +32,10 @@
       "type": "string",
       "enum": ["healthy", "degraded", "down", "unknown"]
     },
+    "lifecycle_state": {
+      "type": "string",
+      "enum": ["LIVE", "PREPARED/NOT_LIVE"]
+    },
     "provenance": {
       "$ref": "https://github.com/tjsasakifln/Governance/control-center/contracts/schemas/primitives.v1.schema.json#/$defs/provenance"
     },

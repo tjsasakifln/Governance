@@ -1,0 +1,13 @@
+/var/log/confenge-web/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 root confenge-web
+    sharedscripts
+    postrotate
+        nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || true
+    endscript
+}

@@ -21,6 +21,9 @@ export const CHECK_KINDS = [
 ] as const;
 export type CheckKind = (typeof CHECK_KINDS)[number];
 
+export const TARGET_LIFECYCLE_STATES = ["LIVE", "PREPARED/NOT_LIVE"] as const;
+export type TargetLifecycleState = (typeof TARGET_LIFECYCLE_STATES)[number];
+
 export const SERVICE_STATUSES = ["healthy", "degraded", "unhealthy", "unknown"] as const;
 export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 
@@ -69,6 +72,8 @@ export interface ServiceHealth {
   readonly observed_at: string;
   readonly freshness_status: FreshnessStatus;
   readonly status: ServiceStatus;
+  /** Catalog lifecycle. PREPARED/NOT_LIVE targets are visible but not probed. */
+  readonly lifecycle_state?: TargetLifecycleState;
   readonly checks: readonly ServiceCheck[];
   readonly uptime_seconds?: number;
   readonly restart_count?: number;
@@ -135,6 +140,8 @@ export interface AllowlistTarget {
    */
   readonly runbook_url?: string;
   readonly checks: readonly CheckKind[];
+  /** Defaults to LIVE. PREPARED/NOT_LIVE suppresses probes and incidents until cutover. */
+  readonly lifecycle_state?: TargetLifecycleState;
   readonly host?: string;
   /** TCP connect address (IP or hostname). Independent of TLS/HTTP identity. */
   readonly connect_host?: string;

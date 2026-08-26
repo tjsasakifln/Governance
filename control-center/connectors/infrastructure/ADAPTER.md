@@ -29,6 +29,7 @@ Canonical Control Center contracts live in sibling path `control-center/contract
 | `observed_at` | string | UTC |
 | `freshness_status` | same enum | Worst of member checks |
 | `status` | `healthy` \| `degraded` \| `unhealthy` \| `unknown` | Never `healthy` unless freshness is `FRESH` |
+| `lifecycle_state` | `LIVE` \| `PREPARED/NOT_LIVE` | Catalog state; prepared targets have no probes/incidents |
 | `checks` | array | Per-check status + freshness + summary |
 | `uptime_seconds` | number? | When the uptime probe observed it |
 | `restart_count` | number? | When the uptime probe observed it |
@@ -59,13 +60,14 @@ A service incident (failed/unreachable/unhealthy probe, expired TLS, missing/fai
 
 See `config/allowlist.example.json`. No secrets, SSH material, passwords, tokens, or PEM. Hosts/URLs only. Thresholds are operational, not credentials.
 
-Two optional per-target fields make the cockpit readable instead of a wall of
+Three optional per-target fields make the cockpit readable instead of a wall of
 identical cards:
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `role` | string? | What the target does, ≤120 chars. Omitted, the collector derives one from the target's checks |
 | `runbook_url` | string? | Same-origin absolute path, or an http(s) URL with no credentials. Protocol-relative and `javascript:` are refused at parse time |
+| `lifecycle_state` | `LIVE` \| `PREPARED/NOT_LIVE`? | Defaults to `LIVE`; prepared targets stay visible but unprobed until cutover |
 
 ## Read-only agent payload (`GET {AGENT}/v1/targets/{id}`)
 
