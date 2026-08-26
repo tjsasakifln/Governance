@@ -949,8 +949,20 @@ function exceptionOpsCard(
   const startDraftKey = `operator:START_EXCEPTION_WORK:${canonical}:${sourceId}`;
   const workflow = String(row.workflow_state ?? "new");
   const owner = typeof row.owner === "string" && row.owner ? row.owner : "sem responsável";
+  const reason = String(row.reason ?? row.why ?? row.id ?? "motivo não informado pela origem");
   const age = typeof row.age_seconds === "number" ? `${Math.max(0, Math.floor(row.age_seconds / 3600))} h` : "não informada";
   const count = typeof row.occurrence_count === "number" ? row.occurrence_count : 1;
+  const severity = typeof row.severity === "string" && row.severity ? row.severity : "unknown";
+  const evidence = Array.isArray(row.evidence)
+    ? row.evidence.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+    : [];
+  const exceptionSource = row.source && typeof row.source === "object" && !Array.isArray(row.source)
+    ? row.source as Record<string, unknown>
+    : {};
+  const sourceSystem = String(exceptionSource.system ?? row.source_system ?? "origem não informada");
+  const sourceLocator = String(exceptionSource.locator ?? row.source_locator ?? "locator não informado");
+  const exceptionFreshness = String(row.freshness ?? row.freshness_status ?? "UNKNOWN");
+  const nextAction = String(row.next_action ?? row.recommended_next_action ?? "investigar a evidência e definir correção");
   const resolutionKind = String(row.resolution_kind ?? "unsupported");
   let resolution: string;
   if (resolutionKind === "warmbly_action") {
@@ -966,13 +978,16 @@ function exceptionOpsCard(
   const nextId = position.next ? String(position.next.row.id ?? position.next.row.source_id ?? "") : "";
   const actionContinuity = queueActionAttributes(position, nextId);
   return `<article class="card"${focusAttributes} data-exception-id="${escapeHtml(id)}" data-exception-status="${escapeHtml(String(row.status ?? ""))}" data-workflow-state="${escapeHtml(workflow)}" data-occurrence-count="${count}">
-    <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))}</p>
-    <h3>${escapeHtml(String(row.why ?? row.id ?? "exceção"))}</h3>
+    <p class="kicker">${statusPill(workflow, commercialStateLabel(workflow))} · ${statusPill(String(row.kind ?? "exception"), exceptionKindLabel(String(row.kind ?? "exception")))} · ${statusPill(severity, severityLabel(severity))}</p>
+    <h3>${escapeHtml(reason)}</h3>
     <dl class="facts">
       ${fact("Responsável", escapeHtml(owner), owner === "sem responsável" ? ` data-absent="true"` : "")}
       ${fact("Idade", escapeHtml(age))}
       ${fact("Impacto", escapeHtml(String(row.impact ?? "impacto não informado pela origem")))}
-      ${fact("Ação recomendada", escapeHtml(String(row.recommended_next_action ?? "investigar a evidência e definir correção")))}
+      ${fact("Ação recomendada", escapeHtml(nextAction))}
+      ${fact("Evidência", escapeHtml(evidence.length > 0 ? evidence.join(" · ") : "não informada pela origem"), evidence.length === 0 ? ` data-absent="true"` : "")}
+      ${fact("Origem", escapeHtml(`${sourceSystemLabel(sourceSystem)} · ${sourceLocator}`))}
+      ${fact("Atualização", escapeHtml(availabilityLabel(exceptionFreshness)), ` data-freshness="${escapeHtml(exceptionFreshness)}"`)}
       ${fact("Ocorrências agrupadas", String(count))}
       ${fact("Sincronização", escapeHtml(String(row.sync_status ?? "observada na origem")))}
     </dl>
@@ -983,6 +998,12 @@ function exceptionOpsCard(
       { term: "canonical_id", value: canonical },
       { term: "source_id", value: sourceId },
       { term: "workflow_state", value: workflow },
+      { term: "severity", value: severity },
+      { term: "source_system", value: sourceSystem },
+      { term: "source_kind", value: String(exceptionSource.kind ?? "") },
+      { term: "source_locator", value: sourceLocator },
+      { term: "freshness", value: exceptionFreshness },
+      { term: "evidence", value: evidence.join(",") },
       { term: "group_key", value: String(row.group_key ?? "") },
       { term: "occurrence_ids", value: Array.isArray(row.occurrence_ids) ? row.occurrence_ids.join(",") : "" },
     ], "resolvable-exception")}

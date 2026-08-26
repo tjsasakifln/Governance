@@ -6,8 +6,9 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
-from delivery.capacity import CapacityError, CapacityLedger, evaluate_admission
+from delivery.capacity import CapacityError, CapacityLedger, evaluate_admission, project_capacity_read_only
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -184,6 +185,57 @@ def test_policy_ceiling_50_is_not_a_capacity_input():
     assert snapshot["staffed_capacity_units"] == 1
     assert snapshot["policy_ceiling_used_as_staffed_capacity"] is False
     assert snapshot["real_checkout_enabled"] is False
+
+
+def test_read_only_projection_separates_ceiling_from_unknown_staffed_capacity():
+    projection = project_capacity_read_only(
+        policy_ceiling=50,
+        capacity_snapshot=None,
+        active_work_orders=None,
+        committed_allocations=None,
+        projected_at=EVALUATED_AT,
+    )
+    assert projection["policy_ceiling"] == 50
+    assert projection["staffed_capacity"] is None
+    assert projection["staffed_capacity_state"] == "UNKNOWN"
+    assert projection["committed"] is None
+    assert projection["available"] is None
+    assert projection["freshness"] == "UNKNOWN"
+    assert projection["admission"] == "UNKNOWN"
+    assert projection["can_accept"] is False
+    assert projection["checkout_enabled"] is False
+
+
+def test_synthetic_capacity_projection_never_becomes_real_readiness():
+    projection = project_capacity_read_only(
+        policy_ceiling=50,
+        capacity_snapshot=load("capacity-synthetic-one.v1.json"),
+        active_work_orders=[],
+        committed_allocations=0,
+        projected_at=EVALUATED_AT,
+        admission_decision="CAN_ACCEPT",
+    )
+    assert projection["staffed_capacity"] == 1
+    assert projection["committed"] == 0
+    assert projection["available"] == 1
+    assert projection["evidence_class"] == "SYNTHETIC"
+    assert projection["admission"] == "UNKNOWN"
+    assert projection["can_accept"] is False
+    assert projection["checkout_enabled"] is False
+    assert projection["reason_codes"] == ["SYNTHETIC_CAPACITY_NOT_REAL_READINESS"]
+
+
+def test_read_only_capacity_projection_validates_against_versioned_schema():
+    schema = json.loads((ROOT / "schemas" / "capacity-projection.v1.schema.json").read_text())
+    Draft202012Validator.check_schema(schema)
+    projection = project_capacity_read_only(
+        policy_ceiling=50,
+        capacity_snapshot=None,
+        active_work_orders=None,
+        committed_allocations=None,
+        projected_at=EVALUATED_AT,
+    )
+    Draft202012Validator(schema).validate(projection)
 
 
 def test_expiry_reconciliation_and_idempotency_payloads_fail_closed(tmp_path: Path):

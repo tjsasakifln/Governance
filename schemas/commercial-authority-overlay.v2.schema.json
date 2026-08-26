@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/commercial-authority-overlay.v2.schema.json",
+  "title": "commercial-authority-overlay.v2",
+  "description": "Additive authority overlay. It pins the external web-cfg catalog and naming authorities without copying their catalog, preserves v1 as history, and keeps capacity/provider/checkout facts fail-closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "authority_id",
+    "status",
+    "effective_at",
+    "source_issue",
+    "v1_history",
+    "catalog_boundary",
+    "historical_financial_subset",
+    "provider_boundary",
+    "capacity_boundary",
+    "payment_semantics",
+    "activation_gates"
+  ],
+  "properties": {
+    "schema_version": { "const": "commercial-authority-overlay.v2" },
+    "authority_id": { "const": "CFG-COMMERCIAL-AUTHORITY-OVERLAY-v2" },
+    "status": { "const": "ACTIVE" },
+    "effective_at": { "type": "string", "format": "date-time" },
+    "source_issue": { "type": "string", "format": "uri" },
+    "v1_history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved", "manifest_path", "catalog_path", "semantic_status"],
+      "properties": {
+        "preserved": { "const": true },
+        "manifest_path": { "const": "commercial/authority/authority-manifest.v1.json" },
+        "catalog_path": { "const": "commercial/offers/catalog.v1.json" },
+        "semantic_status": { "const": "HISTORICAL_FINANCIAL_SUBSET_SUPERSEDED_AS_PUBLIC_CATALOG" }
+      }
+    },
+    "catalog_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["governance_catalog_role", "no_parallel_catalog", "deliverables_registry", "naming_authority"],
+      "properties": {
+        "governance_catalog_role": { "const": "NONE" },
+        "no_parallel_catalog": { "const": true },
+        "deliverables_registry": { "$ref": "#/$defs/external_pin" },
+        "naming_authority": {
+          "allOf": [
+            { "$ref": "#/$defs/external_pin" },
+            {
+              "type": "object",
+              "required": ["effective_at", "human_test_state", "publication_state"],
+              "properties": {
+                "effective_at": { "type": "null" },
+                "human_test_state": { "const": "NOT_STARTED" },
+                "publication_state": { "const": "DECIDED_NOT_PROVEN_EFFECTIVE" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "historical_financial_subset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "source_path", "offer_ids", "complete_public_catalog"],
+      "properties": {
+        "classification": { "const": "HISTORICAL_FINANCIAL_MAPPING_SUBSET" },
+        "source_path": { "const": "commercial/offers/catalog.v1.json" },
+        "offer_ids": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "complete_public_catalog": { "const": false }
+      }
+    },
+    "provider_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "mapping_path", "provider_lookup_performed", "mappings", "checkout_gate"],
+      "properties": {
+        "provider": { "const": "asaas" },
+        "mapping_path": { "const": "commercial/providers/asaas-mapping.v1.json" },
+        "provider_lookup_performed": { "const": false },
+        "mappings": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["offer_id", "mapping_state", "provider_object_state", "provider_object_id", "evidence_refs"],
+            "properties": {
+              "offer_id": { "type": "string", "minLength": 1 },
+              "mapping_state": { "enum": ["MISSING", "UNKNOWN", "BLOCKED"] },
+              "provider_object_state": { "enum": ["MISSING", "UNKNOWN", "BLOCKED"] },
+              "provider_object_id": { "type": "null" },
+              "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        },
+        "checkout_gate": { "const": "BLOCKED" }
+      }
+    },
+    "capacity_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_ceiling", "staffed_capacity", "committed", "available", "freshness", "admission", "can_accept"],
+      "properties": {
+        "policy_ceiling": { "$ref": "#/$defs/known_units" },
+        "staffed_capacity": { "$ref": "#/$defs/unknown_units" },
+        "committed": { "$ref": "#/$defs/unknown_units" },
+        "available": { "$ref": "#/$defs/unknown_units" },
+        "freshness": { "const": "UNKNOWN" },
+        "admission": { "enum": ["UNKNOWN", "CANNOT_ACCEPT"] },
+        "can_accept": { "const": false }
+      }
+    },
+    "payment_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_accepted", "PAYMENT_CREATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"],
+      "properties": {
+        "proposal_accepted": { "const": "NOT_REVENUE" },
+        "PAYMENT_CREATED": { "const": "PROVIDER_OBJECT_CREATED_NOT_PAID_NOT_RECEIVED" },
+        "PAYMENT_CONFIRMED": { "const": "PAID_NOT_RECEIVED" },
+        "PAYMENT_RECEIVED": { "const": "RECEIVED_REVENUE_REQUIRES_PROVIDER_PROOF" }
+      }
+    },
+    "activation_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["production_checkout_enabled", "real_money_mutation_approved", "provider_objects_proven", "staffed_capacity_published"],
+      "properties": {
+        "production_checkout_enabled": { "const": false },
+        "real_money_mutation_approved": { "const": false },
+        "provider_objects_proven": { "const": false },
+        "staffed_capacity_published": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "external_pin": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["repository", "ref", "path", "blob_sha", "source_issue", "authority_state"],
+      "properties": {
+        "repository": { "const": "tjsasakifln/web-cfg" },
+        "ref": { "const": "main" },
+        "path": { "type": "string", "minLength": 1 },
+        "blob_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "source_issue": { "type": "string", "format": "uri" },
+        "authority_state": { "const": "PINNED" }
+      }
+    },
+    "known_units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "units", "unit", "source_ref"],
+      "properties": {
+        "state": { "const": "KNOWN" },
+        "units": { "type": "integer", "minimum": 0 },
+        "unit": { "const": "delivery_slot" },
+        "source_ref": { "type": "string", "minLength": 1 }
+      }
+    },
+    "unknown_units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "units", "unit", "reason"],
+      "properties": {
+        "state": { "const": "UNKNOWN" },
+        "units": { "type": "null" },
+        "unit": { "const": "delivery_slot" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

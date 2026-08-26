@@ -390,6 +390,133 @@ def evaluate_admission(
     }
 
 
+def project_capacity_read_only(
+    *,
+    policy_ceiling: int | None,
+    capacity_snapshot: Mapping[str, Any] | None,
+    active_work_orders: Sequence[Mapping[str, Any]] | None,
+    committed_allocations: int | None,
+    projected_at: str,
+    admission_decision: str | None = None,
+) -> dict[str, Any]:
+    """Project current capacity without reserving, committing, or enabling checkout.
+
+    This projection has deliberately different semantics from the synthetic
+    admission canary.  Synthetic evidence may exercise arithmetic, but it can
+    never become real-world readiness in the Control Center.
+    """
+
+    now = _parse_instant(projected_at, "projected_at")
+    if not isinstance(policy_ceiling, int) or isinstance(policy_ceiling, bool) or policy_ceiling < 0:
+        policy_ceiling = None
+
+    base: dict[str, Any] = {
+        "schema_version": "confenge.capacity_projection.v1",
+        "projected_at": projected_at,
+        "policy_ceiling": policy_ceiling,
+        "staffed_capacity": None,
+        "staffed_capacity_state": "UNKNOWN",
+        "committed": None,
+        "available": None,
+        "freshness": "UNKNOWN",
+        "evidence_class": "ABSENT",
+        "admission": "UNKNOWN",
+        "can_accept": False,
+        "checkout_enabled": False,
+        "source": {"capacity_snapshot_id": None, "as_of": None, "expires_at": None},
+        "reason_codes": [],
+    }
+    if not capacity_snapshot:
+        base["reason_codes"] = ["STAFFED_CAPACITY_UNKNOWN"]
+        return base
+
+    snapshot_id = capacity_snapshot.get("capacity_snapshot_id")
+    as_of = capacity_snapshot.get("as_of")
+    expires_at = capacity_snapshot.get("expires_at")
+    base["source"] = {
+        "capacity_snapshot_id": snapshot_id if isinstance(snapshot_id, str) and snapshot_id else None,
+        "as_of": as_of if isinstance(as_of, str) else None,
+        "expires_at": expires_at if isinstance(expires_at, str) else None,
+    }
+    if capacity_snapshot.get("schema_version") != "confenge.staffed_capacity_snapshot.v1":
+        base["freshness"] = "ERROR"
+        base["reason_codes"] = ["CAPACITY_SNAPSHOT_INVALID"]
+        return base
+    staffed = capacity_snapshot.get("staffed_capacity_units")
+    if not isinstance(staffed, int) or isinstance(staffed, bool) or staffed < 0:
+        base["reason_codes"] = ["STAFFED_CAPACITY_UNKNOWN"]
+        return base
+    if capacity_snapshot.get("policy_ceiling_used_as_staffed_capacity") is not False:
+        base["freshness"] = "ERROR"
+        base["reason_codes"] = ["POLICY_CEILING_USED_AS_STAFFED_CAPACITY"]
+        return base
+    try:
+        observed = _parse_instant(as_of, "capacity_snapshot.as_of")
+        expiry = _parse_instant(expires_at, "capacity_snapshot.expires_at")
+    except CapacityError:
+        base["freshness"] = "ERROR"
+        base["reason_codes"] = ["CAPACITY_SNAPSHOT_INVALID"]
+        return base
+    if observed > now:
+        base["reason_codes"] = ["CAPACITY_SNAPSHOT_FROM_FUTURE"]
+        return base
+    if now >= expiry:
+        base["freshness"] = "STALE"
+        base["reason_codes"] = ["CAPACITY_SNAPSHOT_STALE"]
+        return base
+
+    synthetic = capacity_snapshot.get("synthetic") is True
+    base["staffed_capacity"] = staffed
+    base["staffed_capacity_state"] = "KNOWN"
+    base["freshness"] = "FRESH"
+    base["evidence_class"] = "SYNTHETIC" if synthetic else "REAL"
+    if active_work_orders is None or not isinstance(committed_allocations, int) or committed_allocations < 0:
+        base["reason_codes"] = ["COMMITTED_CAPACITY_UNKNOWN"]
+        return base
+
+    active_effort = 0
+    seen: set[str] = set()
+    for work_order in active_work_orders:
+        work_order_id = work_order.get("work_order_id") if isinstance(work_order, Mapping) else None
+        stage = work_order.get("current_stage") if isinstance(work_order, Mapping) else None
+        effort = work_order.get("estimated_capacity_units") if isinstance(work_order, Mapping) else None
+        if (
+            not isinstance(work_order_id, str)
+            or not work_order_id
+            or work_order_id in seen
+            or stage not in WORK_ORDER_STAGES
+            or not isinstance(effort, int)
+            or isinstance(effort, bool)
+            or effort <= 0
+        ):
+            base["committed"] = None
+            base["available"] = None
+            base["reason_codes"] = ["ACTIVE_WIP_INVALID"]
+            return base
+        seen.add(work_order_id)
+        if stage not in TERMINAL_WORK_ORDER_STAGES:
+            active_effort += effort
+
+    committed = active_effort + committed_allocations
+    base["committed"] = committed
+    base["available"] = max(0, staffed - committed)
+    requested_admission = admission_decision if admission_decision in {"CAN_ACCEPT", "CANNOT_ACCEPT", "UNKNOWN"} else "UNKNOWN"
+    if staffed == 0:
+        requested_admission = "CANNOT_ACCEPT"
+        base["reason_codes"] = ["INSUFFICIENT_STAFFED_CAPACITY"]
+    elif synthetic:
+        requested_admission = "UNKNOWN"
+        base["reason_codes"] = ["SYNTHETIC_CAPACITY_NOT_REAL_READINESS"]
+    elif requested_admission == "CAN_ACCEPT":
+        base["reason_codes"] = ["READ_ONLY_PROJECTION_DOES_NOT_ENABLE_CHECKOUT"]
+    else:
+        base["reason_codes"] = ["ADMISSION_NOT_PROVEN"]
+    base["admission"] = requested_admission
+    # A read model reports an admission fact but never enables checkout itself.
+    base["can_accept"] = requested_admission == "CAN_ACCEPT" and not synthetic
+    return base
+
+
 class CapacityLedger:
     """SQLite-backed idempotent hold/commit/release ledger.
 

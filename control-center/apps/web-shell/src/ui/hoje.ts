@@ -24,6 +24,11 @@ import {
   type HojeIntegration,
 } from "../hoje-domains";
 import { operationalTruthBlock, parseOperationalTruth } from "./operational-truth";
+import type {
+  FounderOperatingTruth,
+  MorningException,
+  MorningSource,
+} from "../founder-operating-truth";
 
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const tone = row.freshness_tone || freshnessTone(row.freshness_status);
@@ -204,6 +209,136 @@ function integrationRow(row: HojeIntegration): string {
   </li>`;
 }
 
+const MORNING_TOKEN_LABELS: Record<string, string> = {
+  PAUSED_BY_KILL_SWITCH: "pausado pelo kill switch",
+  BLOCKED_GAPS: "bloqueado por lacunas",
+  HEALTHY_200: "saudável · HTTP 200",
+  PAYMENT_CONFIRMED: "pagamento confirmado",
+  ACTIVE: "ativo",
+  PAUSED: "pausado",
+  UNKNOWN: "desconhecido",
+  KNOWN: "conhecido",
+  FRESH: "fresco",
+  STALE: "defasado",
+  ERROR: "erro de coleta",
+  CAN_ACCEPT: "pode aceitar",
+  CANNOT_ACCEPT: "não pode aceitar",
+  OPEN: "aberto",
+  BLOCKED: "bloqueado",
+  PROVEN: "comprovado",
+  MISSING: "ausente",
+};
+
+function morningText(value: string): string {
+  return value.replace(
+    /\b(PAUSED_BY_KILL_SWITCH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING)\b/g,
+    (token) => MORNING_TOKEN_LABELS[token] ?? "estado não reconhecido",
+  );
+}
+
+function morningValue(value: string | number | null): string {
+  return value === null ? "desconhecido" : morningText(String(value));
+}
+
+function morningSource(source: MorningSource): string {
+  return technicalDetails(
+    [
+      { term: "source", value: `${source.system}:${source.kind}:${source.locator}` },
+      { term: "as_of", value: source.as_of ?? "UNKNOWN" },
+      { term: "freshness", value: source.freshness },
+    ],
+    "founder-operating-source",
+  );
+}
+
+const EXCEPTION_LABELS: Record<MorningException["bucket"], string> = {
+  identity_recipient_conflict: "conflito de identidade/destinatário",
+  stale_drift: "dado defasado ou drift",
+  party_role_conflict: "conflito de papel da parte",
+  outbound_reply_handoff: "handoff de resposta outbound",
+  payment_provider_ambiguity: "ambiguidade de pagamento/provider",
+  capacity_unknown: "capacidade desconhecida",
+  delivery_blocker: "blocker de entrega",
+  runtime_mismatch: "divergência de runtime",
+  other: "outra exceção",
+};
+
+function morningExceptionRow(item: MorningException): string {
+  return `<article class="card" data-morning-exception="${escapeHtml(item.bucket)}" data-severity="${escapeHtml(item.severity)}">
+    <p class="kicker">${escapeHtml(EXCEPTION_LABELS[item.bucket])} · ${escapeHtml(severityLabel(item.severity))}</p>
+    <h4>${escapeHtml(item.reason)}</h4>
+    <dl class="facts">
+      <dt>Owner</dt><dd>${escapeHtml(item.owner)}</dd>
+      <dt>Idade</dt><dd>${escapeHtml(item.age_seconds === null ? "desconhecida" : `${item.age_seconds}s`)}</dd>
+      <dt>Próxima ação</dt><dd>${escapeHtml(morningText(item.next_action))}</dd>
+      <dt>Atualização</dt><dd>${escapeHtml(morningText(item.source.freshness))}</dd>
+      <dt>Evidência</dt><dd>${escapeHtml(morningText(item.evidence.join(" · ")))}</dd>
+    </dl>
+    ${morningSource(item.source)}
+  </article>`;
+}
+
+function morningFacts(items: ReadonlyArray<readonly [string, string | number | null]>): string {
+  return `<dl class="facts">${items.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(morningValue(value))}</dd>`).join("")}</dl>`;
+}
+
+function morningCard(
+  id: string,
+  title: string,
+  facts: ReadonlyArray<readonly [string, string | number | null]>,
+  source?: MorningSource,
+  attributes = "",
+): string {
+  return `<article class="card" data-morning-domain="${id}"${attributes}><h3>${title}</h3>${morningFacts(facts)}${source ? morningSource(source) : ""}</article>`;
+}
+
+function founderOperatingTruthBlock(truth: FounderOperatingTruth): string {
+  const outbound = truth.outbound;
+  const data = truth.data;
+  const web = truth.inbound_web;
+  const delivery = truth.delivery_finance;
+  const action = truth.primary_action;
+  const cards = [
+    morningCard("outbound", "1. Outbound", [
+      ["Estado", morningText(outbound.state)], ["Policy / versão", outbound.policy_version], ["Source run", outbound.source_run],
+      ["Queued por readback", outbound.queued], ["Próximo due", outbound.next_due],
+      ["Envios hoje / limite", `${morningValue(outbound.sends_today)} / ${morningValue(outbound.limit)}`],
+      ["Replies / bounces / opt-outs", `${morningValue(outbound.replies)} / ${morningValue(outbound.bounces)} / ${morningValue(outbound.opt_outs)}`],
+      ["Exceções", outbound.exceptions], ["Saúde do transporte", outbound.transport_health],
+    ], outbound.source, ` data-outbound-state="${escapeHtml(outbound.state)}"`),
+    morningCard("data", "2. Dados", [
+      ["Feed atual", data.current_feed], ["Run atual", data.current_run], ["Atualização", morningText(data.source.freshness)],
+      ["Cobertura do target", data.target_coverage], ["Blocker", data.blocker],
+    ], data.source),
+    morningCard("inbound-web", "3. Inbound / Web", [
+      ["Deploy identity", web.deploy_identity], ["Lead SLA", web.lead_sla_state], ["GSC readiness", web.gsc_readiness],
+      ["Saúde da superfície pública", web.public_surface_health],
+    ], web.source),
+    morningCard("delivery-finance", "4. Delivery / Finance", [
+      ["Work Orders ativos", delivery.active_work_orders], ["Policy ceiling", delivery.policy_ceiling],
+      ["Capacidade alocada", `${morningValue(delivery.staffed_capacity)} · ${morningText(delivery.staffed_capacity_state)}`],
+      ["Committed / available", `${morningValue(delivery.committed)} / ${morningValue(delivery.available)}`],
+      ["Atualização / admissão", `${morningText(delivery.capacity_freshness)} / ${morningText(delivery.admission)}`],
+      ["Checkout / Asaas", `${morningText(delivery.checkout_gate)} / ${morningText(delivery.asaas_gate)}`], ["Exceções", delivery.exceptions],
+    ], delivery.source, ` data-capacity-state="${escapeHtml(delivery.staffed_capacity_state)}"`),
+    `<article class="card" data-morning-domain="next-human-action"><h3>5. Próxima ação humana</h3>${action
+      ? `<p><strong>${escapeHtml(action.label)}</strong></p><p>${escapeHtml(action.reason)}</p><p>Owner: ${escapeHtml(action.owner)}</p><p><a class="button" href="${escapeHtml(action.href)}">Abrir contexto</a></p>`
+      : `<p class="domain-empty">Nenhuma ação humana primária é segura com as leituras atuais. O estado desconhecido permanece visível.</p>`}</article>`,
+  ].join("");
+  const exceptionDetails = truth.exceptions.length === 0
+    ? `<p class="domain-empty">Nenhuma exceção observada. Ausência de fila não substitui freshness das origens.</p>`
+    : `<details class="tech" data-morning-exceptions="${truth.exceptions.length}"><summary>Abrir fila de exceções (${truth.exceptions.length})</summary><div class="cards">${truth.exceptions.map(morningExceptionRow).join("")}</div></details>`;
+  return `<section class="stack founder-operating-truth" aria-labelledby="founder-operating-title" data-founder-operating-truth="true" data-primary-action-count="${action ? "1" : "0"}">
+    <header>
+      <p class="kicker">Verdade operacional · somente leitura</p>
+      <h2 id="founder-operating-title">Control Center para a manhã</h2>
+      <p class="constraint">Configurado não significa provado. Aprovado não significa enviado. Pagamento confirmado não significa receita recebida. Teto de política não significa capacidade alocada.</p>
+    </header>
+    <div class="cards domain-grid">${cards}</div>
+    ${exceptionDetails}
+  </section>`;
+}
+
 function domainSummaryBlock(summary: HojeDomainSummary): string {
   const total = summary.action_total;
   const totalText = total === null ? "indisponível" : String(total);
@@ -225,6 +360,7 @@ function domainSummaryBlock(summary: HojeDomainSummary): string {
       ? `<p class="domain-empty" data-integrations="0">Faltam dados: nenhuma observação de origem chegou nesta leitura. Não significa que as integrações estejam sãs.</p>`
       : `<ul class="domain-integrations">${summary.integrations.map(integrationRow).join("")}</ul>`;
   return `
+    ${founderOperatingTruthBlock(summary.founder_truth)}
     <p class="domain-total" data-action-total="${escapeHtml(total === null ? "unknown" : totalText)}">
       <strong>${escapeHtml(totalText)}</strong>${escapeHtml(totalSuffix)}
       <span class="hint">${escapeHtml(summary.action_total_note)}</span>

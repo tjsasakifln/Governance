@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://confenge.com.br/schemas/capacity-projection.v1.schema.json",
+  "title": "confenge.capacity_projection.v1",
+  "description": "Read-only capacity truth. A policy ceiling is never substituted for staffed capacity, and synthetic evidence never enables real admission or checkout.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "projected_at",
+    "policy_ceiling",
+    "staffed_capacity",
+    "staffed_capacity_state",
+    "committed",
+    "available",
+    "freshness",
+    "evidence_class",
+    "admission",
+    "can_accept",
+    "checkout_enabled",
+    "source",
+    "reason_codes"
+  ],
+  "properties": {
+    "schema_version": { "const": "confenge.capacity_projection.v1" },
+    "projected_at": { "type": "string", "format": "date-time" },
+    "policy_ceiling": { "type": ["integer", "null"], "minimum": 0 },
+    "staffed_capacity": { "type": ["integer", "null"], "minimum": 0 },
+    "staffed_capacity_state": { "enum": ["KNOWN", "UNKNOWN"] },
+    "committed": { "type": ["integer", "null"], "minimum": 0 },
+    "available": { "type": ["integer", "null"], "minimum": 0 },
+    "freshness": { "enum": ["FRESH", "STALE", "UNKNOWN", "ERROR"] },
+    "evidence_class": { "enum": ["REAL", "SYNTHETIC", "ABSENT"] },
+    "admission": { "enum": ["CAN_ACCEPT", "CANNOT_ACCEPT", "UNKNOWN"] },
+    "can_accept": { "type": "boolean" },
+    "checkout_enabled": { "const": false },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capacity_snapshot_id", "as_of", "expires_at"],
+      "properties": {
+        "capacity_snapshot_id": { "type": ["string", "null"] },
+        "as_of": { "type": ["string", "null"], "format": "date-time" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "staffed_capacity_state": { "const": "UNKNOWN" } } },
+      "then": {
+        "properties": {
+          "staffed_capacity": { "type": "null" },
+          "committed": { "type": "null" },
+          "available": { "type": "null" },
+          "admission": { "enum": ["UNKNOWN", "CANNOT_ACCEPT"] },
+          "can_accept": { "const": false }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "evidence_class": { "const": "SYNTHETIC" } } },
+      "then": {
+        "properties": {
+          "admission": { "enum": ["UNKNOWN", "CANNOT_ACCEPT"] },
+          "can_accept": { "const": false }
+        }
+      }
+    }
+  ]
+}
