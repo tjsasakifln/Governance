@@ -290,6 +290,55 @@ export type WarmblyDelegatedFirstTouchItem = {
   decided_at?: string;
 };
 
+/**
+ * `control.source` describes the authoritative feed run behind the control block.
+ * `target_membership_count` is only a count of the confirmed target when
+ * `target_membership_complete` is true — an incomplete membership reporting 0 means
+ * "not reconciled yet", never "zero targets".
+ */
+export type WarmblyDelegatedFirstTouchControlSource = {
+  run_id?: string;
+  snapshot_hash?: string;
+  freshness_state?: string;
+  generated_at?: string | null;
+  expires_at?: string | null;
+  target_membership_complete?: boolean;
+  target_membership_count?: number;
+  supplier_confirmed_count?: number;
+};
+
+/**
+ * Additive blocks of schema `warmbly.confenge.first-touch-control.v1`, forwarded verbatim
+ * by the collector. Absent on older Warmbly releases, so every field stays optional.
+ */
+export type WarmblyDelegatedFirstTouchControl = {
+  prepared?: number;
+  ready_reservoir?: number;
+  delegated_approved?: number;
+  human_approved?: number;
+  queued?: number;
+  reserved?: number;
+  next_due_at?: string | null;
+  furthest_due_at?: string | null;
+  capacity?: number;
+  blocker?: string;
+  source?: WarmblyDelegatedFirstTouchControlSource;
+};
+
+export type WarmblyDelegatedFirstTouchRunway = {
+  ready_reservoir_count?: number;
+  min_ready_reservoir?: number;
+  queued_count?: number;
+  reserved_count?: number;
+  runway_hours?: number;
+  runway_days?: number;
+  mailbox_count?: number;
+  daily_capacity?: number;
+  stale_retired?: number;
+  capacity_blocked?: boolean;
+  capacity_blocker?: string;
+};
+
 export type WarmblyDelegatedFirstTouchStatus = {
   batch_id?: string;
   policy_id?: string;
@@ -301,6 +350,8 @@ export type WarmblyDelegatedFirstTouchStatus = {
   queued_readback?: number;
   duplicate_live_account?: number;
   duplicate_live_root?: number;
+  runway?: WarmblyDelegatedFirstTouchRunway;
+  control?: WarmblyDelegatedFirstTouchControl;
   items?: WarmblyDelegatedFirstTouchItem[];
 };
 
