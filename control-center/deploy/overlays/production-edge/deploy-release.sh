@@ -9,6 +9,7 @@ EVIDENCE_DIR="${CC_RELEASE_EVIDENCE_DIR:-/opt/confenge-control-center-release-ev
 LOCK_FILE="${CC_RELEASE_LOCK_FILE:-/run/lock/confenge-control-center-release.lock}"
 SCRIPT_RELATIVE="control-center/deploy/overlays/production-edge"
 TARGET_SHA="${1:-}"
+RUNNING_SCRIPT_SHA256="$(sha256sum -- "${BASH_SOURCE[0]}" | awk '{print $1}')"
 
 if [ "$#" -ne 1 ] || [[ ! "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
   echo "DEPLOY_ERROR: pass exactly one full lowercase 40-character origin/main SHA" >&2
@@ -52,6 +53,22 @@ fi
 if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
   echo "DEPLOY_ERROR: checkout became dirty; no image was built" >&2
   exit 1
+fi
+
+# Bash reads the running script before git checkout changes its file. If the
+# target release updates this deployer, continuing here would execute the old
+# rollout contract against the new checkout. Re-exec the exact checked-out
+# script once, still before secrets, Compose rendering or any image build.
+CHECKED_OUT_SCRIPT="$REPO_ROOT/$SCRIPT_RELATIVE/deploy-release.sh"
+CHECKED_OUT_SCRIPT_SHA256="$(sha256sum -- "$CHECKED_OUT_SCRIPT" | awk '{print $1}')"
+if [ "$RUNNING_SCRIPT_SHA256" != "$CHECKED_OUT_SCRIPT_SHA256" ]; then
+  if [ "${CC_RELEASE_REEXEC_SHA:-}" = "$TARGET_SHA" ]; then
+    echo "DEPLOY_ERROR: checked-out deploy script did not stabilize after re-exec; no image was built" >&2
+    exit 1
+  fi
+  echo "== deploy contract changed at $TARGET_SHA; re-executing checked-out script =="
+  export CC_RELEASE_REEXEC_SHA="$TARGET_SHA"
+  exec "$CHECKED_OUT_SCRIPT" "$TARGET_SHA"
 fi
 
 if [ ! -r "$SECRET_ENV" ]; then
