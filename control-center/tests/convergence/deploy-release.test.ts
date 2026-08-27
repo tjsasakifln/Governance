@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -87,7 +89,15 @@ function fakeDeployRuntime(): DeployRuntime {
     `#!/bin/sh
 case "$1" in
   status) if [ "$FAKE_GIT_DIRTY" = true ]; then printf ' M dirty-before-build\n'; fi ;;
-  fetch|checkout|cat-file) exit 0 ;;
+  fetch|cat-file) exit 0 ;;
+  checkout)
+    if [ -n "$FAKE_CHECKOUT_DEPLOY_SOURCE" ]; then
+      cp "$FAKE_CHECKOUT_DEPLOY_SOURCE" "$FAKE_CHECKOUT_DEPLOY_TARGET.next"
+      chmod 755 "$FAKE_CHECKOUT_DEPLOY_TARGET.next"
+      mv "$FAKE_CHECKOUT_DEPLOY_TARGET.next" "$FAKE_CHECKOUT_DEPLOY_TARGET"
+    fi
+    exit 0
+    ;;
   rev-parse)
     case "$*" in
       *--show-toplevel*) printf '%s\n' "$FAKE_REPO_ROOT" ;;
@@ -264,6 +274,51 @@ test("dirty checkout fails before any build", () => {
   const { result, runtime } = runDeploy({ FAKE_GIT_DIRTY: "true" });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /checkout is not clean; no image was built/);
+  assert.equal(existsSync(runtime.trace), false);
+});
+
+test("a deployer changed by checkout is re-executed before any build", () => {
+  const runtime = fakeDeployRuntime();
+  const root = mkdtempSync(join(tmpdir(), "cc-deploy-reexec-repo-"));
+  tempDirs.push(root);
+  const copiedOverlay = join(
+    root,
+    "control-center",
+    "deploy",
+    "overlays",
+    "production-edge",
+  );
+  mkdirSync(copiedOverlay, { recursive: true });
+  const copiedDeploy = join(copiedOverlay, "deploy-release.sh");
+  copyFileSync(DEPLOY_SCRIPT, copiedDeploy);
+  chmodSync(copiedDeploy, 0o755);
+  const checkedOutDeploy = join(root, "checked-out-deploy.sh");
+  writeFileSync(
+    checkedOutDeploy,
+    "#!/bin/sh\nprintf 'REEXECUTED_SHA=%s\\n' \"$1\"\n",
+    "utf8",
+  );
+  chmodSync(checkedOutDeploy, 0o755);
+  const sha = repositoryHead();
+
+  const result = spawnSync("bash", [copiedDeploy, sha], {
+    cwd: root,
+    env: {
+      ...process.env,
+      PATH: `${runtime.bin}:${process.env.PATH ?? ""}`,
+      CC_REPO_ROOT: root,
+      CC_RELEASE_LOCK_FILE: runtime.lockFile,
+      FAKE_REPO_ROOT: root,
+      FAKE_RELEASE_SHA: sha,
+      FAKE_CHECKOUT_DEPLOY_SOURCE: checkedOutDeploy,
+      FAKE_CHECKOUT_DEPLOY_TARGET: copiedDeploy,
+    },
+    encoding: "utf8",
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /deploy contract changed .* re-executing checked-out script/);
+  assert.match(result.stdout, new RegExp(`REEXECUTED_SHA=${sha}`));
   assert.equal(existsSync(runtime.trace), false);
 });
 
