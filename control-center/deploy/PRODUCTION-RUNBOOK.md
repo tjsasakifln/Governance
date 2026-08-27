@@ -29,7 +29,9 @@ Caddy never binds host `:80`/`:443` and never issues public ACME.
 - Compose project: `confenge-control-center`
 - Canonical overlay: `control-center/deploy/overlays/production-edge/docker-compose.production-edge.yml`
 - Caddyfile: `overlays/production-edge/Caddyfile` (must contain `forward_auth`; the open `deploy/Caddyfile` is not this pack)
-- Optional read-only collector join: `docker-compose.warmbly-collector.override.yml`
+- Required read-only collector join for release apply: `docker-compose.warmbly-collector.override.yml`
+- Required host collector environment overlay: `/etc/confenge/control-center/docker-compose.collector-env.yml`
+- Canonical release compose wrapper: `overlays/production-edge/release-compose.sh`
 - Warmbly human-gate and draft-review join: `docker-compose.warmbly-human-gate.override.yml`
 - Nginx vhost templates: `control-center/deploy/nginx/`
 - Secrets contract: `control-center/security/production/secrets/manifest.json` + `generate-local.sh`
@@ -136,39 +138,33 @@ Do not create a browser token or expose the credential to `web`.
 
 ## Deploy (production-edge)
 
-Before every release, record the current Git SHA and image IDs for `context`,
-`web` and `mcp`; those are the rollback point. Then fast-forward the certified
-release at `/opt/confenge-control-center`. The Warmbly connector is compiled
-inside the Context image, so every connector change must rebuild `context`.
+Run the repository-wide mandatory checks on a clean branch rebased onto the
+contemporary `origin/main`. Merge only after they pass. Fetch `origin/main`
+again and pass that exact full SHA to the versioned release script; never pass a
+branch, tag, abbreviation, or historical SHA.
 
 ```bash
-git -C /opt/confenge-control-center pull --ff-only
-cd /opt/confenge-control-center/control-center/deploy/overlays/production-edge
-set -a
-source /etc/confenge/control-center/secrets/.env
-set +a
-export CC_SECRET_DIR=/etc/confenge/control-center/secrets
-export CC_RELEASE_SHA=<certified-git-sha>
+git -C /opt/confenge-control-center fetch --all --prune
+CERTIFIED_SHA="$(git -C /opt/confenge-control-center rev-parse --verify origin/main)"
+/opt/confenge-control-center/control-center/deploy/overlays/production-edge/deploy-release.sh \
+  "$CERTIFIED_SHA"
+```
 
-# Build and replace both artifacts touched by the release. The connector travels
-# in Context; updating only web leaves the old server contract in production.
-docker compose -p confenge-control-center \
-  -f docker-compose.production-edge.yml \
-  -f docker-compose.warmbly-human-gate.override.yml \
-  build context web
-docker compose -p confenge-control-center \
-  -f docker-compose.production-edge.yml \
-  -f docker-compose.warmbly-human-gate.override.yml \
-  up -d context web
+`deploy-release.sh` refuses a dirty checkout before any build, refuses a SHA
+different from the just-fetched `origin/main`, derives the release set from the
+complete rendered compose, includes both collector overlays, builds the whole
+set, waits for compose health, and then verifies repository/image/runtime SHA.
+It writes a rollback-point receipt before mutation and a sanitized final or
+partial-failure receipt under
+`/opt/confenge-control-center-release-evidence/` (mode `0600`). A green HTTP
+probe with any SHA, runtime, topology, or health divergence is a failed release.
 
-# Mandatory identity gate: proves baseline ancestry and reconciles repository
-# SHA -> image label/ID -> container env -> each live HTTP response. Save this
-# output beside the release record; health alone is not release evidence.
-export CC_RELEASE_EVIDENCE_DIR=/opt/confenge-control-center-release-evidence
-mkdir -p "$CC_RELEASE_EVIDENCE_DIR"
-set -o pipefail
-./verify-release.sh "$CC_RELEASE_SHA" context web | tee \
-  "$CC_RELEASE_EVIDENCE_DIR/release-attestation-${CC_RELEASE_SHA}.log"
+Direct readback uses the same full compose topology and never accepts a service
+subset:
+
+```bash
+cd /opt/confenge-control-center
+./control-center/deploy/overlays/production-edge/verify-release.sh "$CERTIFIED_SHA"
 ```
 
 For a first installation only, use the full bootstrap sequence instead of the
@@ -181,13 +177,9 @@ docker compose -f docker-compose.production-edge.yml up -d postgres redis nats
 # 2. migrations (schema control_center): 001_init, 002_current_state, 003_durable_operational_data_plane, 004_operator_actions
 # 3. Authelia (own DB/role, Redis sessions, default deny, operators require 2FA)
 docker compose -f docker-compose.production-edge.yml up -d authelia
-# 4. context, MCP, collector, web, Caddy
-docker compose \
-  -f docker-compose.production-edge.yml \
-  -f docker-compose.warmbly-human-gate.override.yml \
-  up -d context mcp collector web caddy
-# optional additional -f docker-compose.warmbly-collector.override.yml only for
-# the collector's existing read-only observations.
+# 4. context, MCP, collector, web, Caddy. The host collector environment
+# overlay must exist before this command.
+./release-compose.sh up -d --wait context mcp collector web caddy
 ```
 
 After Caddy is up, `ss -lntp` must show nginx on `:80`/`:443` and Caddy on `127.0.0.1:18080` only.
