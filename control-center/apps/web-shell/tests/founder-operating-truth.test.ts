@@ -411,9 +411,10 @@ test("Warmbly first-touch control fills the reservoir stocks only when extra-cli
   withWarmblyControl(input);
 
   const truth = projectFounderOperatingTruth(input);
-  assert.equal(truth.outbound_runway.stock.target_confirmed.value, 2400);
-  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "warmbly");
-  assert.equal(truth.outbound_runway.stock.target_confirmed.source.locator, "commercial/operations");
+  // target_confirmed is deliberately NOT filled from Warmbly: target_membership_count is a
+  // membership denominator, not this funnel stage. It stays extra-cli-only and therefore UNKNOWN.
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli");
   assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1100);
   assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "warmbly");
   assert.equal(truth.outbound_runway.runway.ready_reservoir.source.locator, "commercial/operations");
