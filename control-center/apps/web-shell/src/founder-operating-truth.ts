@@ -356,8 +356,14 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     : warmblySource;
   const reconciledExtraSource = hasImpossibleNumbers ? sourceWithFreshness(extraSource, "ERROR") : extraSource;
 
-  // Provenance follows the value: a Warmbly-derived reservoir never claims the extra-cli locator.
+  // Provenance follows the value: a Warmbly-derived reservoir never claims the extra-cli locator,
+  // and its drill-down has to land where the number actually lives. Sending the founder to the
+  // extra-cli growth view for a count extra-cli never published would show an empty stage and read
+  // as a contradiction of the tile above it.
   const readyReservoirSource = readyReservoirFromWarmbly ? reconciledWarmblySource : reconciledExtraSource;
+  const readyReservoirHref = readyReservoirFromWarmbly
+    ? `${WARMBLY_DRILLDOWN}?etapa=ready_reservoir`
+    : `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`;
   const targetFact = countFact(targetConfirmed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=target_confirmed`);
   const recipientFact = countFact(recipientAttributed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=recipient_attributed`, "Identidade atribuída à empresa pela origem; nenhuma mailbox é exibida nesta visão.");
   const eligibleFact = countFact(eligibleCurrent, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=eligible_current`);
@@ -374,7 +380,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const suppressedFact = countFact(suppressed, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=suppressed`);
   const slots24Fact = countFact(rawSlots24h, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; theoretical_slots_24h não entra no cálculo.");
   const slots7Fact = countFact(rawSlots7d, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; cap ou teto de política não substituem capacidade.");
-  const readyFact = countFact(readyReservoir, readyReservoirSource, `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`);
+  const readyFact = countFact(readyReservoir, readyReservoirSource, readyReservoirHref);
   const runwayDays = sourceRunMatch === "MATCH" && readyFact.value !== null && slots7Fact.value !== null && slots7Fact.value > 0
     ? Math.round((readyFact.value * 7 / slots7Fact.value) * 10) / 10
     : null;

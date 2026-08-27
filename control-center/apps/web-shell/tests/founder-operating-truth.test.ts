@@ -401,6 +401,7 @@ test("extra-cli keeps precedence over the Warmbly control block for the reservoi
   assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli");
   assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1200);
   assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "extra-cli");
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.href, "#/crescimento?etapa=ready_reservoir");
   assert.equal(truth.outbound_runway.runway.estimated_days.source.system, "extra-cli+warmbly");
   assert.equal(truth.data.target_coverage, "1/1");
 });
@@ -418,6 +419,8 @@ test("Warmbly first-touch control fills the reservoir stocks only when extra-cli
   assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1100);
   assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "warmbly");
   assert.equal(truth.outbound_runway.runway.ready_reservoir.source.locator, "commercial/operations");
+  // The drill-down follows the value too: extra-cli's growth view has no such stage to show.
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.href, "#/warmbly/revisao?etapa=ready_reservoir");
   assert.equal(truth.outbound_runway.runway.reservoir_below_1000, false);
   // The run reconciliation still gates the derived runway; the fallback does not bypass it.
   assert.equal(truth.outbound_runway.integrity.source_run_match, "MATCH");
