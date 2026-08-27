@@ -90,6 +90,7 @@ export interface GateDiffEntry {
 export interface GateReadback {
   status: "confirmed" | "not_confirmed" | "unavailable" | "skipped";
   detail: string;
+  reason_group?: "READBACK_UNKNOWN";
 }
 
 /** Backend reconciliation of durable APPROVEs into scheduled queue work. */

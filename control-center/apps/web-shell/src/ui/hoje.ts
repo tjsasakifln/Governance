@@ -213,11 +213,11 @@ function integrationRow(row: HojeIntegration): string {
 
 const MORNING_TOKEN_LABELS: Record<string, string> = {
   PAUSED_BY_KILL_SWITCH: "pausado pelo kill switch",
-  BLOCKED_GAPS: "bloqueado por lacunas",
-  HEALTHY_200: "saudável · HTTP 200",
+  BLOCKED_GAPS: "lacunas",
+  HEALTHY_200: "HTTP 200",
   PAYMENT_CONFIRMED: "pagamento confirmado",
   WAITING_FOR_ELIGIBLE_BATCH: "aguardando novo lote elegível",
-  WAITING_FOR_EXTRA_CLI_REFRESH: "aguardando atualização do extra-cli",
+  WAITING_FOR_EXTRA_CLI_REFRESH: "aguardando extra-cli",
   GO: "rodando",
   NO_GO: "bloqueado",
   ACTIVE: "ativo",
@@ -238,11 +238,14 @@ const MORNING_TOKEN_LABELS: Record<string, string> = {
   MATCH: "conciliado",
   MISMATCH: "divergente",
   CURRENT: "atual",
+  DEGRADED: "degradada",
+  EXPIRED: "expirada",
+  FROZEN: "congelada",
 };
 
 function morningText(value: string): string {
   return value.replace(
-    /\b(PAUSED_BY_KILL_SWITCH|WAITING_FOR_ELIGIBLE_BATCH|WAITING_FOR_EXTRA_CLI_REFRESH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|NO_GO|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING|FEASIBLE|INFEASIBLE|MISMATCH|MATCH|GO|CURRENT)\b/g,
+    /\b(PAUSED_BY_KILL_SWITCH|WAITING_FOR_ELIGIBLE_BATCH|WAITING_FOR_EXTRA_CLI_REFRESH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|NO_GO|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING|FEASIBLE|INFEASIBLE|MISMATCH|MATCH|GO|CURRENT|DEGRADED|EXPIRED|FROZEN)\b/g,
     (token) => MORNING_TOKEN_LABELS[token] ?? "estado não reconhecido",
   );
 }
@@ -263,26 +266,31 @@ function morningSource(source: MorningSource): string {
 }
 
 const EXCEPTION_LABELS: Record<MorningException["bucket"], string> = {
-  identity_recipient_conflict: "conflito de identidade/destinatário",
-  stale_drift: "dado defasado ou drift",
-  party_role_conflict: "conflito de papel da parte",
-  outbound_reply_handoff: "handoff de resposta outbound",
-  payment_provider_ambiguity: "ambiguidade de pagamento/provider",
+  identity_recipient_conflict: "identidade/destinatário",
+  stale_drift: "dado defasado",
+  party_role_conflict: "papel da parte",
+  outbound_reply_handoff: "handoff outbound",
+  payment_provider_ambiguity: "pagamento/provider",
   capacity_unknown: "capacidade desconhecida",
   delivery_blocker: "blocker de entrega",
-  runtime_mismatch: "divergência de runtime",
+  runtime_mismatch: "runtime divergente",
   other: "outra exceção",
 };
 
 function morningExceptionRow(item: MorningException): string {
-  return `<article class="card" data-morning-exception="${escapeHtml(item.bucket)}" data-severity="${escapeHtml(item.severity)}">
-    <p class="kicker">${escapeHtml(EXCEPTION_LABELS[item.bucket])} · ${escapeHtml(severityLabel(item.severity))}</p>
+  const group = item.reason_group
+    ? item.reason_group.endsWith("_EXPIRED") ? "estoque expirado"
+      : item.reason_group.endsWith("_FROZEN") ? "estoque congelado"
+      : morningText(item.reason_group)
+    : EXCEPTION_LABELS[item.bucket];
+  return `<article class="card" data-morning-exception="${escapeHtml(item.bucket)}" data-reason-group="${escapeHtml(item.reason_group ?? "")}" data-severity="${escapeHtml(item.severity)}">
+    <p class="kicker">${escapeHtml(group)} · ${escapeHtml(severityLabel(item.severity))}</p>
     <h4>${escapeHtml(item.reason)}</h4>
     <dl class="facts">
       <dt>Owner</dt><dd>${escapeHtml(item.owner)}</dd>
       <dt>Idade</dt><dd>${escapeHtml(item.age_seconds === null ? "desconhecida" : `${item.age_seconds}s`)}</dd>
-      <dt>Próxima ação</dt><dd>${escapeHtml(morningText(item.next_action))}</dd>
-      <dt>Atualização</dt><dd>${escapeHtml(morningText(item.source.freshness))}</dd>
+      <dt>Ação</dt><dd>${escapeHtml(morningText(item.next_action))}</dd>
+      <dt>Freshness</dt><dd>${escapeHtml(morningText(item.source.freshness))}</dd>
       <dt>Evidência</dt><dd>${escapeHtml(morningText(item.evidence.join(" · ")))}</dd>
     </dl>
     ${morningSource(item.source)}
@@ -321,8 +329,7 @@ function runwayFact(metric: string, label: string, fact: RunwayFact, suffix = ""
       <dt>as_of</dt><dd>${escapeHtml(fact.source.as_of ?? "UNKNOWN")}</dd>
       <dt>freshness</dt><dd>${escapeHtml(fact.source.freshness)}</dd>
     </dl>
-    ${fact.note ? `<p class="hint">${escapeHtml(fact.note)}</p>` : ""}
-    <a href="${escapeHtml(fact.href)}">Abrir denominador e registros</a>
+    <a href="${escapeHtml(fact.href)}">Abrir</a>
   </details>`;
 }
 
@@ -359,69 +366,72 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
     ["Destinatário", runway.stock.recipient_attributed],
     ["Elegível", runway.stock.eligible_current],
     ["Preparado", runway.stock.prepared],
-    ["Aprovado delegado", runway.stock.delegated_approved],
+    ["Delegado", runway.stock.delegated_approved],
     ["Queued", runway.stock.queued_reserved],
     ["Sent", runway.stock.sent],
   ] as const;
   const groups = [
-    runwayGroup("transport", "Fonte, estoque e transporte", [
-      ["source-health", "Fonte de dados", runway.transport.source_health],
+    runwayGroup("transport", "Transporte", [
+      ["source-health", "Fonte", runway.transport.source_health],
       ["commercial-state", "Estoque comercial", runway.transport.commercial_state],
+      ["commercial-until", "Até", runway.transport.commercial_until],
       ["transport-state", "Transporte", runway.transport.state],
+      ["pause", "Pausa", runway.transport.pause],
+      ["kill-switch", "Kill switch", runway.transport.kill_switch],
       ["policy-version", "Policy", runway.transport.policy_version],
     ]),
     runwayGroup("stock", "Estoque", [
       ["target-confirmed", "TARGET_CONFIRMED", runway.stock.target_confirmed],
-      ["recipient-attributed", "Destinatário atribuído", runway.stock.recipient_attributed],
-      ["eligible-current", "Elegíveis atuais", runway.stock.eligible_current],
+      ["recipient-attributed", "Destinatário", runway.stock.recipient_attributed],
+      ["eligible-current", "Elegíveis", runway.stock.eligible_current],
       ["prepared", "Preparados", runway.stock.prepared],
-      ["delegated-approved", "Aprovados delegados", runway.stock.delegated_approved],
-      ["human-approved", "Aprovados humanos", runway.stock.human_approved],
-      ["queued-reserved", "QUEUED / reservados", runway.stock.queued_reserved],
-      ["hold-exceptions", "HOLD / exceções", runway.stock.hold_exceptions],
+      ["delegated-approved", "Delegados", runway.stock.delegated_approved],
+      ["human-approved", "Humanos", runway.stock.human_approved],
+      ["queued-reserved", "QUEUED", runway.stock.queued_reserved],
+      ["hold-exceptions", "HOLD", runway.stock.hold_exceptions],
       ["sent", "SENT", runway.stock.sent],
       ["attempted", "Tentados", runway.stock.attempted],
-      ["provider-accepted", "Aceitos pelo provider", runway.stock.provider_accepted],
+      ["provider-accepted", "Provider", runway.stock.provider_accepted],
       ["delivered", "Delivered", runway.stock.delivered],
       ["replies", "Respostas", runway.stock.replies],
       ["suppressed", "Suprimidos", runway.stock.suppressed],
     ]),
     runwayGroup("runway", "Munição", [
-      ["current-queued", "Fila atual", runway.runway.current_queued],
-      ["furthest-due-at", "Último due_at", runway.runway.furthest_due_at],
-      ["estimated-days", "Munição estimada", runway.runway.estimated_days, " dias"],
-      ["slots-next-24h", "Slots reais · 24h", runway.runway.slots_next_24h],
-      ["slots-next-7d", "Slots reais · 7d", runway.runway.slots_next_7d],
-      ["ready-reservoir", "Reservoir pronto", runway.runway.ready_reservoir],
-      ["source-feed-age", "Idade do source feed", runway.runway.source_feed_age_seconds, "s"],
-      ["next-replenishment", "Próxima reposição", runway.runway.next_replenishment_state],
+      ["current-queued", "Fila", runway.runway.current_queued],
+      ["furthest-due-at", "due_at", runway.runway.furthest_due_at],
+      ["estimated-days", "Munição", runway.runway.estimated_days, " dias"],
+      ["slots-next-24h", "Slots 24h", runway.runway.slots_next_24h],
+      ["slots-next-7d", "Slots 7d", runway.runway.slots_next_7d],
+      ["ready-reservoir", "Reservoir", runway.runway.ready_reservoir],
+      ["source-feed-age", "Idade do feed", runway.runway.source_feed_age_seconds, "s"],
+      ["next-replenishment", "Reposição", runway.runway.next_replenishment_state],
     ]),
     runwayGroup("health", "Health", [
-      ["mailboxes-healthy", "Mailboxes saudáveis", runway.health.mailboxes_healthy],
-      ["mailboxes-blocked", "Mailboxes bloqueadas", runway.health.mailboxes_blocked],
-      ["mailboxes-unknown", "Mailboxes desconhecidas", runway.health.mailboxes_unknown],
-      ["provider-errors", "Erros do provider", runway.health.provider_errors],
-      ["bounces", "Bounces factuais", runway.health.bounces],
-      ["complaints", "Complaints factuais", runway.health.complaints],
-      ["stale-retired", "Stale retirados", runway.health.stale_retired],
-      ["queue-fill-blocker", "Blocker do preenchimento", runway.health.queue_fill_blocker],
+      ["mailboxes-healthy", "Saudáveis", runway.health.mailboxes_healthy],
+      ["mailboxes-blocked", "Bloqueadas", runway.health.mailboxes_blocked],
+      ["mailboxes-unknown", "Desconhecidas", runway.health.mailboxes_unknown],
+      ["provider-errors", "Erros", runway.health.provider_errors],
+      ["bounces", "Bounces", runway.health.bounces],
+      ["complaints", "Complaints", runway.health.complaints],
+      ["stale-retired", "Stale", runway.health.stale_retired],
+      ["queue-fill-blocker", "Blocker", runway.health.queue_fill_blocker],
     ]),
   ].join("");
 
   return `<article class="card outbound-runway" data-morning-domain="outbound" data-outbound-runway="true" data-transport-state="${escapeHtml(runway.transport.state.value ?? "UNKNOWN")}" data-transport-tone="${transportTone}" data-integrity-state="${escapeHtml(runway.integrity.state)}">
     <header class="runway-title">
-      <div><p class="kicker">Munição outbound · somente leitura</p><h3>Fonte, estoque e transporte</h3></div>
+      <div><p class="kicker">Munição</p><h3>Transporte</h3></div>
       <div>${reservoirSignal}<span class="pill">run ${escapeHtml(morningText(runway.integrity.source_run_match))}</span></div>
     </header>
     <div class="runway-headline">${headline.map(([label, fact]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></div>`).join("")}</div>
-    <p class="runway-blocker"><strong>O que impede mais volume:</strong> ${escapeHtml(blocker === null ? "DESCONHECIDO" : morningText(blocker))}</p>
-    <ol class="runway-stages" aria-label="Conservação do denominador outbound">${stages.map(([label, fact]) => `<li><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></li>`).join("")}</ol>
+    <p class="runway-blocker"><strong>Blocker:</strong> ${escapeHtml(blocker === null ? "DESCONHECIDO" : morningText(blocker))}</p>
+    <ol class="runway-stages" aria-label="Estoque outbound">${stages.map(([label, fact]) => `<li><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></li>`).join("")}</ol>
     <div class="runway-groups">${groups}</div>
     <section class="runway-action" data-morning-domain="next-human-action" aria-labelledby="runway-action-title">
       <h4 id="runway-action-title">Ação humana</h4>
       ${action
         ? `<div><strong>${escapeHtml(action.label)}</strong><p>${escapeHtml(morningText(action.reason))}</p><span>Owner: ${escapeHtml(action.owner)}</span></div><a class="button" data-runway-primary-action="true" href="${escapeHtml(action.href)}">Abrir contexto</a>`
-        : `<p class="domain-empty">Nenhuma ação primária é segura com as leituras atuais. UNKNOWN permanece visível.</p>`}
+        : `<p class="domain-empty">Sem ação primária.</p>`}
     </section>
   </article>`;
 }
@@ -433,34 +443,34 @@ function founderOperatingTruthBlock(truth: FounderOperatingTruth): string {
   const cards = [
     outboundRunwayBlock(truth),
     morningCard("data", "Dados", [
-      ["Feed atual", data.current_feed], ["Run atual", data.current_run], ["Atualização", morningText(data.source.freshness)],
-      ["Cobertura do target", data.target_coverage], ["Blocker", data.blocker],
+      ["Feed", data.current_feed], ["Run", data.current_run], ["Atualização", morningText(data.source.freshness)],
+      ["Target", data.target_coverage], ["Blocker", data.blocker],
     ], data.source),
     morningCard("inbound-web", "Inbound / Web", [
-      ["Deploy identity", web.deploy_identity], ["Lead SLA", web.lead_sla_state], ["GSC readiness", web.gsc_readiness],
-      ["Saúde da superfície pública", web.public_surface_health],
+      ["Deploy", web.deploy_identity], ["Lead SLA", web.lead_sla_state], ["GSC", web.gsc_readiness],
+      ["Superfície pública", web.public_surface_health],
     ], web.source),
     morningCard("delivery-finance", "4. Delivery / Finance", [
-      ["Work Orders ativos", delivery.active_work_orders], ["Teto comercial (não staffed)", delivery.policy_ceiling],
+      ["Work Orders", delivery.active_work_orders], ["Teto comercial (não staffed)", delivery.policy_ceiling],
       ["Capacidade staffed", `${morningValue(delivery.staffed_capacity)} · ${morningText(delivery.staffed_capacity_state)}`],
       ["Comprometido (Work Orders)", delivery.committed],
       ["Disponível", delivery.available],
       ["Atualização / admissão", `${morningText(delivery.capacity_freshness)} / ${morningText(delivery.admission)}`],
-      ["Entregável / versão / prazo", delivery.request],
+      ["Entregável", delivery.request],
       ["Risco de prazo", morningText(delivery.deadline_risk)],
       ["Bloqueios", delivery.blockers.length ? delivery.blockers.join("; ") : null],
-      ["Próxima ação de admissão", delivery.next_action],
+      ["Admissão", delivery.next_action],
       ["Checkout / Asaas", `${morningText(delivery.checkout_gate)} / ${morningText(delivery.asaas_gate)}`], ["Exceções", delivery.exceptions],
     ], delivery.source, ` data-capacity-state="${escapeHtml(delivery.staffed_capacity_state)}"`),
   ].join("");
   const exceptionDetails = truth.exceptions.length === 0
-    ? `<p class="domain-empty">Nenhuma exceção observada. Ausência de fila não substitui freshness das origens.</p>`
-    : `<details class="tech" data-morning-exceptions="${truth.exceptions.length}"><summary>Abrir fila de exceções (${truth.exceptions.length})</summary><div class="cards">${truth.exceptions.map(morningExceptionRow).join("")}</div></details>`;
+    ? `<p class="domain-empty">Nenhuma exceção observada.</p>`
+    : `<details class="tech" data-morning-exceptions="${truth.exceptions.length}"><summary>Exceções (${truth.exceptions.length})</summary><div class="cards">${truth.exceptions.map(morningExceptionRow).join("")}</div></details>`;
   return `<section class="stack founder-operating-truth" aria-labelledby="founder-operating-title" data-founder-operating-truth="true" data-primary-action-count="${truth.primary_action ? "1" : "0"}">
     <header>
-      <p class="kicker">Verdade operacional · somente leitura</p>
-      <h2 id="founder-operating-title">Control Center para a manhã</h2>
-      <details class="founder-constraints"><summary>Limites de interpretação</summary><p class="constraint">Configurado não significa provado. Aprovado não significa enviado. Pagamento confirmado não significa receita recebida. Teto de política não significa capacidade alocada.</p></details>
+      <p class="kicker">Operação</p>
+      <h2 id="founder-operating-title">Manhã</h2>
+      <details class="founder-constraints"><summary>Limites</summary><p class="constraint">Configurado ≠ provado. Aprovado ≠ enviado. Pagamento confirmado ≠ receita. Teto ≠ capacidade.</p></details>
     </header>
     <div class="cards domain-grid">${cards}</div>
     ${exceptionDetails}

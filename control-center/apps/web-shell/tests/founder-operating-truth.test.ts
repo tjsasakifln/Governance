@@ -275,7 +275,7 @@ test("Hoje renders one primary action and the complete exception evidence fields
   assert.match(html, /href="#\/warmbly\/revisao\?filtro=queued"/);
   assert.doesNotMatch(html, /aprovar tudo/i);
   assert.equal((html.match(/data-runway-primary-action="true"/g) ?? []).length, 1);
-  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 34);
+  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 37);
 });
 
 test("impossible denominators fail closed instead of publishing a plausible zero", () => {
@@ -619,13 +619,94 @@ test("expired commercial authority is not a single STALE and is a human exceptio
     source_run_id: "run-current",
     membership_hash: "mem-fixture",
     validated_at: "2026-08-18T03:00:00Z",
+    valid_until: "2026-08-19T03:00:00Z",
     state: "EXPIRED",
   };
   const truth = projectFounderOperatingTruth(input);
   assert.equal(truth.outbound_runway.transport.commercial_state.value, "EXPIRED");
   assert.equal(truth.outbound_runway.transport.source_health.value, "FRESH");
-  assert.equal(truth.outbound_runway.transport.commercial_state.value, "EXPIRED");
+  assert.equal(truth.outbound_runway.transport.commercial_until.value, "2026-08-19T03:00:00Z");
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "COMMERCIAL_AUTHORITY_EXPIRED"));
   assert.equal(truth.exceptions.some((item) => /corrigir freshness/i.test(item.next_action) || /corrigir freshness/i.test(item.reason)), false);
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, />expirada</);
+  assert.match(html, /estoque expirado/);
+  assert.doesNotMatch(html, /corrigir freshness/i);
+});
+
+test("producer DEGRADED and FROZEN commercial states stay visible with validade", () => {
+  for (const [state, htmlToken] of [["DEGRADED", "degradada"], ["FROZEN_FOR_NEW_ADMISSION", "congelada"]] as const) {
+    const input = envelope();
+    firstTouchControl(input).commercial_authority = {
+      source_run_id: "run-bound",
+      validated_at: "2026-08-24T03:00:00Z",
+      valid_until: "2026-08-31T03:00:00Z",
+      state,
+    };
+    const truth = projectFounderOperatingTruth(input);
+    assert.notEqual(truth.outbound_runway.transport.commercial_state.value, "UNKNOWN", state);
+    assert.equal(
+      truth.outbound_runway.transport.commercial_state.value,
+      state === "FROZEN_FOR_NEW_ADMISSION" ? "FROZEN" : state,
+      state,
+    );
+    assert.equal(truth.outbound_runway.transport.commercial_until.value, "2026-08-31T03:00:00Z", state);
+    if (state === "FROZEN_FOR_NEW_ADMISSION") {
+      assert.ok(truth.exceptions.some((item) => item.reason_group === "COMMERCIAL_AUTHORITY_FROZEN"));
+    }
+    const html = renderHoje(composeHoje({
+      generated_at: NOW,
+      headline: "cockpit",
+      priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+      engineering: null, infra: [], activities: [], operational_envelope: input,
+    }));
+    assert.match(html, new RegExp(`>${htmlToken}<`));
+    assert.doesNotMatch(html, />${state}</);
+  }
+});
+
+test("pause actor/source and kill switch stay UNKNOWN when Warmbly omits them", () => {
+  const truth = projectFounderOperatingTruth(envelope());
+  assert.match(truth.outbound_runway.transport.pause.value ?? "", /UNKNOWN/);
+  assert.equal(truth.outbound_runway.transport.kill_switch.value, "UNKNOWN");
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: envelope(),
+  }));
+  assert.match(html, /data-runway-metric="pause"/);
+  assert.match(html, /data-runway-metric="kill-switch"/);
+  assert.match(html, /desconhecido · desconhecido/);
+});
+
+test("named exception reason groups from producer codes stay on the exception recorte", () => {
+  const input = envelope();
+  const commercial = (((input.snapshots as Record<string, unknown>).commercial as Record<string, unknown>).snapshot as Record<string, unknown>);
+  const operations = commercial.operations as Record<string, unknown>;
+  operations.exceptions = [
+    { id: "e1", reason_group: "RECIPIENT_EXPIRED", reason: "destinatário caiu", owner: "outbound_owner" },
+    { id: "e2", reason_codes: ["MEMBERSHIP_LEAVE_PROVEN"], reason: "saiu do membership", owner: "outbound_owner" },
+    { id: "e3", reason_group: "READBACK_UNKNOWN", reason: "readback não confirmou", owner: "outbound_owner" },
+  ];
+  const truth = projectFounderOperatingTruth(input);
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "RECIPIENT_EXPIRED"));
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "MEMBERSHIP_DRIFT"));
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "READBACK_UNKNOWN"));
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, /data-reason-group="RECIPIENT_EXPIRED"/);
+  assert.match(html, /data-reason-group="MEMBERSHIP_DRIFT"/);
+  assert.match(html, /data-reason-group="READBACK_UNKNOWN"/);
 });
 
 test("SOURCE_HEALTH_DEGRADED is not forced into the human exception queue", () => {
@@ -637,7 +718,15 @@ test("SOURCE_HEALTH_DEGRADED is not forced into the human exception queue", () =
   const truth = projectFounderOperatingTruth(input);
   assert.equal(truth.outbound_runway.transport.source_health.value, "DEGRADED");
   assert.equal(truth.outbound_runway.transport.commercial_state.value, "CURRENT");
-  assert.equal(truth.exceptions.some((item) => /fonte degradada/i.test(item.reason)), false);
+  assert.equal(truth.exceptions.some((item) => item.reason_group === "SOURCE_HEALTH_DEGRADED"), false);
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, />degradada</);
+  assert.match(html, />atual</);
 });
 
 test("unknown policy version stays unknown and does not look like v2", () => {

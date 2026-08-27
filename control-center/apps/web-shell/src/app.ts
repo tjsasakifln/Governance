@@ -31,6 +31,7 @@ import {
   settleHumanGateIntent,
   type HumanGateIntent,
 } from "./human-gate-idempotency";
+import { classifySchedulingReadback } from "./first-touch-readback";
 import {
   armPendingResumeConfirmation,
   clearPendingResumeConfirmation as clearPendingResume,
@@ -1095,6 +1096,18 @@ async function settleGateIntent(
 ): Promise<AdapterWriteResult> {
   if (result.code === "adjust_route_unavailable") markAdjustRouteMissing();
   const readback = await gateReadback(adapter, intent, result);
+  if (intent.action === "review" && intent.decision === "APPROVE") {
+    const group = classifySchedulingReadback({
+      http_ok: typeof result.status === "number" && result.status >= 200 && result.status < 300,
+      timeout: readback.status === "unavailable",
+      idempotency_key: result.correlationId ?? humanGateIdempotencyKey(intent),
+      approval_source: "HUMAN_APPROVE",
+      readback: readback.status === "confirmed"
+        ? { status: "confirmed", state: "QUEUED", due_at: "1" }
+        : { status: readback.status },
+    }).reason_group;
+    if (group) readback.reason_group = group;
+  }
   // A refusal is definitive before any write. An executed response is only
   // definitive after the resource readback confirms it. If that GET fails or
   // disagrees, retaining the same idempotency key is what lets a later retry

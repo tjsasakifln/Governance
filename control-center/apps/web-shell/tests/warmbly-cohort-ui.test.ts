@@ -2472,6 +2472,10 @@ test("uma releitura que não confirma o efeito devolve a mensagem para a fila", 
     "uma resposta aceita sem readback não pode continuar semanticamente bem-sucedida",
   );
   assert.equal((adapter.lastOperatorResult as AdapterWriteResult | undefined)?.outcome, "unknown");
+  assert.equal(
+    (adapter.lastOperatorResult as AdapterWriteResult | undefined)?.readback?.reason_group,
+    "READBACK_UNKNOWN",
+  );
 });
 
 test("uma escrita aceita cuja releitura falha não some da fila nem avança a chave de idempotência", async () => {

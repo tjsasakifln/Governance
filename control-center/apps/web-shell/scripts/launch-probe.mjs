@@ -224,8 +224,8 @@ async function assertOutboundRunway(page, viewport, requireFirstViewport = false
   }
   const metrics = runway.locator("[data-runway-metric]");
   const metricCount = await metrics.count();
-  if (metricCount !== 34) {
-    throw new Error(`${viewport}: outbound runway metric contract changed: ${metricCount}/34`);
+  if (metricCount !== 37) {
+    throw new Error(`${viewport}: outbound runway metric contract changed: ${metricCount}/37`);
   }
   const readbacks = await runway.locator(".runway-readback").count();
   if (readbacks !== metricCount) {
