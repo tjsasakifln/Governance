@@ -256,6 +256,7 @@ services:
         br.com.confenge.service: "mcp"
     image: confenge-control-center-mcp:${CC_RELEASE_SHA:-local}
     environment:
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
       HOST: 0.0.0.0
       CONFENGE_MCP_HTTP_HOST: 0.0.0.0
       CONFENGE_MCP_HTTP_PORT: "8080"
@@ -294,6 +295,7 @@ services:
         br.com.confenge.service: "collector"
     image: confenge-control-center-collector:${CC_RELEASE_SHA:-local}
     environment:
+      CC_RELEASE_SHA: "${CC_RELEASE_SHA:-local}"
       HOST: 0.0.0.0
       PORT: "8080"
       NODE_ENV: production
