@@ -291,10 +291,30 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     S(delegated.runtime_release_sha),
   ].filter((item): item is string => Boolean(item)))];
 
-  const targetConfirmed = N(inventoryValue("target_confirmed")) ?? N(reservoir.TARGET_CONFIRMED) ?? countFromFunnel(funnelRows, "target_confirmed");
+  // Warmbly's first-touch control block (schema warmbly.confenge.first-touch-control.v1) is
+  // forwarded verbatim by the connector, so `control` and `runway` reach this projection intact.
+  // It is a *fallback* only: extra-cli remains the authority for the reservoir funnel, and Warmbly
+  // numbers are only adopted when extra-cli produced nothing at all. Stale/error Warmbly readings
+  // are never adopted — same gate the transport decision already applies.
+  const delegatedControl = O(delegated.control), delegatedRunway = O(delegated.runway), delegatedControlSource = O(delegatedControl.source);
+  const warmblyCount = (value: number | null): number | null => warmblySource.freshness === "FRESH" ? value : null;
+  // target_membership_count is only a count of the confirmed target when the membership is complete;
+  // an incomplete membership reporting 0 means "not reconciled yet", which is UNKNOWN and never zero.
+  const warmblyTargetConfirmed = warmblyCount(delegatedControlSource.target_membership_complete === true ? N(delegatedControlSource.target_membership_count) : null);
+  const warmblyReadyReservoir = warmblyCount(N(delegatedControl.ready_reservoir) ?? N(delegatedRunway.ready_reservoir_count));
+
+  const extraTargetConfirmed = N(inventoryValue("target_confirmed")) ?? N(reservoir.TARGET_CONFIRMED) ?? countFromFunnel(funnelRows, "target_confirmed");
+  const extraReadyReservoir = N(inventoryValue("ready_reservoir")) ?? N(inventoryValue("email_send_ready_reservoir")) ?? N(reservoir.email_send_ready_reservoir) ?? N(inventoryValue("email_send_ready")) ?? countFromFunnel(funnelRows, "email_send_ready");
+  const targetConfirmedFromWarmbly = extraTargetConfirmed === null && warmblyTargetConfirmed !== null;
+  const readyReservoirFromWarmbly = extraReadyReservoir === null && warmblyReadyReservoir !== null;
+  const targetConfirmed = extraTargetConfirmed ?? warmblyTargetConfirmed;
+  const readyReservoir = extraReadyReservoir ?? warmblyReadyReservoir;
+  // recipient_attributed (identidade atribuída) and eligible_current (elegibilidade Warmbly) have no
+  // defensible counterpart in the first-touch control block: nothing there counts identity attribution
+  // or current eligibility. Inventing a mapping would publish a number nobody observed, so both stay
+  // extra-cli only and remain UNKNOWN while extra-cli is silent.
   const recipientAttributed = N(inventoryValue("recipient_attributed")) ?? N(inventoryValue("identity_safe")) ?? countFromFunnel(funnelRows, "identity_safe");
   const eligibleCurrent = N(inventoryValue("eligible_current")) ?? N(inventoryValue("warmbly_eligible")) ?? countFromFunnel(funnelRows, "warmbly_eligible");
-  const readyReservoir = N(inventoryValue("ready_reservoir")) ?? N(inventoryValue("email_send_ready_reservoir")) ?? N(reservoir.email_send_ready_reservoir) ?? N(inventoryValue("email_send_ready")) ?? countFromFunnel(funnelRows, "email_send_ready");
   const prepared = N(working.prepared) ?? N(delegated.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
   const delegatedApproved = N(delegated.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
   const humanApproved = N(delegated.human_approved);
@@ -339,7 +359,10 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     : warmblySource;
   const reconciledExtraSource = hasImpossibleNumbers ? sourceWithFreshness(extraSource, "ERROR") : extraSource;
 
-  const targetFact = countFact(targetConfirmed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=target_confirmed`);
+  // Provenance follows the value: a Warmbly-derived stock never claims the extra-cli locator.
+  const targetConfirmedSource = targetConfirmedFromWarmbly ? reconciledWarmblySource : reconciledExtraSource;
+  const readyReservoirSource = readyReservoirFromWarmbly ? reconciledWarmblySource : reconciledExtraSource;
+  const targetFact = countFact(targetConfirmed, targetConfirmedSource, `${EXTRA_DRILLDOWN}?etapa=target_confirmed`);
   const recipientFact = countFact(recipientAttributed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=recipient_attributed`, "Identidade atribuída à empresa pela origem; nenhuma mailbox é exibida nesta visão.");
   const eligibleFact = countFact(eligibleCurrent, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=eligible_current`);
   const preparedFact = countFact(prepared, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=prepared`, "Denominador preparado explícito ou soma conservativa dos estados canônicos que já atravessaram PREPARED no mesmo run.");
@@ -355,18 +378,18 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const suppressedFact = countFact(suppressed, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=suppressed`);
   const slots24Fact = countFact(rawSlots24h, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; theoretical_slots_24h não entra no cálculo.");
   const slots7Fact = countFact(rawSlots7d, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; cap ou teto de política não substituem capacidade.");
-  const readyFact = countFact(readyReservoir, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`);
+  const readyFact = countFact(readyReservoir, readyReservoirSource, `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`);
   const runwayDays = sourceRunMatch === "MATCH" && readyFact.value !== null && slots7Fact.value !== null && slots7Fact.value > 0
     ? Math.round((readyFact.value * 7 / slots7Fact.value) * 10) / 10
     : null;
   const runwaySource: MorningSource = {
-    system: "extra-cli+warmbly",
+    system: readyReservoirFromWarmbly ? "warmbly" : "extra-cli+warmbly",
     kind: "derived-runway",
-    locator: `${extraSource.locator} + ${warmblySource.locator}`,
-    as_of: oldestAsOf(extraSource.as_of, warmblySource.as_of),
+    locator: readyReservoirFromWarmbly ? warmblySource.locator : `${extraSource.locator} + ${warmblySource.locator}`,
+    as_of: readyReservoirFromWarmbly ? warmblySource.as_of : oldestAsOf(extraSource.as_of, warmblySource.as_of),
     freshness: runwayDays === null ? "UNKNOWN" : "FRESH",
   };
-  const runwayDaysFact = countFact(runwayDays, runwaySource, TRANSPORT_DRILLDOWN, "Fórmula: ready reservoir (extra-cli) × 7 ÷ slots reais dos próximos 7 dias (Warmbly). as_of é o mais antigo das duas fontes. Capacidade zero, ausente ou source-run divergente resulta em UNKNOWN.");
+  const runwayDaysFact = countFact(runwayDays, runwaySource, TRANSPORT_DRILLDOWN, `Fórmula: ready reservoir (${readyReservoirFromWarmbly ? "Warmbly" : "extra-cli"}) × 7 ÷ slots reais dos próximos 7 dias (Warmbly). as_of é o mais antigo das fontes usadas. Capacidade zero, ausente ou source-run divergente resulta em UNKNOWN.`);
 
   const outboundRunway: OutboundRunwayTruth = {
     transport: {
@@ -526,7 +549,9 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     data: {
       current_feed: currentFeed,
       current_run: currentRun,
-      target_coverage: targetCoverageText ?? (targetConfirmed === null ? null : String(targetConfirmed)),
+      // This block is attributed to extraSource, so it may only carry extra-cli numbers;
+      // a Warmbly-derived target_confirmed does not leak into an extra-cli reading.
+      target_coverage: targetCoverageText ?? (extraTargetConfirmed === null ? null : String(extraTargetConfirmed)),
       blocker: queueFillBlocker ?? (pncpSlot.presence === "absent" ? S(pncpSlot.absence_reason) : null), source: extraSource,
     },
     inbound_web: {

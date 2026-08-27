@@ -358,6 +358,167 @@ test("reservoir threshold and exception-only review are explicit", () => {
   assert.doesNotMatch(html, /aprovar tudo/i);
 });
 
+function firstTouchControl(input: Record<string, unknown>): Record<string, unknown> {
+  const snapshots = input.snapshots as Record<string, Record<string, unknown>>;
+  const commercial = snapshots.commercial!.snapshot as Record<string, unknown>;
+  const operations = commercial.operations as Record<string, unknown>;
+  return operations.delegated_first_touch as Record<string, unknown>;
+}
+
+function dropExtraObservation(input: Record<string, unknown>): void {
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  input.source_observations = observations.filter((row) => (row.source as Record<string, unknown>).system !== "extra-cli");
+  const snapshots = input.snapshots as Record<string, Record<string, unknown>>;
+  const pncp = snapshots.pncp!.snapshot as Record<string, unknown>;
+  delete pncp.target_coverage;
+}
+
+/** Live production shape of GET /v1/confenge/first-touch/status, trimmed to the read fields. */
+function withWarmblyControl(input: Record<string, unknown>, overrides: Record<string, unknown> = {}): void {
+  const delegated = firstTouchControl(input);
+  delegated.runway = { ready_reservoir_count: 880, runway_days: 4 };
+  delegated.control = {
+    prepared: 900,
+    ready_reservoir: 1100,
+    queued: 140,
+    source: {
+      run_id: "run-current",
+      freshness_state: "fresh",
+      target_membership_complete: true,
+      target_membership_count: 2400,
+      supplier_confirmed_count: 2400,
+    },
+    ...overrides,
+  };
+}
+
+test("extra-cli keeps precedence over the Warmbly control block for the reservoir stocks", () => {
+  const input = envelope();
+  withWarmblyControl(input);
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, 2500);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli");
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1200);
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "extra-cli");
+  assert.equal(truth.outbound_runway.runway.estimated_days.source.system, "extra-cli+warmbly");
+  assert.equal(truth.data.target_coverage, "1/1");
+});
+
+test("Warmbly first-touch control fills the reservoir stocks only when extra-cli produced nothing", () => {
+  const input = envelope();
+  dropExtraObservation(input);
+  withWarmblyControl(input);
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, 2400);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "warmbly");
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.locator, "commercial/operations");
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1100);
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "warmbly");
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.source.locator, "commercial/operations");
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, false);
+  // The run reconciliation still gates the derived runway; the fallback does not bypass it.
+  assert.equal(truth.outbound_runway.integrity.source_run_match, "MATCH");
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, 36.7);
+  assert.equal(truth.outbound_runway.runway.estimated_days.source.system, "warmbly");
+  // Nothing observed identity attribution or current eligibility, so both stay UNKNOWN.
+  assert.equal(truth.outbound_runway.stock.recipient_attributed.value, null);
+  assert.equal(truth.outbound_runway.stock.eligible_current.value, null);
+  // A Warmbly-derived target never leaks into the extra-cli-attributed data block.
+  assert.equal(truth.data.target_coverage, null);
+});
+
+test("runway.ready_reservoir_count backs the reservoir when control.ready_reservoir is absent", () => {
+  const input = envelope();
+  dropExtraObservation(input);
+  withWarmblyControl(input);
+  delete (firstTouchControl(input).control as Record<string, unknown>).ready_reservoir;
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 880);
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.source.system, "warmbly");
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, true);
+});
+
+test("both sources absent leaves the reservoir stocks UNKNOWN instead of zero", () => {
+  const input = envelope();
+  dropExtraObservation(input);
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.value, null);
+  assert.equal(truth.outbound_runway.runway.reservoir_below_1000, null);
+  assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli");
+});
+
+test("a stale or errored Warmbly reading is never adopted as reservoir stock", () => {
+  for (const freshness of ["STALE", "ERROR", "UNKNOWN"]) {
+    const input = envelope();
+    dropExtraObservation(input);
+    withWarmblyControl(input);
+    ((input.snapshots as Record<string, Record<string, unknown>>).commercial!).freshness_status = freshness;
+
+    const truth = projectFounderOperatingTruth(input);
+    assert.equal(truth.outbound_runway.stock.target_confirmed.value, null, freshness);
+    assert.equal(truth.outbound_runway.runway.ready_reservoir.value, null, freshness);
+    assert.equal(truth.outbound_runway.runway.reservoir_below_1000, null, freshness);
+    assert.equal(truth.outbound_runway.runway.estimated_days.value, null, freshness);
+    // The number was not adopted at all, so the fact keeps the extra-cli attribution it always had.
+    assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli", freshness);
+  }
+});
+
+test("an incomplete target membership reporting zero stays UNKNOWN and never becomes zero", () => {
+  const input = envelope();
+  dropExtraObservation(input);
+  withWarmblyControl(input, {
+    source: {
+      run_id: "run-current",
+      freshness_state: "invalid",
+      target_membership_complete: false,
+      target_membership_count: 0,
+      supplier_confirmed_count: 0,
+    },
+  });
+
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.value, null);
+  assert.equal(truth.outbound_runway.stock.target_confirmed.source.system, "extra-cli");
+  // The reservoir, which carries no completeness qualifier, is still adopted.
+  assert.equal(truth.outbound_runway.runway.ready_reservoir.value, 1100);
+});
+
+test("a Warmbly-sourced reservoir does not bypass the monotonicity and run-match guards", () => {
+  const mismatched = envelope();
+  dropExtraObservation(mismatched);
+  withWarmblyControl(mismatched);
+  ((mismatched.snapshots as Record<string, Record<string, unknown>>).pncp!.snapshot as Record<string, unknown>).current_run = "run-other";
+
+  const mismatchTruth = projectFounderOperatingTruth(mismatched);
+  assert.equal(mismatchTruth.outbound_runway.integrity.source_run_match, "MISMATCH");
+  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.value, null);
+  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.source.freshness, "ERROR");
+  assert.equal(mismatchTruth.outbound_runway.runway.estimated_days.value, null);
+
+  const impossible = envelope();
+  const observations = impossible.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  const payload = extra.payload as Record<string, unknown>;
+  // extra-cli publishes only the eligibility stage; the reservoir has to come from Warmbly.
+  delete payload.ready_reservoir;
+  (payload.funnel_rows as Array<Record<string, unknown>>).pop();
+  payload.eligible_current = 10;
+  withWarmblyControl(impossible);
+
+  const impossibleTruth = projectFounderOperatingTruth(impossible);
+  assert.ok(impossibleTruth.outbound_runway.integrity.reason_codes.includes("READY_RESERVOIR_GT_ELIGIBLE_CURRENT"));
+  assert.equal(impossibleTruth.outbound_runway.integrity.state, "ERROR");
+  assert.equal(impossibleTruth.outbound_runway.runway.ready_reservoir.value, null);
+  assert.equal(impossibleTruth.outbound_runway.runway.ready_reservoir.source.freshness, "ERROR");
+});
+
 test("capacity v2 stays a read-only projection and exposes deadline blockers in the first viewport", () => {
   const value = envelope();
   const snapshots = value.snapshots as Record<string, Record<string, unknown>>;
