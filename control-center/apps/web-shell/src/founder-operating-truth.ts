@@ -350,7 +350,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : fromAge;
   const extraFeedAge = N(inventoryValue("feed_age_seconds"));
   const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
-  const pause = [S(dispatch.pause_reason), S(dispatch.paused_by), S(dispatch.pause_source)].map((v) => v ?? "UNKNOWN").join(" · ");
+  const pause = [S(dispatch.pause_reason), S(dispatch.paused_by), S(dispatch.pause_source), validDate(dispatch.paused_at)].map((v) => v ?? "UNKNOWN").join(" · ");
   const killRaw = overview.kill_switch ?? dispatch.kill_switch ?? O(operations.confenge_status).kill_switch;
   const kill = typeof killRaw === "boolean" ? (killRaw ? "ativo" : "desligado") : "UNKNOWN";
 

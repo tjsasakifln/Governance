@@ -672,7 +672,7 @@ test("producer DEGRADED and FROZEN commercial states stay visible with validade"
 
 test("pause actor/source and kill switch stay UNKNOWN when Warmbly omits them", () => {
   const truth = projectFounderOperatingTruth(envelope());
-  assert.match(truth.outbound_runway.transport.pause.value ?? "", /UNKNOWN/);
+  assert.equal(truth.outbound_runway.transport.pause.value, "UNKNOWN · UNKNOWN · UNKNOWN · UNKNOWN");
   assert.equal(truth.outbound_runway.transport.kill_switch.value, "UNKNOWN");
   const html = renderHoje(composeHoje({
     generated_at: NOW,
@@ -682,7 +682,30 @@ test("pause actor/source and kill switch stay UNKNOWN when Warmbly omits them", 
   }));
   assert.match(html, /data-runway-metric="pause"/);
   assert.match(html, /data-runway-metric="kill-switch"/);
-  assert.match(html, /desconhecido · desconhecido/);
+  assert.match(html, /desconhecido · desconhecido · desconhecido · desconhecido/);
+});
+
+test("pause fact keeps Warmbly paused_at on the runway when the producer publishes it", () => {
+  const input = envelope();
+  const operations = ((input.snapshots as Record<string, Record<string, unknown>>).commercial!.snapshot as Record<string, unknown>).operations as Record<string, unknown>;
+  const dispatch = operations.dispatch as Record<string, unknown>;
+  dispatch.pause_reason = "mailbox_blocked";
+  dispatch.paused_by = "outbound_owner";
+  dispatch.pause_source = "warmbly";
+  dispatch.paused_at = "2026-08-25T12:00:00Z";
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(
+    truth.outbound_runway.transport.pause.value,
+    "mailbox_blocked · outbound_owner · warmbly · 2026-08-25T12:00:00Z",
+  );
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, /data-runway-metric="pause"/);
+  assert.match(html, /mailbox_blocked · outbound_owner · warmbly · 2026-08-25T12:00:00Z/);
 });
 
 test("named exception reason groups from producer codes stay on the exception recorte", () => {
