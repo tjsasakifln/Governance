@@ -24,7 +24,7 @@
     { "method": "GET", "path": "/v1/confenge/today", "notes": "feature-flagged executable human work" },
     { "method": "GET", "path": "/v1/confenge/inbound", "notes": "feature-flagged inbound-now queue (lead surface)" },
     { "method": "GET", "path": "/v1/confenge/dispatch/status", "notes": "authoritative pause, kill-switch-adjacent scheduling and queue readback surface" },
-    { "method": "GET", "path": "/v1/confenge/first-touch/status", "notes": "authoritative CFG-FIRST-TOUCH-ROUTING-v1 delegated decisions, HOLD exceptions, approval source, evidence/reason codes and QUEUED readback; Control Center displays but never re-evaluates it" },
+    { "method": "GET", "path": "/v1/confenge/first-touch/status", "notes": "authoritative CFG-FIRST-TOUCH-ROUTING-v1 or v2 delegated decisions, HOLD exceptions, approval source, evidence/reason codes and QUEUED readback; optional commercial_authority binding (source_run_id, membership_hash, validated_at, valid_until, state) is displayed when present and UNKNOWN when absent; Control Center displays but never re-evaluates policy gates" },
     { "method": "GET", "path": "/v1/confenge/working-overview", "notes": "authoritative aggregate working lanes, current reservoir, suppression and feed age; theoretical_slots_24h is planning-only and is never used as actual runway capacity" }
   ],
   "operator_actions": {

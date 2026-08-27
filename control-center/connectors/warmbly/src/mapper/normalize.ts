@@ -572,6 +572,16 @@ function dispatchOf(payload: WarmblyPayload): Record<string, unknown> {
   if (typeof st.pause_reason === "string" && st.pause_reason.trim() !== "") {
     out.pause_reason = st.pause_reason.trim();
   }
+  if (typeof st.paused_by === "string" && st.paused_by.trim() !== "") {
+    out.paused_by = st.paused_by.trim();
+  }
+  if (typeof st.paused_at === "string" && st.paused_at.trim() !== "") {
+    out.paused_at = st.paused_at.trim();
+  }
+  if (typeof st.pause_source === "string" && st.pause_source.trim() !== "") {
+    out.pause_source = st.pause_source.trim();
+  }
+  if (typeof st.kill_switch === "boolean") out.kill_switch = st.kill_switch;
   if (typeof st.in_send_window === "boolean") out.in_send_window = st.in_send_window;
   if (typeof st.timezone === "string" && st.timezone !== "") out.timezone = st.timezone;
   if (typeof st.window_start === "string" && st.window_start !== "") out.window_start = st.window_start;

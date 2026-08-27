@@ -1,0 +1,212 @@
+[
+  {
+    "case_id": "v1-legacy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v1",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": false,
+      "source_state": "UNKNOWN",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["UNKNOWN_POLICY_VERSION"]
+    }
+  },
+  {
+    "case_id": "v2-current",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 3600 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true
+    }
+  },
+  {
+    "case_id": "v2-degraded",
+    "requested_policy": "v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 172800 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "DEGRADED",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true
+    }
+  },
+  {
+    "case_id": "v2-frozen",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 345600 },
+    "already_bound_materialized": true,
+    "explicit_binding_still_valid": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "FROZEN_FOR_NEW_ADMISSION",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": true,
+      "reason_codes_contains": ["COMMERCIAL_AUTHORITY_FROZEN"]
+    }
+  },
+  {
+    "case_id": "v2-expired",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 700000 },
+    "already_bound_materialized": true,
+    "explicit_binding_still_valid": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "EXPIRED",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["COMMERCIAL_AUTHORITY_EXPIRED"]
+    }
+  },
+  {
+    "case_id": "unknown-policy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v9",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": false,
+      "source_state": "UNKNOWN",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["UNKNOWN_POLICY_VERSION"]
+    }
+  },
+  {
+    "case_id": "missing-commercial-authority",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "already_bound_materialized": false,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["MISSING_COMMERCIAL_AUTHORITY"]
+    }
+  },
+  {
+    "case_id": "binding-mismatch",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60, "observed_membership_hash": "mem-other" },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["BINDING_MISMATCH"]
+    }
+  },
+  {
+    "case_id": "stale-source-valid-authority",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "STALE", "age_seconds": 400000 },
+    "commercial_binding": { "age_seconds": 1800 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "STALE",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true,
+      "reason_codes_contains": ["SOURCE_HEALTH_DEGRADED_NOT_COMMERCIAL_REVOCATION"]
+    }
+  },
+  {
+    "case_id": "valid-source-expired-recipient",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "fail_closed": { "recipient_expired": true },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["RECIPIENT_EXPIRED"]
+    }
+  },
+  {
+    "case_id": "explicit-suppression",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "fail_closed": { "suppression": true },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["SUPPRESSION"]
+    }
+  },
+  {
+    "case_id": "delegated-queued",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true
+    }
+  },
+  {
+    "case_id": "human-exception-queued",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "fail_closed": { "party_role_conflict": true },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": false,
+      "existing_bound_touch_transport_allowed": false,
+      "reason_codes_contains": ["PARTY_ROLE_CONFLICT"]
+    }
+  },
+  {
+    "case_id": "readback-unknown",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "commercial_binding": { "age_seconds": 60 },
+    "already_bound_materialized": true,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "CURRENT",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true
+    }
+  }
+]

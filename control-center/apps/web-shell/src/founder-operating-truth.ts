@@ -1,4 +1,8 @@
 export type TruthFreshness = "FRESH" | "STALE" | "UNKNOWN" | "ERROR";
+export type SourceHealthState = "FRESH" | "DEGRADED" | "STALE" | "UNKNOWN";
+export type CommercialAuthorityState = "CURRENT" | "DEGRADED" | "FROZEN" | "EXPIRED" | "UNKNOWN";
+
+
 
 export interface MorningSource {
   system: string;
@@ -43,7 +47,8 @@ export interface OutboundRunwayTruth {
     state: MorningFact<TransportDecision>;
     runtime_sha: MorningFact<string>;
     policy_version: MorningFact<string>;
-    source_run_freshness: MorningFact<TruthFreshness>;
+    source_health: MorningFact<SourceHealthState>;
+    commercial_state: MorningFact<CommercialAuthorityState>;
   };
   stock: {
     target_confirmed: MorningFact<number>;
@@ -315,7 +320,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const prepared = N(working.prepared) ?? N(delegated.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
   const delegatedApproved = N(delegated.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
   const humanApproved = N(delegated.human_approved);
-  const queued = N(delegated.queued_readback) ?? N(dispatch.queued_approved);
+  const queued = N(delegated.queued_readback);
   const holdExceptions = N(delegated.hold_exceptions) ?? stateCount(delegatedCounts, ["HOLD", "NEEDS_REVIEW", "EXCEPTION"]) ?? N(overview.outbound_exceptions);
   const sent = N(outcomes.sent) ?? (Object.hasOwn(delegatedCounts, "SENT") ? N(delegatedCounts.SENT) : null);
   const attempted = N(outcomes.attempted);
@@ -332,8 +337,14 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const queueFillBlocker = S(working.queue_fill_blocker) ?? S(inventoryValue("queue_fill_blocker")) ?? S(pncp.blocker);
   const queueFillSource = S(working.queue_fill_blocker) ? warmblySource : extraSource;
 
+  const authorityBlock = O(delegated.commercial_authority);
+  const cs = S(authorityBlock.state);
+  const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "EXPIRED" ? cs : "UNKNOWN";
+  const extraFeedAge = N(inventoryValue("feed_age_seconds"));
+  const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
+
   const integrityReasons: string[] = [];
-  if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_MISMATCH");
+  if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_CHANGED");
   if (runtimeShas.length > 1) integrityReasons.push("RUNTIME_SHA_MISMATCH");
   const impossible = (code: string, part: number | null, whole: number | null): void => {
     if (part !== null && whole !== null && part > whole) integrityReasons.push(code);
@@ -350,8 +361,8 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   impossible("DELIVERED_GT_PROVIDER_ACCEPTED", delivered, providerAccepted);
   impossible("REPLIES_GT_ATTEMPTED", replies, attempted);
   impossible("SUPPRESSED_GT_TARGET_CONFIRMED", suppressed, targetConfirmed);
-  const hasImpossibleNumbers = integrityReasons.some((code) => code !== "SOURCE_RUN_MISMATCH" && code !== "RUNTIME_SHA_MISMATCH");
-  const reconciledWarmblySource = sourceRunMatch === "MISMATCH" || hasImpossibleNumbers
+  const hasImpossibleNumbers = integrityReasons.some((code) => code !== "SOURCE_RUN_CHANGED" && code !== "RUNTIME_SHA_MISMATCH");
+  const reconciledWarmblySource = hasImpossibleNumbers
     ? sourceWithFreshness(warmblySource, "ERROR")
     : warmblySource;
   const reconciledExtraSource = hasImpossibleNumbers ? sourceWithFreshness(extraSource, "ERROR") : extraSource;
@@ -370,7 +381,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const preparedFact = countFact(prepared, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=prepared`, "Denominador preparado explícito ou soma conservativa dos estados canônicos que já atravessaram PREPARED no mesmo run.");
   const approvedFact = countFact(delegatedApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`, "Soma dos buckets canônicos APPROVED, APPROVED_NOT_SCHEDULED, QUEUED e SENT; nenhuma aprovação humana é forjada.");
   const humanApprovedFact = countFact(humanApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=human_approved`, "Aprovação humana permanece separada da autoridade delegada e não é somada ao delegated approved.");
-  const queuedFact = countFact(queued, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`, "Conta somente QUEUED confirmado por readback canônico.");
+  const queuedFact = countFact(queued, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`, "Somente readback canônico.");
   const holdFact = countFact(holdExceptions, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`, "Revisar mensagens conta somente HOLD, NEEDS_REVIEW e EXCEPTION.");
   const sentFact = countFact(sent, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=sent`, "SENT é separado de provider accepted e delivered.");
   const attemptedFact = countFact(attempted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=attempted`);
@@ -398,7 +409,8 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       state: textFact(transportDecision, warmblySource, TRANSPORT_DRILLDOWN, "GO/PAUSED/NO_GO vem do transporte Warmbly; esta projeção não altera kill switch."),
       runtime_sha: textFact(runtimeShas.length === 1 ? runtimeShas[0]! : null, runtimeShas.length > 1 ? sourceWithFreshness(warmblySource, "ERROR") : warmblySource, TRANSPORT_DRILLDOWN),
       policy_version: textFact(S(delegated.policy_version), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
-      source_run_freshness: textFact(sourceRunMatch === "MISMATCH" ? "ERROR" : extraSource.freshness, sourceRunMatch === "MISMATCH" ? sourceWithFreshness(extraSource, "ERROR") : extraSource, EXTRA_DRILLDOWN, `Reconciliação do run extra-cli (${currentRun ?? "UNKNOWN"}) com Warmbly (${delegatedRun ?? "UNKNOWN"}): ${sourceRunMatch}.`),
+      source_health: textFact(sourceHealthState, extraSource, EXTRA_DRILLDOWN),
+      commercial_state: textFact(commercialState, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
     },
     stock: {
       target_confirmed: targetFact,
@@ -438,7 +450,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       queue_fill_blocker: textFact(queueFillBlocker, queueFillSource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`),
     },
     integrity: {
-      state: integrityReasons.length > 0 ? "ERROR" : sourceRunMatch === "UNKNOWN" ? "UNKNOWN" : "OK",
+      state: hasImpossibleNumbers || runtimeShas.length > 1 ? "ERROR" : sourceRunMatch === "UNKNOWN" && commercialState === "UNKNOWN" ? "UNKNOWN" : "OK",
       source_run_match: sourceRunMatch,
       reason_codes: [...new Set(integrityReasons)],
     },
@@ -464,12 +476,13 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const capacityNextAction = S(capacity.next_action);
 
   const exceptions = A(operations.exceptions).map((item) => exception(item, generatedAt));
-  if (integrityReasons.length > 0 && !exceptions.some((item) => item.id === "projection-outbound-integrity")) {
+  const invalidatingIntegrity = hasImpossibleNumbers || runtimeShas.length > 1;
+  if (invalidatingIntegrity && !exceptions.some((item) => item.id === "projection-outbound-integrity")) {
     exceptions.push({
       id: "projection-outbound-integrity",
-      bucket: integrityReasons.includes("SOURCE_RUN_MISMATCH") || integrityReasons.includes("RUNTIME_SHA_MISMATCH") ? "runtime_mismatch" : "other",
+      bucket: runtimeShas.length > 1 ? "runtime_mismatch" : "other",
       owner: "outbound_owner",
-      reason: `Leitura outbound bloqueada por ${integrityReasons.join(", ")}.`,
+      reason: `Leitura outbound bloqueada por ${integrityReasons.filter((code) => code !== "SOURCE_RUN_CHANGED").join(", ")}.`,
       evidence: [`extra_run:${currentRun ?? "UNKNOWN"}`, `warmbly_run:${delegatedRun ?? "UNKNOWN"}`],
       age_seconds: null,
       next_action: "Reconciliar source run, runtime e denominadores antes de aumentar volume.",

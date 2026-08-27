@@ -1,0 +1,31 @@
+{
+  "schema_version": "cfg-first-touch-routing-consumer-expectations.v2",
+  "policy_canonical": "CFG-FIRST-TOUCH-ROUTING-v2",
+  "v1_preserved": "CFG-FIRST-TOUCH-ROUTING-v1",
+  "activation": {
+    "v1_readable": true,
+    "v2_exact_match_only": true,
+    "unknown_version_fail_closed": true
+  },
+  "smtp_authorized": false,
+  "provider_dispatch_authorized": false,
+  "cases": [
+    "v1-legacy",
+    "v2-current",
+    "v2-degraded",
+    "v2-frozen",
+    "v2-expired",
+    "unknown-policy",
+    "missing-commercial-authority",
+    "binding-mismatch",
+    "stale-source-valid-authority",
+    "valid-source-expired-recipient",
+    "explicit-suppression",
+    "delegated-queued",
+    "human-exception-queued",
+    "readback-unknown"
+  ],
+  "fixture": "commercial/fixtures/first-touch-routing-v2/matrix.v1.json",
+  "extra_cli": "not edited; expected to publish source health and commercial binding independently",
+  "warmbly": "not edited; missing paused_by/pause_source remain UNKNOWN; queued_readback is the only QUEUED count"
+}

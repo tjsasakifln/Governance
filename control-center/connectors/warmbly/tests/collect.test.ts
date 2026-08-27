@@ -31,6 +31,11 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     const decisions = delegated.items as Array<Record<string, unknown>>;
     assert.equal(decisions[0]?.approval_source, "DELEGATED_POLICY_APPROVE");
     assert.equal(decisions[1]?.approval_source, "POLICY_EVALUATION_HOLD");
+    const dispatch = snapshot.operations?.dispatch as Record<string, unknown>;
+    assert.equal(dispatch.observed, false);
+    assert.equal("paused_by" in dispatch, false);
+    assert.equal("pause_source" in dispatch, false);
+
     const working = snapshot.operations?.working_overview as Record<string, unknown>;
     assert.equal(working.observed, true);
     assert.equal(working.reservoir_monitored, 2500);
@@ -120,6 +125,28 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     assert.ok(contract.min_response.body);
     assert.ok(snapshot.attention.some((a) => a.id.includes("task-overdue-1")));
     assert.equal(snapshot.attention.some((a) => a.kind === "confenge_attention"), false);
+  });
+
+  it("forwards pause actor fields when present and never invents them", () => {
+    const payload = loadFixture("commercial-runtime.json");
+    const withActor = structuredClone(payload);
+    withActor.confenge_dispatch_status = {
+      paused: true,
+      pause_reason: "hold",
+      paused_by: "founder",
+      paused_at: "2026-08-26T12:00:00Z",
+      pause_source: "api",
+    };
+    const observed = collectFromWarmblyPayload(withActor, { now: NOW });
+    const dispatch = observed.operations?.dispatch as Record<string, unknown>;
+    assert.equal(dispatch.paused_by, "founder");
+    assert.equal(dispatch.pause_source, "api");
+    assert.equal(dispatch.paused_at, "2026-08-26T12:00:00Z");
+
+    const missing = collectFromWarmblyPayload(payload, { now: NOW });
+    const missingDispatch = missing.operations?.dispatch as Record<string, unknown>;
+    assert.equal(missingDispatch.paused_by, undefined);
+    assert.equal(missingDispatch.pause_source, undefined);
   });
 
   it("campaigns list 500 is a gap and does not ERROR required CRM freshness", () => {

@@ -54,7 +54,7 @@ export const OPERATIONAL_ENVELOPE_FIXTURE: unknown = {
             provider_errors: 2,
           },
           delegated_first_touch: {
-            policy_version: "CFG-FIRST-TOUCH-ROUTING-v1",
+            policy_version: "CFG-FIRST-TOUCH-ROUTING-v2",
             runtime_release_sha: "cd0c5d0f7d5b5df2c8d6ccfc2bfd9ae6bb48392f",
             source_run_id: "extra-run-2026-08-20-1740",
             queued_readback: 140,

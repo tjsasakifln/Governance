@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/cfg-first-touch-routing.v2.schema.json",
+  "title": "CONFENGE delegated first-touch routing policy v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "status",
+    "effective_at",
+    "additive_to",
+    "v1_history_rewritten",
+    "authority",
+    "activation",
+    "scope",
+    "source_authorities",
+    "separated_authorities",
+    "source_operational_health",
+    "commercial_authority",
+    "transport_authority",
+    "evaluation",
+    "hard_gates",
+    "fail_closed_blockers",
+    "frozen_for_new_admission",
+    "drift_invalidation",
+    "failure",
+    "audit",
+    "runtime_reuse",
+    "canary"
+  ],
+  "properties": {
+    "schema_version": { "const": "cfg-first-touch-routing.v2" },
+    "policy_id": { "const": "CFG-FIRST-TOUCH-ROUTING" },
+    "policy_version": { "const": "v2" },
+    "canonical_name": { "const": "CFG-FIRST-TOUCH-ROUTING-v2" },
+    "status": { "const": "ACTIVE" },
+    "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "additive_to": { "const": "CFG-FIRST-TOUCH-ROUTING-v1" },
+    "v1_history_rewritten": { "const": false },
+    "authority": { "$ref": "#/$defs/authority" },
+    "activation": { "$ref": "#/$defs/activation" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "source_authorities": { "$ref": "#/$defs/source_authorities" },
+    "separated_authorities": { "$ref": "#/$defs/separated_authorities" },
+    "source_operational_health": { "$ref": "#/$defs/source_operational_health" },
+    "commercial_authority": { "$ref": "#/$defs/commercial_authority" },
+    "transport_authority": { "$ref": "#/$defs/transport_authority" },
+    "evaluation": { "$ref": "#/$defs/evaluation" },
+    "hard_gates": { "$ref": "#/$defs/hard_gates" },
+    "fail_closed_blockers": { "$ref": "#/$defs/fail_closed_blockers" },
+    "frozen_for_new_admission": { "$ref": "#/$defs/frozen_for_new_admission" },
+    "drift_invalidation": { "$ref": "#/$defs/drift_invalidation" },
+    "failure": { "$ref": "#/$defs/failure" },
+    "audit": { "$ref": "#/$defs/audit" },
+    "runtime_reuse": { "$ref": "#/$defs/runtime_reuse" },
+    "canary": { "$ref": "#/$defs/canary" }
+  },
+  "$defs": {
+    "string_array": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "closed_band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_inclusive", "max_inclusive"],
+      "properties": {
+        "min_inclusive": { "type": "integer", "minimum": 0 },
+        "max_inclusive": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "open_closed_band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_exclusive", "max_inclusive"],
+      "properties": {
+        "min_exclusive": { "type": "integer", "minimum": 0 },
+        "max_inclusive": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "open_band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_exclusive"],
+      "properties": {
+        "min_exclusive": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decided_by_role", "decision_reference", "runtime_reference", "decision_source", "eligible_first_touch_requires_human_review", "human_actor_impersonation_allowed"],
+      "properties": {
+        "decided_by_role": { "const": "FOUNDER" },
+        "decision_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/129" },
+        "runtime_reference": { "const": "https://github.com/tjsasakifln/warmbly/issues/41" },
+        "decision_source": { "const": "DELEGATED_POLICY_APPROVE" },
+        "eligible_first_touch_requires_human_review": { "const": false },
+        "human_actor_impersonation_allowed": { "const": false }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_version_match_required", "accepted_version_strings", "unknown_version_disposition", "v1_string_does_not_activate_v2", "missing_version_disposition"],
+      "properties": {
+        "exact_version_match_required": { "const": true },
+        "accepted_version_strings": { "const": ["v2", "CFG-FIRST-TOUCH-ROUTING-v2"] },
+        "unknown_version_disposition": { "const": "FAIL_CLOSED" },
+        "v1_string_does_not_activate_v2": { "const": true },
+        "missing_version_disposition": { "const": "FAIL_CLOSED" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "message_kind", "followups_authorized", "approval_authorized", "scheduling_authorized", "provider_dispatch_authorized"],
+      "properties": {
+        "channel": { "const": "EMAIL" },
+        "message_kind": { "const": "FIRST_TOUCH" },
+        "followups_authorized": { "const": false },
+        "approval_authorized": { "const": true },
+        "scheduling_authorized": { "const": true },
+        "provider_dispatch_authorized": { "const": false }
+      }
+    },
+    "source_authorities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_identity_party_role_recipient_evidence", "approval_scheduling_queue_transport", "policy_governance"],
+      "properties": {
+        "target_identity_party_role_recipient_evidence": { "const": "extra-cli/confenge.outreach.v1" },
+        "approval_scheduling_queue_transport": { "const": "warmbly/confenge" },
+        "policy_governance": { "const": "Governance/CFG-FIRST-TOUCH-ROUTING-v2" }
+      }
+    },
+    "separated_authorities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_operational_health_is_commercial_decision", "source_degradation_revokes_proven_commercial_authorization", "validity_inferred_from_absence_of_event"],
+      "properties": {
+        "source_operational_health_is_commercial_decision": { "const": false },
+        "source_degradation_revokes_proven_commercial_authorization": { "const": false },
+        "validity_inferred_from_absence_of_event": { "const": false }
+      }
+    },
+    "source_operational_health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observable_independently", "alarmable", "is_commercial_decision", "components", "states", "unknown_remains_unknown", "age_bands_seconds"],
+      "properties": {
+        "observable_independently": { "const": true },
+        "alarmable": { "const": true },
+        "is_commercial_decision": { "const": false },
+        "components": { "const": ["crawler", "target_fit_maintenance", "publication", "age_lag"] },
+        "states": { "const": ["FRESH", "DEGRADED", "STALE", "UNKNOWN"] },
+        "unknown_remains_unknown": { "const": true },
+        "age_bands_seconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["FRESH", "DEGRADED", "STALE"],
+          "properties": {
+            "FRESH": { "$ref": "#/$defs/closed_band" },
+            "DEGRADED": { "$ref": "#/$defs/open_closed_band" },
+            "STALE": { "$ref": "#/$defs/open_band" }
+          }
+        }
+      }
+    },
+    "commercial_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding_fields", "first_window_thresholds_seconds", "missing_binding_disposition", "states"],
+      "properties": {
+        "binding_fields": {
+          "const": [
+            "source_run_id",
+            "snapshot_id",
+            "membership_hash",
+            "validated_at",
+            "valid_until",
+            "state",
+            "new_admission_allowed",
+            "existing_bound_touch_transport_allowed",
+            "reason_codes"
+          ]
+        },
+        "first_window_thresholds_seconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["CURRENT", "DEGRADED", "FROZEN_FOR_NEW_ADMISSION", "EXPIRED"],
+          "properties": {
+            "CURRENT": { "$ref": "#/$defs/closed_band" },
+            "DEGRADED": { "$ref": "#/$defs/open_closed_band" },
+            "FROZEN_FOR_NEW_ADMISSION": { "$ref": "#/$defs/open_closed_band" },
+            "EXPIRED": { "$ref": "#/$defs/open_band" }
+          }
+        },
+        "missing_binding_disposition": { "const": "FAIL_CLOSED" },
+        "states": { "const": ["CURRENT", "DEGRADED", "FROZEN_FOR_NEW_ADMISSION", "EXPIRED", "UNKNOWN"] }
+      }
+    },
+    "transport_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed_fields", "pause_actor_missing_is_unknown", "invented_pause_actor_allowed", "first_window_go_authorized_by_this_policy"],
+      "properties": {
+        "observed_fields": {
+          "const": [
+            "mailbox",
+            "rates",
+            "min_wait",
+            "business_window",
+            "pause",
+            "kill_switch",
+            "suppression",
+            "worker_provider",
+            "first_window_go"
+          ]
+        },
+        "pause_actor_missing_is_unknown": { "const": true },
+        "invented_pause_actor_allowed": { "const": false },
+        "first_window_go_authorized_by_this_policy": { "const": false }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "unknown_result", "individual_failure_stops_batch", "replay_semantics"],
+      "properties": {
+        "mode": { "const": "ALL_HARD_GATES_MUST_PASS" },
+        "unknown_result": { "const": "HOLD_NEEDS_REVIEW" },
+        "individual_failure_stops_batch": { "const": false },
+        "replay_semantics": { "const": "IDEMPOTENT_NO_DUPLICATE_APPROVAL_OR_SCHEDULING" }
+      }
+    },
+    "hard_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_and_party_role", "recipient", "evidence", "compliance_and_reputation", "copy"],
+      "properties": {
+        "identity_and_party_role": {
+          "const": {
+            "target_state": "TARGET_CONFIRMED",
+            "source_run_must_be_current": false,
+            "commercial_binding_must_be_valid": true,
+            "source_health_is_not_commercial_decision": true,
+            "cnpj_root_must_reconcile": true,
+            "allowed_target_party_roles": ["SUPPLIER", "CONTRACTOR", "CONTRATADA", "FORNECEDORA"],
+            "required_typed_status": "CONTRACTOR_ROLE_CONFIRMED",
+            "supplier_exact_cnpj_or_typed_branch_binding_required": true,
+            "cnpj_root_only_match_disposition": "HOLD_NEEDS_REVIEW",
+            "forbidden_target_party_roles": ["BUYER", "CONTRACTING_AUTHORITY", "CONTRATANTE", "ORGAO"],
+            "conflict_disposition": "PARTY_ROLE_CONFLICT",
+            "unknown_disposition": "HOLD_NEEDS_REVIEW",
+            "warmbly_may_reinterpret_raw_pncp": false
+          }
+        },
+        "recipient": {
+          "const": {
+            "allowed_route_classes": ["DIRECT_PERSON", "ROLE_OR_DEPARTMENT", "GENERIC_COMPANY", "PUBLIC_COMPANY_FREEMAIL"],
+            "exact_recipient_required": true,
+            "company_association_evidence_required": true,
+            "current_source_run_required": false,
+            "commercial_binding_required": true,
+            "recipient_attribution_must_be_valid": true,
+            "forbidden_proof_only": ["GUESSED_PATTERN", "SYNTAX_ONLY", "MX_ONLY", "DOMAIN_ONLY", "SEARCH_SNIPPET_ONLY", "UNATTRIBUTED_FREEMAIL", "UNPROVEN_SHARED_MAILBOX"]
+          }
+        },
+        "evidence": {
+          "const": {
+            "bundle_reconciled": true,
+            "source_run_current": false,
+            "commercial_authority_valid": true,
+            "freshness_valid": true,
+            "critical_conflict_absent": true,
+            "company_cnpj_recipient_binding_required": true,
+            "every_copy_fact_supported": true,
+            "internal_hypothesis_as_fact_allowed": false
+          }
+        },
+        "compliance_and_reputation": {
+          "const": {
+            "suppression_clear": true,
+            "opt_out_clear": true,
+            "dnc_clear": true,
+            "hard_bounce_clear": true,
+            "organization_risk_clear": true,
+            "mailbox_transport_eligible": true,
+            "kill_switch_bypass_allowed": false,
+            "dispatch_pause_bypass_allowed": false
+          }
+        },
+        "copy": {
+          "const": {
+            "first_touch_only": true,
+            "current_composer_template_prompt_required": true,
+            "subject_and_body_nonempty": true,
+            "deterministic_editorial_qa": "PASS",
+            "deterministic_factual_qa": "PASS",
+            "raw_metadata_allowed": false,
+            "internal_reasoning_allowed": false,
+            "unsupported_economic_or_legal_claim_allowed": false,
+            "forbidden_generic_subject_allowed": false,
+            "truncation_allowed": false,
+            "near_duplicate_above_existing_limit_allowed": false,
+            "route_class_compatible_cta_required": true,
+            "non_direct_routes_request_forwarding": true,
+            "non_direct_routes_may_claim_decision_maker": false
+          }
+        }
+      }
+    },
+    "fail_closed_blockers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["always_block_inside_grace", "unknown_flag_blocks", "codes"],
+      "properties": {
+        "always_block_inside_grace": { "const": true },
+        "unknown_flag_blocks": { "const": true },
+        "codes": {
+          "const": [
+            "EXPLICIT_DEACTIVATION",
+            "MEMBERSHIP_LEAVE_PROVEN",
+            "PARTY_ROLE_CONFLICT",
+            "RECIPIENT_EXPIRED",
+            "EVIDENCE_EXPIRED",
+            "SUPPRESSION",
+            "OPT_OUT_DNC",
+            "HARD_BOUNCE",
+            "COMPLIANCE_RISK",
+            "POLICY_DRIFT",
+            "BINDING_MISMATCH",
+            "TRANSPORT_BLOCKED"
+          ]
+        }
+      }
+    },
+    "frozen_for_new_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "new_leads_promoted",
+        "new_unproven_factual_assertion_allowed",
+        "existing_bound_touch_continues_only_with_explicit_still_valid_declaration",
+        "existing_bound_touch_requires_fail_closed_gates_pass",
+        "validity_inferred_from_absence_of_event"
+      ],
+      "properties": {
+        "new_leads_promoted": { "const": false },
+        "new_unproven_factual_assertion_allowed": { "const": false },
+        "existing_bound_touch_continues_only_with_explicit_still_valid_declaration": { "const": true },
+        "existing_bound_touch_requires_fail_closed_gates_pass": { "const": true },
+        "validity_inferred_from_absence_of_event": { "const": false }
+      }
+    },
+    "drift_invalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "material_fields"],
+      "properties": {
+        "action": { "const": "INVALIDATE_DELEGATED_APPROVAL" },
+        "material_fields": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "disposition", "concrete_reason_codes_required", "fail_closed"],
+      "properties": {
+        "decision": { "const": "DO_NOT_APPROVE" },
+        "disposition": { "const": "HOLD_NEEDS_REVIEW_EXCEPTION" },
+        "concrete_reason_codes_required": { "const": true },
+        "fail_closed": { "const": true }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved_by_type", "human_approved_by_must_be_empty", "required_fields"],
+      "properties": {
+        "approved_by_type": { "const": "delegated_agent_or_system" },
+        "human_approved_by_must_be_empty": { "const": true },
+        "required_fields": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "runtime_reuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existing_approval_authority", "existing_scheduler", "existing_queue", "existing_crm", "existing_suppression", "existing_idempotency", "existing_readback_verification", "existing_next_eligible_slot", "existing_min_wait_time", "existing_business_window", "existing_mailbox_rate_limits", "parallel_architecture_allowed"],
+      "properties": {
+        "existing_approval_authority": { "const": true },
+        "existing_scheduler": { "const": true },
+        "existing_queue": { "const": true },
+        "existing_crm": { "const": true },
+        "existing_suppression": { "const": true },
+        "existing_idempotency": { "const": true },
+        "existing_readback_verification": { "const": true },
+        "existing_next_eligible_slot": { "const": true },
+        "existing_min_wait_time": { "const": true },
+        "existing_business_window": { "const": true },
+        "existing_mailbox_rate_limits": { "const": true },
+        "parallel_architecture_allowed": { "const": false }
+      }
+    },
+    "canary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operational_data_allowed", "dispatch_global_paused_required", "kill_switch_preserved_required", "queued_readback_required", "smtp_send_allowed", "sent_count_required", "provider_send_mutation_allowed"],
+      "properties": {
+        "operational_data_allowed": { "const": true },
+        "dispatch_global_paused_required": { "const": true },
+        "kill_switch_preserved_required": { "const": true },
+        "queued_readback_required": { "const": true },
+        "smtp_send_allowed": { "const": false },
+        "sent_count_required": { "const": 0 },
+        "provider_send_mutation_allowed": { "const": false }
+      }
+    }
+  }
+}

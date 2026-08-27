@@ -1,0 +1,340 @@
+{
+  "schema_version": "cfg-first-touch-routing.v2",
+  "policy_id": "CFG-FIRST-TOUCH-ROUTING",
+  "policy_version": "v2",
+  "canonical_name": "CFG-FIRST-TOUCH-ROUTING-v2",
+  "status": "ACTIVE",
+  "effective_at": "2026-08-27T00:00:00Z",
+  "additive_to": "CFG-FIRST-TOUCH-ROUTING-v1",
+  "v1_history_rewritten": false,
+  "authority": {
+    "decided_by_role": "FOUNDER",
+    "decision_reference": "https://github.com/tjsasakifln/Governance/issues/129",
+    "runtime_reference": "https://github.com/tjsasakifln/warmbly/issues/41",
+    "decision_source": "DELEGATED_POLICY_APPROVE",
+    "eligible_first_touch_requires_human_review": false,
+    "human_actor_impersonation_allowed": false
+  },
+  "activation": {
+    "exact_version_match_required": true,
+    "accepted_version_strings": [
+      "v2",
+      "CFG-FIRST-TOUCH-ROUTING-v2"
+    ],
+    "unknown_version_disposition": "FAIL_CLOSED",
+    "v1_string_does_not_activate_v2": true,
+    "missing_version_disposition": "FAIL_CLOSED"
+  },
+  "scope": {
+    "channel": "EMAIL",
+    "message_kind": "FIRST_TOUCH",
+    "followups_authorized": false,
+    "approval_authorized": true,
+    "scheduling_authorized": true,
+    "provider_dispatch_authorized": false
+  },
+  "source_authorities": {
+    "target_identity_party_role_recipient_evidence": "extra-cli/confenge.outreach.v1",
+    "approval_scheduling_queue_transport": "warmbly/confenge",
+    "policy_governance": "Governance/CFG-FIRST-TOUCH-ROUTING-v2"
+  },
+  "separated_authorities": {
+    "source_operational_health_is_commercial_decision": false,
+    "source_degradation_revokes_proven_commercial_authorization": false,
+    "validity_inferred_from_absence_of_event": false
+  },
+  "source_operational_health": {
+    "observable_independently": true,
+    "alarmable": true,
+    "is_commercial_decision": false,
+    "components": [
+      "crawler",
+      "target_fit_maintenance",
+      "publication",
+      "age_lag"
+    ],
+    "states": [
+      "FRESH",
+      "DEGRADED",
+      "STALE",
+      "UNKNOWN"
+    ],
+    "unknown_remains_unknown": true,
+    "age_bands_seconds": {
+      "FRESH": {
+        "min_inclusive": 0,
+        "max_inclusive": 86400
+      },
+      "DEGRADED": {
+        "min_exclusive": 86400,
+        "max_inclusive": 259200
+      },
+      "STALE": {
+        "min_exclusive": 259200
+      }
+    }
+  },
+  "commercial_authority": {
+    "binding_fields": [
+      "source_run_id",
+      "snapshot_id",
+      "membership_hash",
+      "validated_at",
+      "valid_until",
+      "state",
+      "new_admission_allowed",
+      "existing_bound_touch_transport_allowed",
+      "reason_codes"
+    ],
+    "first_window_thresholds_seconds": {
+      "CURRENT": {
+        "min_inclusive": 0,
+        "max_inclusive": 86400
+      },
+      "DEGRADED": {
+        "min_exclusive": 86400,
+        "max_inclusive": 259200
+      },
+      "FROZEN_FOR_NEW_ADMISSION": {
+        "min_exclusive": 259200,
+        "max_inclusive": 604800
+      },
+      "EXPIRED": {
+        "min_exclusive": 604800
+      }
+    },
+    "missing_binding_disposition": "FAIL_CLOSED",
+    "states": [
+      "CURRENT",
+      "DEGRADED",
+      "FROZEN_FOR_NEW_ADMISSION",
+      "EXPIRED",
+      "UNKNOWN"
+    ]
+  },
+  "transport_authority": {
+    "observed_fields": [
+      "mailbox",
+      "rates",
+      "min_wait",
+      "business_window",
+      "pause",
+      "kill_switch",
+      "suppression",
+      "worker_provider",
+      "first_window_go"
+    ],
+    "pause_actor_missing_is_unknown": true,
+    "invented_pause_actor_allowed": false,
+    "first_window_go_authorized_by_this_policy": false
+  },
+  "evaluation": {
+    "mode": "ALL_HARD_GATES_MUST_PASS",
+    "unknown_result": "HOLD_NEEDS_REVIEW",
+    "individual_failure_stops_batch": false,
+    "replay_semantics": "IDEMPOTENT_NO_DUPLICATE_APPROVAL_OR_SCHEDULING"
+  },
+  "hard_gates": {
+    "identity_and_party_role": {
+      "target_state": "TARGET_CONFIRMED",
+      "source_run_must_be_current": false,
+      "commercial_binding_must_be_valid": true,
+      "source_health_is_not_commercial_decision": true,
+      "cnpj_root_must_reconcile": true,
+      "allowed_target_party_roles": [
+        "SUPPLIER",
+        "CONTRACTOR",
+        "CONTRATADA",
+        "FORNECEDORA"
+      ],
+      "required_typed_status": "CONTRACTOR_ROLE_CONFIRMED",
+      "supplier_exact_cnpj_or_typed_branch_binding_required": true,
+      "cnpj_root_only_match_disposition": "HOLD_NEEDS_REVIEW",
+      "forbidden_target_party_roles": [
+        "BUYER",
+        "CONTRACTING_AUTHORITY",
+        "CONTRATANTE",
+        "ORGAO"
+      ],
+      "conflict_disposition": "PARTY_ROLE_CONFLICT",
+      "unknown_disposition": "HOLD_NEEDS_REVIEW",
+      "warmbly_may_reinterpret_raw_pncp": false
+    },
+    "recipient": {
+      "allowed_route_classes": [
+        "DIRECT_PERSON",
+        "ROLE_OR_DEPARTMENT",
+        "GENERIC_COMPANY",
+        "PUBLIC_COMPANY_FREEMAIL"
+      ],
+      "exact_recipient_required": true,
+      "company_association_evidence_required": true,
+      "current_source_run_required": false,
+      "commercial_binding_required": true,
+      "recipient_attribution_must_be_valid": true,
+      "forbidden_proof_only": [
+        "GUESSED_PATTERN",
+        "SYNTAX_ONLY",
+        "MX_ONLY",
+        "DOMAIN_ONLY",
+        "SEARCH_SNIPPET_ONLY",
+        "UNATTRIBUTED_FREEMAIL",
+        "UNPROVEN_SHARED_MAILBOX"
+      ]
+    },
+    "evidence": {
+      "bundle_reconciled": true,
+      "source_run_current": false,
+      "commercial_authority_valid": true,
+      "freshness_valid": true,
+      "critical_conflict_absent": true,
+      "company_cnpj_recipient_binding_required": true,
+      "every_copy_fact_supported": true,
+      "internal_hypothesis_as_fact_allowed": false
+    },
+    "compliance_and_reputation": {
+      "suppression_clear": true,
+      "opt_out_clear": true,
+      "dnc_clear": true,
+      "hard_bounce_clear": true,
+      "organization_risk_clear": true,
+      "mailbox_transport_eligible": true,
+      "kill_switch_bypass_allowed": false,
+      "dispatch_pause_bypass_allowed": false
+    },
+    "copy": {
+      "first_touch_only": true,
+      "current_composer_template_prompt_required": true,
+      "subject_and_body_nonempty": true,
+      "deterministic_editorial_qa": "PASS",
+      "deterministic_factual_qa": "PASS",
+      "raw_metadata_allowed": false,
+      "internal_reasoning_allowed": false,
+      "unsupported_economic_or_legal_claim_allowed": false,
+      "forbidden_generic_subject_allowed": false,
+      "truncation_allowed": false,
+      "near_duplicate_above_existing_limit_allowed": false,
+      "route_class_compatible_cta_required": true,
+      "non_direct_routes_request_forwarding": true,
+      "non_direct_routes_may_claim_decision_maker": false
+    }
+  },
+  "fail_closed_blockers": {
+    "always_block_inside_grace": true,
+    "unknown_flag_blocks": true,
+    "codes": [
+      "EXPLICIT_DEACTIVATION",
+      "MEMBERSHIP_LEAVE_PROVEN",
+      "PARTY_ROLE_CONFLICT",
+      "RECIPIENT_EXPIRED",
+      "EVIDENCE_EXPIRED",
+      "SUPPRESSION",
+      "OPT_OUT_DNC",
+      "HARD_BOUNCE",
+      "COMPLIANCE_RISK",
+      "POLICY_DRIFT",
+      "BINDING_MISMATCH",
+      "TRANSPORT_BLOCKED"
+    ]
+  },
+  "frozen_for_new_admission": {
+    "new_leads_promoted": false,
+    "new_unproven_factual_assertion_allowed": false,
+    "existing_bound_touch_continues_only_with_explicit_still_valid_declaration": true,
+    "existing_bound_touch_requires_fail_closed_gates_pass": true,
+    "validity_inferred_from_absence_of_event": false
+  },
+  "drift_invalidation": {
+    "action": "INVALIDATE_DELEGATED_APPROVAL",
+    "material_fields": [
+      "recipient",
+      "route_class",
+      "content_hash",
+      "evidence_hash",
+      "evidence_version",
+      "membership_hash",
+      "commercial_authority_ref",
+      "target_fit",
+      "target_party_role",
+      "template_version",
+      "composer_version",
+      "prompt_version",
+      "policy_version",
+      "suppression",
+      "opt_out",
+      "dnc",
+      "hard_bounce",
+      "organization_risk",
+      "mailbox_eligibility"
+    ]
+  },
+  "failure": {
+    "decision": "DO_NOT_APPROVE",
+    "disposition": "HOLD_NEEDS_REVIEW_EXCEPTION",
+    "concrete_reason_codes_required": true,
+    "fail_closed": true
+  },
+  "audit": {
+    "approved_by_type": "delegated_agent_or_system",
+    "human_approved_by_must_be_empty": true,
+    "required_fields": [
+      "policy_id",
+      "policy_version",
+      "authority_reference",
+      "executor",
+      "source_health_ref",
+      "commercial_authority_ref",
+      "commercial_authority_hash",
+      "basis_source_run_id",
+      "membership_hash",
+      "lead_account_cnpj_root_ref",
+      "recipient",
+      "route_class",
+      "target_party_role",
+      "supplier_identity_ref",
+      "buyer_identity_ref",
+      "contract_role_match_method",
+      "contract_role_confidence",
+      "contract_role_reason_codes",
+      "contract_role_evidence_ref",
+      "evidence_bundle_version",
+      "evidence_hash",
+      "evidence_validity",
+      "content_hash",
+      "composer_version",
+      "template_version",
+      "prompt_version",
+      "suppression_snapshot",
+      "transport_snapshot_ref",
+      "approval_timestamp",
+      "scheduling_result",
+      "due_at",
+      "reason_codes",
+      "idempotency_key",
+      "runtime_release_sha"
+    ]
+  },
+  "runtime_reuse": {
+    "existing_approval_authority": true,
+    "existing_scheduler": true,
+    "existing_queue": true,
+    "existing_crm": true,
+    "existing_suppression": true,
+    "existing_idempotency": true,
+    "existing_readback_verification": true,
+    "existing_next_eligible_slot": true,
+    "existing_min_wait_time": true,
+    "existing_business_window": true,
+    "existing_mailbox_rate_limits": true,
+    "parallel_architecture_allowed": false
+  },
+  "canary": {
+    "operational_data_allowed": true,
+    "dispatch_global_paused_required": true,
+    "kill_switch_preserved_required": true,
+    "queued_readback_required": true,
+    "smtp_send_allowed": false,
+    "sent_count_required": 0,
+    "provider_send_mutation_allowed": false
+  }
+}

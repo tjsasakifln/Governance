@@ -31,6 +31,7 @@ import type {
   MorningSource,
 } from "../founder-operating-truth";
 
+
 function rowCard(sectionId: string, row: HojeSection["rows"][number]): string {
   const tone = row.freshness_tone || freshnessTone(row.freshness_status);
   const money = row.money
@@ -236,11 +237,12 @@ const MORNING_TOKEN_LABELS: Record<string, string> = {
   INFEASIBLE: "inviável",
   MATCH: "conciliado",
   MISMATCH: "divergente",
+  CURRENT: "atual",
 };
 
 function morningText(value: string): string {
   return value.replace(
-    /\b(PAUSED_BY_KILL_SWITCH|WAITING_FOR_ELIGIBLE_BATCH|WAITING_FOR_EXTRA_CLI_REFRESH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|NO_GO|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING|FEASIBLE|INFEASIBLE|MISMATCH|MATCH|GO)\b/g,
+    /\b(PAUSED_BY_KILL_SWITCH|WAITING_FOR_ELIGIBLE_BATCH|WAITING_FOR_EXTRA_CLI_REFRESH|BLOCKED_GAPS|HEALTHY_200|PAYMENT_CONFIRMED|NO_GO|ACTIVE|PAUSED|UNKNOWN|KNOWN|FRESH|STALE|ERROR|CAN_ACCEPT|CANNOT_ACCEPT|OPEN|BLOCKED|PROVEN|MISSING|FEASIBLE|INFEASIBLE|MISMATCH|MATCH|GO|CURRENT)\b/g,
     (token) => MORNING_TOKEN_LABELS[token] ?? "estado não reconhecido",
   );
 }
@@ -347,10 +349,10 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
       ? `<span class="pill">reservoir ≥ 1 mil</span>` : "";
   const blocker = runway.health.queue_fill_blocker.value;
   const headline = [
-    ["Tem outbound rodando?", runway.transport.state, ""],
+    ["Dados PNCP", runway.transport.source_health, ""],
+    ["Estoque comercial", runway.transport.commercial_state, ""],
     ["Leads prontos", runway.runway.ready_reservoir, ""],
-    ["Na fila agora", runway.runway.current_queued, ""],
-    ["Munição estimada", runway.runway.estimated_days, " dias"],
+    ["Transporte", runway.transport.state, ""],
   ] as const;
   const stages = [
     ["Target", runway.stock.target_confirmed],
@@ -362,11 +364,11 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
     ["Sent", runway.stock.sent],
   ] as const;
   const groups = [
-    runwayGroup("transport", "Transporte", [
-      ["transport-state", "Estado", runway.transport.state],
-      ["runtime-sha", "Runtime SHA", runway.transport.runtime_sha],
-      ["policy-version", "Policy version", runway.transport.policy_version],
-      ["source-run-freshness", "Freshness do source run", runway.transport.source_run_freshness],
+    runwayGroup("transport", "Fonte, estoque e transporte", [
+      ["source-health", "Fonte de dados", runway.transport.source_health],
+      ["commercial-state", "Estoque comercial", runway.transport.commercial_state],
+      ["transport-state", "Transporte", runway.transport.state],
+      ["policy-version", "Policy", runway.transport.policy_version],
     ]),
     runwayGroup("stock", "Estoque", [
       ["target-confirmed", "TARGET_CONFIRMED", runway.stock.target_confirmed],
@@ -408,10 +410,10 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
 
   return `<article class="card outbound-runway" data-morning-domain="outbound" data-outbound-runway="true" data-transport-state="${escapeHtml(runway.transport.state.value ?? "UNKNOWN")}" data-transport-tone="${transportTone}" data-integrity-state="${escapeHtml(runway.integrity.state)}">
     <header class="runway-title">
-      <div><p class="kicker">Munição outbound · somente leitura</p><h3>Temos munição e transporte?</h3></div>
+      <div><p class="kicker">Munição outbound · somente leitura</p><h3>Fonte, estoque e transporte</h3></div>
       <div>${reservoirSignal}<span class="pill">run ${escapeHtml(morningText(runway.integrity.source_run_match))}</span></div>
     </header>
-    <div class="runway-headline">${headline.map(([label, fact, suffix]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact, suffix))}</strong></div>`).join("")}</div>
+    <div class="runway-headline">${headline.map(([label, fact]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></div>`).join("")}</div>
     <p class="runway-blocker"><strong>O que impede mais volume:</strong> ${escapeHtml(blocker === null ? "DESCONHECIDO" : morningText(blocker))}</p>
     <ol class="runway-stages" aria-label="Conservação do denominador outbound">${stages.map(([label, fact]) => `<li><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></li>`).join("")}</ol>
     <div class="runway-groups">${groups}</div>
