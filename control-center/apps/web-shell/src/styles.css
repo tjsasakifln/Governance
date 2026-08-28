@@ -967,6 +967,15 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+/* Acquisition health, not a verdict: same neutral surface as the blocker line,
+   deliberately without the alert treatment a real block would carry. */
+.runway-acquisition {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  overflow-wrap: anywhere;
+}
+
 .runway-groups {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

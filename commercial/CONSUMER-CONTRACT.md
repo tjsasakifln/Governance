@@ -19,6 +19,12 @@ This is the stable contract for commercial-offer consumers. It does not authoriz
 | Example fixture (no real provider IDs) | `commercial/fixtures/consumer-catalog.example.v1.json` |
 | Consumer compatibility contract | `commercial/compatibility/consumer-compatibility.v1.json` |
 | Read-only CI compatibility fixture | `commercial/fixtures/consumer-compatibility.ci.v1.json` |
+| Delegated first-touch routing policy (published, historical) | `commercial/outbound/cfg-first-touch-routing.v1.json` |
+| Delegated first-touch routing policy (published, historical) | `commercial/outbound/cfg-first-touch-routing.v2.json` |
+| Delegated first-touch routing policy (current) | `commercial/outbound/cfg-first-touch-routing.v3.json` |
+| First-touch routing JSON Schema (current) | `schemas/cfg-first-touch-routing.v3.schema.json` |
+| First-touch consumer expectations (current) | `commercial/outbound/consumer-expectations.v3.json` |
+| First-touch contract fixtures (current) | `commercial/fixtures/first-touch-routing-v3/matrix.v1.json` |
 
 Governance is the only commercial truth plane. `web-cfg#88` is the delivery parent. `Warmbly#47` is the reconciliation/learning consumer. Do not copy these files into those repos as a writable second catalog.
 
@@ -97,3 +103,78 @@ Diagnóstico `funnel_role=ENTRY_ONE_OFF`. The documented R$ 2.000 credit is a ne
 ## Pending founder input (not a catalog offer)
 
 A priced baixa-fricção SKU is `PENDING_FOUNDER_INPUT`. See `commercial/offers/pending-founder-inputs.v1.json`. Absence of that SKU does not block the documented v1 catalog.
+
+## Outbound commercial qualification — COMMERCIAL_AUTHORITY/2.0
+
+`CFG-FIRST-TOUCH-ROUTING-v3` is the current outbound routing policy. It consumes
+`COMMERCIAL_AUTHORITY/2.0` / `COMMERCIAL_AUTHORITY_POLICY/2.0`. v1 and v2 stay
+machine-readable with their original semantics and are not reinterpreted.
+
+The canonical, non-negotiable business rule is:
+
+> CONFENGE commercial qualification is based on qualifying public engineering contracting evidence within a rolling three-year window. PNCP/source freshness is acquisition health and MUST NOT by itself revoke, hold, dequeue or block transport for an otherwise valid commercially-qualified member.
+
+### Qualification
+
+| Question | Rule |
+|---|---|
+| Who qualifies | A company that figured as CONTRACTED SUPPLIER / FORNECEDORA on a public engineering work or service. `party_role` must be `SUPPLIER` (`FORNECEDORA` / `CONTRATADA` are accepted spellings of the same role). |
+| Who never qualifies | The contracting body. `BUYER`, `CONTRACTING_AUTHORITY`, `CONTRATANTE` and `ORGAO` are refused with `commercial_qualification_party_role_invalid`, whatever else is true about the record. |
+| Identity | CNPJ root (`cnpj_root8`). Qualification is per root, not per branch and not per contact. |
+| Window | Rolling three years, evaluated against the CONTRACTING ACT date. There is no TTL and no grace period anywhere in the contract. |
+| Qualifying date | Deterministic precedence over the canonical contracts view `v_contracts_canonical_v2`: `data_assinatura` -> `data_inicio` -> `data_publicacao` -> `data_publicacao_fonte`. `data_fim` is deliberately excluded: it is an execution-end estimate, frequently null, and would make the window non-deterministic. |
+| `qualified_until` | Derived as contracting date + 3 years with forward calendar normalization (`2024-02-29` + 3y = `2027-03-01`). It is never declared by the producer; a producer-declared value that does not reconcile is `commercial_qualification_window_invalid`. |
+| Several contracts | The company stays `QUALIFIED` while at least one contracting act is inside the window. The declared qualifying act must be the newest one counted. |
+| States | `QUALIFIED` \| `EXPIRED` \| `REVOKED` \| `UNKNOWN`. The v1 age bands `CURRENT` / `DEGRADED` / `FROZEN_FOR_NEW_ADMISSION` / `EXPIRED` (24h / 72h / 168h) are abolished. |
+
+Per-root evidence that must be persisted or derivable: `cnpj_root8`,
+`target_fit_class`, `party_role`, `qualifying_contract_id`,
+`qualifying_contract_date`, `qualifying_date_field`, `qualifying_contract_count`,
+`qualified_until`, `qualification_evidence_hash`,
+`qualification_evidence_reference`, `provenance`, `deactivated`,
+`deactivation_reason`.
+
+### What blocks, and what does not
+
+| Condition | Effect |
+|---|---|
+| Explicit deactivation / revocation | Blocks immediately and beats everything, including a live qualifying contract. Reason `commercial_qualification_revoked`. Time alone restores nothing. |
+| Qualification expiry | Contracting act older than the rolling window: `EXPIRED`, reason `commercial_qualification_expired`. |
+| Missing qualification | `UNKNOWN`, reason `commercial_authority_missing`. Never inferred from a fresh source. |
+| Evidence drift | Reason `commercial_qualification_evidence_drift` (hash, date field or counted acts do not reconcile). |
+| Party-role invalid | Reason `commercial_qualification_party_role_invalid`. |
+| Window invalid | Reason `commercial_qualification_window_invalid`. |
+| Unrecognised authority policy | Reason `commercial_authority_policy_unsupported`. Unknown is never "probably v2". |
+| DNC / opt-out | Blocks transport for that recipient. |
+| Suppression | Blocks transport for that recipient. |
+| Hard bounce | Blocks transport for that recipient. |
+| Recipient expiry | Blocks that recipient; the company stays qualified. |
+| Policy revocation / drift | Invalidates the delegated approval and routes to the human exception path. |
+| Source health `FRESH` / `DEGRADED` / `STALE` / `MISSING` | Reported for observability only. It is never a blocker, never revokes a proven qualification, and never grants authority by fallback. |
+
+The readiness blocker `source_health_not_fresh_strict_fallback` is retired and
+replaced by `commercial_authority_missing`. First-window readiness may
+legitimately report `source_health=STALE` together with
+`commercial_authority=QUALIFIED` and a verdict of
+`ARMED_FOR_NEXT_BUSINESS_WINDOW` or `TRANSPORT_ACTIVE_IN_WINDOW`.
+
+### Transport-time conjunction
+
+Every member must pass: commercial qualification (the three-year rule), supplier
+party role, membership/evidence binding integrity, recognised policy version,
+delegated decision integrity, recipient validity, recipient-belongs-to-company,
+no hard bounce, no DNC, no suppression/opt-out, no party-role conflict, copy/QA,
+message/context binding, idempotency, mailbox validity, rate limits, send window,
+transport governor, kill switch, worker health.
+
+Source health is **not** in this conjunction. Neither is feed age, crawler lag or
+any other acquisition signal.
+
+### Founder-facing presentation
+
+A late acquisition source is an acquisition-plan condition, not an outbound
+verdict. Present it as:
+
+> Atualização de mercado atrasada; novos leads podem não estar refletidos.
+
+Never as "Outbound bloqueado."

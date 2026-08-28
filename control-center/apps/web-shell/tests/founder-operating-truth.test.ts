@@ -269,7 +269,7 @@ test("Hoje renders one primary action and the complete exception evidence fields
   assert.match(html, /data-runway-group="health"/);
   assert.match(html, /data-runway-metric="provider-accepted"/);
   assert.match(html, /data-runway-metric="delivered"/);
-  assert.match(html, /Dados PNCP/);
+  assert.match(html, /Fonte de aquisição/);
   assert.match(html, /Estoque comercial/);
   assert.match(html, />atual</);
   assert.match(html, /data-runway-metric="slots-next-24h"/);
@@ -280,7 +280,7 @@ test("Hoje renders one primary action and the complete exception evidence fields
   assert.match(html, /href="#\/warmbly\/revisao\?filtro=queued"/);
   assert.doesNotMatch(html, /aprovar tudo/i);
   assert.equal((html.match(/data-runway-primary-action="true"/g) ?? []).length, 1);
-  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 37);
+  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 38);
 });
 
 test("impossible denominators fail closed instead of publishing a plausible zero", () => {

@@ -1,0 +1,411 @@
+[
+  {
+    "case_id": "v1-legacy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v1",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": false,
+      "source_state": "UNKNOWN",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["UNKNOWN_POLICY_VERSION"]
+    }
+  },
+  {
+    "case_id": "v2-legacy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v2",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": false,
+      "source_state": "UNKNOWN",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["UNKNOWN_POLICY_VERSION"]
+    }
+  },
+  {
+    "case_id": "unknown-policy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v9",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": false,
+      "source_state": "UNKNOWN",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["UNKNOWN_POLICY_VERSION"]
+    }
+  },
+  {
+    "case_id": "qualified-fresh-source",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": true,
+      "transport_allowed": true
+    }
+  },
+  {
+    "case_id": "qualified-stale-source",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "STALE", "age_seconds": 1200000 },
+    "qualification": { "contract_date": "2024-01-15" },
+    "expect": {
+      "activated": true,
+      "source_state": "STALE",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": true,
+      "transport_allowed": true,
+      "reason_codes_contains": ["SOURCE_HEALTH_DEGRADED_NOT_COMMERCIAL_REVOCATION"],
+      "reason_codes_excludes": ["source_health_not_fresh_strict_fallback", "commercial_authority_missing"]
+    }
+  },
+  {
+    "case_id": "qualified-missing-source",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "MISSING" },
+    "qualification": { "contract_date": "2024-01-15" },
+    "expect": {
+      "activated": true,
+      "source_state": "MISSING",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": true,
+      "transport_allowed": true,
+      "reason_codes_excludes": ["source_health_not_fresh_strict_fallback"]
+    }
+  },
+  {
+    "case_id": "fresh-source-no-authority",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "authority": { "present": false },
+    "qualification": null,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_authority_missing"]
+    }
+  },
+  {
+    "case_id": "fresh-source-no-root-qualification",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": null,
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_authority_missing"]
+    }
+  },
+  {
+    "case_id": "contract-outside-three-year-window",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2022-08-27" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "EXPIRED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_expired"]
+    }
+  },
+  {
+    "case_id": "contract-on-the-window-edge",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2023-08-29" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": true,
+      "transport_allowed": true
+    }
+  },
+  {
+    "case_id": "contracting-body-never-qualifies",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02", "party_role": "CONTRATANTE" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_party_role_invalid"]
+    }
+  },
+  {
+    "case_id": "buyer-never-qualifies",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02", "party_role": "BUYER" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_party_role_invalid"]
+    }
+  },
+  {
+    "case_id": "explicit-deactivation-revokes",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02", "deactivated": true, "deactivation_reason": "founder removed the account" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "REVOKED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_revoked"]
+    }
+  },
+  {
+    "case_id": "producer-declared-qualified-until",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2022-08-27", "qualified_until_override": "2030-01-01" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_window_invalid"]
+    }
+  },
+  {
+    "case_id": "evidence-hash-drift",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02", "evidence_hash_drift": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_evidence_drift"]
+    }
+  },
+  {
+    "case_id": "excluded-data-fim-is-not-a-qualifying-field",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02", "qualifying_date_field": "data_fim" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_evidence_drift"]
+    }
+  },
+  {
+    "case_id": "unsupported-authority-policy",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "authority": { "policy_version": "COMMERCIAL_AUTHORITY_POLICY/1.0", "contract_version": "COMMERCIAL_AUTHORITY/1.0" },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_authority_policy_unsupported"]
+    }
+  },
+  {
+    "case_id": "population-binding-mismatch",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "authority": { "observed_membership_hash": "mem-other" },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "UNKNOWN",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["BINDING_MISMATCH"]
+    }
+  },
+  {
+    "case_id": "several-contracts-one-inside-window",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "STALE", "age_seconds": 900000 },
+    "qualification": {
+      "contract_date": "2025-02-10",
+      "contract_dates": ["2019-04-01", "2021-11-30", "2025-02-10"],
+      "qualifying_contract_count": 3
+    },
+    "expect": {
+      "activated": true,
+      "source_state": "STALE",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": true,
+      "transport_allowed": true
+    }
+  },
+  {
+    "case_id": "several-contracts-all-outside-window",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": {
+      "contract_date": "2021-11-30",
+      "contract_dates": ["2019-04-01", "2021-11-30"],
+      "qualifying_contract_count": 2
+    },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "EXPIRED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_expired"]
+    }
+  },
+  {
+    "case_id": "suppression-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "suppression": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["SUPPRESSION", "FAIL_CLOSED_OVER_QUALIFIED_MEMBER"]
+    }
+  },
+  {
+    "case_id": "recipient-expired-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "recipient_expired": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["RECIPIENT_EXPIRED"]
+    }
+  },
+  {
+    "case_id": "hard-bounce-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "hard_bounce": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["HARD_BOUNCE"]
+    }
+  },
+  {
+    "case_id": "dnc-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "opt_out_or_dnc": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["OPT_OUT_DNC"]
+    }
+  },
+  {
+    "case_id": "explicit-deactivation-flag-blocks-immediately",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "explicit_deactivation": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "REVOKED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["EXPLICIT_DEACTIVATION", "commercial_qualification_revoked"]
+    }
+  },
+  {
+    "case_id": "party-role-conflict-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "party_role_conflict": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["PARTY_ROLE_CONFLICT"]
+    }
+  },
+  {
+    "case_id": "policy-revocation-over-qualified-member",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "qualification": { "contract_date": "2025-06-02" },
+    "fail_closed": { "policy_drift": true },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "QUALIFIED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["POLICY_DRIFT"]
+    }
+  },
+  {
+    "case_id": "authority-revoked-by-producer",
+    "requested_policy": "CFG-FIRST-TOUCH-ROUTING-v3",
+    "source_health": { "state": "FRESH", "age_seconds": 60 },
+    "authority": { "revoked": true },
+    "qualification": { "contract_date": "2025-06-02" },
+    "expect": {
+      "activated": true,
+      "source_state": "FRESH",
+      "commercial_state": "REVOKED",
+      "new_admission_allowed": false,
+      "transport_allowed": false,
+      "reason_codes_contains": ["commercial_qualification_revoked"]
+    }
+  }
+]
