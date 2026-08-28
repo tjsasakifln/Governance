@@ -1,6 +1,10 @@
+import { acquisitionPlanCondition } from "./acquisition-plan";
+
 export type TruthFreshness = "FRESH" | "STALE" | "UNKNOWN" | "ERROR";
 export type SourceHealthState = "FRESH" | "DEGRADED" | "STALE" | "UNKNOWN";
-export type CommercialAuthorityState = "CURRENT" | "DEGRADED" | "FROZEN" | "EXPIRED" | "UNKNOWN";
+// COMMERCIAL_AUTHORITY/2.0 states are QUALIFIED | EXPIRED | REVOKED | UNKNOWN.
+// CURRENT/DEGRADED/FROZEN are only kept so a v2 payload still reads back.
+export type CommercialAuthorityState = "QUALIFIED" | "REVOKED" | "CURRENT" | "DEGRADED" | "FROZEN" | "EXPIRED" | "UNKNOWN";
 
 
 
@@ -78,6 +82,8 @@ export interface OutboundRunwayTruth {
     ready_reservoir: MorningFact<number>;
     source_feed_age_seconds: MorningFact<number>;
     next_replenishment_state: MorningFact<string>;
+    /** Founder readback for a late market feed. Never an outbound verdict. */
+    acquisition_plan_condition: MorningFact<string>;
     reservoir_below_1000: boolean | null;
   };
   health: {
@@ -362,9 +368,12 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const csRaw = S(authorityBlock.state);
   const cs = csRaw && csRaw.includes("FROZEN") ? "FROZEN" : csRaw;
   // Warmbly is authoritative. Missing state stays UNKNOWN; never infer CURRENT from envelope age.
-  const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : "UNKNOWN";
+  const commercialState: CommercialAuthorityState = cs === "QUALIFIED" || cs === "REVOKED" || cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : "UNKNOWN";
   const extraFeedAge = N(inventoryValue("feed_age_seconds"));
   const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
+  // Source health is acquisition health under CFG-FIRST-TOUCH-ROUTING-v3: it is
+  // reported as a plan condition and never as an outbound block.
+  const acquisitionCondition = acquisitionPlanCondition(sourceHealthState);
   const pause = [
     S(dispatch.pause_reason) ?? S(capacityBlock.pause_reason) ?? S(transportBlock.pause_reason),
     S(dispatch.paused_by) ?? S(capacityBlock.paused_by),
@@ -486,6 +495,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       ready_reservoir: readyFact,
       source_feed_age_seconds: countFact(feedAge, feedAgeSource, EXTRA_DRILLDOWN),
       next_replenishment_state: textFact(replenishmentState, replenishmentSource, EXTRA_DRILLDOWN),
+      acquisition_plan_condition: textFact(acquisitionCondition, extraSource, EXTRA_DRILLDOWN),
       reservoir_below_1000: readyFact.value === null ? null : readyFact.value < 1000,
     },
     health: {
@@ -525,16 +535,25 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const capacityNextAction = S(capacity.next_action);
 
   const exceptions = A(operations.exceptions).map((item) => exception(item, generatedAt));
-  if (commercialState === "EXPIRED" || commercialState === "FROZEN") {
-    const expired = commercialState === "EXPIRED";
-    const group = expired ? "COMMERCIAL_AUTHORITY_EXPIRED" : "COMMERCIAL_AUTHORITY_FROZEN";
+  // Only a commercial fact opens this exception. A late acquisition feed never does.
+  if (commercialState === "EXPIRED" || commercialState === "REVOKED" || commercialState === "FROZEN") {
+    const group = commercialState === "EXPIRED"
+      ? "COMMERCIAL_AUTHORITY_EXPIRED"
+      : commercialState === "REVOKED"
+        ? "COMMERCIAL_AUTHORITY_REVOKED"
+        : "COMMERCIAL_AUTHORITY_FROZEN";
+    const reason = commercialState === "EXPIRED"
+      ? "Estoque expirado."
+      : commercialState === "REVOKED"
+        ? "Qualificação comercial revogada na origem."
+        : "Estoque congelado.";
     if (!exceptions.some((item) => item.reason_group === group)) {
       exceptions.push({
         id: "projection-commercial-authority",
         bucket: "stale_drift",
         reason_group: group,
         owner: "outbound_owner",
-        reason: expired ? "Estoque expirado." : "Estoque congelado.",
+        reason,
         evidence: [`binding:${S(authorityBlock.source_run_id) ?? "UNKNOWN"}`],
         age_seconds: null,
         next_action: "Revalidar na origem.",

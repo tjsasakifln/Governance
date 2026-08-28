@@ -22,14 +22,14 @@
     "cls_p75": 0.1,
     "long_task_max_ms": 350,
     "initial_request_count": 16,
-    "javascript_raw_bytes": 404100,
-    "javascript_gzip_bytes": 123400,
+    "javascript_raw_bytes": 404900,
+    "javascript_gzip_bytes": 123600,
     "css_raw_bytes": 30000,
     "css_gzip_bytes": 6700,
-    "bundle_gzip_bytes": 130000
+    "bundle_gzip_bytes": 130300
   },
   "budget_change": {
-    "previous_bundle_gzip_bytes": 123500,
-    "reason": "The existing founder operating-truth viewport now includes the source-attributed outbound runway, fail-closed queued_readback, and ARMED_FOR_NEXT_BUSINESS_WINDOW so dispatch ACTIVE outside the São Paulo window is not shown as GO; the bounded ceiling follows the measured feature delta while mobile LCP and INP targets remain unchanged."
+    "previous_bundle_gzip_bytes": 130000,
+    "reason": "The outbound runway viewport now carries the CFG-FIRST-TOUCH-ROUTING-v3 acquisition-plan readback, so a late market source reads as an acquisition condition instead of an outbound block; the bounded ceiling follows the measured feature delta while mobile LCP and INP targets remain unchanged."
   }
 }

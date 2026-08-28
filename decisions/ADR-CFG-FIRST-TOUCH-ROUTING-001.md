@@ -57,3 +57,37 @@ age; `FRESH` / `DEGRADED` / `STALE` / `UNKNOWN`) from commercial authority
 not automatically revoke a previously proven commercial authorization.
 v2 activates only on exact version match; unknown or missing version is
 fail-closed. The policy still does not authorize SMTP or provider dispatch.
+
+## Additive note — v3 (2026-08-28)
+
+`CFG-FIRST-TOUCH-ROUTING-v3` is an additive authority. v1 and v2 remain
+machine-readable with their original semantics; neither decision is rewritten.
+
+v3 replaces the v2 commercial age bands with `COMMERCIAL_AUTHORITY/2.0`. The
+canonical, non-negotiable business rule is:
+
+> CONFENGE commercial qualification is based on qualifying public engineering contracting evidence within a rolling three-year window. PNCP/source freshness is acquisition health and MUST NOT by itself revoke, hold, dequeue or block transport for an otherwise valid commercially-qualified member.
+
+Consequences recorded here so the next reader does not have to rediscover them:
+
+- commercial states are `QUALIFIED` / `EXPIRED` / `REVOKED` / `UNKNOWN`. The v2
+  bands `CURRENT` (24h), `DEGRADED` (72h), `FROZEN_FOR_NEW_ADMISSION` (168h) and
+  age-based `EXPIRED` are abolished. There is no TTL and no grace period;
+- a company qualifies as CONTRACTED SUPPLIER / FORNECEDORA, never as the
+  contracting body, on a public engineering work or service whose contracting act
+  falls inside the rolling three-year window;
+- the qualifying date follows a deterministic precedence over
+  `v_contracts_canonical_v2`: `data_assinatura` -> `data_inicio` ->
+  `data_publicacao` -> `data_publicacao_fonte`. `data_fim` is excluded because it
+  is an execution-end estimate, frequently null, and would make the window
+  non-deterministic;
+- `qualified_until` is derived as contracting date + 3 years with forward calendar
+  normalization, never declared by the producer;
+- explicit deactivation blocks immediately and beats everything;
+- the readiness blocker `source_health_not_fresh_strict_fallback` is retired and
+  replaced by `commercial_authority_missing`. Source health stays observable and
+  alarmable, is presented as an acquisition-plan condition, and is not a member of
+  the transport-time conjunction.
+
+v3 activates only on exact version match; a v1, v2, unknown or missing version is
+fail-closed. The policy still does not authorize SMTP or provider dispatch.

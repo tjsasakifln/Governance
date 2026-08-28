@@ -66,6 +66,49 @@ Diagnóstico limited production is a **scoped overlay** (`commercial/gates/diagn
 - Flex: 30-day billable notice; 180/365: no silent renewal after `max_payments`
 - 6% tax premise ≠ confirmed regime; NFS-e blocked
 
+## Outbound first touch — CFG-FIRST-TOUCH-ROUTING-v3
+
+The current outbound routing policy is `CFG-FIRST-TOUCH-ROUTING-v3`
+(`commercial/outbound/cfg-first-touch-routing.v3.json`, schema
+`schemas/cfg-first-touch-routing.v3.schema.json`). It consumes
+`COMMERCIAL_AUTHORITY/2.0` / `COMMERCIAL_AUTHORITY_POLICY/2.0`. v1 and v2 remain
+published and machine-readable; v3 does not rewrite them.
+
+The canonical, non-negotiable business rule is:
+
+> CONFENGE commercial qualification is based on qualifying public engineering contracting evidence within a rolling three-year window. PNCP/source freshness is acquisition health and MUST NOT by itself revoke, hold, dequeue or block transport for an otherwise valid commercially-qualified member.
+
+Consume it as follows:
+
+- qualification is per **CNPJ root** (`cnpj_root8`), for a company that figured as
+  **contracted supplier / fornecedora** on a public engineering work or service.
+  The **contracting body never qualifies**;
+- the window is a **rolling three years** measured from the CONTRACTING ACT date,
+  taken by the deterministic precedence `data_assinatura` -> `data_inicio` ->
+  `data_publicacao` -> `data_publicacao_fonte` over `v_contracts_canonical_v2`;
+  `data_fim` is excluded on purpose;
+- `qualified_until` is **derived** (contracting date + 3 years, forward calendar
+  normalization). A producer-declared value that does not reconcile fails closed;
+- states are `QUALIFIED` / `EXPIRED` / `REVOKED` / `UNKNOWN`. There is **no TTL and
+  no grace period**; the v1 age bands are abolished;
+- **explicit deactivation blocks immediately** and beats everything else;
+- **DNC, suppression, hard bounce, recipient expiry and policy revocation** block
+  the affected message or recipient. They are separate from qualification;
+- **source health is never a blocker**. `source_health_not_fresh_strict_fallback`
+  is retired in favour of `commercial_authority_missing`, and freshness never
+  grants authority by fallback either.
+
+Fail-closed reason codes a consumer must be able to render:
+`commercial_authority_missing`, `commercial_qualification_expired`,
+`commercial_qualification_revoked`, `commercial_qualification_evidence_drift`,
+`commercial_qualification_party_role_invalid`,
+`commercial_qualification_window_invalid`,
+`commercial_authority_policy_unsupported`.
+
+A stale acquisition source is presented to the founder as an acquisition-plan
+condition ("Atualização de mercado atrasada; novos leads podem não estar
+refletidos."), never as "Outbound bloqueado."
+
 ## Schema contracts
 
 - `schemas/offer-catalog.v1.schema.json`
@@ -74,6 +117,7 @@ Diagnóstico limited production is a **scoped overlay** (`commercial/gates/diagn
 - `schemas/provider-mapping.v1.schema.json`
 - `schemas/diagnostico-limited-production.v1.schema.json`
 - `schemas/consumer-compatibility.v1.schema.json`
+- `schemas/cfg-first-touch-routing.v3.schema.json`
 - `schemas/mapping-copyback.v1.schema.json`
 
 Read-only CI fixture: `commercial/fixtures/consumer-compatibility.ci.v1.json`. Founder mapping copy-back: `python scripts/validate_commercial_authority.py --check-mapping <payload.json>` (no Asaas call).

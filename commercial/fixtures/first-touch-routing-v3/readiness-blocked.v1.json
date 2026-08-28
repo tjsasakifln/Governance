@@ -1,0 +1,14 @@
+{
+  "governance_policy_ready": true,
+  "control_center_readback_ready": false,
+  "commercial_authority_observable": true,
+  "source_health_observable": true,
+  "reservoir_observable": false,
+  "queue_observable": true,
+  "transport_pause_observable": true,
+  "kill_switch_observable": true,
+  "mailbox_capacity_observable": true,
+  "exceptions_operable": true,
+  "cross_contract_version": "CFG-FIRST-TOUCH-ROUTING-v3",
+  "blocking_reasons": ["CONTROL_CENTER_READBACK_NOT_PROVEN"]
+}

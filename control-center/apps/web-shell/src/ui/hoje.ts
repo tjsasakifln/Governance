@@ -357,7 +357,7 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
       ? `<span class="pill">reservoir ≥ 1 mil</span>` : "";
   const blocker = runway.health.queue_fill_blocker.value;
   const headline = [
-    ["Dados PNCP", runway.transport.source_health, ""],
+    ["Fonte de aquisição", runway.transport.source_health, ""],
     ["Estoque comercial", runway.transport.commercial_state, ""],
     ["Leads prontos", runway.runway.ready_reservoir, ""],
     ["Transporte", runway.transport.state, ""],
@@ -406,6 +406,7 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
       ["ready-reservoir", "Reservoir", runway.runway.ready_reservoir],
       ["source-feed-age", "Idade do feed", runway.runway.source_feed_age_seconds, "s"],
       ["next-replenishment", "Reposição", runway.runway.next_replenishment_state],
+      ["acquisition-plan", "Plano de aquisição", runway.runway.acquisition_plan_condition],
     ]),
     runwayGroup("health", "Health", [
       ["mailboxes-healthy", "Saudáveis", runway.health.mailboxes_healthy],
@@ -426,6 +427,7 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
     </header>
     <div class="runway-headline">${headline.map(([label, fact]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></div>`).join("")}</div>
     <p class="runway-blocker"><strong>Blocker:</strong> ${escapeHtml(blocker === null ? "DESCONHECIDO" : morningText(blocker))}</p>
+    <p class="runway-acquisition" data-acquisition-plan="${escapeHtml(runway.transport.source_health.value ?? "UNKNOWN")}" data-outbound-blocking="false"><strong>Plano de aquisição:</strong> ${escapeHtml(runwayValue(runway.runway.acquisition_plan_condition))}</p>
     <ol class="runway-stages" aria-label="Estoque outbound">${stages.map(([label, fact]) => `<li><span>${escapeHtml(label)}</span><strong>${escapeHtml(runwayValue(fact))}</strong></li>`).join("")}</ol>
     <div class="runway-groups">${groups}</div>
     <section class="runway-action" data-morning-domain="next-human-action" aria-labelledby="runway-action-title">
