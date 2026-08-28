@@ -343,7 +343,6 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const authorityBlock = O(delegated.commercial_authority);
   const csRaw = S(authorityBlock.state);
   const cs = csRaw && csRaw.includes("FROZEN") ? "FROZEN" : csRaw;
-  const validatedAt = validDate(authorityBlock.validated_at);
   const runCanonical = S(authorityBlock.basis_source_run_id);
   const runAlias = S(authorityBlock.source_run_id);
   const snapCanonical = S(authorityBlock.basis_snapshot_hash);
