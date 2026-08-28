@@ -617,6 +617,54 @@ test("QUEUED comes only from queued_readback, never from dispatch.queued_approve
   assert.equal(truth.outbound.queued, null);
 });
 
+test("live first-touch control block keeps queued_readback and does not use queued_approved", () => {
+  const input = envelope();
+  const delegated = firstTouchControl(input);
+  delete delegated.commercial_authority;
+  delegated.queued_readback = 140;
+  delegated.control = {
+    delegated_approved: 140,
+    next_due_at: "2026-08-28T12:00:00Z",
+    furthest_due_at: "2026-09-28T12:00:00Z",
+    commercial_authority: {
+      state: "CURRENT",
+      valid_until: "2026-08-29T05:41:30Z",
+      basis_publication_semantic_hash: "sem-live",
+      producer_identity: "producer-live",
+    },
+    transport: {
+      kill_switch_engaged: true,
+      pause_reason: "scale_pre_go_release_91e37d8b",
+    },
+    capacity: {
+      pause_reason: "scale_pre_go_release_91e37d8b",
+      pause_source: "durable_control",
+      paused_by: "00000000-0000-0000-0000-000000000000",
+      paused_at: "2026-08-27T02:18:09.167916Z",
+      forecast: { slots_next_24h: 0, slots_next_7d: 0, potential_slots_next_24h: 50 },
+      mailboxes: [{ health: "ready" }],
+    },
+  };
+  const operations = ((input.snapshots as Record<string, Record<string, unknown>>).commercial!.snapshot as Record<string, unknown>).operations as Record<string, unknown>;
+  const dispatch = operations.dispatch as Record<string, unknown>;
+  const working = operations.working_overview as Record<string, unknown>;
+  dispatch.queued_approved = 99;
+  delete dispatch.slots_next_24h;
+  delete dispatch.slots_next_7d;
+  delete working.slots_next_24h;
+  delete working.slots_next_7d;
+  delete operations.mailbox_health;
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, 140);
+  assert.notEqual(truth.outbound_runway.stock.queued_reserved.value, 99);
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "CURRENT");
+  assert.equal(truth.outbound_runway.transport.kill_switch.value, "ativo");
+  assert.match(String(truth.outbound_runway.transport.pause.value), /durable_control/);
+  assert.equal(truth.outbound_runway.health.mailboxes_healthy.value, 1);
+  assert.equal(truth.outbound_runway.runway.slots_next_24h.value, 0);
+  assert.equal(truth.outbound_runway.runway.slots_next_7d.value, 0);
+});
+
 test("expired commercial authority is not a single STALE and is a human exception", () => {
   const input = envelope();
   const delegated = firstTouchControl(input);

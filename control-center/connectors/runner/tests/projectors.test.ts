@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { collectFromWarmblyPayload } from "../../warmbly/src/mapper/normalize.ts";
+import { loadFixture } from "../../warmbly/tests/helpers.ts";
 import { availabilityFromEnvelope } from "../src/projectors/availability.ts";
 import { projectCollector } from "../src/projectors/project.ts";
 import { CONFENGE_OPERATIONAL_REPOS } from "../src/projectors/types.ts";
@@ -74,6 +75,105 @@ test("Warmbly counts project to commercial snapshot with labeled acquisition coh
   assert.equal(typeof rate?.denominator, "number");
   const clients = projected.find((row) => row.snapshot_kind === "clients");
   assert.ok(clients);
+});
+
+test("commercial projector forwards queued_readback and never treats dispatch.queued_approved as QUEUED", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: {
+        dispatch: {
+          state: "PAUSED",
+          observed: true,
+          queued_approved: 421,
+          pause_reason: "deploy_preflight",
+        },
+        delegated_first_touch: {
+          observed: true,
+          policy_id: "CFG-FIRST-TOUCH-ROUTING-v2",
+          queued_readback: 290,
+          counts: { QUEUED: 290, HOLD: 10 },
+        },
+        working_overview: {
+          observed: true,
+          slots_next_24h: 20,
+          furthest_due_at: "2026-09-11T12:00:00Z",
+        },
+        confenge_status: { kill_switch: true, auto_send_enabled: false },
+        mailbox_health: { healthy: 1, blocked: 0, unknown: 0 },
+        outbound_outcomes: { attempted: 0, provider_accepted: 0, sent: 0 },
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as Record<string, unknown>;
+  const delegated = ops.delegated_first_touch as Record<string, unknown>;
+  const dispatch = ops.dispatch as Record<string, unknown>;
+  const working = ops.working_overview as Record<string, unknown>;
+  const status = ops.confenge_status as Record<string, unknown>;
+  const mailbox = ops.mailbox_health as Record<string, unknown>;
+  const outcomes = ops.outbound_outcomes as Record<string, unknown>;
+  assert.equal(delegated.queued_readback, 290);
+  assert.equal(dispatch.queued_approved, 421);
+  assert.notEqual(delegated.queued_readback, dispatch.queued_approved);
+  assert.equal(working.slots_next_24h, 20);
+  assert.equal(status.kill_switch, true);
+  assert.equal(mailbox.healthy, 1);
+  assert.equal(outcomes.sent, 0);
+  assert.equal(Object.hasOwn(ops, "queued"), false);
+});
+
+test("commercial projector does not invent QUEUED when queued_readback is absent", () => {
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: {
+      counts: { deals_open: 1, inbound_now: 0 },
+      operations: {
+        dispatch: { state: "PAUSED", observed: true, queued_approved: 421 },
+      },
+    },
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as Record<string, unknown>;
+  assert.equal(ops.delegated_first_touch, undefined);
+  assert.equal((ops.dispatch as Record<string, unknown>).queued_approved, 421);
+  assert.equal(Object.hasOwn(ops, "queued"), false);
+});
+
+test("Warmbly fixture queued_readback survives mapper then commercial projector", () => {
+  const snapshot = collectFromWarmblyPayload(loadFixture("commercial-runtime.json"), {
+    now: new Date(now),
+  });
+  const mapped = snapshot.operations?.delegated_first_touch as Record<string, unknown>;
+  assert.equal(mapped.queued_readback, 1);
+  const projected = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: snapshot,
+  });
+  const commercial = projected.find((row) => row.snapshot_kind === "commercial");
+  assert.ok(commercial);
+  const ops = commercial.payload.operations as Record<string, unknown>;
+  const delegated = ops.delegated_first_touch as Record<string, unknown>;
+  const working = ops.working_overview as Record<string, unknown>;
+  assert.equal(delegated.queued_readback, 1);
+  assert.equal(delegated.observed, true);
+  assert.equal(working.observed, true);
+  assert.equal((ops.dispatch as Record<string, unknown>).queued_approved, undefined);
 });
 
 test("Warmbly weekly revenue facts project under one opaque correlation and preserve UNKNOWN", () => {

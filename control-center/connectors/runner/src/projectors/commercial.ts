@@ -675,6 +675,14 @@ function operationsFromWarmbly(
     observed: false,
     why: "the collector produced no dispatch reading; the kill-switch state is not known",
   };
+  // Connector-owned first-touch / refill / mailbox blocks. QUEUED on the founder
+  // surface is N(delegated_first_touch.queued_readback) only; dispatch.queued_approved
+  // is a runway target and must not be re-derived here as a queue count.
+  const delegatedFirstTouch = asRecord(nested.delegated_first_touch);
+  const workingOverview = asRecord(nested.working_overview);
+  const forwardedStatus = asRecord(nested.confenge_status) ?? asRecord(payload.confenge_status);
+  const outboundOutcomes = asRecord(nested.outbound_outcomes);
+  const mailboxHealth = asRecord(nested.mailbox_health);
 
   const operations = {
     schema_version: "control-center.commercial-operations.v1",
@@ -684,6 +692,11 @@ function operationsFromWarmbly(
     // the connector computes has to be forwarded explicitly or it silently
     // disappears between the mapper and the surface that renders it.
     dispatch,
+    ...(delegatedFirstTouch ? { delegated_first_touch: delegatedFirstTouch } : {}),
+    ...(workingOverview ? { working_overview: workingOverview } : {}),
+    ...(forwardedStatus ? { confenge_status: forwardedStatus } : {}),
+    ...(outboundOutcomes ? { outbound_outcomes: outboundOutcomes } : {}),
+    ...(mailboxHealth ? { mailbox_health: mailboxHealth } : {}),
     authority: {
       catalog_authority: "governance",
       commercial_runtime: "warmbly",

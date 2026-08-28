@@ -22,14 +22,14 @@
     "cls_p75": 0.1,
     "long_task_max_ms": 350,
     "initial_request_count": 16,
-    "javascript_raw_bytes": 403000,
-    "javascript_gzip_bytes": 123000,
+    "javascript_raw_bytes": 404000,
+    "javascript_gzip_bytes": 123250,
     "css_raw_bytes": 30000,
     "css_gzip_bytes": 6700,
     "bundle_gzip_bytes": 130000
   },
   "budget_change": {
     "previous_bundle_gzip_bytes": 123500,
-    "reason": "The existing founder operating-truth viewport now includes the source-attributed outbound runway, 33 progressive readbacks and fail-closed reconciliation; the bounded ceiling follows the measured feature delta while mobile LCP and INP targets remain unchanged."
+    "reason": "The existing founder operating-truth viewport now includes the source-attributed outbound runway, 33 progressive readbacks, fail-closed reconciliation, and first-touch control fallbacks so QUEUED is queued_readback rather than dispatch.queued_approved; the bounded ceiling follows the measured feature delta while mobile LCP and INP targets remain unchanged."
   }
 }

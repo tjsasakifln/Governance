@@ -282,6 +282,10 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const sourceRunMatch: OutboundRunwayTruth["integrity"]["source_run_match"] = sourceRuns.length > 1
     ? "MISMATCH"
     : currentRun && delegatedRun ? currentRun === delegatedRun ? "MATCH" : "MISMATCH" : "UNKNOWN";
+  const delegatedControl = O(delegated.control);
+  const transportBlock = O(delegatedControl.transport);
+  const capacityBlock = O(delegatedControl.capacity);
+  const forecast = O(capacityBlock.forecast);
   const dueDates = delegatedItems
     .filter((item) => item.state === "QUEUED")
     .map((item) => validDate(item.due_at))
@@ -291,9 +295,14 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     ...dueDates,
     validDate(working.furthest_due_at),
     validDate(delegated.furthest_due_at),
+    validDate(delegatedControl.furthest_due_at),
     validDate(dispatch.furthest_due_at),
   ].filter((item): item is string => Boolean(item)).sort();
-  const nextDueDates = [...dueDates, validDate(dispatch.next_slot_at)].filter((item): item is string => Boolean(item)).sort();
+  const nextDueDates = [
+    ...dueDates,
+    validDate(delegatedControl.next_due_at),
+    validDate(dispatch.next_slot_at),
+  ].filter((item): item is string => Boolean(item)).sort();
   const runtimeShas = [...new Set([
     ...delegatedItems.map((item) => S(item.runtime_release_sha)),
     S(delegated.runtime_release_sha),
@@ -310,7 +319,6 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   // nothing in the control block counts identity attribution or current eligibility, and
   // target_membership_count is a membership denominator, not the funnel stage this row reports.
   // Inventing those mappings would publish numbers nobody observed.
-  const delegatedControl = O(delegated.control);
   const extraReadyReservoir = N(inventoryValue("ready_reservoir")) ?? N(inventoryValue("email_send_ready_reservoir")) ?? N(reservoir.email_send_ready_reservoir) ?? N(inventoryValue("email_send_ready")) ?? countFromFunnel(funnelRows, "email_send_ready");
   const warmblyReadyReservoir = extraReadyReservoir === null && warmblySource.freshness === "FRESH"
     ? N(delegatedControl.ready_reservoir) ?? N(O(delegated.runway).ready_reservoir_count)
@@ -320,19 +328,19 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const targetConfirmed = N(inventoryValue("target_confirmed")) ?? N(reservoir.TARGET_CONFIRMED) ?? countFromFunnel(funnelRows, "target_confirmed");
   const recipientAttributed = N(inventoryValue("recipient_attributed")) ?? N(inventoryValue("identity_safe")) ?? countFromFunnel(funnelRows, "identity_safe");
   const eligibleCurrent = N(inventoryValue("eligible_current")) ?? N(inventoryValue("warmbly_eligible")) ?? countFromFunnel(funnelRows, "warmbly_eligible");
-  const prepared = N(working.prepared) ?? N(delegated.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
-  const delegatedApproved = N(delegated.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
+  const prepared = N(working.prepared) ?? N(delegated.prepared) ?? N(delegatedControl.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
+  const delegatedApproved = N(delegated.delegated_approved) ?? N(delegatedControl.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
   const humanApproved = N(delegated.human_approved);
   const queued = N(delegated.queued_readback);
   const holdExceptions = N(delegated.hold_exceptions) ?? stateCount(delegatedCounts, ["HOLD", "NEEDS_REVIEW", "EXCEPTION"]) ?? N(overview.outbound_exceptions);
-  const sent = N(outcomes.sent) ?? (Object.hasOwn(delegatedCounts, "SENT") ? N(delegatedCounts.SENT) : null);
-  const attempted = N(outcomes.attempted);
-  const providerAccepted = N(outcomes.provider_accepted);
+  const sent = N(outcomes.sent) ?? N(transportBlock.sent) ?? (Object.hasOwn(delegatedCounts, "SENT") ? N(delegatedCounts.SENT) : null);
+  const attempted = N(outcomes.attempted) ?? N(transportBlock.provider_attempts);
+  const providerAccepted = N(outcomes.provider_accepted) ?? N(transportBlock.provider_accepted);
   const delivered = N(outcomes.delivered);
   const replies = N(outcomes.replies) ?? N(overview.replies);
   const suppressed = N(outcomes.suppressed) ?? N(working.suppressed);
-  const rawSlots24h = N(working.slots_next_24h) ?? N(dispatch.slots_next_24h);
-  const rawSlots7d = N(working.slots_next_7d) ?? N(dispatch.slots_next_7d);
+  const rawSlots24h = N(working.slots_next_24h) ?? N(dispatch.slots_next_24h) ?? N(forecast.slots_next_24h);
+  const rawSlots7d = N(working.slots_next_7d) ?? N(dispatch.slots_next_7d) ?? N(forecast.slots_next_7d);
   const feedAge = N(working.feed_age_seconds) ?? N(inventoryValue("feed_age_seconds"));
   const feedAgeSource = N(working.feed_age_seconds) !== null ? warmblySource : extraSource;
   const replenishmentState = S(working.replenishment_state) ?? S(inventoryValue("replenishment_state"));
@@ -340,16 +348,35 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const queueFillBlocker = S(working.queue_fill_blocker) ?? S(inventoryValue("queue_fill_blocker")) ?? S(pncp.blocker);
   const queueFillSource = S(working.queue_fill_blocker) ? warmblySource : extraSource;
 
-  const authorityBlock = O(delegated.commercial_authority);
+  const authorityBlock = Object.keys(O(delegated.commercial_authority)).length > 0
+    ? O(delegated.commercial_authority)
+    : O(delegatedControl.commercial_authority);
   const csRaw = S(authorityBlock.state);
   const cs = csRaw && csRaw.includes("FROZEN") ? "FROZEN" : csRaw;
   // Warmbly is authoritative. Missing state stays UNKNOWN; never infer CURRENT from envelope age.
   const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : "UNKNOWN";
   const extraFeedAge = N(inventoryValue("feed_age_seconds"));
   const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
-  const pause = [S(dispatch.pause_reason), S(dispatch.paused_by), S(dispatch.pause_source), validDate(dispatch.paused_at)].map((v) => v ?? "UNKNOWN").join(" · ");
-  const killRaw = overview.kill_switch ?? dispatch.kill_switch ?? O(operations.confenge_status).kill_switch;
+  const pause = [
+    S(dispatch.pause_reason) ?? S(capacityBlock.pause_reason) ?? S(transportBlock.pause_reason),
+    S(dispatch.paused_by) ?? S(capacityBlock.paused_by),
+    S(dispatch.pause_source) ?? S(capacityBlock.pause_source) ?? S(transportBlock.pause_source),
+    validDate(dispatch.paused_at) ?? validDate(capacityBlock.paused_at),
+  ].map((v) => v ?? "UNKNOWN").join(" · ");
+  const killRaw = overview.kill_switch ?? dispatch.kill_switch ?? O(operations.confenge_status).kill_switch ?? transportBlock.kill_switch_engaged;
   const kill = typeof killRaw === "boolean" ? (killRaw ? "ativo" : "desligado") : "UNKNOWN";
+  const mailboxRows = A(capacityBlock.mailboxes).map((row) => O(row));
+  const mailboxFromCapacity = mailboxRows.length === 0 ? null : {
+    healthy: mailboxRows.filter((row) => S(row.health) === "ready").length,
+    blocked: mailboxRows.filter((row) => {
+      const health = S(row.health) ?? "";
+      return health === "blocked" || health === "unhealthy" || health === "error";
+    }).length,
+    unknown: mailboxRows.filter((row) => {
+      const health = S(row.health) ?? "";
+      return health !== "ready" && health !== "blocked" && health !== "unhealthy" && health !== "error";
+    }).length,
+  };
 
   const integrityReasons: string[] = [];
   if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_CHANGED");
@@ -454,9 +481,9 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       reservoir_below_1000: readyFact.value === null ? null : readyFact.value < 1000,
     },
     health: {
-      mailboxes_healthy: countFact(N(mailboxHealth.healthy), warmblySource, TRANSPORT_DRILLDOWN),
-      mailboxes_blocked: countFact(N(mailboxHealth.blocked), warmblySource, TRANSPORT_DRILLDOWN),
-      mailboxes_unknown: countFact(N(mailboxHealth.unknown), warmblySource, TRANSPORT_DRILLDOWN),
+      mailboxes_healthy: countFact(N(mailboxHealth.healthy) ?? mailboxFromCapacity?.healthy ?? null, warmblySource, TRANSPORT_DRILLDOWN),
+      mailboxes_blocked: countFact(N(mailboxHealth.blocked) ?? mailboxFromCapacity?.blocked ?? null, warmblySource, TRANSPORT_DRILLDOWN),
+      mailboxes_unknown: countFact(N(mailboxHealth.unknown) ?? mailboxFromCapacity?.unknown ?? null, warmblySource, TRANSPORT_DRILLDOWN),
       provider_errors: countFact(N(outcomes.provider_errors) ?? N(dispatch.provider_errors), warmblySource, TRANSPORT_DRILLDOWN),
       bounces: countFact(N(outcomes.bounces) ?? N(overview.bounces), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=bounces`),
       complaints: countFact(N(outcomes.complaints), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=complaints`),
