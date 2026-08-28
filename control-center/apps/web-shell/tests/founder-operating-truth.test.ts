@@ -606,6 +606,21 @@ test("capacity v2 stays a read-only projection and exposes deadline blockers in 
   assert.doesNotMatch(html, /REQUESTED_DEADLINE_INFEASIBLE/);
 });
 
+test("dispatch ACTIVE outside the send window is ARMED_FOR_NEXT_BUSINESS_WINDOW not GO", () => {
+  const input = envelope();
+  const delegated = firstTouchControl(input);
+  const operations = ((input.snapshots as Record<string, Record<string, unknown>>).commercial!.snapshot as Record<string, unknown>).operations as Record<string, unknown>;
+  (operations.dispatch as Record<string, unknown>).state = "ACTIVE";
+  delegated.control = {
+    transport: { kill_switch_engaged: false, dispatch_paused: false, sent: 0, provider_attempts: 0 },
+    capacity: { in_send_window: false, timezone: "America/Sao_Paulo", window_start: "09:00", window_end: "18:00" },
+  };
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.transport.state.value, "ARMED_FOR_NEXT_BUSINESS_WINDOW");
+  assert.notEqual(truth.outbound_runway.transport.state.value, "GO");
+  assert.equal(truth.outbound.state, "PAUSED");
+});
+
 test("QUEUED comes only from queued_readback, never from dispatch.queued_approved", () => {
   const input = envelope();
   const delegated = firstTouchControl(input);

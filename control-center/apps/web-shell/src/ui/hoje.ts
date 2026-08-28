@@ -349,7 +349,8 @@ function outboundRunwayBlock(truth: FounderOperatingTruth): string {
   const action = truth.primary_action;
   const transportTone = runway.transport.state.value === "GO" ? "go"
     : runway.transport.state.value === "PAUSED" ? "paused"
-      : runway.transport.state.value === "NO_GO" ? "no-go" : "unknown";
+      : runway.transport.state.value === "NO_GO" ? "no-go"
+        : runway.transport.state.value === "ARMED_FOR_NEXT_BUSINESS_WINDOW" ? "armed" : "unknown";
   const reservoirSignal = runway.runway.reservoir_below_1000 === true
     ? `<span class="pill runway-low">reservoir abaixo de 1 mil</span>`
     : runway.runway.reservoir_below_1000 === false

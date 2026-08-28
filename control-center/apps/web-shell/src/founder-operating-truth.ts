@@ -34,7 +34,7 @@ export interface MorningException {
   source: MorningSource;
 }
 
-export type TransportDecision = "GO" | "PAUSED" | "NO_GO" | "UNKNOWN";
+export type TransportDecision = "GO" | "PAUSED" | "NO_GO" | "ARMED_FOR_NEXT_BUSINESS_WINDOW" | "UNKNOWN";
 
 export interface MorningFact<T extends string | number> {
   value: T | null;
@@ -272,11 +272,6 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const targetCoverageText = N(target.covered) !== null && N(target.total) !== null ? `${N(target.covered)}/${N(target.total)}` : S(pncp.target_coverage);
 
   const transportRaw = S(dispatch.transport_state) ?? rawDispatchState;
-  const reportedTransportDecision: TransportDecision = transportRaw === "GO" || transportRaw === "NO_GO" || transportRaw === "PAUSED"
-    ? transportRaw
-    : transportRaw === "ACTIVE" ? "GO" : "UNKNOWN";
-  const transportDecision: TransportDecision = warmblySource.freshness === "FRESH" ? reportedTransportDecision : "UNKNOWN";
-  const outboundState: FounderOperatingTruth["outbound"]["state"] = transportDecision === "GO" ? "ACTIVE" : transportDecision === "PAUSED" || transportDecision === "NO_GO" ? "PAUSED" : "UNKNOWN";
   const sourceRuns = [...new Set(delegatedItems.map((item) => S(item.source_run_id)).filter((item): item is string => Boolean(item)))];
   const delegatedRun = sourceRuns.length === 1 ? sourceRuns[0]! : sourceRuns.length === 0 ? S(delegated.source_run_id) : null;
   const sourceRunMatch: OutboundRunwayTruth["integrity"]["source_run_match"] = sourceRuns.length > 1
@@ -286,6 +281,19 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const transportBlock = O(delegatedControl.transport);
   const capacityBlock = O(delegatedControl.capacity);
   const forecast = O(capacityBlock.forecast);
+  const killEngaged = transportBlock.kill_switch_engaged === true || dispatch.kill_switch === true;
+  const durablePaused = transportBlock.dispatch_paused === true || transportRaw === "PAUSED" || transportRaw === "NO_GO";
+  const inSendWindow = capacityBlock.in_send_window;
+  let reportedTransportDecision: TransportDecision;
+  if (transportRaw === "NO_GO") reportedTransportDecision = "NO_GO";
+  else if (killEngaged || durablePaused) reportedTransportDecision = "PAUSED";
+  else if (inSendWindow === false) reportedTransportDecision = "ARMED_FOR_NEXT_BUSINESS_WINDOW";
+  else if (inSendWindow === true && (transportRaw === "ACTIVE" || transportRaw === "GO")) reportedTransportDecision = "GO";
+  else if (transportRaw === "GO" || transportRaw === "PAUSED") reportedTransportDecision = transportRaw;
+  else if (transportRaw === "ACTIVE") reportedTransportDecision = "GO";
+  else reportedTransportDecision = "UNKNOWN";
+  const transportDecision: TransportDecision = warmblySource.freshness === "FRESH" ? reportedTransportDecision : "UNKNOWN";
+  const outboundState: FounderOperatingTruth["outbound"]["state"] = transportDecision === "GO" ? "ACTIVE" : transportDecision === "PAUSED" || transportDecision === "NO_GO" || transportDecision === "ARMED_FOR_NEXT_BUSINESS_WINDOW" ? "PAUSED" : "UNKNOWN";
   const dueDates = delegatedItems
     .filter((item) => item.state === "QUEUED")
     .map((item) => validDate(item.due_at))
