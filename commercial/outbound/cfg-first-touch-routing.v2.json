@@ -76,15 +76,28 @@
   },
   "commercial_authority": {
     "binding_fields": [
-      "source_run_id",
-      "snapshot_id",
-      "membership_hash",
+      "basis_source_run_id",
+      "basis_snapshot_hash",
+      "basis_membership_hash",
+      "basis_publication_semantic_hash",
+      "producer_identity",
       "validated_at",
       "valid_until",
       "state",
       "new_admission_allowed",
       "existing_bound_touch_transport_allowed",
       "reason_codes"
+    ],
+    "binding_field_aliases": {
+      "basis_source_run_id": ["source_run_id"],
+      "basis_snapshot_hash": ["snapshot_id"],
+      "basis_membership_hash": ["membership_hash"]
+    },
+    "alias_conflict_disposition": "FAIL_CLOSED",
+    "alias_must_not_drop": [
+      "basis_publication_semantic_hash",
+      "producer_identity",
+      "commercial_authority_hash"
     ],
     "first_window_thresholds_seconds": {
       "CURRENT": {
@@ -253,6 +266,8 @@
       "evidence_hash",
       "evidence_version",
       "membership_hash",
+      "basis_publication_semantic_hash",
+      "producer_identity",
       "commercial_authority_ref",
       "target_fit",
       "target_party_role",
@@ -286,6 +301,10 @@
       "commercial_authority_ref",
       "commercial_authority_hash",
       "basis_source_run_id",
+      "basis_snapshot_hash",
+      "basis_membership_hash",
+      "basis_publication_semantic_hash",
+      "producer_identity",
       "membership_hash",
       "lead_account_cnpj_root_ref",
       "recipient",

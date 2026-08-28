@@ -344,10 +344,24 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const csRaw = S(authorityBlock.state);
   const cs = csRaw && csRaw.includes("FROZEN") ? "FROZEN" : csRaw;
   const validatedAt = validDate(authorityBlock.validated_at);
-  const originMs = Date.parse(generatedAt ?? "");
-  const ageSec = validatedAt && originMs ? Math.floor((originMs - Date.parse(validatedAt)) / 1000) : null;
-  const fromAge: CommercialAuthorityState = ageSec === null || ageSec < 0 ? "UNKNOWN" : ageSec <= 86400 ? "CURRENT" : ageSec <= 259200 ? "DEGRADED" : ageSec <= 604800 ? "FROZEN" : "EXPIRED";
-  const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : fromAge;
+  const runCanonical = S(authorityBlock.basis_source_run_id);
+  const runAlias = S(authorityBlock.source_run_id);
+  const snapCanonical = S(authorityBlock.basis_snapshot_hash);
+  const snapAlias = S(authorityBlock.snapshot_id);
+  const memCanonical = S(authorityBlock.basis_membership_hash);
+  const memAlias = S(authorityBlock.membership_hash);
+  const semantic = S(authorityBlock.basis_publication_semantic_hash);
+  const producer = S(authorityBlock.producer_identity);
+  const aliasConflict =
+    (runCanonical !== null && runAlias !== null && runCanonical !== runAlias) ||
+    (snapCanonical !== null && snapAlias !== null && snapCanonical !== snapAlias) ||
+    (memCanonical !== null && memAlias !== null && memCanonical !== memAlias);
+  // Warmbly is authoritative. Missing or conflicted state stays UNKNOWN; never infer CURRENT from age.
+  const commercialState: CommercialAuthorityState = aliasConflict
+    ? "UNKNOWN"
+    : cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED"
+      ? cs
+      : "UNKNOWN";
   const extraFeedAge = N(inventoryValue("feed_age_seconds"));
   const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
   const pause = [S(dispatch.pause_reason), S(dispatch.paused_by), S(dispatch.pause_source), validDate(dispatch.paused_at)].map((v) => v ?? "UNKNOWN").join(" · ");
@@ -357,6 +371,10 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const integrityReasons: string[] = [];
   if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_CHANGED");
   if (runtimeShas.length > 1) integrityReasons.push("RUNTIME_SHA_MISMATCH");
+  if (aliasConflict) integrityReasons.push("COMMERCIAL_AUTHORITY_ALIAS_CONFLICT");
+  if (csRaw && (!semantic || !producer || !(runCanonical ?? runAlias) || !(memCanonical ?? memAlias))) {
+    integrityReasons.push("COMMERCIAL_AUTHORITY_BINDING_INCOMPLETE");
+  }
   const impossible = (code: string, part: number | null, whole: number | null): void => {
     if (part !== null && whole !== null && part > whole) integrityReasons.push(code);
   };

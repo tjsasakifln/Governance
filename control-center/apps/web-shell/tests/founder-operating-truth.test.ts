@@ -51,6 +51,11 @@ function envelope(): Record<string, unknown> {
             human_approved: 0,
             executor: "agent:first-touch-v2",
             commercial_authority: {
+              basis_source_run_id: "run-current",
+              basis_snapshot_hash: "snap-fixture",
+              basis_membership_hash: "mem-fixture",
+              basis_publication_semantic_hash: "sem-fixture",
+              producer_identity: "producer-fixture",
               source_run_id: "run-current",
               membership_hash: "mem-fixture",
               validated_at: "2026-08-26T02:00:00Z",
@@ -616,6 +621,11 @@ test("expired commercial authority is not a single STALE and is a human exceptio
   const input = envelope();
   const delegated = firstTouchControl(input);
   delegated.commercial_authority = {
+    basis_source_run_id: "run-current",
+    basis_snapshot_hash: "snap-fixture",
+    basis_membership_hash: "mem-fixture",
+    basis_publication_semantic_hash: "sem-fixture",
+    producer_identity: "producer-fixture",
     source_run_id: "run-current",
     membership_hash: "mem-fixture",
     validated_at: "2026-08-18T03:00:00Z",
@@ -643,6 +653,11 @@ test("producer DEGRADED and FROZEN commercial states stay visible with validade"
   for (const [state, htmlToken] of [["DEGRADED", "degradada"], ["FROZEN_FOR_NEW_ADMISSION", "congelada"]] as const) {
     const input = envelope();
     firstTouchControl(input).commercial_authority = {
+      basis_source_run_id: "run-bound",
+      basis_snapshot_hash: "snap-bound",
+      basis_membership_hash: "mem-bound",
+      basis_publication_semantic_hash: "sem-bound",
+      producer_identity: "producer-bound",
       source_run_id: "run-bound",
       validated_at: "2026-08-24T03:00:00Z",
       valid_until: "2026-08-31T03:00:00Z",

@@ -174,15 +174,35 @@
       "properties": {
         "binding_fields": {
           "const": [
-            "source_run_id",
-            "snapshot_id",
-            "membership_hash",
+            "basis_source_run_id",
+            "basis_snapshot_hash",
+            "basis_membership_hash",
+            "basis_publication_semantic_hash",
+            "producer_identity",
             "validated_at",
             "valid_until",
             "state",
             "new_admission_allowed",
             "existing_bound_touch_transport_allowed",
             "reason_codes"
+          ]
+        },
+        "binding_field_aliases": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["basis_source_run_id", "basis_snapshot_hash", "basis_membership_hash"],
+          "properties": {
+            "basis_source_run_id": { "const": ["source_run_id"] },
+            "basis_snapshot_hash": { "const": ["snapshot_id"] },
+            "basis_membership_hash": { "const": ["membership_hash"] }
+          }
+        },
+        "alias_conflict_disposition": { "const": "FAIL_CLOSED" },
+        "alias_must_not_drop": {
+          "const": [
+            "basis_publication_semantic_hash",
+            "producer_identity",
+            "commercial_authority_hash"
           ]
         },
         "first_window_thresholds_seconds": {

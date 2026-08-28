@@ -223,6 +223,22 @@
     "counts": { "QUEUED": 1, "HOLD": 1 },
     "human_approved": 2,
     "queued_readback": 1,
+    "commercial_authority": {
+      "schema": "COMMERCIAL_AUTHORITY/1.0",
+      "state": "CURRENT",
+      "basis_source_run_id": "run-current",
+      "basis_snapshot_hash": "snap-current",
+      "basis_membership_hash": "mem-current",
+      "basis_publication_semantic_hash": "sem-current",
+      "producer_identity": "producer-current",
+      "source_run_id": "run-current",
+      "snapshot_id": "snap-current",
+      "membership_hash": "mem-current",
+      "validated_at": "2026-08-25T12:00:00Z",
+      "valid_until": "2026-08-26T12:00:00Z",
+      "new_admission_allowed": true,
+      "existing_bound_touch_transport_allowed": true
+    },
     "items": [
       {
         "cnpj14": "12345678000190",

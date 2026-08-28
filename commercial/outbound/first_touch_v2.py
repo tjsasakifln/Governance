@@ -11,9 +11,24 @@ This module never authorizes SMTP or provider dispatch.
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Mapping
+
+
+def _load_adapter():
+    path = Path(__file__).resolve().with_name("commercial_authority_adapter.py")
+    spec = importlib.util.spec_from_file_location("commercial_authority_adapter", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_adapter = _load_adapter()
+adapt_commercial_authority = _adapter.adapt_commercial_authority
 
 POLICY_CANONICAL = "CFG-FIRST-TOUCH-ROUTING-v2"
 POLICY_VERSION = "v2"
@@ -135,6 +150,11 @@ class SourceHealthObservation:
 @dataclass(frozen=True)
 class CommercialAuthorityBinding:
     present: bool = False
+    basis_source_run_id: str | None = None
+    basis_snapshot_hash: str | None = None
+    basis_membership_hash: str | None = None
+    basis_publication_semantic_hash: str | None = None
+    producer_identity: str | None = None
     source_run_id: str | None = None
     snapshot_id: str | None = None
     membership_hash: str | None = None
@@ -143,6 +163,21 @@ class CommercialAuthorityBinding:
     authority_ref: str | None = None
     authority_hash: str | None = None
     observed_membership_hash: str | None = None
+    observed_publication_semantic_hash: str | None = None
+    observed_producer_identity: str | None = None
+
+    def wire(self) -> dict[str, Any]:
+        return {
+            "basis_source_run_id": self.basis_source_run_id,
+            "basis_snapshot_hash": self.basis_snapshot_hash,
+            "basis_membership_hash": self.basis_membership_hash,
+            "basis_publication_semantic_hash": self.basis_publication_semantic_hash,
+            "producer_identity": self.producer_identity,
+            "source_run_id": self.source_run_id,
+            "snapshot_id": self.snapshot_id,
+            "membership_hash": self.membership_hash,
+            "authority_hash": self.authority_hash,
+        }
 
 
 @dataclass(frozen=True)
@@ -269,7 +304,13 @@ def evaluate(policy: Mapping[str, Any], inp: EvaluationInput) -> dict[str, Any]:
                 "state": "UNKNOWN",
                 "new_admission_allowed": False,
                 "existing_bound_touch_transport_allowed": False,
+                "basis_source_run_id": None,
+                "basis_snapshot_hash": None,
+                "basis_membership_hash": None,
+                "basis_publication_semantic_hash": None,
+                "producer_identity": None,
                 "source_run_id": None,
+                "snapshot_id": None,
                 "membership_hash": None,
                 "validated_at": None,
                 "valid_until": None,
@@ -292,11 +333,22 @@ def evaluate(policy: Mapping[str, Any], inp: EvaluationInput) -> dict[str, Any]:
 
     source_state = source_health_state(inp.source_health, policy)
     binding = inp.commercial_binding
+    wire = adapt_commercial_authority(binding.wire())
     blockers = fail_closed_reasons(inp.fail_closed, policy)
     reasons.extend(blockers)
 
-    if binding.present and binding.membership_hash and binding.observed_membership_hash:
-        if binding.membership_hash != binding.observed_membership_hash and "BINDING_MISMATCH" not in blockers:
+    if binding.present:
+        observed_membership = binding.observed_membership_hash or wire["basis_membership_hash"]
+        observed_semantic = binding.observed_publication_semantic_hash or wire["basis_publication_semantic_hash"]
+        observed_producer = binding.observed_producer_identity or wire["producer_identity"]
+        mismatched = bool(wire["conflicts"]) or not wire["complete"]
+        if observed_membership and wire["basis_membership_hash"] != observed_membership:
+            mismatched = True
+        if observed_semantic and wire["basis_publication_semantic_hash"] != observed_semantic:
+            mismatched = True
+        if observed_producer and wire["producer_identity"] != observed_producer:
+            mismatched = True
+        if mismatched and "BINDING_MISMATCH" not in blockers:
             reasons.append("BINDING_MISMATCH")
             blockers.append("BINDING_MISMATCH")
 
@@ -396,8 +448,14 @@ def evaluate(policy: Mapping[str, Any], inp: EvaluationInput) -> dict[str, Any]:
             "state": commercial_state,
             "new_admission_allowed": new_admission,
             "existing_bound_touch_transport_allowed": existing_bound,
-            "source_run_id": binding.source_run_id if binding.present else None,
-            "membership_hash": binding.membership_hash if binding.present else None,
+            "basis_source_run_id": wire["basis_source_run_id"] if binding.present else None,
+            "basis_snapshot_hash": wire["basis_snapshot_hash"] if binding.present else None,
+            "basis_membership_hash": wire["basis_membership_hash"] if binding.present else None,
+            "basis_publication_semantic_hash": wire["basis_publication_semantic_hash"] if binding.present else None,
+            "producer_identity": wire["producer_identity"] if binding.present else None,
+            "source_run_id": wire["source_run_id"] if binding.present else None,
+            "snapshot_id": wire["snapshot_id"] if binding.present else None,
+            "membership_hash": wire["membership_hash"] if binding.present else None,
             "validated_at": binding.validated_at if binding.present else None,
             "valid_until": binding.valid_until if binding.present else None,
             "age_seconds": age,

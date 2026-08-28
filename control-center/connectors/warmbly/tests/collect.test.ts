@@ -27,6 +27,14 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
     assert.equal(delegated.policy_id, "CFG-FIRST-TOUCH-ROUTING-v1");
     assert.equal(delegated.policy_active, true);
     assert.equal(delegated.queued_readback, 1);
+    const authority = delegated.commercial_authority as Record<string, unknown>;
+    assert.equal(authority.basis_source_run_id, "run-current");
+    assert.equal(authority.basis_snapshot_hash, "snap-current");
+    assert.equal(authority.basis_membership_hash, "mem-current");
+    assert.equal(authority.basis_publication_semantic_hash, "sem-current");
+    assert.equal(authority.producer_identity, "producer-current");
+    assert.equal(authority.source_run_id, authority.basis_source_run_id);
+    assert.equal(authority.state, "CURRENT");
     assert.deepEqual(delegated.counts, { QUEUED: 1, HOLD: 1 });
     const decisions = delegated.items as Array<Record<string, unknown>>;
     assert.equal(decisions[0]?.approval_source, "DELEGATED_POLICY_APPROVE");

@@ -75,6 +75,11 @@ def clear_flags(**overrides) -> ev.FailClosedFlags:
 def binding(age_seconds: int, **overrides) -> ev.CommercialAuthorityBinding:
     payload = {
         "present": True,
+        "basis_source_run_id": "run-bound",
+        "basis_snapshot_hash": "snap-bound",
+        "basis_membership_hash": "mem-aaa",
+        "basis_publication_semantic_hash": "sem-aaa",
+        "producer_identity": "producer-aaa",
         "source_run_id": "run-bound",
         "snapshot_id": "snap-bound",
         "membership_hash": "mem-aaa",
@@ -83,6 +88,8 @@ def binding(age_seconds: int, **overrides) -> ev.CommercialAuthorityBinding:
         "authority_ref": "commercial-authority/run-bound",
         "authority_hash": "auth-hash-aaa",
         "observed_membership_hash": "mem-aaa",
+        "observed_publication_semantic_hash": "sem-aaa",
+        "observed_producer_identity": "producer-aaa",
     }
     payload.update(overrides)
     return ev.CommercialAuthorityBinding(**payload)
@@ -450,3 +457,117 @@ def test_contract_fixtures_cover_the_v1_v2_unknown_matrix():
             assert code in result["reason_codes"], f"{row['case_id']} missing {code}"
         assert result["smtp_send_allowed"] is False
         assert result["provider_dispatch_authorized"] is False
+
+
+def test_v2_binding_fields_are_the_producer_canonical_names():
+    fields = policy_v2()["commercial_authority"]["binding_fields"]
+    assert "basis_source_run_id" in fields
+    assert "basis_snapshot_hash" in fields
+    assert "basis_membership_hash" in fields
+    assert "basis_publication_semantic_hash" in fields
+    assert "producer_identity" in fields
+    assert policy_v2()["commercial_authority"]["alias_conflict_disposition"] == "FAIL_CLOSED"
+    assert "basis_publication_semantic_hash" in policy_v2()["commercial_authority"]["alias_must_not_drop"]
+    assert "producer_identity" in policy_v2()["commercial_authority"]["alias_must_not_drop"]
+
+
+def test_lossless_alias_adapter_never_drops_semantic_or_producer():
+    adapter = load_module(ROOT / "commercial" / "outbound" / "commercial_authority_adapter.py", "ca_adapter")
+    extra_cli = {
+        "basis_source_run_id": "run-snapshot-a",
+        "basis_snapshot_hash": "snapshot-a",
+        "basis_membership_hash": "membership-a",
+        "basis_publication_semantic_hash": "semantic-a",
+        "producer_identity": "producer-a",
+        "state": "CURRENT",
+    }
+    adapted = adapter.adapt_commercial_authority(extra_cli)
+    assert adapted["complete"] is True
+    assert adapted["source_run_id"] == "run-snapshot-a"
+    assert adapted["snapshot_id"] == "snapshot-a"
+    assert adapted["membership_hash"] == "membership-a"
+    assert adapted["basis_publication_semantic_hash"] == "semantic-a"
+    assert adapted["producer_identity"] == "producer-a"
+
+    alias_only = adapter.adapt_commercial_authority(
+        {
+            "source_run_id": "run-snapshot-a",
+            "snapshot_id": "snapshot-a",
+            "membership_hash": "membership-a",
+            "basis_publication_semantic_hash": "semantic-a",
+            "producer_identity": "producer-a",
+        }
+    )
+    assert alias_only["basis_source_run_id"] == "run-snapshot-a"
+    assert alias_only["complete"] is True
+
+    conflict = adapter.adapt_commercial_authority(
+        {
+            "basis_source_run_id": "run-a",
+            "source_run_id": "run-b",
+            "basis_snapshot_hash": "snapshot-a",
+            "basis_membership_hash": "membership-a",
+            "basis_publication_semantic_hash": "semantic-a",
+            "producer_identity": "producer-a",
+        }
+    )
+    assert conflict["complete"] is False
+    assert "basis_source_run_id" in conflict["conflicts"]
+
+    dropped = adapter.adapt_commercial_authority(
+        {
+            "source_run_id": "run-a",
+            "snapshot_id": "snap-a",
+            "membership_hash": "mem-a",
+        }
+    )
+    assert dropped["complete"] is False
+    assert dropped["basis_publication_semantic_hash"] is None
+    assert dropped["producer_identity"] is None
+
+
+def test_one_byte_drift_of_semantic_producer_or_membership_fails_closed():
+    adapter = load_module(ROOT / "commercial" / "outbound" / "commercial_authority_adapter.py", "ca_adapter")
+    happy = evaluate(
+        source_health=source("FRESH", age_seconds=10),
+        commercial_binding=binding(60),
+        fail_closed=clear_flags(),
+        already_bound_materialized=True,
+    )
+    assert happy["commercial_authority"]["new_admission_allowed"] is True
+    assert happy["commercial_authority"]["basis_publication_semantic_hash"] == "sem-aaa"
+    assert happy["commercial_authority"]["producer_identity"] == "producer-aaa"
+    assert happy["commercial_authority"]["source_run_id"] == happy["commercial_authority"]["basis_source_run_id"]
+
+    for field, observed in (
+        ("observed_membership_hash", adapter.one_byte_drift("mem-aaa")),
+        ("observed_publication_semantic_hash", adapter.one_byte_drift("sem-aaa")),
+        ("observed_producer_identity", adapter.one_byte_drift("producer-aaa")),
+    ):
+        closed = evaluate(
+            source_health=source("FRESH", age_seconds=10),
+            commercial_binding=binding(60, **{field: observed}),
+            fail_closed=clear_flags(),
+            already_bound_materialized=True,
+        )
+        assert closed["commercial_authority"]["new_admission_allowed"] is False, field
+        assert "BINDING_MISMATCH" in closed["reason_codes"], field
+
+
+def test_extra_cli_example_fixture_roundtrip_preserves_producer_binding():
+    adapter = load_module(ROOT / "commercial" / "outbound" / "commercial_authority_adapter.py", "ca_adapter")
+    example = v.load_json(FIXTURE_DIR.parent / "cross-contract" / "extra-cli-warmbly-manifest-authority.json")
+    adapted = adapter.adapt_commercial_authority(example["commercial_authority"])
+    assert adapted["complete"] is True
+    assert adapted["basis_source_run_id"] == example["source"]["run_id"]
+    assert adapted["basis_snapshot_hash"] == example["source"]["snapshot_hash"]
+    assert adapted["basis_membership_hash"] == example["authoritative_target_membership"]["membership_hash"]
+    assert adapted["basis_publication_semantic_hash"] == "semantic-a"
+    assert adapted["producer_identity"] == "producer-a"
+    drifted = adapter.adapt_commercial_authority(
+        {
+            **example["commercial_authority"],
+            "basis_publication_semantic_hash": adapter.one_byte_drift("semantic-a"),
+        }
+    )
+    assert drifted["basis_publication_semantic_hash"] != "semantic-a"
