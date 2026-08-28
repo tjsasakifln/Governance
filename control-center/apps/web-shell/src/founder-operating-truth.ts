@@ -1,4 +1,8 @@
 export type TruthFreshness = "FRESH" | "STALE" | "UNKNOWN" | "ERROR";
+export type SourceHealthState = "FRESH" | "DEGRADED" | "STALE" | "UNKNOWN";
+export type CommercialAuthorityState = "CURRENT" | "DEGRADED" | "FROZEN" | "EXPIRED" | "UNKNOWN";
+
+
 
 export interface MorningSource {
   system: string;
@@ -20,6 +24,7 @@ export interface MorningException {
     | "delivery_blocker"
     | "runtime_mismatch"
     | "other";
+  reason_group?: string;
   owner: string;
   reason: string;
   evidence: string[];
@@ -35,7 +40,6 @@ export interface MorningFact<T extends string | number> {
   value: T | null;
   source: MorningSource;
   href: string;
-  note: string | null;
 }
 
 export interface OutboundRunwayTruth {
@@ -43,7 +47,11 @@ export interface OutboundRunwayTruth {
     state: MorningFact<TransportDecision>;
     runtime_sha: MorningFact<string>;
     policy_version: MorningFact<string>;
-    source_run_freshness: MorningFact<TruthFreshness>;
+    source_health: MorningFact<SourceHealthState>;
+    commercial_state: MorningFact<CommercialAuthorityState>;
+    commercial_until: MorningFact<string>;
+    pause: MorningFact<string>;
+    kill_switch: MorningFact<string>;
   };
   stock: {
     target_confirmed: MorningFact<number>;
@@ -167,13 +175,11 @@ function countFact(
   value: number | null,
   factSource: MorningSource,
   href: string,
-  note: string | null = null,
 ): MorningFact<number> {
   return {
     value: factSource.freshness === "FRESH" ? value : null,
     source: factSource,
     href,
-    note,
   };
 }
 
@@ -181,9 +187,8 @@ function textFact<T extends string>(
   value: T | null,
   factSource: MorningSource,
   href: string,
-  note: string | null = null,
 ): MorningFact<T> {
-  return { value, source: factSource, href, note };
+  return { value, source: factSource, href };
 }
 
 function newestObservation(
@@ -222,14 +227,17 @@ function exception(row: Record<string, unknown>, generatedAt: string | null): Mo
   const rawSource = O(row.source);
   const evidence = Array.isArray(row.evidence) ? row.evidence.filter((item): item is string => Boolean(S(item))) : [];
   const severity = row.severity === "critical" || row.severity === "high" || row.severity === "low" ? row.severity : "medium";
+  const code0 = Array.isArray(row.reason_codes) && typeof row.reason_codes[0] === "string" ? row.reason_codes[0] : null;
+  const group = S(row.reason_group) ?? (code0 === "MEMBERSHIP_LEAVE_PROVEN" ? "MEMBERSHIP_DRIFT" : code0);
   return {
     id: S(row.exception_id) ?? S(row.id) ?? `projection-${bucket}`,
     bucket,
+    ...(group ? { reason_group: group } : {}),
     owner: S(row.owner) ?? "UNKNOWN",
-    reason: S(row.reason) ?? "Motivo não informado pela origem.",
+    reason: S(row.reason) ?? "Motivo ausente.",
     evidence: evidence.length ? evidence : ["evidence:UNKNOWN"],
     age_seconds: N(row.age_seconds),
-    next_action: S(row.next_action) ?? "Confirmar owner, evidência e próxima ação na origem canônica.",
+    next_action: S(row.next_action) ?? "Confirmar owner e evidência na origem.",
     severity,
     source: { system: S(rawSource.system) ?? "warmbly", kind: S(rawSource.kind) ?? "exception-read", locator: S(rawSource.locator) ?? S(row.id) ?? "unobserved", as_of: S(row.observed_at) ?? generatedAt, freshness: F(row.freshness ?? row.freshness_status) },
   };
@@ -315,7 +323,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const prepared = N(working.prepared) ?? N(delegated.prepared) ?? stateCount(delegatedCounts, ["PREPARED", "POLICY_EVALUATED", "APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT", "HOLD", "NEEDS_REVIEW", "EXCEPTION"]);
   const delegatedApproved = N(delegated.delegated_approved) ?? stateCount(delegatedCounts, ["APPROVED", "APPROVED_NOT_SCHEDULED", "QUEUED", "SENT"]);
   const humanApproved = N(delegated.human_approved);
-  const queued = N(delegated.queued_readback) ?? N(dispatch.queued_approved);
+  const queued = N(delegated.queued_readback);
   const holdExceptions = N(delegated.hold_exceptions) ?? stateCount(delegatedCounts, ["HOLD", "NEEDS_REVIEW", "EXCEPTION"]) ?? N(overview.outbound_exceptions);
   const sent = N(outcomes.sent) ?? (Object.hasOwn(delegatedCounts, "SENT") ? N(delegatedCounts.SENT) : null);
   const attempted = N(outcomes.attempted);
@@ -332,9 +340,23 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const queueFillBlocker = S(working.queue_fill_blocker) ?? S(inventoryValue("queue_fill_blocker")) ?? S(pncp.blocker);
   const queueFillSource = S(working.queue_fill_blocker) ? warmblySource : extraSource;
 
+  const authorityBlock = O(delegated.commercial_authority);
+  const csRaw = S(authorityBlock.state);
+  const cs = csRaw && csRaw.includes("FROZEN") ? "FROZEN" : csRaw;
+  // Warmbly is authoritative. Missing state stays UNKNOWN; never infer CURRENT from envelope age.
+  const commercialState: CommercialAuthorityState = cs === "CURRENT" || cs === "DEGRADED" || cs === "FROZEN" || cs === "EXPIRED" ? cs : "UNKNOWN";
+  const extraFeedAge = N(inventoryValue("feed_age_seconds"));
+  const sourceHealthState: SourceHealthState = extraFeedAge !== null && extraFeedAge >= 0 ? extraFeedAge <= 86400 ? "FRESH" : extraFeedAge <= 259200 ? "DEGRADED" : "STALE" : extraSource.freshness === "ERROR" ? "UNKNOWN" : extraSource.freshness;
+  const pause = [S(dispatch.pause_reason), S(dispatch.paused_by), S(dispatch.pause_source), validDate(dispatch.paused_at)].map((v) => v ?? "UNKNOWN").join(" · ");
+  const killRaw = overview.kill_switch ?? dispatch.kill_switch ?? O(operations.confenge_status).kill_switch;
+  const kill = typeof killRaw === "boolean" ? (killRaw ? "ativo" : "desligado") : "UNKNOWN";
+
   const integrityReasons: string[] = [];
-  if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_MISMATCH");
+  if (sourceRunMatch === "MISMATCH") integrityReasons.push("SOURCE_RUN_CHANGED");
   if (runtimeShas.length > 1) integrityReasons.push("RUNTIME_SHA_MISMATCH");
+  if (csRaw && (!S(authorityBlock.basis_publication_semantic_hash) || !S(authorityBlock.producer_identity))) {
+    integrityReasons.push("COMMERCIAL_AUTHORITY_BINDING_INCOMPLETE");
+  }
   const impossible = (code: string, part: number | null, whole: number | null): void => {
     if (part !== null && whole !== null && part > whole) integrityReasons.push(code);
   };
@@ -350,8 +372,8 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   impossible("DELIVERED_GT_PROVIDER_ACCEPTED", delivered, providerAccepted);
   impossible("REPLIES_GT_ATTEMPTED", replies, attempted);
   impossible("SUPPRESSED_GT_TARGET_CONFIRMED", suppressed, targetConfirmed);
-  const hasImpossibleNumbers = integrityReasons.some((code) => code !== "SOURCE_RUN_MISMATCH" && code !== "RUNTIME_SHA_MISMATCH");
-  const reconciledWarmblySource = sourceRunMatch === "MISMATCH" || hasImpossibleNumbers
+  const hasImpossibleNumbers = integrityReasons.some((code) => code !== "SOURCE_RUN_CHANGED" && code !== "RUNTIME_SHA_MISMATCH");
+  const reconciledWarmblySource = hasImpossibleNumbers
     ? sourceWithFreshness(warmblySource, "ERROR")
     : warmblySource;
   const reconciledExtraSource = hasImpossibleNumbers ? sourceWithFreshness(extraSource, "ERROR") : extraSource;
@@ -365,21 +387,21 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     ? `${WARMBLY_DRILLDOWN}?etapa=ready_reservoir`
     : `${EXTRA_DRILLDOWN}?etapa=ready_reservoir`;
   const targetFact = countFact(targetConfirmed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=target_confirmed`);
-  const recipientFact = countFact(recipientAttributed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=recipient_attributed`, "Identidade atribuída à empresa pela origem; nenhuma mailbox é exibida nesta visão.");
+  const recipientFact = countFact(recipientAttributed, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=recipient_attributed`);
   const eligibleFact = countFact(eligibleCurrent, reconciledExtraSource, `${EXTRA_DRILLDOWN}?etapa=eligible_current`);
-  const preparedFact = countFact(prepared, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=prepared`, "Denominador preparado explícito ou soma conservativa dos estados canônicos que já atravessaram PREPARED no mesmo run.");
-  const approvedFact = countFact(delegatedApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`, "Soma dos buckets canônicos APPROVED, APPROVED_NOT_SCHEDULED, QUEUED e SENT; nenhuma aprovação humana é forjada.");
-  const humanApprovedFact = countFact(humanApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=human_approved`, "Aprovação humana permanece separada da autoridade delegada e não é somada ao delegated approved.");
-  const queuedFact = countFact(queued, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`, "Conta somente QUEUED confirmado por readback canônico.");
-  const holdFact = countFact(holdExceptions, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`, "Revisar mensagens conta somente HOLD, NEEDS_REVIEW e EXCEPTION.");
-  const sentFact = countFact(sent, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=sent`, "SENT é separado de provider accepted e delivered.");
+  const preparedFact = countFact(prepared, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=prepared`);
+  const approvedFact = countFact(delegatedApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`);
+  const humanApprovedFact = countFact(humanApproved, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=human_approved`);
+  const queuedFact = countFact(queued, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=queued`);
+  const holdFact = countFact(holdExceptions, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`);
+  const sentFact = countFact(sent, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=sent`);
   const attemptedFact = countFact(attempted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=attempted`);
-  const providerAcceptedFact = countFact(providerAccepted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=provider_accepted`, "Aceite do provider não é SENT nem delivered.");
-  const deliveredFact = countFact(delivered, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delivered`, "Delivered é estágio factual separado de tentativa, aceite do provider e SENT.");
+  const providerAcceptedFact = countFact(providerAccepted, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=provider_accepted`);
+  const deliveredFact = countFact(delivered, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delivered`);
   const repliesFact = countFact(replies, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=replies`);
   const suppressedFact = countFact(suppressed, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=suppressed`);
-  const slots24Fact = countFact(rawSlots24h, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; theoretical_slots_24h não entra no cálculo.");
-  const slots7Fact = countFact(rawSlots7d, warmblySource, TRANSPORT_DRILLDOWN, "Somente slots reais publicados pelo produtor; cap ou teto de política não substituem capacidade.");
+  const slots24Fact = countFact(rawSlots24h, warmblySource, TRANSPORT_DRILLDOWN);
+  const slots7Fact = countFact(rawSlots7d, warmblySource, TRANSPORT_DRILLDOWN);
   const readyFact = countFact(readyReservoir, readyReservoirSource, readyReservoirHref);
   const runwayDays = sourceRunMatch === "MATCH" && readyFact.value !== null && slots7Fact.value !== null && slots7Fact.value > 0
     ? Math.round((readyFact.value * 7 / slots7Fact.value) * 10) / 10
@@ -391,14 +413,18 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
     as_of: readyReservoirFromWarmbly ? warmblySource.as_of : oldestAsOf(extraSource.as_of, warmblySource.as_of),
     freshness: runwayDays === null ? "UNKNOWN" : "FRESH",
   };
-  const runwayDaysFact = countFact(runwayDays, runwaySource, TRANSPORT_DRILLDOWN, `Fórmula: ready reservoir (${readyReservoirFromWarmbly ? "Warmbly" : "extra-cli"}) × 7 ÷ slots reais dos próximos 7 dias (Warmbly). as_of é o mais antigo das fontes usadas. Capacidade zero, ausente ou source-run divergente resulta em UNKNOWN.`);
+  const runwayDaysFact = countFact(runwayDays, runwaySource, TRANSPORT_DRILLDOWN);
 
   const outboundRunway: OutboundRunwayTruth = {
     transport: {
-      state: textFact(transportDecision, warmblySource, TRANSPORT_DRILLDOWN, "GO/PAUSED/NO_GO vem do transporte Warmbly; esta projeção não altera kill switch."),
+      state: textFact(transportDecision, warmblySource, TRANSPORT_DRILLDOWN),
       runtime_sha: textFact(runtimeShas.length === 1 ? runtimeShas[0]! : null, runtimeShas.length > 1 ? sourceWithFreshness(warmblySource, "ERROR") : warmblySource, TRANSPORT_DRILLDOWN),
       policy_version: textFact(S(delegated.policy_version), warmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
-      source_run_freshness: textFact(sourceRunMatch === "MISMATCH" ? "ERROR" : extraSource.freshness, sourceRunMatch === "MISMATCH" ? sourceWithFreshness(extraSource, "ERROR") : extraSource, EXTRA_DRILLDOWN, `Reconciliação do run extra-cli (${currentRun ?? "UNKNOWN"}) com Warmbly (${delegatedRun ?? "UNKNOWN"}): ${sourceRunMatch}.`),
+      source_health: textFact(sourceHealthState, extraSource, EXTRA_DRILLDOWN),
+      commercial_state: textFact(commercialState, reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
+      commercial_until: textFact(validDate(authorityBlock.valid_until), reconciledWarmblySource, `${WARMBLY_DRILLDOWN}?filtro=delegated`),
+      pause: textFact(pause, warmblySource, TRANSPORT_DRILLDOWN),
+      kill_switch: textFact(kill, warmblySource, TRANSPORT_DRILLDOWN),
     },
     stock: {
       target_confirmed: targetFact,
@@ -438,7 +464,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       queue_fill_blocker: textFact(queueFillBlocker, queueFillSource, `${WARMBLY_DRILLDOWN}?filtro=exceptions`),
     },
     integrity: {
-      state: integrityReasons.length > 0 ? "ERROR" : sourceRunMatch === "UNKNOWN" ? "UNKNOWN" : "OK",
+      state: hasImpossibleNumbers || runtimeShas.length > 1 ? "ERROR" : sourceRunMatch === "UNKNOWN" && commercialState === "UNKNOWN" ? "UNKNOWN" : "OK",
       source_run_match: sourceRunMatch,
       reason_codes: [...new Set(integrityReasons)],
     },
@@ -464,15 +490,34 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
   const capacityNextAction = S(capacity.next_action);
 
   const exceptions = A(operations.exceptions).map((item) => exception(item, generatedAt));
-  if (integrityReasons.length > 0 && !exceptions.some((item) => item.id === "projection-outbound-integrity")) {
+  if (commercialState === "EXPIRED" || commercialState === "FROZEN") {
+    const expired = commercialState === "EXPIRED";
+    const group = expired ? "COMMERCIAL_AUTHORITY_EXPIRED" : "COMMERCIAL_AUTHORITY_FROZEN";
+    if (!exceptions.some((item) => item.reason_group === group)) {
+      exceptions.push({
+        id: "projection-commercial-authority",
+        bucket: "stale_drift",
+        reason_group: group,
+        owner: "outbound_owner",
+        reason: expired ? "Estoque expirado." : "Estoque congelado.",
+        evidence: [`binding:${S(authorityBlock.source_run_id) ?? "UNKNOWN"}`],
+        age_seconds: null,
+        next_action: "Revalidar na origem.",
+        severity: "high",
+        source: reconciledWarmblySource,
+      });
+    }
+  }
+  const invalidatingIntegrity = hasImpossibleNumbers || runtimeShas.length > 1;
+  if (invalidatingIntegrity && !exceptions.some((item) => item.id === "projection-outbound-integrity")) {
     exceptions.push({
       id: "projection-outbound-integrity",
-      bucket: integrityReasons.includes("SOURCE_RUN_MISMATCH") || integrityReasons.includes("RUNTIME_SHA_MISMATCH") ? "runtime_mismatch" : "other",
+      bucket: runtimeShas.length > 1 ? "runtime_mismatch" : "other",
       owner: "outbound_owner",
-      reason: `Leitura outbound bloqueada por ${integrityReasons.join(", ")}.`,
+      reason: `Leitura outbound bloqueada por ${integrityReasons.filter((code) => code !== "SOURCE_RUN_CHANGED").join(", ")}.`,
       evidence: [`extra_run:${currentRun ?? "UNKNOWN"}`, `warmbly_run:${delegatedRun ?? "UNKNOWN"}`],
       age_seconds: null,
-      next_action: "Reconciliar source run, runtime e denominadores antes de aumentar volume.",
+      next_action: "Reconciliar source run, runtime e denominadores.",
       severity: "critical",
       source: sourceWithFreshness(warmblySource, "ERROR"),
     });
@@ -482,10 +527,10 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       id: "projection-capacity-unknown",
       bucket: "capacity_unknown",
       owner: "delivery_owner",
-      reason: "Capacidade staffed real não foi observada; policy ceiling não é disponibilidade.",
+      reason: "Capacidade staffed não observada; teto de política não é disponibilidade.",
       evidence: [S(capacity.source_ref) ?? "capacity_snapshot:UNKNOWN"],
       age_seconds: null,
-      next_action: "Publicar snapshot staffed real, calendário e WIP; manter admission/checkout fail-closed.",
+      next_action: "Publicar snapshot staffed real e manter admissão fechada.",
       severity: "critical",
       source: {
         system: "governance",
@@ -501,10 +546,10 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
       id: "projection-provider-unknown",
       bucket: "payment_provider_ambiguity",
       owner: "finance",
-      reason: "Objetos/mapping Asaas não foram comprovados; PAYMENT_CONFIRMED não é receita recebida.",
+      reason: "Asaas não comprovado; PAYMENT_CONFIRMED não é receita.",
       evidence: [S(governance.authority_ref) ?? "asaas_mapping:UNKNOWN"],
       age_seconds: null,
-      next_action: "Reconciliar objetos/eventos no provider em sessão humana autorizada; não simular nem habilitar checkout.",
+      next_action: "Reconciliar no provider; não habilitar checkout.",
       severity: "critical",
       source: {
         ...source(financeSlot, "asaas"),
@@ -534,7 +579,7 @@ export function projectFounderOperatingTruth(envelopeValue: unknown): FounderOpe
         ? {
             owner: "outbound_owner",
             label: `Revisar ${holdFact.value} exceção(ões) outbound`,
-            reason: "Somente HOLD, NEEDS_REVIEW e EXCEPTION entram nesta revisão; itens elegíveis continuam delegados.",
+            reason: "Somente HOLD, NEEDS_REVIEW e EXCEPTION; elegíveis seguem delegados.",
             href: "#/warmbly/revisao?filtro=exceptions",
           }
         : null;

@@ -140,8 +140,9 @@ function delegatedSnapshot(policyActive = true): Record<string, unknown> {
     operations: {
       delegated_first_touch: {
         observed: true,
-        policy_id: "CFG-FIRST-TOUCH-ROUTING-v1",
-        policy_version: "CFG-FIRST-TOUCH-ROUTING-v1",
+        policy_id: "CFG-FIRST-TOUCH-ROUTING-v2",
+        policy_version: "CFG-FIRST-TOUCH-ROUTING-v2",
+        executor: "agent:first-touch-v2",
         policy_hash: "3ea77bb047d9db19c061d96c62ae302768f25dbd075db7cccac5fe56d3fe3b99",
         policy_active: policyActive,
         counts: { QUEUED: 1, HOLD: 1 },
@@ -191,7 +192,7 @@ test("Control Center distinguishes delegated approval, human approval and fail-c
 
   for (const html of [operation, review]) {
     assert.match(html, /data-first-touch-policy="active"/);
-    assert.match(html, /CFG-FIRST-TOUCH-ROUTING-v1/);
+    assert.match(html, /CFG-FIRST-TOUCH-ROUTING-v2/);
     assert.match(html, /DELEGATED_POLICY_APPROVE/);
     assert.match(html, /HUMAN_APPROVE/);
     assert.match(html, /POLICY_EVALUATION_HOLD/);
@@ -2471,6 +2472,10 @@ test("uma releitura que não confirma o efeito devolve a mensagem para a fila", 
     "uma resposta aceita sem readback não pode continuar semanticamente bem-sucedida",
   );
   assert.equal((adapter.lastOperatorResult as AdapterWriteResult | undefined)?.outcome, "unknown");
+  assert.equal(
+    (adapter.lastOperatorResult as AdapterWriteResult | undefined)?.readback?.reason_group,
+    "READBACK_UNKNOWN",
+  );
 });
 
 test("uma escrita aceita cuja releitura falha não some da fila nem avança a chave de idempotência", async () => {

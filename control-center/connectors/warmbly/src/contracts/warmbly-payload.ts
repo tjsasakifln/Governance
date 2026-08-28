@@ -250,6 +250,10 @@ export type WarmblyHealth = {
 export type WarmblyDispatchStatus = {
   paused?: boolean;
   pause_reason?: string;
+  paused_by?: string | null;
+  paused_at?: string | null;
+  pause_source?: string | null;
+  kill_switch?: boolean;
   in_send_window?: boolean;
   timezone?: string;
   window_start?: string;
@@ -345,9 +349,25 @@ export type WarmblyDelegatedFirstTouchStatus = {
   policy_version?: string;
   policy_hash?: string;
   policy_active?: boolean;
+  executor?: string;
   counts?: Record<string, number>;
   human_approved?: number;
   queued_readback?: number;
+  commercial_authority?: {
+    basis_source_run_id?: string;
+    basis_snapshot_hash?: string;
+    basis_membership_hash?: string;
+    basis_publication_semantic_hash?: string;
+    producer_identity?: string;
+    source_run_id?: string;
+    snapshot_id?: string;
+    membership_hash?: string;
+    validated_at?: string | null;
+    valid_until?: string | null;
+    state?: string;
+    new_admission_allowed?: boolean;
+    existing_bound_touch_transport_allowed?: boolean;
+  };
   duplicate_live_account?: number;
   duplicate_live_root?: number;
   runway?: WarmblyDelegatedFirstTouchRunway;

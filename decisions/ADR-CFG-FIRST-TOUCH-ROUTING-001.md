@@ -43,3 +43,17 @@ recipient and evidence. Warmbly remains the authority for drafts, approvals,
 scheduling, queue, suppression, idempotency, readback and transport controls.
 Governance owns only the versioned policy. No parallel CRM, lead base, queue,
 scheduler or raw PNCP reinterpretation is introduced.
+
+## Additive note — v2 (2026-08-27)
+
+`CFG-FIRST-TOUCH-ROUTING-v2` is an additive authority. v1 remains
+machine-readable with its original semantics, including the monolithic
+current-source-run gates. This ADR's v1 decision is not rewritten.
+
+v2 separates source operational health (crawler / target-fit / publication /
+age; `FRESH` / `DEGRADED` / `STALE` / `UNKNOWN`) from commercial authority
+(the last fully proven population binding) from transport authority
+(mailbox, pause, kill switch, window). Operational source degradation does
+not automatically revoke a previously proven commercial authorization.
+v2 activates only on exact version match; unknown or missing version is
+fail-closed. The policy still does not authorize SMTP or provider dispatch.

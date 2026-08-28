@@ -421,14 +421,14 @@ function outboundFrom(commercial: DomainSlot | null): HojeOutbound {
   if (state === "UNKNOWN") {
     detail =
       strOf(dispatch.why) ??
-      "Nenhuma leitura do kill switch chegou nesta coleta. Desconhecido não é 'ativo' nem 'pausado'.";
+      "Kill switch não lido. Desconhecido não é 'ativo' nem 'pausado'.";
   } else if (state === "PAUSED") {
-    detail = `Outbound pausado. Motivo registrado: ${strOf(dispatch.pause_reason) ?? "não informado pela origem"}.`;
+    detail = `Outbound pausado. Motivo: ${strOf(dispatch.pause_reason) ?? "não informado"}.`;
   } else {
     const sent = intOf(dispatch.sent_last_hour);
     const cap = intOf(dispatch.cap);
     const volume = sent !== null || cap !== null ? ` Enviados na hora/teto: ${sent ?? "sem dado"}/${cap ?? "sem dado"}.` : "";
-    detail = `Outbound ativo — e-mail frio pode sair.${volume}`;
+    detail = `Outbound ativo.${volume}`;
   }
   return { state, label, observed, detail, href: "#/warmbly" };
 }
@@ -440,8 +440,8 @@ function warmblyCard(
   seed: CardSeed,
 ): HojeDomainCard {
   const pending: DomainPending[] = [];
-  if (outbound.state === "PAUSED") pending.push({ label: "disparo pausado — decidir retomar ou manter", count: 1 });
-  if (outbound.state === "UNKNOWN") pending.push({ label: "estado do disparo desconhecido — confirmar no Warmbly", count: 1 });
+  if (outbound.state === "PAUSED") pending.push({ label: "disparo pausado", count: 1 });
+  if (outbound.state === "UNKNOWN") pending.push({ label: "disparo desconhecido — confirmar no Warmbly", count: 1 });
   const inbound = commercial?.snapshot ? intOf(commercial.snapshot.inbound_unread_count) : null;
   if (inbound !== null && inbound > 0) pending.push({ label: "inbound sem leitura", count: inbound });
   const operations = commercial?.snapshot ? asRecord(commercial.snapshot.operations) : null;
@@ -453,33 +453,33 @@ function warmblyCard(
   let reason: string;
   if (commercial === null) {
     state = "desconhecido";
-    reason = "Faltam dados: o envelope operacional não trouxe o recorte comercial que carrega o estado do disparo.";
+    reason = "Faltam dados: envelope sem recorte comercial do disparo.";
   } else if (commercial.presence === "absent") {
     const absence = commercial.absence_reason ?? "no_data";
     state = absence === "upstream_error" ? "erro_coleta" : "desconhecido";
     reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? "Faltam dados por motivo não reconhecido.";
   } else if (commercial.freshness_status === "ERROR") {
     state = "erro_coleta";
-    reason = "Erro de coleta na origem Warmbly: o estado exibido não é confiável.";
+    reason = "Erro de coleta Warmbly: estado não confiável.";
   } else if (commercial.freshness_status === "UNKNOWN") {
     state = "desconhecido";
-    reason = "Faltam dados: a recência da leitura comercial não pôde ser determinada.";
+    reason = "Faltam dados: recência comercial indeterminada.";
   } else if (outbound.state === "UNKNOWN" || !outbound.observed) {
     state = "desconhecido";
     reason =
-      "Faltam dados: o Warmbly não reportou o estado do disparo. Ausência de leitura não é 'outbound parado'.";
+      "Faltam dados: Warmbly não reportou o disparo. Ausência não é 'outbound parado'.";
   } else if (commercial.freshness_status !== "FRESH") {
     state = "atencao";
-    reason = "Leitura defasada: o estado do disparo abaixo pode já ter mudado na origem.";
+    reason = "Leitura defasada: o disparo abaixo pode ter mudado.";
   } else if (alerts.critical > 0) {
     state = "critico";
-    reason = `${alerts.critical} alerta(s) crítico(s) abertos no recorte comercial.`;
+    reason = `${alerts.critical} alerta(s) crítico(s) no recorte comercial.`;
   } else if (pending.length > 0) {
     state = "atencao";
     reason = "Há pendências de disparo/inbound listadas abaixo.";
   } else {
     state = "saudavel";
-    reason = "Sem ocorrências: a leitura chegou e não há pendência de disparo nem inbound represado.";
+    reason = "Sem ocorrências: sem pendência de disparo nem inbound.";
   }
 
   return {

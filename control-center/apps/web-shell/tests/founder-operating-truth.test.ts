@@ -44,11 +44,24 @@ function envelope(): Record<string, unknown> {
             provider_errors: 0,
           },
           delegated_first_touch: {
-            policy_version: "CFG-FIRST-TOUCH-ROUTING-v1",
+            policy_version: "CFG-FIRST-TOUCH-ROUTING-v2",
             runtime_release_sha: "0123456789abcdef0123456789abcdef01234567",
             source_run_id: "run-current",
             queued_readback: 140,
             human_approved: 0,
+            executor: "agent:first-touch-v2",
+            commercial_authority: {
+              basis_source_run_id: "run-current",
+              basis_snapshot_hash: "snap-fixture",
+              basis_membership_hash: "mem-fixture",
+              basis_publication_semantic_hash: "sem-fixture",
+              producer_identity: "producer-fixture",
+              source_run_id: "run-current",
+              membership_hash: "mem-fixture",
+              validated_at: "2026-08-26T02:00:00Z",
+              valid_until: "2026-08-27T03:00:00Z",
+              state: "CURRENT",
+            },
             counts: { PREPARED: 180, QUEUED: 140, SENT: 20, HOLD: 8 },
             items: [{
               state: "QUEUED",
@@ -156,7 +169,7 @@ function envelope(): Record<string, unknown> {
 test("first viewport projects the five founder questions without hiding UNKNOWN", () => {
   const truth = projectFounderOperatingTruth(envelope());
   assert.equal(truth.outbound.state, "PAUSED");
-  assert.equal(truth.outbound.policy_version, "CFG-FIRST-TOUCH-ROUTING-v1");
+  assert.equal(truth.outbound.policy_version, "CFG-FIRST-TOUCH-ROUTING-v2");
   assert.equal(truth.outbound.source_run, "run-current");
   assert.equal(truth.outbound.queued, 140);
   assert.equal(truth.outbound.sends_today, 0);
@@ -187,6 +200,8 @@ test("first viewport projects the five founder questions without hiding UNKNOWN"
   assert.equal(truth.outbound_runway.runway.slots_next_7d.value, 210);
   assert.equal(truth.outbound_runway.runway.reservoir_below_1000, false);
   assert.equal(truth.outbound_runway.integrity.source_run_match, "MATCH");
+  assert.equal(truth.outbound_runway.transport.source_health.value, "FRESH");
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "CURRENT");
   assert.ok(truth.exceptions.some((item) => item.bucket === "capacity_unknown"));
   assert.ok(truth.exceptions.some((item) => item.bucket === "payment_provider_ambiguity"));
   assert.ok(truth.primary_action);
@@ -208,6 +223,10 @@ test("missing observations remain UNKNOWN and never become zero or healthy", () 
   assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
   assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
   assert.equal(truth.outbound_runway.runway.reservoir_below_1000, null);
+  assert.equal(truth.outbound_runway.transport.source_health.value, "UNKNOWN");
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "UNKNOWN");
+  assert.equal(truth.outbound_runway.stock.hold_exceptions.value, null);
+  assert.notEqual(truth.outbound_runway.stock.queued_reserved.value, 0);
 });
 
 test("Hoje renders one primary action and the complete exception evidence fields", () => {
@@ -243,18 +262,25 @@ test("Hoje renders one primary action and the complete exception evidence fields
   assert.match(html, /freshness/i);
   assert.match(html, /data-outbound-runway="true"/);
   assert.match(html, /data-runway-group="transport"/);
+  assert.match(html, /data-runway-metric="source-health"/);
+  assert.match(html, /data-runway-metric="commercial-state"/);
   assert.match(html, /data-runway-group="stock"/);
   assert.match(html, /data-runway-group="runway"/);
   assert.match(html, /data-runway-group="health"/);
   assert.match(html, /data-runway-metric="provider-accepted"/);
   assert.match(html, /data-runway-metric="delivered"/);
+  assert.match(html, /Dados PNCP/);
+  assert.match(html, /Estoque comercial/);
+  assert.match(html, />atual</);
+  assert.match(html, /data-runway-metric="slots-next-24h"/);
+  assert.doesNotMatch(html, /corrigir freshness/i);
   assert.match(html, />40 dias</);
   assert.match(html, /aguardando novo lote elegível/);
   assert.match(html, /href="#\/crescimento\?etapa=target_confirmed"/);
   assert.match(html, /href="#\/warmbly\/revisao\?filtro=queued"/);
   assert.doesNotMatch(html, /aprovar tudo/i);
   assert.equal((html.match(/data-runway-primary-action="true"/g) ?? []).length, 1);
-  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 34);
+  assert.equal((html.match(/class="runway-readback"/g) ?? []).length, 37);
 });
 
 test("impossible denominators fail closed instead of publishing a plausible zero", () => {
@@ -273,19 +299,30 @@ test("impossible denominators fail closed instead of publishing a plausible zero
   assert.equal(truth.primary_action?.label, "Resolver divergência do outbound");
 });
 
-test("source-run mismatch blocks runway math and exposes the reconciliation failure", () => {
+test("source-run mismatch does not revoke a still-valid commercial binding or paint a single STALE", () => {
   const input = envelope();
   const observations = input.source_observations as Array<Record<string, unknown>>;
   const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
   (extra.payload as Record<string, unknown>).current_run = "run-other";
+  extra.freshness_status = "STALE";
+  (extra.payload as Record<string, unknown>).feed_age_seconds = 400000;
 
   const truth = projectFounderOperatingTruth(input);
   assert.equal(truth.outbound_runway.integrity.source_run_match, "MISMATCH");
-  assert.equal(truth.outbound_runway.integrity.state, "ERROR");
-  assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
+  assert.equal(truth.outbound_runway.integrity.state, "OK");
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, 140);
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "CURRENT");
+  assert.equal(truth.outbound_runway.transport.source_health.value, "STALE");
   assert.equal(truth.outbound_runway.runway.estimated_days.value, null);
-  assert.equal(truth.outbound_runway.runway.estimated_days.source.freshness, "UNKNOWN");
-  assert.equal(truth.primary_action?.label, "Resolver divergência do outbound");
+  assert.notEqual(truth.primary_action?.label, "Resolver divergência do outbound");
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, />atual</);
+  assert.doesNotMatch(html, /corrigir freshness/i);
 });
 
 test("theoretical capacity never becomes runway when real slots are absent", () => {
@@ -502,8 +539,8 @@ test("a Warmbly-sourced reservoir does not bypass the monotonicity and run-match
 
   const mismatchTruth = projectFounderOperatingTruth(mismatched);
   assert.equal(mismatchTruth.outbound_runway.integrity.source_run_match, "MISMATCH");
-  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.value, null);
-  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.source.freshness, "ERROR");
+  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.value, 1100);
+  assert.equal(mismatchTruth.outbound_runway.runway.ready_reservoir.source.freshness, "FRESH");
   assert.equal(mismatchTruth.outbound_runway.runway.estimated_days.value, null);
 
   const impossible = envelope();
@@ -568,3 +605,179 @@ test("capacity v2 stays a read-only projection and exposes deadline blockers in 
   assert.match(html, /inviável/);
   assert.doesNotMatch(html, /REQUESTED_DEADLINE_INFEASIBLE/);
 });
+
+test("QUEUED comes only from queued_readback, never from dispatch.queued_approved", () => {
+  const input = envelope();
+  const delegated = firstTouchControl(input);
+  delete delegated.queued_readback;
+  const operations = ((input.snapshots as Record<string, Record<string, unknown>>).commercial!.snapshot as Record<string, unknown>).operations as Record<string, unknown>;
+  (operations.dispatch as Record<string, unknown>).queued_approved = 99;
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.stock.queued_reserved.value, null);
+  assert.equal(truth.outbound.queued, null);
+});
+
+test("expired commercial authority is not a single STALE and is a human exception", () => {
+  const input = envelope();
+  const delegated = firstTouchControl(input);
+  delegated.commercial_authority = {
+    basis_source_run_id: "run-current",
+    basis_snapshot_hash: "snap-fixture",
+    basis_membership_hash: "mem-fixture",
+    basis_publication_semantic_hash: "sem-fixture",
+    producer_identity: "producer-fixture",
+    source_run_id: "run-current",
+    membership_hash: "mem-fixture",
+    validated_at: "2026-08-18T03:00:00Z",
+    valid_until: "2026-08-19T03:00:00Z",
+    state: "EXPIRED",
+  };
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "EXPIRED");
+  assert.equal(truth.outbound_runway.transport.source_health.value, "FRESH");
+  assert.equal(truth.outbound_runway.transport.commercial_until.value, "2026-08-19T03:00:00Z");
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "COMMERCIAL_AUTHORITY_EXPIRED"));
+  assert.equal(truth.exceptions.some((item) => /corrigir freshness/i.test(item.next_action) || /corrigir freshness/i.test(item.reason)), false);
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, />expirada</);
+  assert.match(html, /estoque expirado/);
+  assert.doesNotMatch(html, /corrigir freshness/i);
+});
+
+test("producer DEGRADED and FROZEN commercial states stay visible with validade", () => {
+  for (const [state, htmlToken] of [["DEGRADED", "degradada"], ["FROZEN_FOR_NEW_ADMISSION", "congelada"]] as const) {
+    const input = envelope();
+    firstTouchControl(input).commercial_authority = {
+      basis_source_run_id: "run-bound",
+      basis_snapshot_hash: "snap-bound",
+      basis_membership_hash: "mem-bound",
+      basis_publication_semantic_hash: "sem-bound",
+      producer_identity: "producer-bound",
+      source_run_id: "run-bound",
+      validated_at: "2026-08-24T03:00:00Z",
+      valid_until: "2026-08-31T03:00:00Z",
+      state,
+    };
+    const truth = projectFounderOperatingTruth(input);
+    assert.notEqual(truth.outbound_runway.transport.commercial_state.value, "UNKNOWN", state);
+    assert.equal(
+      truth.outbound_runway.transport.commercial_state.value,
+      state === "FROZEN_FOR_NEW_ADMISSION" ? "FROZEN" : state,
+      state,
+    );
+    assert.equal(truth.outbound_runway.transport.commercial_until.value, "2026-08-31T03:00:00Z", state);
+    if (state === "FROZEN_FOR_NEW_ADMISSION") {
+      assert.ok(truth.exceptions.some((item) => item.reason_group === "COMMERCIAL_AUTHORITY_FROZEN"));
+    }
+    const html = renderHoje(composeHoje({
+      generated_at: NOW,
+      headline: "cockpit",
+      priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+      engineering: null, infra: [], activities: [], operational_envelope: input,
+    }));
+    assert.match(html, new RegExp(`>${htmlToken}<`));
+    assert.doesNotMatch(html, />${state}</);
+  }
+});
+
+test("pause actor/source and kill switch stay UNKNOWN when Warmbly omits them", () => {
+  const truth = projectFounderOperatingTruth(envelope());
+  assert.equal(truth.outbound_runway.transport.pause.value, "UNKNOWN · UNKNOWN · UNKNOWN · UNKNOWN");
+  assert.equal(truth.outbound_runway.transport.kill_switch.value, "UNKNOWN");
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: envelope(),
+  }));
+  assert.match(html, /data-runway-metric="pause"/);
+  assert.match(html, /data-runway-metric="kill-switch"/);
+  assert.match(html, /desconhecido · desconhecido · desconhecido · desconhecido/);
+});
+
+test("pause fact keeps Warmbly paused_at on the runway when the producer publishes it", () => {
+  const input = envelope();
+  const operations = ((input.snapshots as Record<string, Record<string, unknown>>).commercial!.snapshot as Record<string, unknown>).operations as Record<string, unknown>;
+  const dispatch = operations.dispatch as Record<string, unknown>;
+  dispatch.pause_reason = "mailbox_blocked";
+  dispatch.paused_by = "outbound_owner";
+  dispatch.pause_source = "warmbly";
+  dispatch.paused_at = "2026-08-25T12:00:00Z";
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(
+    truth.outbound_runway.transport.pause.value,
+    "mailbox_blocked · outbound_owner · warmbly · 2026-08-25T12:00:00Z",
+  );
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, /data-runway-metric="pause"/);
+  assert.match(html, /mailbox_blocked · outbound_owner · warmbly · 2026-08-25T12:00:00Z/);
+});
+
+test("named exception reason groups from producer codes stay on the exception recorte", () => {
+  const input = envelope();
+  const commercial = (((input.snapshots as Record<string, unknown>).commercial as Record<string, unknown>).snapshot as Record<string, unknown>);
+  const operations = commercial.operations as Record<string, unknown>;
+  operations.exceptions = [
+    { id: "e1", reason_group: "RECIPIENT_EXPIRED", reason: "destinatário caiu", owner: "outbound_owner" },
+    { id: "e2", reason_codes: ["MEMBERSHIP_LEAVE_PROVEN"], reason: "saiu do membership", owner: "outbound_owner" },
+    { id: "e3", reason_group: "READBACK_UNKNOWN", reason: "readback não confirmou", owner: "outbound_owner" },
+  ];
+  const truth = projectFounderOperatingTruth(input);
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "RECIPIENT_EXPIRED"));
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "MEMBERSHIP_DRIFT"));
+  assert.ok(truth.exceptions.some((item) => item.reason_group === "READBACK_UNKNOWN"));
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, /data-reason-group="RECIPIENT_EXPIRED"/);
+  assert.match(html, /data-reason-group="MEMBERSHIP_DRIFT"/);
+  assert.match(html, /data-reason-group="READBACK_UNKNOWN"/);
+});
+
+test("SOURCE_HEALTH_DEGRADED is not forced into the human exception queue", () => {
+  const input = envelope();
+  const observations = input.source_observations as Array<Record<string, unknown>>;
+  const extra = observations.find((row) => (row.source as Record<string, unknown>).system === "extra-cli")!;
+  extra.freshness_status = "STALE";
+  (extra.payload as Record<string, unknown>).feed_age_seconds = 200000;
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound_runway.transport.source_health.value, "DEGRADED");
+  assert.equal(truth.outbound_runway.transport.commercial_state.value, "CURRENT");
+  assert.equal(truth.exceptions.some((item) => item.reason_group === "SOURCE_HEALTH_DEGRADED"), false);
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, />degradada</);
+  assert.match(html, />atual</);
+});
+
+test("unknown policy version stays unknown and does not look like v2", () => {
+  const input = envelope();
+  firstTouchControl(input).policy_version = "CFG-FIRST-TOUCH-ROUTING-v9";
+  const truth = projectFounderOperatingTruth(input);
+  assert.equal(truth.outbound.policy_version, "CFG-FIRST-TOUCH-ROUTING-v9");
+  const html = renderHoje(composeHoje({
+    generated_at: NOW,
+    headline: "cockpit",
+    priorities: [], incidents: [], clients: [], commercial: null, finance: null,
+    engineering: null, infra: [], activities: [], operational_envelope: input,
+  }));
+  assert.match(html, /CFG-FIRST-TOUCH-ROUTING-v9/);
+});
+
