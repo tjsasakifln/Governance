@@ -9,7 +9,7 @@ RUN apk add --no-cache git \
  && cd /src \
  && git checkout --detach "$AUTHELIA_SOURCE_COMMIT" \
  && test "$(git rev-parse HEAD)" = "$AUTHELIA_SOURCE_COMMIT" \
- && go get golang.org/x/crypto@v0.55.0 \
+ && go get golang.org/x/crypto@v0.55.0 golang.org/x/net@v0.56.0 \
  && go mod tidy \
  && CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /authelia ./cmd/authelia
 
