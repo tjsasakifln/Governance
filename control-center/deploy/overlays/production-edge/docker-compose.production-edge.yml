@@ -118,7 +118,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/nats.Dockerfile
-    image: confenge-control-center-nats:2.12.6
+    image: confenge-control-center-nats:2.12.15
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 128m
@@ -143,7 +143,10 @@ services:
       - no-new-privileges:true
 
   authelia:
-    image: authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
+    build:
+      context: ../..
+      dockerfile: docker/authelia.Dockerfile
+    image: confenge-control-center-authelia:4.39.20-fixed
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 256m

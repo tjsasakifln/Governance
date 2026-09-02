@@ -60,7 +60,7 @@ test("runtime Dockerfiles are real images, not the deploy stub", () => {
   assert.match(lastStage(collector), /"node"/);
   assert.match(web, /serve-prod\.mjs/);
   assert.match(postgres, /postgres:16-alpine@sha256:[0-9a-f]{64}/);
-  assert.match(nats, /nats:2\.12\.6-alpine@sha256:[0-9a-f]{64}/);
+  assert.match(nats, /nats:2\.12\.15-alpine@sha256:[0-9a-f]{64}/);
   assert.doesNotMatch(context, /stub-health-server/);
   assert.doesNotMatch(mcp, /stub-health-server/);
   assert.doesNotMatch(collector, /stub-health-server/);
@@ -230,6 +230,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
     "caddy-overlay-scan",
     "redis-overlay-scan",
     "nats",
+    "go-security-rebuilder",
   ]);
   for (const pin of Object.values(pins.images)) {
     assert.notEqual(pin.tag, "latest");
@@ -252,6 +253,7 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
     "deploy/docker/postgres.Dockerfile",
     "deploy/docker/caddy.Dockerfile",
     "deploy/docker/nats.Dockerfile",
+    "deploy/docker/authelia.Dockerfile",
   ];
   for (const rel of dockerfiles) {
     const text = read(rel);
@@ -263,7 +265,8 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
   assert.match(read("deploy/docker/caddy.Dockerfile"), new RegExp(escapeRegExp(caddyRef)));
 
   const compose = read("deploy/docker-compose.yml");
-  assert.match(compose, new RegExp(escapeRegExp(autheliaRef)));
+  assert.match(read("deploy/docker/authelia.Dockerfile"), new RegExp(escapeRegExp(autheliaRef)));
+  assert.match(compose, /image: confenge-control-center-authelia:4\.39\.20-fixed/);
   assert.doesNotMatch(compose, /image:\s+\S+:latest(?:\s|$)/);
 
   const overlay = read("security/examples/valid/compose.yaml");
@@ -272,14 +275,14 @@ test("productive FROM and compose image refs are digest-pinned and match the pin
   assert.ok(redisRef.includes("redis:7-alpine@sha256:"));
   assert.ok(pins.images["caddy-2.9-alpine"]?.ref.includes("caddy:2.9-alpine@sha256:"));
 
-  const natsRef = pins.images["nats-2.12.6-alpine"]?.ref;
-  assert.ok(natsRef && natsRef.includes("nats:2.12.6-alpine@sha256:"));
+  const natsRef = pins.images["nats-2.12.15-alpine"]?.ref;
+  assert.ok(natsRef && natsRef.includes("nats:2.12.15-alpine@sha256:"));
   assert.match(read("deploy/docker/nats.Dockerfile"), new RegExp(escapeRegExp(natsRef)));
   const prodOverlay = read("deploy/overlays/production-edge/docker-compose.production-edge.yml");
-  assert.match(prodOverlay, /image: confenge-control-center-nats:2\.12\.6/);
+  assert.match(prodOverlay, /image: confenge-control-center-nats:2\.12\.15/);
   assert.match(prodOverlay, /image: confenge-control-center-postgres:16/);
   assert.match(prodOverlay, /image: confenge-control-center-caddy:2\.11/);
-  assert.match(prodOverlay, new RegExp(escapeRegExp(autheliaRef)));
+  assert.match(prodOverlay, /image: confenge-control-center-authelia:4\.39\.20-fixed/);
   assert.match(prodOverlay, new RegExp(escapeRegExp(redisRef)));
   for (const line of prodOverlay.split("\n")) {
     const trimmed = line.trim();

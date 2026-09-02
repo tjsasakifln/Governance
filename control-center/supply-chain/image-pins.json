@@ -1,6 +1,6 @@
 {
   "schema_version": "control-center.image-pins.v1",
-  "updated_at": "2026-08-21T13:10:00Z",
+  "updated_at": "2026-09-02T03:00:00Z",
   "notes": "Never use floating tags (latest or unpinned) in productive FROM/image lines. Re-resolve with `node scripts/update-image-digests.mjs`. Overlay files under security/examples are not rewritten; their images are pinned here for scan.",
   "images": {
     "node-22-bookworm-slim": {
@@ -45,12 +45,19 @@
       "ref": "caddy:2.11-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648",
       "role": "caddy-base"
     },
-    "nats-2.12.6-alpine": {
+    "nats-2.12.15-alpine": {
       "name": "nats",
-      "tag": "2.12.6-alpine",
-      "digest": "sha256:1cfc36e2e5e638243d8c722f72c954cd0ec4b15ee82fadbc718ce12e2b3c1652",
-      "ref": "nats:2.12.6-alpine@sha256:1cfc36e2e5e638243d8c722f72c954cd0ec4b15ee82fadbc718ce12e2b3c1652",
+      "tag": "2.12.15-alpine",
+      "digest": "sha256:b270f5e2428354c0335612694d7dd2fb588148e567a5757fdff325ef9c9332e6",
+      "ref": "nats:2.12.15-alpine@sha256:b270f5e2428354c0335612694d7dd2fb588148e567a5757fdff325ef9c9332e6",
       "role": "nats"
+    },
+    "golang-1.26-alpine": {
+      "name": "golang",
+      "tag": "1.26-alpine",
+      "digest": "sha256:b6890e35ded5d19118c2bca3d7754dc4e6f694aac2d0aeb92f9807c2879e4230",
+      "ref": "golang:1.26-alpine@sha256:b6890e35ded5d19118c2bca3d7754dc4e6f694aac2d0aeb92f9807c2879e4230",
+      "role": "go-security-rebuilder"
     }
   }
 }

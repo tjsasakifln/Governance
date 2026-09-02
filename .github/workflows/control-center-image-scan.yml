@@ -76,6 +76,7 @@ jobs:
           docker build -f deploy/docker/ops.Dockerfile -t confenge-control-center-ops:ci deploy
           docker build -f deploy/docker/postgres.Dockerfile -t confenge-control-center-postgres:ci deploy
           docker build -f deploy/docker/caddy.Dockerfile -t confenge-control-center-caddy:ci deploy
+          docker build -f deploy/docker/authelia.Dockerfile -t confenge-control-center-authelia:ci deploy
           docker build -f deploy/docker/nats.Dockerfile -t confenge-control-center-nats:ci deploy
 
       - name: Pull pinned third-party images
@@ -84,7 +85,7 @@ jobs:
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const pins = JSON.parse(readFileSync("./supply-chain/image-pins.json", "utf8"));
-            for (const key of ["authelia-4.39", "caddy-2.11-alpine", "caddy-2.9-alpine", "redis-7-alpine", "postgres-16-alpine", "node-22-bookworm-slim", "nats-2.12.6-alpine"]) {
+            for (const key of ["authelia-4.39", "caddy-2.11-alpine", "caddy-2.9-alpine", "redis-7-alpine", "postgres-16-alpine", "node-22-bookworm-slim", "nats-2.12.15-alpine", "golang-1.26-alpine"]) {
               const pin = pins.images[key];
               if (!pin) throw new Error("missing pin " + key);
               console.log(pin.ref);
@@ -114,7 +115,7 @@ jobs:
           scan_image ops confenge-control-center-ops:ci
           scan_image postgres confenge-control-center-postgres:ci
           scan_image caddy confenge-control-center-caddy:ci
-          scan_image authelia authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
+          scan_image authelia confenge-control-center-authelia:ci
           scan_image redis redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
           scan_image caddy_overlay caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
           scan_image nats confenge-control-center-nats:ci
