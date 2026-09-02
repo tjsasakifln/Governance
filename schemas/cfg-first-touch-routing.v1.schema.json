@@ -27,7 +27,7 @@
     "policy_id": { "const": "CFG-FIRST-TOUCH-ROUTING" },
     "policy_version": { "const": "v1" },
     "canonical_name": { "const": "CFG-FIRST-TOUCH-ROUTING-v1" },
-    "status": { "const": "ACTIVE" },
+    "status": { "const": "SUPERSEDED" },
     "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
     "authority": { "$ref": "#/$defs/authority" },
     "scope": { "$ref": "#/$defs/scope" },

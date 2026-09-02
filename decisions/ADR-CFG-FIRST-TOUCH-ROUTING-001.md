@@ -5,23 +5,20 @@ Effective: 2026-08-25
 Authority: founder decision recorded in [Governance #129](https://github.com/tjsasakifln/Governance/issues/129)
 Runtime tracking: [Warmbly #41](https://github.com/tjsasakifln/warmbly/issues/41)
 
-## Decision
+## Current decision
 
-The founder delegates per-message approval for an eligible outbound first touch
-to the executing agent or system under `CFG-FIRST-TOUCH-ROUTING-v1`. A delegated
-decision is recorded as `DELEGATED_POLICY_APPROVE`; it is never represented as a
-human click or as `HUMAN_APPROVE`.
+`CFG-FIRST-TOUCH-ROUTING-v3` is the only active first-touch routing policy.
+Consumers pin its canonical name exactly; missing, v1, v2, partial or unknown
+versions fail closed. A delegated decision is recorded as
+`DELEGATED_POLICY_APPROVE`; it is never represented as a human click or as
+`HUMAN_APPROVE`.
 
-Every hard gate in
-`commercial/outbound/cfg-first-touch-routing.v1.json` must pass at the same
-version and source run. Any `UNKNOWN`, conflict, failure or material drift
-invalidates the delegated decision and routes the item to the existing human
-exception path.
-
-The policy covers first-touch approval and scheduling only. It does not
-authorize follow-ups or provider dispatch. The operational canary must preserve
-the kill switch and global dispatch pause and must record zero SMTP/provider
-send mutations.
+Every v3 hard gate must pass. Any `UNKNOWN`, conflict, failure or material
+drift invalidates the delegated decision and routes the item to the existing
+human exception path. The policy covers approval and scheduling only: it does
+not authorize follow-ups, provider dispatch or SMTP. The kill switch and global
+dispatch pause remain non-bypassable, and a zero-SMTP canary may only reach
+`QUEUED`.
 
 The global dispatch pause and kill switch are revocable transport controls, not
 material message inputs. Their activation defers or blocks provider handoff but
@@ -33,8 +30,8 @@ paused; neither control may ever be bypassed.
 
 Before this ADR, Governance #129 and Warmbly #41 required human review or a
 human cohort/policy authorization before every first touch could advance. That
-decision remains historical and still governs messages outside this policy,
-but it no longer applies to first touches that satisfy every v1 hard gate.
+decision remains historical and still governs messages outside the active v3
+policy.
 
 ## Architecture consequence
 
@@ -46,9 +43,8 @@ scheduler or raw PNCP reinterpretation is introduced.
 
 ## Additive note — v2 (2026-08-27)
 
-`CFG-FIRST-TOUCH-ROUTING-v2` is an additive authority. v1 remains
-machine-readable with its original semantics, including the monolithic
-current-source-run gates. This ADR's v1 decision is not rewritten.
+`CFG-FIRST-TOUCH-ROUTING-v2` is retained only as machine-readable historical
+evidence. v1 and v2 are `SUPERSEDED` and must not activate a consumer.
 
 v2 separates source operational health (crawler / target-fit / publication /
 age; `FRESH` / `DEGRADED` / `STALE` / `UNKNOWN`) from commercial authority
@@ -60,8 +56,9 @@ fail-closed. The policy still does not authorize SMTP or provider dispatch.
 
 ## Additive note — v3 (2026-08-28)
 
-`CFG-FIRST-TOUCH-ROUTING-v3` is an additive authority. v1 and v2 remain
-machine-readable with their original semantics; neither decision is rewritten.
+`CFG-FIRST-TOUCH-ROUTING-v3` is the current authority. v1 and v2 remain
+machine-readable only as superseded historical artifacts; neither may activate
+a consumer.
 
 v3 replaces the v2 commercial age bands with `COMMERCIAL_AUTHORITY/2.0`. The
 canonical, non-negotiable business rule is:
@@ -89,5 +86,8 @@ Consequences recorded here so the next reader does not have to rediscover them:
   alarmable, is presented as an acquisition-plan condition, and is not a member of
   the transport-time conjunction.
 
-v3 activates only on exact version match; a v1, v2, unknown or missing version is
-fail-closed. The policy still does not authorize SMTP or provider dispatch.
+v3 activates only on exact version match; a v1, v2, unknown or missing version
+is fail-closed. It does not authorize SMTP or provider dispatch. Governance
+#129 is the sole human record for `NO_GO` or a bounded GO: without an explicit
+human decision and a new additive transport policy, transport remains
+fail-closed.

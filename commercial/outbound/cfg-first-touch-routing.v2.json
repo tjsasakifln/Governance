@@ -3,7 +3,7 @@
   "policy_id": "CFG-FIRST-TOUCH-ROUTING",
   "policy_version": "v2",
   "canonical_name": "CFG-FIRST-TOUCH-ROUTING-v2",
-  "status": "ACTIVE",
+  "status": "SUPERSEDED",
   "effective_at": "2026-08-27T00:00:00Z",
   "additive_to": "CFG-FIRST-TOUCH-ROUTING-v1",
   "v1_history_rewritten": false,

@@ -7,8 +7,8 @@
   "commercial_authority_policy": "COMMERCIAL_AUTHORITY_POLICY/2.0",
   "canonical_rule": "CONFENGE commercial qualification is based on qualifying public engineering contracting evidence within a rolling three-year window. PNCP/source freshness is acquisition health and MUST NOT by itself revoke, hold, dequeue or block transport for an otherwise valid commercially-qualified member.",
   "activation": {
-    "v1_readable": true,
-    "v2_readable": true,
+    "v1_readable_as_superseded_history": true,
+    "v2_readable_as_superseded_history": true,
     "v3_exact_match_only": true,
     "unknown_version_fail_closed": true
   },
