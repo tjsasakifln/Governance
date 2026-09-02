@@ -19,6 +19,7 @@ const REWRITE_GLOBS = [
   join(root, "deploy/docker/ops.Dockerfile"),
   join(root, "deploy/docker/postgres.Dockerfile"),
   join(root, "deploy/docker/caddy.Dockerfile"),
+  join(root, "deploy/docker/authelia.Dockerfile"),
   join(root, "deploy/docker/nats.Dockerfile"),
   join(root, "deploy/docker/stub.Dockerfile"),
   join(root, "deploy/docker-compose.yml"),

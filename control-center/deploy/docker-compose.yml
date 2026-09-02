@@ -172,7 +172,10 @@ services:
         condition: service_healthy
 
   authelia:
-    image: authelia/authelia:4.39@sha256:1b363e9279e742397966333f364e0876ae02bf5c876de73e83af6d48c57ff51b
+    build:
+      context: ./deploy
+      dockerfile: docker/authelia.Dockerfile
+    image: confenge-control-center-authelia:4.39.20-fixed
     restart: unless-stopped
     logging: *cc-logging
     mem_limit: 256m

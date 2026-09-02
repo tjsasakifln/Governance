@@ -36,7 +36,7 @@
     "policy_id": { "const": "CFG-FIRST-TOUCH-ROUTING" },
     "policy_version": { "const": "v2" },
     "canonical_name": { "const": "CFG-FIRST-TOUCH-ROUTING-v2" },
-    "status": { "const": "ACTIVE" },
+    "status": { "const": "SUPERSEDED" },
     "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
     "additive_to": { "const": "CFG-FIRST-TOUCH-ROUTING-v1" },
     "v1_history_rewritten": { "const": false },
