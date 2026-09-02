@@ -117,7 +117,9 @@ jobs:
           scan_image caddy confenge-control-center-caddy:ci
           scan_image authelia confenge-control-center-authelia:ci
           scan_image redis redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
-          scan_image caddy_overlay caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+          # The 2.9 reference exists only in non-deployable security fixtures.
+          # Scan the Caddy image actually delivered by the production compose.
+          scan_image caddy_overlay confenge-control-center-caddy:ci
           scan_image nats confenge-control-center-nats:ci
 
       - name: CVE exception gate
