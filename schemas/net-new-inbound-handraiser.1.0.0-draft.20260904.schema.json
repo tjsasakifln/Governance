@@ -1,0 +1,508 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/net-new-inbound-handraiser.1.0.0-draft.20260904.schema.json",
+  "title": "CONFENGE NET_NEW_INBOUND_HANDRAISER authority 1.0.0-draft.20260904",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "status",
+    "effective_at",
+    "does_not_rewrite_v1",
+    "v1_remains_exact_match_authority",
+    "coordination_id",
+    "authority",
+    "activation",
+    "boundary",
+    "inputs",
+    "qualification_states",
+    "closed_states",
+    "reason_codes",
+    "evaluation",
+    "invariants",
+    "identity",
+    "idempotency",
+    "readback",
+    "rollback",
+    "failure",
+    "retention",
+    "safety"
+  ],
+  "properties": {
+    "schema_version": { "const": "net-new-inbound-handraiser.1.0.0-draft.20260904" },
+    "policy_id": { "const": "NET_NEW_INBOUND_HANDRAISER" },
+    "policy_version": { "const": "1.0.0-draft.20260904" },
+    "canonical_name": { "const": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904" },
+    "status": { "const": "ACTIVE" },
+    "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "does_not_rewrite_v1": { "const": true },
+    "v1_remains_exact_match_authority": { "const": true },
+    "coordination_id": { "const": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "activation": { "$ref": "#/$defs/activation" },
+    "boundary": { "$ref": "#/$defs/boundary" },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "qualification_states": {
+      "const": [
+        "NEEDS_CONTEXT",
+        "POTENTIAL_FIT",
+        "CONFLICT_CHECK_REQUIRED",
+        "DOCUMENT_GAP",
+        "CAPACITY_REVIEW",
+        "PARTNER_REQUIRED",
+        "OUT_OF_SCOPE",
+        "QCO"
+      ]
+    },
+    "closed_states": {
+      "const": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"]
+    },
+    "reason_codes": { "$ref": "#/$defs/reason_codes" },
+    "evaluation": { "$ref": "#/$defs/evaluation" },
+    "invariants": { "$ref": "#/$defs/invariants" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "idempotency": { "$ref": "#/$defs/idempotency" },
+    "readback": { "$ref": "#/$defs/readback" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+    "failure": { "$ref": "#/$defs/failure" },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "class"],
+      "properties": {
+        "purpose": { "const": "INBOUND_ADMISSION" },
+        "class": { "const": "COMMERCIAL_INTAKE" }
+      }
+    },
+    "safety": { "$ref": "#/$defs/safety" }
+  },
+  "$defs": {
+    "string_array": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decided_by_role",
+        "decision_reference",
+        "runtime_reference",
+        "decision_source",
+        "human_actor_impersonation_allowed",
+        "extra_cli_pncp_live_is_commercial_authority",
+        "live_intelligence_is_site_inbound"
+      ],
+      "properties": {
+        "decided_by_role": { "const": "FOUNDER" },
+        "decision_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/65" },
+        "runtime_reference": { "const": "https://github.com/tjsasakifln/warmbly/issues/47" },
+        "decision_source": { "const": "VERSIONED_GOVERNANCE_POLICY" },
+        "human_actor_impersonation_allowed": { "const": false },
+        "extra_cli_pncp_live_is_commercial_authority": { "const": false },
+        "live_intelligence_is_site_inbound": { "const": false }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_version_match_required",
+        "accepted_version_strings",
+        "accepted_policy_ids",
+        "v1_string_does_not_activate_this_version",
+        "missing_version_disposition",
+        "unknown_version_disposition",
+        "old_version_disposition"
+      ],
+      "properties": {
+        "exact_version_match_required": { "const": true },
+        "accepted_version_strings": {
+          "const": [
+            "1.0.0-draft.20260904",
+            "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904"
+          ]
+        },
+        "accepted_policy_ids": { "const": ["NET_NEW_INBOUND_HANDRAISER"] },
+        "v1_string_does_not_activate_this_version": { "const": true },
+        "missing_version_disposition": { "const": "FAIL_CLOSED" },
+        "unknown_version_disposition": { "const": "FAIL_CLOSED" },
+        "old_version_disposition": { "const": "FAIL_CLOSED" }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_owner",
+        "producer",
+        "producer_origin",
+        "producer_issue",
+        "producers_by_origin",
+        "producer_issues",
+        "record_queue_outcome_owner",
+        "consumer",
+        "consumer_issue",
+        "view_only_consumer",
+        "view_only_consumer_issue",
+        "policy_governance",
+        "meetcfg_receives",
+        "not_producers_of_this_authority",
+        "producer_may",
+        "producer_must_not",
+        "consumer_may",
+        "consumer_must_not",
+        "governance_owns",
+        "governance_must_not",
+        "parallel_crm_authorized",
+        "parallel_architecture_allowed"
+      ],
+      "properties": {
+        "admission_owner": { "const": "Governance" },
+        "producer": { "const": "web-cfg" },
+        "producer_origin": { "const": "CONFENGE_WEB" },
+        "producer_issue": { "const": "tjsasakifln/web-cfg#577" },
+        "producers_by_origin": {
+          "const": {
+            "CONFENGE_WEB": "web-cfg",
+            "confenge_web": "web-cfg"
+          }
+        },
+        "producer_issues": {
+          "const": {
+            "web-cfg": "tjsasakifln/web-cfg#577"
+          }
+        },
+        "record_queue_outcome_owner": { "const": "Warmbly" },
+        "consumer": { "const": "Warmbly" },
+        "consumer_issue": { "const": "tjsasakifln/warmbly#47" },
+        "view_only_consumer": { "const": "Meetcfg" },
+        "view_only_consumer_issue": { "const": "tjsasakifln/MeetCFG#1" },
+        "policy_governance": { "const": "Governance/NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904" },
+        "meetcfg_receives": { "const": "accepted_commercial_context_only" },
+        "not_producers_of_this_authority": { "$ref": "#/$defs/string_array" },
+        "producer_may": { "$ref": "#/$defs/string_array" },
+        "producer_must_not": { "$ref": "#/$defs/string_array" },
+        "consumer_may": { "$ref": "#/$defs/string_array" },
+        "consumer_must_not": { "$ref": "#/$defs/string_array" },
+        "governance_owns": { "$ref": "#/$defs/string_array" },
+        "governance_must_not": { "$ref": "#/$defs/string_array" },
+        "parallel_crm_authorized": { "const": false },
+        "parallel_architecture_allowed": { "const": false }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "optional_when_present",
+        "admitted_origins",
+        "admitted_intake_sources",
+        "admitted_acquisition_lanes",
+        "admitted_intent_kinds",
+        "intent_kind_aliases",
+        "admitted_nuclei",
+        "admitted_offer_candidates",
+        "admitted_party_kinds",
+        "admitted_decision_roles",
+        "admitted_urgency",
+        "admitted_why_now_classes",
+        "admitted_desired_deliverables",
+        "admitted_document_availability_classes",
+        "admitted_sensitive_classes",
+        "admitted_conflict_statuses",
+        "forbidden_origins",
+        "admitted_consent_bases",
+        "admitted_identity_match_methods",
+        "forbidden_identity_match_methods",
+        "location_allowed_fields",
+        "location_forbidden_fields"
+      ],
+      "properties": {
+        "required": { "$ref": "#/$defs/string_array" },
+        "optional_when_present": { "$ref": "#/$defs/string_array" },
+        "admitted_origins": { "const": ["CONFENGE_WEB", "confenge_web"] },
+        "admitted_intake_sources": { "const": ["CONFENGE_WEB"] },
+        "admitted_acquisition_lanes": { "const": ["NET_NEW_INBOUND"] },
+        "admitted_intent_kinds": {
+          "const": [
+            "HUMAN_REVIEW",
+            "DEEP_DIVE",
+            "REQUEST_HUMAN_REVIEW",
+            "REQUEST_DEEP_DIVE"
+          ]
+        },
+        "intent_kind_aliases": {
+          "const": {
+            "REQUEST_HUMAN_REVIEW": "HUMAN_REVIEW",
+            "REQUEST_DEEP_DIVE": "DEEP_DIVE"
+          }
+        },
+        "admitted_nuclei": {
+          "const": [
+            "expert_evidence_assistance",
+            "property_valuation",
+            "building_engineering_documentation",
+            "occupational_safety",
+            "public_works_b2g"
+          ]
+        },
+        "admitted_offer_candidates": {
+          "const": ["private_project_technical_readiness_assessment"]
+        },
+        "admitted_party_kinds": { "const": ["PERSON", "COMPANY"] },
+        "admitted_decision_roles": {
+          "const": ["DECISION_MAKER", "INFLUENCER", "OPERATOR", "UNKNOWN"]
+        },
+        "admitted_urgency": {
+          "const": ["IMMEDIATE", "THIS_CYCLE", "EXPLORATORY", "UNKNOWN"]
+        },
+        "admitted_why_now_classes": {
+          "const": ["DEADLINE", "INCIDENT", "AUDIT", "PROCUREMENT", "CAPACITY", "UNKNOWN"]
+        },
+        "admitted_desired_deliverables": {
+          "const": ["ASSESSMENT", "OPINION", "DOCUMENT_SET", "SITE_VISIT", "UNKNOWN"]
+        },
+        "admitted_document_availability_classes": {
+          "const": ["COMPLETE", "PARTIAL", "GAP", "UNKNOWN"]
+        },
+        "admitted_sensitive_classes": {
+          "const": ["NONE", "LGPD_SPECIAL", "LEGAL_PRIVILEGE", "HEALTH", "UNKNOWN"]
+        },
+        "admitted_conflict_statuses": {
+          "const": ["CLEAR", "UNKNOWN", "HIT", "NOT_SCREENED"]
+        },
+        "forbidden_origins": {
+          "const": ["intel_watch", "intel_seed", "PNCP_LIVE", "FIRST_TOUCH"]
+        },
+        "admitted_consent_bases": {
+          "const": ["EXPLICIT_FORM_SUBMIT", "EXPLICIT_HUMAN_REVIEW_REQUEST"]
+        },
+        "admitted_identity_match_methods": {
+          "const": ["EXPLICIT_CONTACT", "EXPLICIT_SUBJECT_REF"]
+        },
+        "forbidden_identity_match_methods": {
+          "const": ["NAME", "DISPLAY_NAME", "FUZZY", "FUZZY_NAME", "FUZZY_IDENTITY"]
+        },
+        "location_allowed_fields": { "const": ["city", "uf", "ibge_municipality_code"] },
+        "location_forbidden_fields": {
+          "const": ["street", "address", "cep", "zip", "lat", "lon", "latitude", "longitude", "email"]
+        }
+      }
+    },
+    "reason_codes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "rejected", "unknown", "never_emitted"],
+      "properties": {
+        "accepted": { "const": ["ADMISSION_GATES_SATISFIED"] },
+        "rejected": { "$ref": "#/$defs/string_array" },
+        "unknown": { "$ref": "#/$defs/string_array" },
+        "never_emitted": {
+          "const": [
+            "ACCOUNT_MISSING",
+            "ACCOUNT_REQUIRED",
+            "ACCOUNT_NOT_FOUND",
+            "CONFLICT_UNKNOWN_AS_CLEAR"
+          ]
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "unknown_result",
+        "absence_or_ambiguity",
+        "fail_closed",
+        "replay_semantics",
+        "mutation_mode",
+        "conflict_unknown_never_becomes_clear",
+        "http_2xx_is_not_acceptance",
+        "live_intelligence_is_not_inbound",
+        "first_touch_inheritance_forbidden",
+        "coordination_ids_are_not_runtime_fallbacks"
+      ],
+      "properties": {
+        "mode": { "const": "ALL_REQUIRED_INPUTS_THEN_HARD_GATES" },
+        "unknown_result": { "const": "UNKNOWN" },
+        "absence_or_ambiguity": { "const": "UNKNOWN" },
+        "fail_closed": { "const": true },
+        "replay_semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "mutation_mode": { "const": "MODEL_ONLY" },
+        "conflict_unknown_never_becomes_clear": { "const": true },
+        "http_2xx_is_not_acceptance": { "const": true },
+        "live_intelligence_is_not_inbound": { "const": true },
+        "first_touch_inheritance_forbidden": { "const": true },
+        "coordination_ids_are_not_runtime_fallbacks": { "const": true }
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_required_for_acceptance",
+        "missing_account_is_discard_reason",
+        "accepted_may_create_inbound_only_identity",
+        "inbound_only_on_accepted",
+        "inbound_only_equals_outbound_eligible",
+        "outbound_eligible_default",
+        "auto_send",
+        "smtp_authorized",
+        "followup_authorized",
+        "provider_dispatch_authorized",
+        "fuzzy_identity_by_name",
+        "pii_in_metrics",
+        "pii_in_decision",
+        "parallel_crm_authorized",
+        "inbound_only_never_promotes_outbound",
+        "sensitive_content_in_public_envelope",
+        "conflict_unknown_never_becomes_clear",
+        "http_2xx_is_not_acceptance"
+      ],
+      "properties": {
+        "account_required_for_acceptance": { "const": false },
+        "missing_account_is_discard_reason": { "const": false },
+        "accepted_may_create_inbound_only_identity": { "const": true },
+        "inbound_only_on_accepted": { "const": true },
+        "inbound_only_equals_outbound_eligible": { "const": false },
+        "outbound_eligible_default": { "const": false },
+        "auto_send": { "const": false },
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "provider_dispatch_authorized": { "const": false },
+        "fuzzy_identity_by_name": { "const": false },
+        "pii_in_metrics": { "const": false },
+        "pii_in_decision": { "const": false },
+        "parallel_crm_authorized": { "const": false },
+        "inbound_only_never_promotes_outbound": { "const": true },
+        "sensitive_content_in_public_envelope": { "const": false },
+        "conflict_unknown_never_becomes_clear": { "const": true },
+        "http_2xx_is_not_acceptance": { "const": true }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_authorization",
+        "rejected_or_unknown_authorization",
+        "fuzzy_name_match_allowed",
+        "account_ref_optional",
+        "subject_ref_optional"
+      ],
+      "properties": {
+        "accepted_authorization": { "const": "INBOUND_ONLY" },
+        "rejected_or_unknown_authorization": { "const": "NONE" },
+        "fuzzy_name_match_allowed": { "const": false },
+        "account_ref_optional": { "const": true },
+        "subject_ref_optional": { "const": true }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key_required",
+        "semantics",
+        "same_key_same_material",
+        "same_key_different_material",
+        "same_key_different_material_reason",
+        "distinct_keys",
+        "store_mode",
+        "production_ledger_authorized"
+      ],
+      "properties": {
+        "key_required": { "const": true },
+        "semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "same_key_same_material": { "const": "REPLAY_ORIGINAL_DECISION" },
+        "same_key_different_material": { "const": "REJECTED_WITH_REASON" },
+        "same_key_different_material_reason": { "const": "IDEMPOTENCY_PAYLOAD_CONFLICT" },
+        "distinct_keys": { "const": "DISTINCT_LOGICAL_ADMISSIONS" },
+        "store_mode": { "const": "MODEL_ONLY" },
+        "production_ledger_authorized": { "const": false }
+      }
+    },
+    "readback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "http_2xx_is_not_acceptance", "required_fields", "pii_fields_forbidden"],
+      "properties": {
+        "required": { "const": true },
+        "http_2xx_is_not_acceptance": { "const": true },
+        "required_fields": { "$ref": "#/$defs/string_array" },
+        "pii_fields_forbidden": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pause_intake",
+        "retain_receipts",
+        "refuse_with_reason_code",
+        "refuse_reason_code",
+        "delete_forbidden",
+        "outbound_promotion_forbidden",
+        "replay_of_existing_receipt_preserved",
+        "freeze_intake"
+      ],
+      "properties": {
+        "pause_intake": { "const": true },
+        "retain_receipts": { "const": true },
+        "refuse_with_reason_code": { "const": true },
+        "refuse_reason_code": { "const": "INTAKE_PAUSED" },
+        "delete_forbidden": { "const": true },
+        "outbound_promotion_forbidden": { "const": true },
+        "replay_of_existing_receipt_preserved": { "const": true },
+        "freeze_intake": { "const": true }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "absence_decision",
+        "ambiguity_decision",
+        "concrete_reason_codes_required",
+        "fail_closed"
+      ],
+      "properties": {
+        "absence_decision": { "const": "UNKNOWN" },
+        "ambiguity_decision": { "const": "UNKNOWN" },
+        "concrete_reason_codes_required": { "const": true },
+        "fail_closed": { "const": true }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "smtp_authorized",
+        "followup_authorized",
+        "auto_send",
+        "outbound_eligible_default",
+        "crm_parallel_authorized",
+        "durable_data_plane_authorized",
+        "contains_pii",
+        "e2e_claimed",
+        "pncp_live_commercial_authority",
+        "live_intelligence_as_inbound"
+      ],
+      "properties": {
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "auto_send": { "const": false },
+        "outbound_eligible_default": { "const": false },
+        "crm_parallel_authorized": { "const": false },
+        "durable_data_plane_authorized": { "const": false },
+        "contains_pii": { "const": false },
+        "e2e_claimed": { "const": false },
+        "pncp_live_commercial_authority": { "const": false },
+        "live_intelligence_as_inbound": { "const": false }
+      }
+    }
+  }
+}

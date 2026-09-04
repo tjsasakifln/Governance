@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/net-new-inbound-handraiser-admission.1.0.0-draft.20260904.schema.json",
+  "title": "NET_NEW_INBOUND_HANDRAISER admission decision 1.0.0-draft.20260904",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "decision_id",
+    "logical_admission_id",
+    "decision",
+    "reason_codes",
+    "idempotency_key",
+    "correlation_id",
+    "receipt_id",
+    "replayed",
+    "origin",
+    "acquisition_lane",
+    "intent_kind",
+    "intake_source",
+    "landing_asset",
+    "nucleus_id",
+    "offer_candidate_id",
+    "party_kind",
+    "decision_role",
+    "site_location",
+    "urgency",
+    "why_now_class",
+    "desired_decision_or_deliverable",
+    "document_availability_class",
+    "sensitive_data",
+    "conflict_screening",
+    "qualification_state",
+    "subject_ref",
+    "account_present",
+    "inbound_only",
+    "outbound_eligible",
+    "auto_send",
+    "smtp_authorized",
+    "followup_authorized",
+    "account_required_for_acceptance",
+    "identity_authorization",
+    "owner",
+    "readback",
+    "retention",
+    "downstream_correlation",
+    "consumer_authorization",
+    "metrics",
+    "rollback",
+    "contains_pii",
+    "mutation_mode",
+    "evaluated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "net-new-inbound-handraiser-admission.1.0.0-draft.20260904" },
+    "policy_id": { "const": "NET_NEW_INBOUND_HANDRAISER" },
+    "policy_version": { "const": "1.0.0-draft.20260904" },
+    "canonical_name": { "const": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904" },
+    "decision_id": { "type": "string", "pattern": "^nihr_[0-9a-f]{32}$" },
+    "logical_admission_id": { "type": "string", "pattern": "^nihr_[0-9a-f]{32}$" },
+    "decision": { "enum": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"] },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/reason_code" }
+    },
+    "idempotency_key": { "type": ["string", "null"] },
+    "correlation_id": { "type": ["string", "null"] },
+    "receipt_id": { "type": ["string", "null"] },
+    "replayed": { "type": "boolean" },
+    "origin": { "type": ["string", "null"] },
+    "acquisition_lane": { "type": ["string", "null"] },
+    "intent_kind": { "type": ["string", "null"] },
+    "intake_source": { "type": ["string", "null"] },
+    "landing_asset": { "type": ["object", "null"] },
+    "nucleus_id": { "type": ["string", "null"] },
+    "offer_candidate_id": { "type": ["string", "null"] },
+    "party_kind": { "type": ["string", "null"] },
+    "decision_role": { "type": ["string", "null"] },
+    "site_location": { "type": ["object", "null"] },
+    "urgency": { "type": ["string", "null"] },
+    "why_now_class": { "type": ["string", "null"] },
+    "desired_decision_or_deliverable": { "type": ["string", "null"] },
+    "document_availability_class": { "type": ["string", "null"] },
+    "sensitive_data": { "$ref": "#/$defs/sensitive_data" },
+    "conflict_screening": { "$ref": "#/$defs/conflict_screening" },
+    "qualification_state": {
+      "enum": [
+        "NEEDS_CONTEXT",
+        "POTENTIAL_FIT",
+        "CONFLICT_CHECK_REQUIRED",
+        "DOCUMENT_GAP",
+        "CAPACITY_REVIEW",
+        "PARTNER_REQUIRED",
+        "OUT_OF_SCOPE",
+        "QCO",
+        "NONE"
+      ]
+    },
+    "subject_ref": { "type": ["string", "null"] },
+    "account_present": { "type": "boolean" },
+    "inbound_only": { "type": "boolean" },
+    "outbound_eligible": { "const": false },
+    "auto_send": { "const": false },
+    "smtp_authorized": { "const": false },
+    "followup_authorized": { "const": false },
+    "account_required_for_acceptance": { "const": false },
+    "identity_authorization": { "enum": ["INBOUND_ONLY", "NONE"] },
+    "owner": { "$ref": "#/$defs/owner" },
+    "readback": { "$ref": "#/$defs/readback" },
+    "retention": { "$ref": "#/$defs/retention" },
+    "downstream_correlation": { "$ref": "#/$defs/downstream_correlation" },
+    "consumer_authorization": { "$ref": "#/$defs/consumer_authorization" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+    "contains_pii": { "const": false },
+    "mutation_mode": { "const": "MODEL_ONLY" },
+    "evaluated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "decision": { "const": "ACCEPTED" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "inbound_only": { "const": true },
+          "identity_authorization": { "const": "INBOUND_ONLY" },
+          "outbound_eligible": { "const": false },
+          "auto_send": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "enum": ["REJECTED_WITH_REASON", "UNKNOWN"] } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "inbound_only": { "const": false },
+          "identity_authorization": { "const": "NONE" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "reason_code": {
+      "enum": [
+        "ADMISSION_GATES_SATISFIED",
+        "ORIGIN_NOT_ADMITTED",
+        "ACQUISITION_LANE_NOT_ADMITTED",
+        "INTENT_KIND_NOT_ADMITTED",
+        "CONSENT_REFUSED",
+        "OPT_OUT_PRESENT",
+        "FUZZY_IDENTITY_FORBIDDEN",
+        "IDEMPOTENCY_PAYLOAD_CONFLICT",
+        "INTAKE_PAUSED",
+        "REQUEST_INVALID",
+        "AUTHORITY_UNAVAILABLE",
+        "ORIGIN_UNKNOWN",
+        "ACQUISITION_LANE_UNKNOWN",
+        "INTENT_KIND_UNKNOWN",
+        "INTENT_KIND_AMBIGUOUS",
+        "IDEMPOTENCY_KEY_MISSING",
+        "CONTACT_EVIDENCE_UNKNOWN",
+        "CONSENT_EVIDENCE_UNKNOWN",
+        "CONSENT_AMBIGUOUS",
+        "RECEIPT_UNKNOWN",
+        "CORRELATION_UNKNOWN",
+        "SOURCE_UNKNOWN",
+        "FRESHNESS_UNKNOWN",
+        "FRESHNESS_STALE",
+        "SUBJECT_REFERENCE_AMBIGUOUS",
+        "IDENTITY_CONFLICT",
+        "POLICY_VERSION_NOT_ADMITTED",
+        "POLICY_VERSION_MISSING",
+        "POLICY_VERSION_UNKNOWN",
+        "POLICY_ID_UNKNOWN",
+        "NUCLEUS_NOT_ADMITTED",
+        "OFFER_CANDIDATE_NOT_ADMITTED",
+        "LIVE_INTELLIGENCE_NOT_INBOUND",
+        "FIRST_TOUCH_INHERITANCE_FORBIDDEN",
+        "OUTBOUND_INHERITANCE_FORBIDDEN",
+        "AUTO_SEND_FORBIDDEN",
+        "SENSITIVE_CONTENT_FORBIDDEN",
+        "CONFLICT_CLEAR_COERCION_FORBIDDEN",
+        "LOCATION_NOT_MINIMIZED",
+        "NUCLEUS_UNKNOWN",
+        "OFFER_CANDIDATE_UNKNOWN",
+        "PARTY_KIND_UNKNOWN",
+        "LANDING_ASSET_UNKNOWN",
+        "SENSITIVE_CLASS_UNKNOWN",
+        "CONFLICT_STATUS_MISSING"
+      ]
+    },
+    "sensitive_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "class", "protected_ref"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "class": { "type": ["string", "null"] },
+        "protected_ref": { "type": ["string", "null"] }
+      }
+    },
+    "conflict_screening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "protected_ref"],
+      "properties": {
+        "status": { "type": ["string", "null"] },
+        "protected_ref": { "type": ["string", "null"] }
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["admission", "record_queue_outcome", "accepted_context_consumer"],
+      "properties": {
+        "admission": { "const": "Governance" },
+        "record_queue_outcome": { "const": "Warmbly" },
+        "accepted_context_consumer": { "const": "Meetcfg" }
+      }
+    },
+    "readback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "http_2xx_is_not_acceptance", "receipt_id", "decision_id"],
+      "properties": {
+        "required": { "const": true },
+        "http_2xx_is_not_acceptance": { "const": true },
+        "receipt_id": { "type": ["string", "null"] },
+        "decision_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "class"],
+      "properties": {
+        "purpose": { "const": "INBOUND_ADMISSION" },
+        "class": { "const": "COMMERCIAL_INTAKE" }
+      }
+    },
+    "downstream_correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlation_id", "receipt_id", "logical_admission_id"],
+      "properties": {
+        "correlation_id": { "type": ["string", "null"] },
+        "receipt_id": { "type": ["string", "null"] },
+        "logical_admission_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "consumer_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "create_inbound_only_identity",
+        "surface_on_commercial_queue",
+        "outbound_eligible",
+        "auto_send",
+        "smtp_authorized",
+        "followup_authorized",
+        "fuzzy_identity_by_name"
+      ],
+      "properties": {
+        "create_inbound_only_identity": { "type": "boolean" },
+        "surface_on_commercial_queue": { "type": "boolean" },
+        "outbound_eligible": { "const": false },
+        "auto_send": { "const": false },
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "fuzzy_identity_by_name": { "const": false }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reason_codes",
+        "replayed",
+        "origin",
+        "acquisition_lane",
+        "intent_kind",
+        "nucleus_id",
+        "qualification_state",
+        "inbound_only",
+        "outbound_eligible",
+        "auto_send",
+        "smtp_authorized"
+      ],
+      "properties": {
+        "decision": { "enum": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"] },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/reason_code" }
+        },
+        "replayed": { "type": "boolean" },
+        "origin": { "type": ["string", "null"] },
+        "acquisition_lane": { "type": ["string", "null"] },
+        "intent_kind": { "type": ["string", "null"] },
+        "nucleus_id": { "type": ["string", "null"] },
+        "qualification_state": {
+          "enum": [
+            "NEEDS_CONTEXT",
+            "POTENTIAL_FIT",
+            "CONFLICT_CHECK_REQUIRED",
+            "DOCUMENT_GAP",
+            "CAPACITY_REVIEW",
+            "PARTNER_REQUIRED",
+            "OUT_OF_SCOPE",
+            "QCO",
+            "NONE"
+          ]
+        },
+        "inbound_only": { "type": "boolean" },
+        "outbound_eligible": { "const": false },
+        "auto_send": { "const": false },
+        "smtp_authorized": { "const": false }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intake_paused",
+        "receipts_retained",
+        "delete_forbidden",
+        "outbound_promotion_forbidden"
+      ],
+      "properties": {
+        "intake_paused": { "type": "boolean" },
+        "receipts_retained": { "const": true },
+        "delete_forbidden": { "const": true },
+        "outbound_promotion_forbidden": { "const": true }
+      }
+    }
+  }
+}
