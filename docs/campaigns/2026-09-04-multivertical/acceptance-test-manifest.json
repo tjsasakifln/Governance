@@ -1,0 +1,567 @@
+{
+  "schema_version": "confenge.multivertical-acceptance-test-manifest.v1",
+  "campaign_id": 15,
+  "as_of": "2026-09-04",
+  "purpose": "Executable accept/reject contract for goal 97. Tests current-code invariants the matrix must not violate. Future campaign PRs were not reviewed.",
+  "no_final_review_claim": true,
+  "inspected_shas": {
+    "Governance": "230d73a22a321112abe09b34a0d5fe743790b857",
+    "web-cfg": "89b081a8676d8a0b30747dfcb1477f21d9ac4dfb",
+    "warmbly": "8602ce4ae68e27080fa4431390194c09c2b76d06",
+    "meetcfg": "26f79e3fd414b12e765b6ec243e47a90c8a9b226",
+    "extra-cli": "3919f4d9af1363e2db641c7edadb8a8404874ec4"
+  },
+  "finding_field_contract": [
+    "id",
+    "severity",
+    "campaign_owner",
+    "repo_path_symbol",
+    "invariant",
+    "reproduction",
+    "test_to_add",
+    "reject_condition",
+    "rollback_implication"
+  ],
+  "adversarial_questions_covered": [
+    "facade_repositioning",
+    "taxonomy_second_sot",
+    "draft_as_runtime",
+    "dual_owner_shared_files",
+    "pii_in_url_event_log",
+    "unknown_coercion",
+    "b2g_url_canonical_link_intent",
+    "credential_endorsement_storefront_art",
+    "canary_contact_wall_or_deceptive_score",
+    "local_hub_doorway",
+    "inbound_inherits_outbound",
+    "http_2xx_as_accept_readback",
+    "rollback_deletes_receipt_or_reopens_risk",
+    "worktrees_share_mutable_artifacts"
+  ],
+  "campaigns": {
+    "01": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "PRs antigas/dependências/workflows; não implementa nova estratégia.",
+      "finding_ids": ["PM-01-001"],
+      "acceptance_tests": [
+        {
+          "id": "01-A1",
+          "name": "stale_pr_rebase_required",
+          "assertion": "Every open web-cfg PR merged by campaign 01 has merge-base equal to inspected origin/main 89b081a8676d8a0b30747dfcb1477f21d9ac4dfb or later.",
+          "check": "gh pr view --json baseRefOid,headRefOid + git merge-base origin/main HEAD",
+          "reject_condition": "Merge of PR whose base SHA is 81c600b7c26dcc606d3a03e648ecd9820d9c1c37 or any SHA behind current main."
+        },
+        {
+          "id": "01-A2",
+          "name": "no_second_production_scheduler",
+          "assertion": "Public plane remains Cloudflare+Netcup per RUNTIME-AUTHORITY.md; Netlify scheduled functions stay leftover/disabled.",
+          "check": "Parse docs/architecture/RUNTIME-AUTHORITY.md yaml netlify_scheduled_functions leftover AND netlify.toml schedule entries must not be the production tick.",
+          "reject_condition": "A workflow or netlify.toml change that makes leftover scheduled functions the public production plane."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "01-N1",
+          "name": "stale_strategy_pr_blocked",
+          "assertion": "PRs 549/548/536 touching form/copy/home cannot merge as 'dependency cleanup'.",
+          "reject_condition": "Campaign 01 merges a stale feature PR that edits index.html, form.js, public-family-registry.json, or AGENTS.md strategy."
+        },
+        {
+          "id": "01-N2",
+          "name": "package_json_script_owner",
+          "assertion": "New package.json scripts require an owner issue id in the PR body.",
+          "reject_condition": "package.json gains a test:* or prepare script without named owner issue."
+        }
+      ]
+    },
+    "02": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "ADR/AGENTS/taxonomia; não toca superfície pública.",
+      "finding_ids": ["PM-02-001"],
+      "acceptance_tests": [
+        {
+          "id": "02-A1",
+          "name": "taxonomy_not_a_gate",
+          "assertion": "Conversion/SEO gates read data/organic/public-family-registry.json + rendered HTML, never ADR/AGENTS family lists.",
+          "check": "scripts/site/inbound_gates.py and interface_coverage.mjs import registry JSON, not markdown taxonomy.",
+          "reject_condition": "A gate loads taxonomy from AGENTS.md or an ADR as the family catalog."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "02-N1",
+          "name": "public_surface_untouched",
+          "assertion": "Campaign 02 diff does not modify indexable HTML, styles.css, or generated public pages.",
+          "reject_condition": "02 changes index.html, /conflitos/, nav/footer chrome, or any indexable route."
+        },
+        {
+          "id": "02-N2",
+          "name": "docs_family_subset_of_registry",
+          "assertion": "Any family named in ADR/AGENTS exists in public-family-registry.json.",
+          "reject_condition": "Document lists a public family the registry does not declare."
+        }
+      ]
+    },
+    "03": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "catálogo/schema de ofertas; não publica páginas.",
+      "finding_ids": ["PM-03-001"],
+      "acceptance_tests": [
+        {
+          "id": "03-A1",
+          "name": "pin_matches_governance_main",
+          "assertion": "data/offers/governance-authority-pin.json git_sha equals Governance origin/main 230d73a22a321112abe09b34a0d5fe743790b857 after 03, or is explicitly marked STALE_NOT_RUNTIME.",
+          "check": "Compare pin.git_sha to inspected Governance SHA; writable_catalog_copied remains false.",
+          "reject_condition": "Pin SHA stays e2b0498a68092c1bdbf64aa31854d652c07afdc0 while treated as runtime authority."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "03-N1",
+          "name": "schema_does_not_publish_pages",
+          "assertion": "03 does not regenerate entregas/catalog-data.js or money-page HTML.",
+          "reject_condition": "Schema-only campaign ships priced public HTML or GENERATED:PUBLIC-CATALOG hireable items while flags.production catalog is false."
+        },
+        {
+          "id": "03-N2",
+          "name": "no_second_writable_catalog",
+          "assertion": "web-cfg snapshot remains a pin, not a writable copy of Governance catalog.v1.json.",
+          "reject_condition": "A second writable offer catalog is committed in web-cfg."
+        }
+      ]
+    },
+    "04": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "credential registry, confiança e especialista.",
+      "finding_ids": ["PM-04-001"],
+      "acceptance_tests": [
+        {
+          "id": "04-A1",
+          "name": "credential_is_fact_not_endorsement",
+          "assertion": "Published credential facts have source, as_of, and correction channel; CREA number only if registry fact exists.",
+          "check": "Parse /confianca/ and /especialista/ HTML + permissioned-proof-registry.json.",
+          "reject_condition": "ART/RRT/endosso/selo language or CREA number without a dated registry fact."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "04-N1",
+          "name": "no_storefront_on_trust_pages",
+          "assertion": "trust_or_legal pages do not host priced capture unless exact-route exemption.",
+          "reject_condition": "Priced offer or shared_lead_form_v1 on /especialista/ or /confianca/ without trust_or_legal exemption."
+        },
+        {
+          "id": "04-N2",
+          "name": "art_not_universal",
+          "assertion": "Terms exclusion survey_design_art_rrt_testing_expert remains; specialist copy does not claim universal ART.",
+          "reject_condition": "Credential campaign implies CONFENGE signs ART as a storefront service."
+        }
+      ]
+    },
+    "05": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "conflito público e /conflitos/.",
+      "finding_ids": ["PM-05-001"],
+      "acceptance_tests": [
+        {
+          "id": "05-A1",
+          "name": "conflict_page_contestable_without_lead_form",
+          "assertion": "/conflitos/ remains contestable via /correcoes/ and does not include lead capture form.",
+          "check": "HTML has no form[action*='lead']; contest path is /correcoes/ or structured non-analytics channel.",
+          "reject_condition": "shared_lead_form_v1 or /.netlify/functions/lead on /conflitos/."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "05-N1",
+          "name": "conflict_pii_not_in_events",
+          "assertion": "Conflict contest payload is not an analytics event and not a wa.me query with process/health/employee/plant facts.",
+          "reject_condition": "Process, health, employee, plant, or conflict PII in URL, event, or log."
+        },
+        {
+          "id": "05-N2",
+          "name": "b2g_conflict_url_kept",
+          "assertion": "Existing /conflitos/ canonical https://confenge.com.br/conflitos/ is not redirected to home.",
+          "reject_condition": "Lost /conflitos/ URL, canonical, or intent."
+        }
+      ]
+    },
+    "06": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "policy de admissão.",
+      "finding_ids": ["PM-06-001"],
+      "acceptance_tests": [
+        {
+          "id": "06-A1",
+          "name": "unknown_never_can_accept",
+          "assertion": "evaluate_admission_v2 returns UNKNOWN (not CAN_ACCEPT) when any authority is UNKNOWN; promise_allowed is false unless evidence_class=REAL.",
+          "check": "python -m pytest tests/test_capacity_admission_v2.py -q plus assertion: CAN_ACCEPT implies promise_allowed and REAL.",
+          "reject_condition": "UNKNOWN coerced to CAN_ACCEPT, clearance, absence, or success."
+        },
+        {
+          "id": "06-A2",
+          "name": "inbound_policy_fail_closed_versions",
+          "assertion": "Missing/old/unknown NET_NEW_INBOUND_HANDRAISER version fails closed; ACCEPTED sets outbound_eligible=false, smtp_authorized=false, followup_authorized=false.",
+          "check": "tests/test_net_new_inbound_handraiser.py",
+          "reject_condition": "ACCEPTED inbound with outbound/SMTP/follow-up true, or unknown version admitted."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "06-N1",
+          "name": "v1_not_runtime",
+          "assertion": "Production consumers cannot call evaluate_admission v1 as the engine.",
+          "reject_condition": "Campaign 06/99 treats capacity_admission.v1 CAN_ACCEPT (no promise_allowed) as runtime."
+        },
+        {
+          "id": "06-N2",
+          "name": "cli_exit_zero_is_not_accepted",
+          "assertion": "python -m commercial.inbound exit 0 is transport, not ACCEPTED.",
+          "reject_condition": "Consumer maps process exit 0 or HTTP 2xx to ACCEPTED."
+        }
+      ]
+    },
+    "07": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "scope": "consumer/readback inbound-only.",
+      "finding_ids": ["PM-07-001", "PM-07-002"],
+      "acceptance_tests": [
+        {
+          "id": "07-A1",
+          "name": "inbound_only_not_outbound_eligible",
+          "assertion": "Inbound admit never returns outbound_eligible true; AUTO_SEND stays false; no confenge_dispatch_sends for inbound_only accounts.",
+          "check": "go test ./internal/app/confenge/ -run InboundOnly|NetNewE2E",
+          "reject_condition": "201 with outbound_eligible:true or SMTP/follow-up from inbound intake."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "07-N1",
+          "name": "email_cnpj_match_does_not_inherit_outbound",
+          "assertion": "Existing extra-cli EmailSendReady account is not the destination of a 07 hand-raiser.",
+          "reject_condition": "Inbound receipt account_id is an extra-cli outbound row, or AdmitInboundOnly skipped because FindCandidateByEmail hit send-ready."
+        },
+        {
+          "id": "07-N2",
+          "name": "health_200_blocked_is_not_ready",
+          "assertion": "GET inbound/health HTTP 200 + status=BLOCKED must not authorize POST; clients key on status/real_event_ready.",
+          "reject_condition": "HTTP 2xx treated as accept/readback or READY."
+        },
+        {
+          "id": "07-N3",
+          "name": "draft_not_send_authority",
+          "assertion": "GenerateDraft and consumer dispatch fail closed on SourceSystemInboundOnly.",
+          "reject_condition": "Draft copy or consumer send treated as runtime send authority for inbound-only."
+        }
+      ]
+    },
+    "08": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "form runtime/endpoint/contract, sem regenerar páginas.",
+      "finding_ids": ["PM-08-001", "PM-08-002"],
+      "acceptance_tests": [
+        {
+          "id": "08-A1",
+          "name": "persist_is_201_not_200",
+          "assertion": "Client finishOk only on 201 create or 200 idempotent:true with store hit; honeypot 200/suppressed never tracks lead_persisted.",
+          "check": "js/modules/form.js predicate + lead.cjs honeypot fixture.",
+          "reject_condition": "2xx without persist emits lead_persisted, thank-you receipt, or Warmbly handoff."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "08-N1",
+          "name": "no_page_regeneration",
+          "assertion": "08 does not regenerate public HTML families.",
+          "reject_condition": "Form campaign rewrites money-page HTML or home chrome owned by 10."
+        },
+        {
+          "id": "08-N2",
+          "name": "pii_allowlist",
+          "assertion": "Lead schema allowlist excludes process/health/employee/plant/conflict fields; no PII in location.search or analytics.",
+          "reject_condition": "PII of processo, saúde, empregados, planta or conflito in URL/event/log, or receipt query treated as public identity."
+        }
+      ]
+    },
+    "09": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "canário privado em protótipo isolado.",
+      "finding_ids": ["PM-09-001"],
+      "acceptance_tests": [
+        {
+          "id": "09-A1",
+          "name": "canary_value_without_contact",
+          "assertion": "Private prototype reveals value without requiring contact; numeric n has provenance; noindex+nofollow; not in sitemap.",
+          "check": "piloto HTML robots + sitemap.xml + form absence on canary body.",
+          "reject_condition": "Contact wall to reveal value, deceptive score, or indexable piloto canonical on production host."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "09-N1",
+          "name": "draft_schema_not_runtime",
+          "assertion": "Handlers refuse schema *-draft; canary-flag enabled=false implies intake 403/404; fixtures not public artifact authority.",
+          "reject_condition": "Draft fixture used as live CTA, score, or runtime authority."
+        }
+      ]
+    },
+    "10": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "home/nav/footer/global CSS/hub shells.",
+      "finding_ids": ["PM-10-001"],
+      "acceptance_tests": [
+        {
+          "id": "10-A1",
+          "name": "b2g_urls_preserved",
+          "assertion": "Routes /diretoria-b2g/, /diagnostico-b2g-360/, /bid-room-licitacoes-obras/, /defesa-margem-contratos-publicos/ keep 200, self-canonical, nav or footer link, and family-registry row.",
+          "check": "CANONICAL_DESTINATIONS ∩ sitemap ∩ rendered nav/footer ∩ public-family-registry.json",
+          "reject_condition": "B2G loses URL, canonical, link, or intent."
+        },
+        {
+          "id": "10-A2",
+          "name": "not_facade_only",
+          "assertion": "Home/nav change names a visitor job and private utility; CSS-only relabel fails market-capture gate.",
+          "check": "PR evidence fields visitor_job + time_to_evidence per AGENTS.md.",
+          "reject_condition": "Reposicionamento termina em reforma de fachada sem utilidade privada."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "10-N1",
+          "name": "no_dual_owner_with_08",
+          "assertion": "10 does not edit js/modules/form.js or lead.cjs; 08 does not edit styles.css/home-10x.css except through 97 lock.",
+          "reject_condition": "Two owners ship overlapping diffs on index.html, styles.css, or form runtime in the same integration window."
+        }
+      ]
+    },
+    "11": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "um hub local, protótipo/noindex.",
+      "finding_ids": ["PM-11-001"],
+      "acceptance_tests": [
+        {
+          "id": "11-A1",
+          "name": "proto_hub_noindex_nofollow",
+          "assertion": "The single local hub is noindex,nofollow, absent from sitemap, not a city-page generator.",
+          "check": "robots meta + sitemap + data/local-entity/surface-decision.json new_public_landing_created=false.",
+          "reject_condition": "Hub local vira doorway or city farm."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "11-N1",
+          "name": "national_urls_not_retitled_local",
+          "assertion": "Existing national service URLs are not re-titled as Florianópolis/city landings.",
+          "reject_condition": "Doorway: thin local hub linking retitled national money pages."
+        }
+      ]
+    },
+    "12": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "proof/copy QA report-only.",
+      "finding_ids": ["PM-12-001"],
+      "acceptance_tests": [
+        {
+          "id": "12-A1",
+          "name": "qa_report_only",
+          "assertion": "Campaign 12 emits a report; permissioned-proof-registry remains NO_APPROVED_CLIENT_PROOF unless a real PUBLISHED record exists.",
+          "check": "data/site/permissioned-proof-registry.json approved_public_proof_count==0 unless records[].state=PUBLISHED.",
+          "reject_condition": "QA report treated as published proof or case."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "12-N1",
+          "name": "no_fabricated_case",
+          "assertion": "/casos/ stay labeled demonstrativo; forbidden_shortcuts in registry remain enforced.",
+          "reject_condition": "Invented client case, reused commercial consent as publication consent, or bot approval."
+        }
+      ]
+    },
+    "13": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "scope": "metric/research contract, sem emitter.",
+      "finding_ids": ["PM-13-001"],
+      "acceptance_tests": [
+        {
+          "id": "13-A1",
+          "name": "contract_without_emitter",
+          "assertion": "13 may add JSON contracts/tests; it does not modify js/modules/analytics.js or assembled script.js destinations.",
+          "check": "git diff --name-only for campaign 13 vs allowlist data/research/** schemas tests.",
+          "reject_condition": "New emitter or destination shipped by 13."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "13-N1",
+          "name": "unknown_service_not_tracked_as_service",
+          "assertion": "UNKNOWN_SERVICE does not emit content_to_service as a known service; SLA UNKNOWN is not a number.",
+          "reject_condition": "UNKNOWN coerced to clearance, absence, or success in metrics."
+        }
+      ]
+    },
+    "14": {
+      "owner_repo": "tjsasakifln/meetcfg",
+      "scope": "consumer/view de contexto.",
+      "finding_ids": ["PM-14-001"],
+      "acceptance_tests": [
+        {
+          "id": "14-A1",
+          "name": "only_accepted_binds_session",
+          "assertion": "consume() requires producer closed state ACCEPTED; native item without decision is UNKNOWN_OUTCOME; conversation status is never ACCEPTED unless producer sent ACCEPTED.",
+          "check": "backend/tools/handraiser_selftest.py + fixtures/handraiser/native_warmbly_item.json and unknown.json",
+          "reject_condition": "Session bind or status=ACCEPTED without producer ACCEPTED."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "14-N1",
+          "name": "refresh_200_ok_true_is_not_readback",
+          "assertion": "HTTP 200 with PRODUCER_NOT_CONFIGURED or accepted=0 is not ok:true / 'atualizado'.",
+          "reject_condition": "HTTP 2xx confused with accept/readback."
+        },
+        {
+          "id": "14-N2",
+          "name": "inbound_not_followup",
+          "assertion": "Inbound lane without inbound_only true fails closed; postcall does not schedule outbound follow-up.",
+          "reject_condition": "Inbound inherits outbound eligibility or email follow-up."
+        },
+        {
+          "id": "14-N3",
+          "name": "producer_sha_revalidated",
+          "assertion": "WARMBLY_PRODUCER_SHA is re-validated against Warmbly origin/main 8602ce4ae68e27080fa4431390194c09c2b76d06 before merge.",
+          "reject_condition": "Stale producer SHA cc11a9ab22d54e08ceb24efc9b555e0ac9c25b23 treated as current envelope."
+        }
+      ]
+    },
+    "15": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "este pré-mortem.",
+      "finding_ids": ["PM-97-001"],
+      "acceptance_tests": [
+        {
+          "id": "15-A1",
+          "name": "four_artifacts_only",
+          "assertion": "Campaign 15 commit contains exactly the four enumerated paths and claims no review of future PRs.",
+          "check": "git show --name-only; grep NO_FINAL_REVIEW_CLAIM",
+          "reject_condition": "Extra staged files, or prose claiming future PRs were reviewed."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "15-N1",
+          "name": "no_merge_deploy_smtp",
+          "assertion": "15 does not merge, deploy, or send SMTP.",
+          "reject_condition": "Merge/deploy/SMTP/provider mutation by campaign 15."
+        }
+      ]
+    },
+    "16": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "snapshot inicial do backlog.",
+      "finding_ids": ["PM-16-001"],
+      "acceptance_tests": [
+        {
+          "id": "16-A1",
+          "name": "snapshot_not_live_authority",
+          "assertion": "Initial backlog snapshot is dated, complete flag honest, SYNTHETIC vs REAL labeled; 54-row UNKNOWN stays UNKNOWN without #123 evidence.",
+          "check": "delivery/fixtures/readiness-54.fail-closed.v2.json readiness_state UNKNOWN; ADMISSION-CONTROL.md no real staffed declaration.",
+          "reject_condition": "Synthetic snapshot pinned as live staffed capacity."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "16-N1",
+          "name": "ceiling_not_copied_to_staffed",
+          "assertion": "policy_ceiling=50 is not copied into staffed_capacity units.",
+          "reject_condition": "Commercial ceiling used as human capacity."
+        },
+        {
+          "id": "16-N2",
+          "name": "reconciliation_required_not_auto_released",
+          "assertion": "CapacityLedger.release of RECONCILIATION_REQUIRED is forbidden without RECONCILE_RESOLVE.",
+          "reject_condition": "Rollback or timeout auto-releases ambiguous holds and reopens admission."
+        }
+      ]
+    },
+    "97": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "integra shared paths.",
+      "finding_ids": ["PM-97-001", "PM-XCLI-001"],
+      "acceptance_tests": [
+        {
+          "id": "97-A1",
+          "name": "literal_path_staging",
+          "assertion": "Each campaign stage uses literal paths only; git add -A and git add . never run.",
+          "check": "Integration log grep; git diff --cached --name-only vs campaign allowlist.",
+          "reject_condition": "Foreign file captured, or worktree of another agent used."
+        },
+        {
+          "id": "97-A2",
+          "name": "apply_this_manifest",
+          "assertion": "Goal 97 executes this file's negative tests for campaigns 01–16/97–99 before promote.",
+          "check": "Presence of reject_condition on every negative_tests item (this document).",
+          "reject_condition": "Integration without running negative tests or stripping caveats."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "97-N1",
+          "name": "dual_owner_lock",
+          "assertion": "Named shared surfaces have a single owner in the integration window (see ownership-conflict-matrix.json).",
+          "reject_condition": "Two campaign PRs merge overlapping diffs on home, form, public-family-registry, package.json, or global CSS without sequential lock."
+        },
+        {
+          "id": "97-N2",
+          "name": "no_shared_mutable_artifacts",
+          "assertion": "Worktrees do not share _site, Blobs, sqlite ledgers, or extra-cli checkpoints as authority.",
+          "reject_condition": "Shared mutable artifact or checkpoint-in-worktree used as pin."
+        }
+      ]
+    },
+    "98": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "audita candidates.",
+      "finding_ids": ["PM-98-001"],
+      "acceptance_tests": [
+        {
+          "id": "98-A1",
+          "name": "semantic_readback_required",
+          "assertion": "Candidate audit requires decision, outbound_eligible=false, smtp_authorized=false, policy_hash; HTTP 200/NXDOMAIN/ISOLATED_PASS is not enough.",
+          "check": "commercial/inbound/conformance.py evaluate_owner_readbacks must not treat ISOLATED_PASS as closeable.",
+          "reject_condition": "HTTP 2xx or isolated PASS used to close #65 or promote a candidate."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "98-N1",
+          "name": "health_blocked_not_ready",
+          "assertion": "Warmbly inbound health 200 + BLOCKED fails the candidate.",
+          "reject_condition": "'service is up' as readback."
+        }
+      ]
+    },
+    "99": {
+      "owner_repo": "tjsasakifln/Governance",
+      "scope": "promove.",
+      "finding_ids": ["PM-99-001"],
+      "acceptance_tests": [
+        {
+          "id": "99-A1",
+          "name": "promote_preserves_receipts",
+          "assertion": "Promote/rollback keeps lead/receipt store; does not enable production_checkout or AUTO_SEND; UNKNOWN hold is not GO.",
+          "check": "RUNTIME-AUTHORITY storage.survives_release_rollback + flags.json + CONFENGE_AUTO_SEND_ENABLED=false + overlay UNKNOWN not new_admission_allowed.",
+          "reject_condition": "Rollback deletes receipt/lead or reopens checkout/SMTP/canary risk."
+        }
+      ],
+      "negative_tests": [
+        {
+          "id": "99-N1",
+          "name": "no_promote_on_synthetic_or_isolated",
+          "assertion": "99 cannot promote on v2 CAN_ACCEPT SYNTHETIC, ACTIVE matrix without hashes, or ISOLATED_PASS.",
+          "reject_condition": "Promote while promise_allowed is false, staffed is UNKNOWN, or #65 closeable is false."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "schema_version": "confenge.ownership-conflict-matrix.v1",
+  "as_of": "2026-09-04",
+  "inspected_shas": {
+    "Governance": "230d73a22a321112abe09b34a0d5fe743790b857",
+    "web-cfg": "89b081a8676d8a0b30747dfcb1477f21d9ac4dfb",
+    "warmbly": "8602ce4ae68e27080fa4431390194c09c2b76d06",
+    "meetcfg": "26f79e3fd414b12e765b6ec243e47a90c8a9b226",
+    "extra-cli": "3919f4d9af1363e2db641c7edadb8a8404874ec4"
+  },
+  "no_final_review_claim": true,
+  "lock_rule": "One campaign owner per path per integration window. Goal 97 fail-closes if two matrix campaigns ship overlapping diffs on a locked surface without an explicit sequential handoff recorded in the PR. CODEOWNERS file is currently ABSENT on web-cfg origin/main.",
+  "named_shared_surfaces": [
+    {
+      "surface_id": "home",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "index.html",
+      "symbols": ["#formulario-contato", "header.site-header", "footer.site-footer", "data-runtime-profile=shared_lead_form_v1", "JSON-LD Organization"],
+      "current_main_role": "B2G-only home with embedded shared lead form, nav, footer, critical CSS vs home-10x.css",
+      "matrix_claimants": ["10", "08", "02", "04", "11"],
+      "primary_owner": "10",
+      "secondary_must_not_edit": ["08", "02", "03", "04", "05", "09", "11", "12", "13"],
+      "allowed_exception": "08 may edit only the form island inside index.html after 10 lands, via 97 sequential lock, never CSS/nav/JSON-LD.",
+      "reject_condition": "Two merged owners on index.html in one matrix day, or 10+08 overlapping hunks without lock.",
+      "rollback_implication": "Reverting 10 reverts 08 form copy if they shared the file."
+    },
+    {
+      "surface_id": "form",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "js/modules/form.js",
+      "related_paths": [
+        "script.js",
+        "netlify/functions/lead.cjs",
+        "netlify/functions/lib/lead-core.cjs",
+        "netlify/functions/lib/inbound-handoff.cjs"
+      ],
+      "symbols": ["finishOk", "res.status === 201 || res.status === 200", "receiptRequired", "safeSuccessDestination"],
+      "current_main_role": "Shared lead runtime assembled into script.js; 200/201 collapse is a live defect (PM-08-001)",
+      "matrix_claimants": ["08", "10", "13", "01"],
+      "primary_owner": "08",
+      "secondary_must_not_edit": ["10", "13", "01", "05", "09"],
+      "reject_condition": "10/13/01 edit form.js or lead.cjs, or 08 regenerates pages.",
+      "rollback_implication": "Client 200-accept and honeypot receipts survive JS revert in sessionStorage/analytics."
+    },
+    {
+      "surface_id": "public-family-registry",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "data/organic/public-family-registry.json",
+      "related_paths": ["data/organic/bofu-intent-matrix.json", "scripts/site/inbound_gates.py"],
+      "symbols": ["families[].id", "terminal_action", "index_evidence", "debt"],
+      "current_main_role": "Fail-closed conversion SoT for indexable routes; owner_issue 300 on home family",
+      "matrix_claimants": ["02", "03", "10", "11", "05", "09"],
+      "primary_owner": "02",
+      "note": "02 owns declaration shape; 10/11/05/09 may add exact routes only through 97 after 02, never a parallel taxonomy.",
+      "reject_condition": "A second family catalog in AGENTS/ADR, or two campaigns rewriting families[] in one window.",
+      "rollback_implication": "ADR rollback without registry leaves gates green on stale families."
+    },
+    {
+      "surface_id": "package.json",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "package.json",
+      "related_paths": ["package-lock.json", ".github/workflows"],
+      "symbols": ["scripts.test", "scripts.prepare", "scripts.inbound:gates"],
+      "current_main_role": "Union of all campaign test entrypoints; prepare git-filters no-op",
+      "matrix_claimants": ["01", "08", "10", "13"],
+      "primary_owner": "01",
+      "reject_condition": "New test:* script without owner issue, or 01 merge of stale Dependabot/feature PR that also touches strategy files.",
+      "rollback_implication": "Removing a script breaks another campaign's CI gate."
+    },
+    {
+      "surface_id": "global_css",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "styles.css",
+      "related_paths": [
+        "assets/home-10x.css",
+        "styles-hubs.css",
+        "styles-tokens.css",
+        "styles-offers.css",
+        "css/contracts.css"
+      ],
+      "symbols": [".site-header", ".site-footer", ".button-primary", "home critical CSS block in index.html"],
+      "current_main_role": "Global chrome; home-10x.css is the home sheet after the former cascade inversion",
+      "matrix_claimants": ["10", "11", "12"],
+      "primary_owner": "10",
+      "reject_condition": "11/12 restyle global chrome, or 10 and 11 both edit styles-hubs.css.",
+      "rollback_implication": "CSS revert without HTML contract leaves visual/form mismatch."
+    }
+  ],
+  "related_shared_surfaces": [
+    {
+      "surface_id": "nav_footer_modules",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "js/modules/nav.js",
+      "matrix_claimants": ["10", "13"],
+      "primary_owner": "10",
+      "reject_condition": "13 changes destination mapping / UNKNOWN_SERVICE tracking as a side effect of the research contract."
+    },
+    {
+      "surface_id": "netlify_toml_and_functions_tree",
+      "repo": "tjsasakifln/web-cfg",
+      "path": "netlify.toml",
+      "related_paths": ["netlify/functions/", "docs/architecture/RUNTIME-AUTHORITY.md"],
+      "matrix_claimants": ["01", "08", "09", "13"],
+      "primary_owner": "01",
+      "reject_condition": "Leftover Netlify scheduler becomes production plane, or 09 packs draft fixtures as public artifact."
+    },
+    {
+      "surface_id": "governance_admission_engine",
+      "repo": "tjsasakifln/Governance",
+      "path": "delivery/capacity.py",
+      "related_paths": [
+        "delivery/admission-consumer-contract.v2.json",
+        "schemas/capacity-admission.v2.schema.json",
+        "schemas/capacity-admission.v1.schema.json"
+      ],
+      "matrix_claimants": ["06", "16", "97"],
+      "primary_owner": "06",
+      "reject_condition": "16 pins synthetic CAN_ACCEPT as live, or 97 mixes v1 and v2 as runtime."
+    },
+    {
+      "surface_id": "governance_inbound_policy",
+      "repo": "tjsasakifln/Governance",
+      "path": "commercial/inbound/net-new-inbound-handraiser.v1.json",
+      "related_paths": [
+        "commercial/inbound/admit.py",
+        "schemas/net-new-inbound-handraiser.v1.schema.json",
+        "commercial/authority/authority-manifest.v1.json"
+      ],
+      "matrix_claimants": ["06", "07", "14", "98", "99"],
+      "primary_owner": "06",
+      "reject_condition": "Consumers pin matrix ACTIVE without manifest hash; 99 closes #65 on ISOLATED_PASS."
+    },
+    {
+      "surface_id": "commercial_authority_ci",
+      "repo": "tjsasakifln/Governance",
+      "path": ".github/workflows/commercial-authority.yml",
+      "matrix_claimants": ["06", "16", "97"],
+      "primary_owner": "97",
+      "reject_condition": "Workflow edited by a product campaign, or pytest list split so inbound/capacity stop running together without a replacement gate."
+    },
+    {
+      "surface_id": "offer_catalog_authority",
+      "repo": "tjsasakifln/Governance",
+      "path": "commercial/offers/catalog.v1.json",
+      "related_paths": [
+        "web-cfg:data/offers/catalog.snapshot.json",
+        "web-cfg:data/offers/governance-authority-pin.json",
+        "web-cfg:entregas/catalog-data.js"
+      ],
+      "matrix_claimants": ["03", "04", "10", "99"],
+      "primary_owner": "Governance catalog (not a matrix campaign); 03 consumes as pin only",
+      "reject_condition": "web-cfg writable second catalog, or pin SHA e2b0498a treated as current main."
+    },
+    {
+      "surface_id": "warmbly_inbound_webhook",
+      "repo": "tjsasakifln/warmbly",
+      "path": "internal/app/confenge/inbound_ingest.go",
+      "related_paths": [
+        "internal/app/confenge/inbound_only.go",
+        "internal/api/handler/confenge_inbound.go",
+        "docs/confenge/inbound-ingest.md"
+      ],
+      "matrix_claimants": ["07", "08", "14", "98"],
+      "primary_owner": "07",
+      "reject_condition": "08/14 treat 201/health 200 as readback, or inbound attaches to extra-cli outbound account."
+    },
+    {
+      "surface_id": "meetcfg_handraiser_consumer",
+      "repo": "tjsasakifln/meetcfg",
+      "path": "backend/app/copilot/handraiser.py",
+      "related_paths": ["backend/app/copilot/context.py", "frontend/static/app.js"],
+      "matrix_claimants": ["14", "07", "06"],
+      "primary_owner": "14",
+      "reject_condition": "Native item without decision binds session; WARMBLY_PRODUCER_SHA not revalidated against 8602ce4a."
+    }
+  ],
+  "integration_window_protocol": {
+    "goal": 97,
+    "order_hint": [
+      "01 (deps/workflows, no strategy)",
+      "02 (taxonomy/ADR, no public HTML)",
+      "03 (schema pin, no pages)",
+      "06 (admission policy)",
+      "16 (snapshot, not live)",
+      "08 (form runtime)",
+      "13 (metric contract, no emitter)",
+      "07 (warmbly inbound-only)",
+      "14 (meetcfg view)",
+      "04 (credentials)",
+      "05 (conflitos)",
+      "09 (private canary)",
+      "12 (report-only)",
+      "11 (one local hub)",
+      "10 (home/nav/css last among public chrome, after 08 form island is specified)",
+      "15 (this premortem, already gating)",
+      "97 integrate using this matrix",
+      "98 audit candidates",
+      "99 promote"
+    ],
+    "forbidden": [
+      "git add -A",
+      "git add .",
+      "git reset --hard",
+      "git clean -fd",
+      "git stash",
+      "using another campaign worktree",
+      "force push"
+    ]
+  }
+}
