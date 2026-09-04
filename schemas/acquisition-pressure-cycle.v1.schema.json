@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/acquisition-pressure-cycle.v1.schema.json",
+  "title": "ACQUISITION_PRESSURE cycle record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "cycle_id",
+    "evaluated_at",
+    "lane",
+    "window",
+    "origin_hash",
+    "dedup_key",
+    "replayed",
+    "mutation_mode",
+    "causal_inference",
+    "new_data_plane",
+    "stages",
+    "transitions",
+    "capacity",
+    "decision",
+    "missing",
+    "saida"
+  ],
+  "properties": {
+    "schema_version": { "const": "acquisition-pressure-cycle.v1" },
+    "policy_id": { "const": "ACQUISITION_PRESSURE" },
+    "policy_version": { "const": "v1" },
+    "canonical_name": { "const": "ACQUISITION_PRESSURE-v1" },
+    "cycle_id": { "type": "string", "pattern": "^acq_[0-9a-f]{32}$" },
+    "evaluated_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "lane": { "const": "NET_NEW_INBOUND" },
+    "window": { "$ref": "#/$defs/window" },
+    "origin_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "dedup_key": { "type": "string", "minLength": 1 },
+    "replayed": { "type": "boolean" },
+    "mutation_mode": { "const": "MODEL_ONLY" },
+    "causal_inference": { "const": false },
+    "new_data_plane": { "const": false },
+    "contains_pii": { "const": false },
+    "stages": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/stage_row" }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/transition_row" }
+    },
+    "capacity": { "$ref": "#/$defs/capacity" },
+    "decision": { "$ref": "#/$defs/decision" },
+    "missing": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/missing_row" }
+    },
+    "saida": { "$ref": "#/$defs/saida" }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "end": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" }
+      }
+    },
+    "count": { "type": ["integer", "null"], "minimum": 0 },
+    "state": { "enum": ["OBSERVED", "UNKNOWN"] },
+    "freshness": { "enum": ["FRESH", "STALE", "UNKNOWN", "ERROR"] },
+    "confidence": { "enum": ["HIGH", "MEDIUM", "LOW", "INSUFFICIENT_EVIDENCE"] },
+    "stage_name": {
+      "enum": [
+        "reached",
+        "asset_visit",
+        "useful_action",
+        "monitor",
+        "handraiser",
+        "QCO",
+        "proposal",
+        "won"
+      ]
+    },
+    "stage_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "lane",
+        "window",
+        "count",
+        "state",
+        "source",
+        "freshness",
+        "confidence",
+        "dedup_key",
+        "dedup_semantics",
+        "missing_event",
+        "missing_readback",
+        "owner"
+      ],
+      "properties": {
+        "stage": { "$ref": "#/$defs/stage_name" },
+        "lane": { "const": "NET_NEW_INBOUND" },
+        "window": { "$ref": "#/$defs/window" },
+        "count": { "$ref": "#/$defs/count" },
+        "state": { "$ref": "#/$defs/state" },
+        "source": { "type": "string", "minLength": 1 },
+        "freshness": { "$ref": "#/$defs/freshness" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "dedup_key": { "type": "string", "minLength": 1 },
+        "dedup_semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "missing_event": { "type": ["string", "null"] },
+        "missing_readback": { "type": ["string", "null"] },
+        "owner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "transition_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_stage",
+        "to_stage",
+        "lane",
+        "window",
+        "numerator",
+        "denominator",
+        "state",
+        "source",
+        "freshness",
+        "confidence",
+        "dedup_key",
+        "dedup_semantics",
+        "missing_event",
+        "owner"
+      ],
+      "properties": {
+        "from_stage": { "$ref": "#/$defs/stage_name" },
+        "to_stage": { "$ref": "#/$defs/stage_name" },
+        "lane": { "const": "NET_NEW_INBOUND" },
+        "window": { "$ref": "#/$defs/window" },
+        "numerator": { "$ref": "#/$defs/count" },
+        "denominator": { "$ref": "#/$defs/count" },
+        "state": { "$ref": "#/$defs/state" },
+        "source": { "type": "string", "minLength": 1 },
+        "freshness": { "$ref": "#/$defs/freshness" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "dedup_key": { "type": "string", "minLength": 1 },
+        "dedup_semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "missing_event": { "type": ["string", "null"] },
+        "owner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "available_units", "evidence_class", "source", "owner", "missing_event"],
+      "properties": {
+        "state": { "$ref": "#/$defs/state" },
+        "available_units": { "$ref": "#/$defs/count" },
+        "evidence_class": { "enum": ["REAL", "SYNTHETIC", "UNKNOWN"] },
+        "source": { "type": "string", "minLength": 1 },
+        "owner": { "const": "tjsasakifln/Governance" },
+        "missing_event": { "type": ["string", "null"] }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bottleneck",
+        "evidence",
+        "owner",
+        "smallest_next_action",
+        "confidence",
+        "acquisition_bottleneck_shifted",
+        "causal_inference"
+      ],
+      "properties": {
+        "bottleneck": {
+          "enum": [
+            "reached",
+            "asset_visit",
+            "useful_action",
+            "monitor",
+            "handraiser",
+            "QCO",
+            "proposal",
+            "won",
+            "UNKNOWN"
+          ]
+        },
+        "evidence": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "smallest_next_action": { "type": "string", "minLength": 1 },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "acquisition_bottleneck_shifted": { "enum": ["YES", "NO", "UNKNOWN"] },
+        "causal_inference": { "const": false }
+      }
+    },
+    "missing_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "missing_event", "missing_readback", "owner"],
+      "properties": {
+        "stage": { "$ref": "#/$defs/stage_name" },
+        "missing_event": { "type": "string", "minLength": 1 },
+        "missing_readback": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 }
+      }
+    },
+    "saida": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ACQUISITION_LEDGER_MINIMAL",
+        "NEW_DATA_PLANE",
+        "UNKNOWN_PRESERVED",
+        "BOTTLENECK_DECISION_CYCLE",
+        "ONE_SMALLEST_NEXT_ACTION",
+        "REPLAY_100",
+        "ACQUISITION_BOTTLENECK_SHIFTED",
+        "GOVERNANCE_164"
+      ],
+      "properties": {
+        "ACQUISITION_LEDGER_MINIMAL": { "const": "YES" },
+        "NEW_DATA_PLANE": { "const": "NO" },
+        "UNKNOWN_PRESERVED": { "const": "YES" },
+        "BOTTLENECK_DECISION_CYCLE": { "const": "PASS" },
+        "ONE_SMALLEST_NEXT_ACTION": { "const": "YES" },
+        "REPLAY_100": { "enum": ["PASS", "PENDING"] },
+        "ACQUISITION_BOTTLENECK_SHIFTED": { "enum": ["YES", "NO", "UNKNOWN"] },
+        "GOVERNANCE_164": { "const": "GO" }
+      }
+    }
+  }
+}

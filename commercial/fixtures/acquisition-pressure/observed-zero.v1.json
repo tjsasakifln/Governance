@@ -1,0 +1,59 @@
+{
+  "schema_version": "acquisition-pressure-observation.v1",
+  "observed_at": "2026-09-03T12:00:00Z",
+  "lane": "NET_NEW_INBOUND",
+  "window": {
+    "start": "2026-08-27T12:00:00Z",
+    "end": "2026-09-03T12:00:00Z"
+  },
+  "previous_decision": null,
+  "sources": {
+    "web_cfg": {
+      "present": true,
+      "payload_ref": null,
+      "snapshot_ref": null,
+      "note": "Named canonical stage observations only"
+    },
+    "warmbly": {
+      "present": false,
+      "payload_ref": null,
+      "snapshot_ref": null,
+      "note": null
+    },
+    "delivery": {
+      "present": false,
+      "payload_ref": null,
+      "snapshot_ref": null,
+      "note": "Governance#123 unpublished"
+    }
+  },
+  "stage_observations": [
+    {
+      "lane": "NET_NEW_INBOUND",
+      "stage": "reached",
+      "state": "OBSERVED",
+      "count": 12,
+      "source": "web-cfg.explicit.reached",
+      "freshness": "FRESH",
+      "confidence": "HIGH"
+    },
+    {
+      "lane": "NET_NEW_INBOUND",
+      "stage": "asset_visit",
+      "state": "OBSERVED",
+      "count": 8,
+      "source": "web-cfg.explicit.asset_visit",
+      "freshness": "FRESH",
+      "confidence": "HIGH"
+    },
+    {
+      "lane": "NET_NEW_INBOUND",
+      "stage": "useful_action",
+      "state": "OBSERVED",
+      "count": 0,
+      "source": "web-cfg.explicit.useful_action",
+      "freshness": "FRESH",
+      "confidence": "HIGH"
+    }
+  ]
+}

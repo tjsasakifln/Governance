@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/acquisition-pressure-observation.v1.schema.json",
+  "title": "ACQUISITION_PRESSURE observation bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observed_at",
+    "lane",
+    "window",
+    "sources",
+    "stage_observations"
+  ],
+  "properties": {
+    "schema_version": { "const": "acquisition-pressure-observation.v1" },
+    "observed_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "lane": { "const": "NET_NEW_INBOUND" },
+    "window": { "$ref": "#/$defs/window" },
+    "previous_decision": { "type": ["object", "null"] },
+    "sources": { "$ref": "#/$defs/sources" },
+    "stage_observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage_observation" }
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+        "end": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" }
+      }
+    },
+    "source_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "payload_ref": { "type": ["string", "null"] },
+        "snapshot_ref": { "type": ["string", "null"] },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web_cfg", "warmbly", "delivery"],
+      "properties": {
+        "web_cfg": { "$ref": "#/$defs/source_block" },
+        "warmbly": { "$ref": "#/$defs/source_block" },
+        "delivery": { "$ref": "#/$defs/source_block" }
+      }
+    },
+    "stage_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "state", "source"],
+      "properties": {
+        "lane": { "type": ["string", "null"] },
+        "stage": { "type": "string", "minLength": 1 },
+        "state": { "enum": ["OBSERVED", "UNKNOWN"] },
+        "count": { "type": ["integer", "null"], "minimum": 0 },
+        "window": { "$ref": "#/$defs/window" },
+        "source": { "type": "string", "minLength": 1 },
+        "source_ref": { "type": ["string", "null"] },
+        "freshness": { "enum": ["FRESH", "STALE", "UNKNOWN", "ERROR"] },
+        "confidence": { "enum": ["HIGH", "MEDIUM", "LOW", "INSUFFICIENT_EVIDENCE"] },
+        "dedup_key": { "type": ["string", "null"] },
+        "as_of": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
