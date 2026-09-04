@@ -1,0 +1,40 @@
+{
+  "schema_version": "net-new-inbound-handraiser-owner-readbacks.v1",
+  "observed_at": "2026-09-04T12:00:00Z",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+  "warmbly": {
+    "issue": "tjsasakifln/warmbly#47",
+    "pr": "https://github.com/tjsasakifln/warmbly/pull/262",
+    "merged": true,
+    "merge_sha": "4d29369ce6f5d0a086280f3d366c2af63ac364f0",
+    "implementation_ack": "PASS",
+    "accepted_e2e": "ISOLATED_PASS",
+    "rejected_unknown_e2e": "ISOLATED_PASS",
+    "replay_100": "ISOLATED_PASS",
+    "inbound_only_never_outbound": "PASS",
+    "collection_export": "SCHEMA_MISMATCH_COLLECTION",
+    "live_get": "NXDOMAIN",
+    "policy_pin_on_governance_main": false
+  },
+  "meetcfg": {
+    "issue": "tjsasakifln/MeetCFG#1",
+    "state": "CLOSED",
+    "consumer_ack": "PASS",
+    "sha": "cd32511",
+    "accepted_e2e": "LOCAL_FIXTURE_PASS",
+    "rejected_unknown_e2e": "PASS",
+    "replay_100": "PASS",
+    "inbound_only_preserved": "PASS",
+    "warmbly_export": "SCHEMA_MISMATCH_COLLECTION",
+    "live_get": "NXDOMAIN"
+  },
+  "governance": {
+    "issue": "tjsasakifln/Governance#65",
+    "policy_on_origin_main": false,
+    "e2e_close_rule": "versioned_policy AND warmbly_ack AND meetcfg_ack AND accepted_e2e AND rejected_unknown_e2e AND replay_100",
+    "residual_owner": "Warmbly",
+    "residual": "SCHEMA_MISMATCH_COLLECTION"
+  }
+}

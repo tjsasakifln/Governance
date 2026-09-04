@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/net-new-inbound-handraiser.v1.schema.json",
+  "title": "CONFENGE NET_NEW_INBOUND_HANDRAISER authority v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "status",
+    "effective_at",
+    "authority",
+    "activation",
+    "boundary",
+    "inputs",
+    "closed_states",
+    "reason_codes",
+    "evaluation",
+    "invariants",
+    "identity",
+    "idempotency",
+    "readback",
+    "rollback",
+    "failure",
+    "safety"
+  ],
+  "properties": {
+    "schema_version": { "const": "net-new-inbound-handraiser.v1" },
+    "policy_id": { "const": "NET_NEW_INBOUND_HANDRAISER" },
+    "policy_version": { "const": "v1" },
+    "canonical_name": { "const": "NET_NEW_INBOUND_HANDRAISER-v1" },
+    "status": { "const": "ACTIVE" },
+    "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "activation": { "$ref": "#/$defs/activation" },
+    "boundary": { "$ref": "#/$defs/boundary" },
+    "inputs": { "$ref": "#/$defs/inputs" },
+    "closed_states": {
+      "const": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"]
+    },
+    "reason_codes": { "$ref": "#/$defs/reason_codes" },
+    "evaluation": { "$ref": "#/$defs/evaluation" },
+    "invariants": { "$ref": "#/$defs/invariants" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "idempotency": { "$ref": "#/$defs/idempotency" },
+    "readback": { "$ref": "#/$defs/readback" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+    "failure": { "$ref": "#/$defs/failure" },
+    "safety": { "$ref": "#/$defs/safety" }
+  },
+  "$defs": {
+    "string_array": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decided_by_role",
+        "decision_reference",
+        "runtime_reference",
+        "decision_source",
+        "human_actor_impersonation_allowed"
+      ],
+      "properties": {
+        "decided_by_role": { "const": "FOUNDER" },
+        "decision_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/65" },
+        "runtime_reference": { "const": "https://github.com/tjsasakifln/warmbly/issues/47" },
+        "decision_source": { "const": "VERSIONED_GOVERNANCE_POLICY" },
+        "human_actor_impersonation_allowed": { "const": false }
+      }
+    },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_version_match_required",
+        "accepted_version_strings",
+        "accepted_policy_ids",
+        "missing_version_disposition",
+        "unknown_version_disposition",
+        "old_version_disposition"
+      ],
+      "properties": {
+        "exact_version_match_required": { "const": true },
+        "accepted_version_strings": { "const": ["v1", "NET_NEW_INBOUND_HANDRAISER-v1"] },
+        "accepted_policy_ids": { "const": ["NET_NEW_INBOUND_HANDRAISER"] },
+        "missing_version_disposition": { "const": "FAIL_CLOSED" },
+        "unknown_version_disposition": { "const": "FAIL_CLOSED" },
+        "old_version_disposition": { "const": "FAIL_CLOSED" }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_owner",
+        "producer",
+        "producer_origin",
+        "producer_issue",
+        "producers_by_origin",
+        "producer_issues",
+        "record_queue_outcome_owner",
+        "consumer",
+        "consumer_issue",
+        "view_only_consumer",
+        "view_only_consumer_issue",
+        "policy_governance",
+        "meetcfg_receives",
+        "producer_may",
+        "producer_must_not",
+        "consumer_may",
+        "consumer_must_not",
+        "governance_owns",
+        "governance_must_not",
+        "parallel_crm_authorized",
+        "parallel_architecture_allowed"
+      ],
+      "properties": {
+        "admission_owner": { "const": "Governance" },
+        "producer": { "const": "web-cfg" },
+        "producer_origin": { "const": "CONFENGE_WEB" },
+        "producer_issue": { "const": "tjsasakifln/web-cfg#61" },
+        "producers_by_origin": {
+          "const": {
+            "CONFENGE_WEB": "web-cfg",
+            "confenge_web": "web-cfg",
+            "intel_watch": "extra-cli",
+            "intel_seed": "extra-cli"
+          }
+        },
+        "producer_issues": {
+          "const": {
+            "web-cfg": "tjsasakifln/web-cfg#61",
+            "extra-cli": "tjsasakifln/extra-cli#530"
+          }
+        },
+        "record_queue_outcome_owner": { "const": "Warmbly" },
+        "consumer": { "const": "Warmbly" },
+        "consumer_issue": { "const": "tjsasakifln/warmbly#47" },
+        "view_only_consumer": { "const": "MeetCFG" },
+        "view_only_consumer_issue": { "const": "tjsasakifln/MeetCFG#1" },
+        "policy_governance": { "const": "Governance/NET_NEW_INBOUND_HANDRAISER-v1" },
+        "meetcfg_receives": { "const": "accepted_commercial_context_only" },
+        "producer_may": { "$ref": "#/$defs/string_array" },
+        "producer_must_not": { "$ref": "#/$defs/string_array" },
+        "consumer_may": { "$ref": "#/$defs/string_array" },
+        "consumer_must_not": { "$ref": "#/$defs/string_array" },
+        "governance_owns": { "$ref": "#/$defs/string_array" },
+        "governance_must_not": { "$ref": "#/$defs/string_array" },
+        "parallel_crm_authorized": { "const": false },
+        "parallel_architecture_allowed": { "const": false }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "optional_when_present",
+        "admitted_origins",
+        "admitted_acquisition_lanes",
+        "admitted_intent_kinds",
+        "intent_kind_aliases",
+        "admitted_consent_bases",
+        "admitted_identity_match_methods",
+        "forbidden_identity_match_methods"
+      ],
+      "properties": {
+        "required": {
+          "const": [
+            "origin",
+            "acquisition_lane",
+            "intent_kind",
+            "idempotency_key",
+            "contact_evidence",
+            "consent_evidence",
+            "receipt_id",
+            "correlation_id"
+          ]
+        },
+        "optional_when_present": {
+          "const": [
+            "subject_ref",
+            "account_ref",
+            "source",
+            "freshness",
+            "policy_id",
+            "policy_version",
+            "canonical_name"
+          ]
+        },
+        "admitted_origins": {
+          "const": ["CONFENGE_WEB", "confenge_web", "intel_watch", "intel_seed"]
+        },
+        "admitted_acquisition_lanes": { "const": ["NET_NEW_INBOUND"] },
+        "admitted_intent_kinds": {
+          "const": [
+            "HUMAN_REVIEW",
+            "DEEP_DIVE",
+            "REQUEST_HUMAN_REVIEW",
+            "REQUEST_DEEP_DIVE"
+          ]
+        },
+        "intent_kind_aliases": {
+          "const": {
+            "REQUEST_HUMAN_REVIEW": "HUMAN_REVIEW",
+            "REQUEST_DEEP_DIVE": "DEEP_DIVE"
+          }
+        },
+        "admitted_consent_bases": {
+          "const": ["EXPLICIT_FORM_SUBMIT", "EXPLICIT_HUMAN_REVIEW_REQUEST"]
+        },
+        "admitted_identity_match_methods": {
+          "const": ["EXPLICIT_CONTACT", "EXPLICIT_SUBJECT_REF"]
+        },
+        "forbidden_identity_match_methods": {
+          "const": ["NAME", "DISPLAY_NAME", "FUZZY", "FUZZY_NAME", "FUZZY_IDENTITY"]
+        }
+      }
+    },
+    "reason_codes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "rejected", "unknown", "never_emitted"],
+      "properties": {
+        "accepted": { "const": ["ADMISSION_GATES_SATISFIED"] },
+        "rejected": {
+          "const": [
+            "ORIGIN_NOT_ADMITTED",
+            "ACQUISITION_LANE_NOT_ADMITTED",
+            "INTENT_KIND_NOT_ADMITTED",
+            "CONSENT_REFUSED",
+            "OPT_OUT_PRESENT",
+            "FUZZY_IDENTITY_FORBIDDEN",
+            "IDEMPOTENCY_PAYLOAD_CONFLICT",
+            "IDENTITY_CONFLICT",
+            "POLICY_VERSION_NOT_ADMITTED",
+            "INTAKE_PAUSED"
+          ]
+        },
+        "unknown": {
+          "const": [
+            "REQUEST_INVALID",
+            "AUTHORITY_UNAVAILABLE",
+            "ORIGIN_UNKNOWN",
+            "ACQUISITION_LANE_UNKNOWN",
+            "INTENT_KIND_UNKNOWN",
+            "INTENT_KIND_AMBIGUOUS",
+            "IDEMPOTENCY_KEY_MISSING",
+            "CONTACT_EVIDENCE_UNKNOWN",
+            "CONSENT_EVIDENCE_UNKNOWN",
+            "CONSENT_AMBIGUOUS",
+            "RECEIPT_UNKNOWN",
+            "CORRELATION_UNKNOWN",
+            "SOURCE_UNKNOWN",
+            "FRESHNESS_UNKNOWN",
+            "FRESHNESS_STALE",
+            "SUBJECT_REFERENCE_AMBIGUOUS",
+            "POLICY_VERSION_MISSING",
+            "POLICY_VERSION_UNKNOWN",
+            "POLICY_ID_UNKNOWN"
+          ]
+        },
+        "never_emitted": {
+          "const": ["ACCOUNT_MISSING", "ACCOUNT_REQUIRED", "ACCOUNT_NOT_FOUND"]
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "unknown_result",
+        "absence_or_ambiguity",
+        "fail_closed",
+        "replay_semantics",
+        "mutation_mode"
+      ],
+      "properties": {
+        "mode": { "const": "ALL_REQUIRED_INPUTS_THEN_HARD_GATES" },
+        "unknown_result": { "const": "UNKNOWN" },
+        "absence_or_ambiguity": { "const": "UNKNOWN" },
+        "fail_closed": { "const": true },
+        "replay_semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "mutation_mode": { "const": "MODEL_ONLY" }
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_required_for_acceptance",
+        "missing_account_is_discard_reason",
+        "accepted_may_create_inbound_only_identity",
+        "inbound_only_on_accepted",
+        "inbound_only_equals_outbound_eligible",
+        "outbound_eligible_default",
+        "smtp_authorized",
+        "followup_authorized",
+        "provider_dispatch_authorized",
+        "fuzzy_identity_by_name",
+        "pii_in_metrics",
+        "pii_in_decision",
+        "parallel_crm_authorized",
+        "inbound_only_never_promotes_outbound"
+      ],
+      "properties": {
+        "account_required_for_acceptance": { "const": false },
+        "missing_account_is_discard_reason": { "const": false },
+        "accepted_may_create_inbound_only_identity": { "const": true },
+        "inbound_only_on_accepted": { "const": true },
+        "inbound_only_equals_outbound_eligible": { "const": false },
+        "outbound_eligible_default": { "const": false },
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "provider_dispatch_authorized": { "const": false },
+        "fuzzy_identity_by_name": { "const": false },
+        "pii_in_metrics": { "const": false },
+        "pii_in_decision": { "const": false },
+        "parallel_crm_authorized": { "const": false },
+        "inbound_only_never_promotes_outbound": { "const": true }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_authorization",
+        "rejected_or_unknown_authorization",
+        "fuzzy_name_match_allowed",
+        "account_ref_optional",
+        "subject_ref_optional"
+      ],
+      "properties": {
+        "accepted_authorization": { "const": "INBOUND_ONLY" },
+        "rejected_or_unknown_authorization": { "const": "NONE" },
+        "fuzzy_name_match_allowed": { "const": false },
+        "account_ref_optional": { "const": true },
+        "subject_ref_optional": { "const": true }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key_required",
+        "semantics",
+        "same_key_same_material",
+        "same_key_different_material",
+        "same_key_different_material_reason",
+        "distinct_keys",
+        "store_mode",
+        "production_ledger_authorized"
+      ],
+      "properties": {
+        "key_required": { "const": true },
+        "semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "same_key_same_material": { "const": "REPLAY_ORIGINAL_DECISION" },
+        "same_key_different_material": { "const": "REJECTED_WITH_REASON" },
+        "same_key_different_material_reason": { "const": "IDEMPOTENCY_PAYLOAD_CONFLICT" },
+        "distinct_keys": { "const": "DISTINCT_LOGICAL_ADMISSIONS" },
+        "store_mode": { "const": "MODEL_ONLY" },
+        "production_ledger_authorized": { "const": false }
+      }
+    },
+    "readback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_fields", "pii_fields_forbidden"],
+      "properties": {
+        "required_fields": { "$ref": "#/$defs/string_array" },
+        "pii_fields_forbidden": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pause_intake",
+        "retain_receipts",
+        "refuse_with_reason_code",
+        "refuse_reason_code",
+        "delete_forbidden",
+        "outbound_promotion_forbidden",
+        "replay_of_existing_receipt_preserved",
+        "freeze_intake"
+      ],
+      "properties": {
+        "pause_intake": { "const": true },
+        "retain_receipts": { "const": true },
+        "refuse_with_reason_code": { "const": true },
+        "refuse_reason_code": { "const": "INTAKE_PAUSED" },
+        "delete_forbidden": { "const": true },
+        "outbound_promotion_forbidden": { "const": true },
+        "replay_of_existing_receipt_preserved": { "const": true },
+        "freeze_intake": { "const": true }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "absence_decision",
+        "ambiguity_decision",
+        "concrete_reason_codes_required",
+        "fail_closed"
+      ],
+      "properties": {
+        "absence_decision": { "const": "UNKNOWN" },
+        "ambiguity_decision": { "const": "UNKNOWN" },
+        "concrete_reason_codes_required": { "const": true },
+        "fail_closed": { "const": true }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "smtp_authorized",
+        "followup_authorized",
+        "outbound_eligible_default",
+        "crm_parallel_authorized",
+        "durable_data_plane_authorized",
+        "contains_pii",
+        "e2e_claimed"
+      ],
+      "properties": {
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "outbound_eligible_default": { "const": false },
+        "crm_parallel_authorized": { "const": false },
+        "durable_data_plane_authorized": { "const": false },
+        "contains_pii": { "const": false },
+        "e2e_claimed": { "const": false }
+      }
+    }
+  }
+}

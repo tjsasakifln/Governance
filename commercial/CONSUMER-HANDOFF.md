@@ -72,7 +72,11 @@ The current outbound routing policy is `CFG-FIRST-TOUCH-ROUTING-v3`
 (`commercial/outbound/cfg-first-touch-routing.v3.json`, schema
 `schemas/cfg-first-touch-routing.v3.schema.json`). It consumes
 `COMMERCIAL_AUTHORITY/2.0` / `COMMERCIAL_AUTHORITY_POLICY/2.0`. v1 and v2 remain
-published and machine-readable; v3 does not rewrite them.
+published and machine-readable as `SUPERSEDED` history; consumers must pin v3
+exactly. A v1, v2, missing or unknown version fails closed. v3 does not rewrite
+v1/v2 bytes and does not authorize SMTP or provider dispatch. Governance #129
+closed as policy history is not transport authorization. Warmbly #43 owns
+`CURRENT_VERDICT`. Warmbly #204 and #47 completed do not equal GO.
 
 The canonical, non-negotiable business rule is:
 
@@ -109,6 +113,20 @@ A stale acquisition source is presented to the founder as an acquisition-plan
 condition ("Atualização de mercado atrasada; novos leads podem não estar
 refletidos."), never as "Outbound bloqueado."
 
+## Inbound admission — NET_NEW_INBOUND_HANDRAISER-v1
+
+Governance owns the versioned admission policy
+(`commercial/inbound/net-new-inbound-handraiser.v1.json`). Missing, old or
+unknown policy versions fail closed. web-cfg produces `CONFENGE_WEB` /
+`confenge_web` intent; extra-cli produces `intel_watch` / `intel_seed` intent.
+Warmbly is the only record/queue/outcome owner. MeetCFG is view-only.
+
+Accepted net-new is inbound-only. It is never outbound-eligible by default and
+never authorizes SMTP or follow-up. Absence of a prior account is not a silent
+discard. Replay is `EXACTLY_ONCE_LOGICAL`. Metrics are PII-free.
+
+Pin: `python -c "from commercial.inbound import policy_hash; print(policy_hash())"`.
+
 ## Schema contracts
 
 - `schemas/offer-catalog.v1.schema.json`
@@ -118,6 +136,7 @@ refletidos."), never as "Outbound bloqueado."
 - `schemas/diagnostico-limited-production.v1.schema.json`
 - `schemas/consumer-compatibility.v1.schema.json`
 - `schemas/cfg-first-touch-routing.v3.schema.json`
+- `schemas/net-new-inbound-handraiser.v1.schema.json`
 - `schemas/mapping-copyback.v1.schema.json`
 
 Read-only CI fixture: `commercial/fixtures/consumer-compatibility.ci.v1.json`. Founder mapping copy-back: `python scripts/validate_commercial_authority.py --check-mapping <payload.json>` (no Asaas call).

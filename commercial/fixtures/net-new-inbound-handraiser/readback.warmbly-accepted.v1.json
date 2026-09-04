@@ -1,0 +1,17 @@
+{
+  "shape": "warmbly.InboundAdmissionMetrics",
+  "source": "tjsasakifln/warmbly#262",
+  "merge_sha": "4d29369ce6f5d0a086280f3d366c2af63ac364f0",
+  "intent_kind": "REQUEST_DEEP_DIVE",
+  "origin": "confenge_web",
+  "lane": "confenge_web",
+  "inbound_only": true,
+  "outbound_eligible": false,
+  "receipt": "rcpt_warmbly_web_001",
+  "reason": "",
+  "matched": false,
+  "queued": true,
+  "reused": false,
+  "smtp_authorized": false,
+  "followup_authorized": false
+}

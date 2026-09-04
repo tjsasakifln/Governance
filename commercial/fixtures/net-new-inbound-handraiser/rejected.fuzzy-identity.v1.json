@@ -1,0 +1,25 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.v1",
+  "origin": "CONFENGE_WEB",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "DEEP_DIVE",
+  "idempotency_key": "nihr:web:rejected-fuzzy-001",
+  "correlation_id": "corr_rejected_fuzzy_001",
+  "receipt_id": "rcpt_rejected_fuzzy_001",
+  "subject_ref": null,
+  "account_ref": null,
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_fuzzy_001",
+    "identity_match_method": "FUZZY_NAME"
+  },
+  "consent_evidence": {
+    "captured": true,
+    "basis": "EXPLICIT_FORM_SUBMIT",
+    "evidence_ref": "ev_consent_fuzzy_001"
+  },
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1"
+}

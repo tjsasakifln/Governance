@@ -1,0 +1,40 @@
+{
+  "schema_version": "net-new-inbound-handraiser-consumer-matrix.v1",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+  "status": "ACTIVE",
+  "policy_hash": "sha256:5f8c03b6a11af3527b202d08c74de1d59d420f181807f094e62b337f055ec4ac",
+  "exact_version_match_required": true,
+  "missing_old_unknown_fail_closed": true,
+  "consumers": [
+    {
+      "id": "Warmbly#47",
+      "role": "record_queue_outcome_owner",
+      "compatibility": "v1_exact",
+      "must_pin": ["canonical_name", "policy_hash"],
+      "may_not": ["outbound_eligible_default", "smtp", "followup", "parallel_crm"]
+    },
+    {
+      "id": "MeetCFG#1",
+      "role": "view_only_consumer",
+      "compatibility": "v1_exact",
+      "must_pin": ["canonical_name"],
+      "may_not": ["create_lead", "create_session_from_rejected_or_unknown", "outbound_eligibility"]
+    },
+    {
+      "id": "web-cfg#61",
+      "role": "intent_producer",
+      "origins": ["CONFENGE_WEB", "confenge_web"],
+      "compatibility": "v1_exact"
+    },
+    {
+      "id": "extra-cli#530",
+      "role": "intent_producer",
+      "origins": ["intel_watch", "intel_seed"],
+      "compatibility": "v1_exact"
+    }
+  ],
+  "incompatible": ["missing_policy_version", "v0", "v2", "unknown_policy_id"],
+  "pin_command": "python -c \"from commercial.inbound import policy_hash; print(policy_hash())\""
+}

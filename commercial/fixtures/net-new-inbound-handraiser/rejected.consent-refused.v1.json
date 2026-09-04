@@ -1,0 +1,25 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.v1",
+  "origin": "CONFENGE_WEB",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "HUMAN_REVIEW",
+  "idempotency_key": "nihr:web:rejected-consent-001",
+  "correlation_id": "corr_rejected_consent_001",
+  "receipt_id": "rcpt_rejected_consent_001",
+  "subject_ref": null,
+  "account_ref": null,
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_consent_001",
+    "identity_match_method": "EXPLICIT_CONTACT"
+  },
+  "consent_evidence": {
+    "captured": false,
+    "basis": "EXPLICIT_FORM_SUBMIT",
+    "evidence_ref": "ev_consent_refused_001"
+  },
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1"
+}

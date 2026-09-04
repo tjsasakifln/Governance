@@ -25,6 +25,8 @@ This is the stable contract for commercial-offer consumers. It does not authoriz
 | First-touch routing JSON Schema (current) | `schemas/cfg-first-touch-routing.v3.schema.json` |
 | First-touch consumer expectations (current) | `commercial/outbound/consumer-expectations.v3.json` |
 | First-touch contract fixtures (current) | `commercial/fixtures/first-touch-routing-v3/matrix.v1.json` |
+| Net-new inbound hand-raiser policy (current) | `commercial/inbound/net-new-inbound-handraiser.v1.json` |
+| Net-new inbound hand-raiser schema (current) | `schemas/net-new-inbound-handraiser.v1.schema.json` |
 
 Governance is the only commercial truth plane. `web-cfg#88` is the delivery parent. `Warmbly#47` is the reconciliation/learning consumer. Do not copy these files into those repos as a writable second catalog.
 
@@ -106,9 +108,14 @@ A priced baixa-fricção SKU is `PENDING_FOUNDER_INPUT`. See `commercial/offers/
 
 ## Outbound commercial qualification — COMMERCIAL_AUTHORITY/2.0
 
-`CFG-FIRST-TOUCH-ROUTING-v3` is the current outbound routing policy. It consumes
-`COMMERCIAL_AUTHORITY/2.0` / `COMMERCIAL_AUTHORITY_POLICY/2.0`. v1 and v2 stay
-machine-readable with their original semantics and are not reinterpreted.
+`CFG-FIRST-TOUCH-ROUTING-v3` is the only `ACTIVE` outbound routing policy. It
+consumes `COMMERCIAL_AUTHORITY/2.0` / `COMMERCIAL_AUTHORITY_POLICY/2.0`. v1 and
+v2 stay machine-readable as `SUPERSEDED` history with their original semantics
+and are not reinterpreted. Consumers pin v3 exactly; a v1, v2, missing or
+unknown version fails closed. v3 does not authorize SMTP or provider dispatch.
+Governance #129 closed as policy history is not transport authorization.
+Warmbly #43 owns `CURRENT_VERDICT`. Warmbly #204 and #47 completed do not equal
+GO.
 
 The canonical, non-negotiable business rule is:
 
@@ -178,3 +185,15 @@ verdict. Present it as:
 > Atualização de mercado atrasada; novos leads podem não estar refletidos.
 
 Never as "Outbound bloqueado."
+
+## Inbound admission — NET_NEW_INBOUND_HANDRAISER-v1
+
+`NET_NEW_INBOUND_HANDRAISER-v1` is the only active net-new inbound admission
+policy. Governance owns admission. Producers are origin-scoped: web-cfg for
+`CONFENGE_WEB` / `confenge_web`, extra-cli for `intel_watch` / `intel_seed`.
+Warmbly owns record, unique queue and outcome. MeetCFG is view-only.
+
+Missing, old, unknown or incompatible policy/version fail closed. Accepted
+missing-account is inbound-only, never outbound-eligible, never SMTP, never
+follow-up. Replay is exactly-once logical. Absence of a prior account is never
+a silent discard.

@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/net-new-inbound-handraiser-admission.v1.schema.json",
+  "title": "NET_NEW_INBOUND_HANDRAISER admission decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "decision_id",
+    "logical_admission_id",
+    "decision",
+    "reason_codes",
+    "idempotency_key",
+    "correlation_id",
+    "receipt_id",
+    "replayed",
+    "origin",
+    "acquisition_lane",
+    "intent_kind",
+    "subject_ref",
+    "account_present",
+    "inbound_only",
+    "outbound_eligible",
+    "smtp_authorized",
+    "followup_authorized",
+    "account_required_for_acceptance",
+    "identity_authorization",
+    "consumer_authorization",
+    "metrics",
+    "rollback",
+    "contains_pii",
+    "mutation_mode",
+    "evaluated_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "net-new-inbound-handraiser-admission.v1" },
+    "policy_id": { "const": "NET_NEW_INBOUND_HANDRAISER" },
+    "policy_version": { "const": "v1" },
+    "canonical_name": { "const": "NET_NEW_INBOUND_HANDRAISER-v1" },
+    "decision_id": { "type": "string", "pattern": "^nihr_[0-9a-f]{32}$" },
+    "logical_admission_id": { "type": "string", "pattern": "^nihr_[0-9a-f]{32}$" },
+    "decision": { "enum": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"] },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/reason_code" }
+    },
+    "idempotency_key": { "type": ["string", "null"] },
+    "correlation_id": { "type": ["string", "null"] },
+    "receipt_id": { "type": ["string", "null"] },
+    "replayed": { "type": "boolean" },
+    "origin": { "type": ["string", "null"] },
+    "acquisition_lane": { "type": ["string", "null"] },
+    "intent_kind": { "type": ["string", "null"] },
+    "subject_ref": { "type": ["string", "null"] },
+    "account_present": { "type": "boolean" },
+    "inbound_only": { "type": "boolean" },
+    "outbound_eligible": { "const": false },
+    "smtp_authorized": { "const": false },
+    "followup_authorized": { "const": false },
+    "account_required_for_acceptance": { "const": false },
+    "identity_authorization": { "enum": ["INBOUND_ONLY", "NONE"] },
+    "consumer_authorization": { "$ref": "#/$defs/consumer_authorization" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "rollback": { "$ref": "#/$defs/rollback" },
+    "contains_pii": { "const": false },
+    "mutation_mode": { "const": "MODEL_ONLY" },
+    "evaluated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "decision": { "const": "ACCEPTED" } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "inbound_only": { "const": true },
+          "identity_authorization": { "const": "INBOUND_ONLY" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "enum": ["REJECTED_WITH_REASON", "UNKNOWN"] } },
+        "required": ["decision"]
+      },
+      "then": {
+        "properties": {
+          "inbound_only": { "const": false },
+          "identity_authorization": { "const": "NONE" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "reason_code": {
+      "enum": [
+        "ADMISSION_GATES_SATISFIED",
+        "ORIGIN_NOT_ADMITTED",
+        "ACQUISITION_LANE_NOT_ADMITTED",
+        "INTENT_KIND_NOT_ADMITTED",
+        "CONSENT_REFUSED",
+        "OPT_OUT_PRESENT",
+        "FUZZY_IDENTITY_FORBIDDEN",
+        "IDEMPOTENCY_PAYLOAD_CONFLICT",
+        "INTAKE_PAUSED",
+        "REQUEST_INVALID",
+        "AUTHORITY_UNAVAILABLE",
+        "ORIGIN_UNKNOWN",
+        "ACQUISITION_LANE_UNKNOWN",
+        "INTENT_KIND_UNKNOWN",
+        "INTENT_KIND_AMBIGUOUS",
+        "IDEMPOTENCY_KEY_MISSING",
+        "CONTACT_EVIDENCE_UNKNOWN",
+        "CONSENT_EVIDENCE_UNKNOWN",
+        "CONSENT_AMBIGUOUS",
+        "RECEIPT_UNKNOWN",
+        "CORRELATION_UNKNOWN",
+        "SOURCE_UNKNOWN",
+        "FRESHNESS_UNKNOWN",
+        "FRESHNESS_STALE",
+        "SUBJECT_REFERENCE_AMBIGUOUS",
+        "IDENTITY_CONFLICT",
+        "POLICY_VERSION_NOT_ADMITTED",
+        "POLICY_VERSION_MISSING",
+        "POLICY_VERSION_UNKNOWN",
+        "POLICY_ID_UNKNOWN"
+      ]
+    },
+    "consumer_authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "create_inbound_only_identity",
+        "surface_on_commercial_queue",
+        "outbound_eligible",
+        "smtp_authorized",
+        "followup_authorized",
+        "fuzzy_identity_by_name"
+      ],
+      "properties": {
+        "create_inbound_only_identity": { "type": "boolean" },
+        "surface_on_commercial_queue": { "type": "boolean" },
+        "outbound_eligible": { "const": false },
+        "smtp_authorized": { "const": false },
+        "followup_authorized": { "const": false },
+        "fuzzy_identity_by_name": { "const": false }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reason_codes",
+        "replayed",
+        "origin",
+        "acquisition_lane",
+        "intent_kind",
+        "inbound_only",
+        "outbound_eligible",
+        "smtp_authorized"
+      ],
+      "properties": {
+        "decision": { "enum": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"] },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/reason_code" }
+        },
+        "replayed": { "type": "boolean" },
+        "origin": { "type": ["string", "null"] },
+        "acquisition_lane": { "type": ["string", "null"] },
+        "intent_kind": { "type": ["string", "null"] },
+        "inbound_only": { "type": "boolean" },
+        "outbound_eligible": { "const": false },
+        "smtp_authorized": { "const": false }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intake_paused",
+        "receipts_retained",
+        "delete_forbidden",
+        "outbound_promotion_forbidden"
+      ],
+      "properties": {
+        "intake_paused": { "type": "boolean" },
+        "receipts_retained": { "const": true },
+        "delete_forbidden": { "const": true },
+        "outbound_promotion_forbidden": { "const": true }
+      }
+    }
+  }
+}

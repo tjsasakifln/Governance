@@ -663,3 +663,32 @@ def test_source_health_readback_is_acquisition_plan_never_an_outbound_block():
     assert ev.acquisition_plan_condition("DEGRADED") == ev.ACQUISITION_PLAN_CONDITION_PT_BR
     assert ev.acquisition_plan_condition("STALE") == ev.ACQUISITION_PLAN_CONDITION_PT_BR
     assert ev.acquisition_plan_condition("FRESH") == ev.ACQUISITION_PLAN_FRESH_PT_BR
+
+
+def test_adr_contemporary_ownership_does_not_mint_v4_or_smtp_go():
+    text = ADR.read_text(encoding="utf-8")
+    assert "CFG-FIRST-TOUCH-ROUTING-v3" in text
+    assert "Contemporary ownership (2026-09-04)" in text
+    assert "CURRENT_VERDICT" in text
+    assert "NO_GO_SMTP" in text
+    assert "warmbly/issues/43" in text
+    assert "Governance/issues/129" in text
+    assert "does not equal GO" in text
+    assert "Inbound-only never promotes outbound" in text
+    assert "No additive v4" in text
+    assert v.load_json(V1_POLICY)["status"] == "SUPERSEDED"
+    assert v.load_json(V2_POLICY)["status"] == "SUPERSEDED"
+    assert v.load_json(V3_POLICY)["status"] == "ACTIVE"
+
+
+def test_scheduling_readback_127_stays_partial_under_incident_gate():
+    evidence = v.load_json(FIXTURE_DIR / "scheduling-readback-127.v1.json")
+    assert evidence["policy_canonical"] == "CFG-FIRST-TOUCH-ROUTING-v3"
+    assert evidence["incident_gate_state"] == "OPEN"
+    assert evidence["live_authorized_readback"] is False
+    assert evidence["provider_mutation"] == 0
+    assert evidence["queued_is_not_smtp"] is True
+    assert evidence["current_transport_verdict"] == "NO_GO_SMTP"
+    assert evidence["verdict"] == "PARTIAL_INCIDENT_GATE"
+    assert evidence["closeable"] is False
+    assert "extra-cli#468" in evidence["reason"]

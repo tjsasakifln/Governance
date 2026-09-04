@@ -1,0 +1,274 @@
+{
+  "schema_version": "net-new-inbound-handraiser.v1",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+  "status": "ACTIVE",
+  "effective_at": "2026-09-03T00:00:00Z",
+  "authority": {
+    "decided_by_role": "FOUNDER",
+    "decision_reference": "https://github.com/tjsasakifln/Governance/issues/65",
+    "runtime_reference": "https://github.com/tjsasakifln/warmbly/issues/47",
+    "decision_source": "VERSIONED_GOVERNANCE_POLICY",
+    "human_actor_impersonation_allowed": false
+  },
+  "activation": {
+    "exact_version_match_required": true,
+    "accepted_version_strings": ["v1", "NET_NEW_INBOUND_HANDRAISER-v1"],
+    "accepted_policy_ids": ["NET_NEW_INBOUND_HANDRAISER"],
+    "missing_version_disposition": "FAIL_CLOSED",
+    "unknown_version_disposition": "FAIL_CLOSED",
+    "old_version_disposition": "FAIL_CLOSED"
+  },
+  "boundary": {
+    "admission_owner": "Governance",
+    "producer": "web-cfg",
+    "producer_origin": "CONFENGE_WEB",
+    "producer_issue": "tjsasakifln/web-cfg#61",
+    "producers_by_origin": {
+      "CONFENGE_WEB": "web-cfg",
+      "confenge_web": "web-cfg",
+      "intel_watch": "extra-cli",
+      "intel_seed": "extra-cli"
+    },
+    "producer_issues": {
+      "web-cfg": "tjsasakifln/web-cfg#61",
+      "extra-cli": "tjsasakifln/extra-cli#530"
+    },
+    "record_queue_outcome_owner": "Warmbly",
+    "consumer": "Warmbly",
+    "consumer_issue": "tjsasakifln/warmbly#47",
+    "view_only_consumer": "MeetCFG",
+    "view_only_consumer_issue": "tjsasakifln/MeetCFG#1",
+    "policy_governance": "Governance/NET_NEW_INBOUND_HANDRAISER-v1",
+    "meetcfg_receives": "accepted_commercial_context_only",
+    "producer_may": [
+      "submit_intake_request",
+      "supply_origin_lane_intent",
+      "supply_idempotency_key",
+      "supply_contact_consent_evidence_refs",
+      "supply_receipt_correlation",
+      "supply_subject_or_account_ref_when_existing"
+    ],
+    "producer_must_not": [
+      "create_crm_record",
+      "evaluate_outbound_eligibility",
+      "authorize_smtp",
+      "authorize_followup",
+      "discard_for_missing_account",
+      "fuzzy_match_identity_by_name"
+    ],
+    "consumer_may": [
+      "create_inbound_only_identity_on_accepted",
+      "retain_receipt_and_evidence",
+      "surface_accepted_intent_on_commercial_queue",
+      "return_readback"
+    ],
+    "consumer_must_not": [
+      "mark_outbound_eligible_from_this_authority",
+      "send_smtp",
+      "send_followup",
+      "fuzzy_match_identity_by_name",
+      "discard_for_missing_account",
+      "emit_pii_to_metrics"
+    ],
+    "governance_owns": [
+      "versioned_policy",
+      "closed_states",
+      "reason_codes",
+      "idempotency_semantics",
+      "readback_contract",
+      "rollback_contract",
+      "pure_admit_evaluator"
+    ],
+    "governance_must_not": [
+      "crm",
+      "commercial_queue",
+      "ui",
+      "smtp",
+      "web_form",
+      "durable_data_plane",
+      "warmbly_runtime",
+      "meetcfg_runtime"
+    ],
+    "parallel_crm_authorized": false,
+    "parallel_architecture_allowed": false
+  },
+  "inputs": {
+    "required": [
+      "origin",
+      "acquisition_lane",
+      "intent_kind",
+      "idempotency_key",
+      "contact_evidence",
+      "consent_evidence",
+      "receipt_id",
+      "correlation_id"
+    ],
+    "optional_when_present": [
+      "subject_ref",
+      "account_ref",
+      "source",
+      "freshness",
+      "policy_id",
+      "policy_version",
+      "canonical_name"
+    ],
+    "admitted_origins": ["CONFENGE_WEB", "confenge_web", "intel_watch", "intel_seed"],
+    "admitted_acquisition_lanes": ["NET_NEW_INBOUND"],
+    "admitted_intent_kinds": [
+      "HUMAN_REVIEW",
+      "DEEP_DIVE",
+      "REQUEST_HUMAN_REVIEW",
+      "REQUEST_DEEP_DIVE"
+    ],
+    "intent_kind_aliases": {
+      "REQUEST_HUMAN_REVIEW": "HUMAN_REVIEW",
+      "REQUEST_DEEP_DIVE": "DEEP_DIVE"
+    },
+    "admitted_consent_bases": ["EXPLICIT_FORM_SUBMIT", "EXPLICIT_HUMAN_REVIEW_REQUEST"],
+    "admitted_identity_match_methods": ["EXPLICIT_CONTACT", "EXPLICIT_SUBJECT_REF"],
+    "forbidden_identity_match_methods": ["NAME", "DISPLAY_NAME", "FUZZY", "FUZZY_NAME", "FUZZY_IDENTITY"]
+  },
+  "closed_states": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"],
+  "reason_codes": {
+    "accepted": ["ADMISSION_GATES_SATISFIED"],
+    "rejected": [
+      "ORIGIN_NOT_ADMITTED",
+      "ACQUISITION_LANE_NOT_ADMITTED",
+      "INTENT_KIND_NOT_ADMITTED",
+      "CONSENT_REFUSED",
+      "OPT_OUT_PRESENT",
+      "FUZZY_IDENTITY_FORBIDDEN",
+      "IDEMPOTENCY_PAYLOAD_CONFLICT",
+      "IDENTITY_CONFLICT",
+      "POLICY_VERSION_NOT_ADMITTED",
+      "INTAKE_PAUSED"
+    ],
+    "unknown": [
+      "REQUEST_INVALID",
+      "AUTHORITY_UNAVAILABLE",
+      "ORIGIN_UNKNOWN",
+      "ACQUISITION_LANE_UNKNOWN",
+      "INTENT_KIND_UNKNOWN",
+      "INTENT_KIND_AMBIGUOUS",
+      "IDEMPOTENCY_KEY_MISSING",
+      "CONTACT_EVIDENCE_UNKNOWN",
+      "CONSENT_EVIDENCE_UNKNOWN",
+      "CONSENT_AMBIGUOUS",
+      "RECEIPT_UNKNOWN",
+      "CORRELATION_UNKNOWN",
+      "SOURCE_UNKNOWN",
+      "FRESHNESS_UNKNOWN",
+      "FRESHNESS_STALE",
+      "SUBJECT_REFERENCE_AMBIGUOUS",
+      "POLICY_VERSION_MISSING",
+      "POLICY_VERSION_UNKNOWN",
+      "POLICY_ID_UNKNOWN"
+    ],
+    "never_emitted": ["ACCOUNT_MISSING", "ACCOUNT_REQUIRED", "ACCOUNT_NOT_FOUND"]
+  },
+  "evaluation": {
+    "mode": "ALL_REQUIRED_INPUTS_THEN_HARD_GATES",
+    "unknown_result": "UNKNOWN",
+    "absence_or_ambiguity": "UNKNOWN",
+    "fail_closed": true,
+    "replay_semantics": "EXACTLY_ONCE_LOGICAL",
+    "mutation_mode": "MODEL_ONLY"
+  },
+  "invariants": {
+    "account_required_for_acceptance": false,
+    "missing_account_is_discard_reason": false,
+    "accepted_may_create_inbound_only_identity": true,
+    "inbound_only_on_accepted": true,
+    "inbound_only_equals_outbound_eligible": false,
+    "outbound_eligible_default": false,
+    "smtp_authorized": false,
+    "followup_authorized": false,
+    "provider_dispatch_authorized": false,
+    "fuzzy_identity_by_name": false,
+    "pii_in_metrics": false,
+    "pii_in_decision": false,
+    "parallel_crm_authorized": false,
+    "inbound_only_never_promotes_outbound": true
+  },
+  "identity": {
+    "accepted_authorization": "INBOUND_ONLY",
+    "rejected_or_unknown_authorization": "NONE",
+    "fuzzy_name_match_allowed": false,
+    "account_ref_optional": true,
+    "subject_ref_optional": true
+  },
+  "idempotency": {
+    "key_required": true,
+    "semantics": "EXACTLY_ONCE_LOGICAL",
+    "same_key_same_material": "REPLAY_ORIGINAL_DECISION",
+    "same_key_different_material": "REJECTED_WITH_REASON",
+    "same_key_different_material_reason": "IDEMPOTENCY_PAYLOAD_CONFLICT",
+    "distinct_keys": "DISTINCT_LOGICAL_ADMISSIONS",
+    "store_mode": "MODEL_ONLY",
+    "production_ledger_authorized": false
+  },
+  "readback": {
+    "required_fields": [
+      "schema_version",
+      "policy_id",
+      "policy_version",
+      "canonical_name",
+      "decision_id",
+      "logical_admission_id",
+      "decision",
+      "reason_codes",
+      "idempotency_key",
+      "correlation_id",
+      "receipt_id",
+      "replayed",
+      "origin",
+      "acquisition_lane",
+      "intent_kind",
+      "inbound_only",
+      "outbound_eligible",
+      "smtp_authorized",
+      "followup_authorized",
+      "account_required_for_acceptance",
+      "identity_authorization",
+      "evaluated_at"
+    ],
+    "pii_fields_forbidden": [
+      "email",
+      "phone",
+      "display_name",
+      "full_name",
+      "name",
+      "cpf",
+      "raw_message",
+      "message_body",
+      "ip_address"
+    ]
+  },
+  "rollback": {
+    "pause_intake": true,
+    "retain_receipts": true,
+    "refuse_with_reason_code": true,
+    "refuse_reason_code": "INTAKE_PAUSED",
+    "delete_forbidden": true,
+    "outbound_promotion_forbidden": true,
+    "replay_of_existing_receipt_preserved": true,
+    "freeze_intake": true
+  },
+  "failure": {
+    "absence_decision": "UNKNOWN",
+    "ambiguity_decision": "UNKNOWN",
+    "concrete_reason_codes_required": true,
+    "fail_closed": true
+  },
+  "safety": {
+    "smtp_authorized": false,
+    "followup_authorized": false,
+    "outbound_eligible_default": false,
+    "crm_parallel_authorized": false,
+    "durable_data_plane_authorized": false,
+    "contains_pii": false,
+    "e2e_claimed": false
+  }
+}

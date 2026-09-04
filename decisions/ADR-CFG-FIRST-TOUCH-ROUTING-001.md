@@ -3,7 +3,7 @@
 Status: accepted
 Effective: 2026-08-25
 Authority: founder decision recorded in [Governance #129](https://github.com/tjsasakifln/Governance/issues/129)
-Runtime tracking: [Warmbly #41](https://github.com/tjsasakifln/warmbly/issues/41)
+Runtime tracking: [Warmbly #155](https://github.com/tjsasakifln/warmbly/issues/155) (Warmbly #41 absorbed; historical)
 
 ## Current decision
 
@@ -91,3 +91,29 @@ is fail-closed. It does not authorize SMTP or provider dispatch. Governance
 #129 is the sole human record for `NO_GO` or a bounded GO: without an explicit
 human decision and a new additive transport policy, transport remains
 fail-closed.
+
+## Contemporary ownership (2026-09-04)
+
+This section records the observed present tense. It does not rewrite the
+history above and it does not mint first-touch v4.
+
+- **extra-cli** produces facts, identity, evidence and the eligible feed.
+- **web-cfg** publishes public surfaces and acquires inbound (`CONFENGE_WEB`).
+- **Governance** owns versioned policy, exceptions and gates. It does not
+  execute commercial action, transport, CRM or billing.
+- **Warmbly** receives, queues, schedules and, only when authorized, transports
+  and records outcomes. Warmbly [#43](https://github.com/tjsasakifln/warmbly/issues/43)
+  owns `CURRENT_VERDICT`. Observed contemporaneous verdict: `NO_GO_SMTP`.
+- **MeetCFG** consumes accepted commercial context view-only.
+
+`CFG-FIRST-TOUCH-ROUTING-v3` remains the only `ACTIVE` first-touch policy. v1
+and v2 are `SUPERSEDED` and fail-closed in consumers. Completing Warmbly
+[#204](https://github.com/tjsasakifln/warmbly/issues/204) (stops) and
+[#47](https://github.com/tjsasakifln/warmbly/issues/47) (commercial record)
+does not equal GO. Governance
+[#129](https://github.com/tjsasakifln/Governance/issues/129) is closed as
+policy history (v1/v2 superseded; v3 active) and is **not** transport
+authorization. Runtime tracking for delegated first-touch to `QUEUED` is
+Warmbly [#155](https://github.com/tjsasakifln/warmbly/issues/155); Warmbly #41
+was absorbed there. Inbound-only never promotes outbound. `QUEUED` is not
+SMTP. No additive v4 is created in this campaign.
