@@ -2,10 +2,10 @@
 
 This campaign produces an **initial photograph** and versioned locks. It does **not** “accompany in background”.
 
-`photograph_observed_at`: `2026-09-04T23:38:42Z`  
-`refresh_owner`: goal **97** (shared registries / build / dependency integration)  
-`audit_owner`: goal **98**  
-`promotion_owner`: goal **99**
+- `photograph_observed_at`: `2026-09-04T23:38:42Z`
+- `refresh_owner`: goal **97** (shared registries / build / dependency integration)
+- `audit_owner`: goal **98**
+- `promotion_owner`: goal **99**
 
 ## When to refresh
 
