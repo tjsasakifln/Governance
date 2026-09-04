@@ -171,6 +171,7 @@ def test_weakened_invariants_fail_closed_on_schema():
         "unknown.missing-contact.v1.json",
         "unknown.stale-freshness.v1.json",
         "unknown.missing-policy-version.v1.json",
+        "unknown.missing-policy-version-with-id.v1.json",
         "unknown.unknown-policy-version.v1.json",
     ],
 )
@@ -441,6 +442,14 @@ def test_missing_old_unknown_policy_version_fail_closed():
     assert unknown["decision"] == "UNKNOWN"
     assert "POLICY_VERSION_UNKNOWN" in unknown["reason_codes"]
     assert unknown["consumer_authorization"]["surface_on_commercial_queue"] is False
+
+    id_without_version = admit(load_fixture("unknown.missing-policy-version-with-id.v1.json"))
+    _assert_closed_and_safe(id_without_version, load_fixture("unknown.missing-policy-version-with-id.v1.json"))
+    assert id_without_version["decision"] == "UNKNOWN"
+    assert "POLICY_VERSION_MISSING" in id_without_version["reason_codes"]
+    assert id_without_version["consumer_authorization"]["create_inbound_only_identity"] is False
+    assert id_without_version["outbound_eligible"] is False
+    assert id_without_version["inbound_only"] is False
 
 
 def test_identity_conflict_is_explicit_and_not_a_second_admission():

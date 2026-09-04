@@ -100,21 +100,27 @@ function receiptComplete(input: SchedulingReadbackInput): boolean {
   const runtime = input.runtime_sha || rb?.runtime_sha;
   const readbackAt = input.readback_at || rb?.readback_at;
   const freshness = input.freshness || rb?.freshness;
-  return [
-    executor,
-    authority,
-    policyHash,
-    recipient,
-    content,
-    evidence,
-    source,
-    window,
-    runtime,
-    readbackAt,
-    freshness,
-    input.idempotency_key,
-    rb?.due_at,
-  ].every(nonempty) && freshness !== "stale" && freshness !== "STALE";
+  const blockers = input.blockers !== undefined ? input.blockers : rb?.blockers;
+  return (
+    Array.isArray(blockers) &&
+    [
+      executor,
+      authority,
+      policyHash,
+      recipient,
+      content,
+      evidence,
+      source,
+      window,
+      runtime,
+      readbackAt,
+      freshness,
+      input.idempotency_key,
+      rb?.due_at,
+    ].every(nonempty) &&
+    freshness !== "stale" &&
+    freshness !== "STALE"
+  );
 }
 
 export function classifySchedulingReadback(input: SchedulingReadbackInput): SchedulingReadbackResult {
