@@ -1106,7 +1106,7 @@ async function settleGateIntent(
         ? { status: "confirmed", state: "QUEUED", due_at: "1" }
         : { status: readback.status },
     }).reason_group;
-    if (group) readback.reason_group = group;
+    if (group) readback.reason_group = "READBACK_UNKNOWN";
   }
   // A refusal is definitive before any write. An executed response is only
   // definitive after the resource readback confirms it. If that GET fails or

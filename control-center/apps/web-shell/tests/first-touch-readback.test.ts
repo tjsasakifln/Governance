@@ -72,9 +72,8 @@ test("QUEUED requires receipt bindings; due_at alone is not enough", () => {
 });
 
 test("v1 v2 missing and unknown policy fail closed and never QUEUED", () => {
-  const missing = classifySchedulingReadback(
-    v3Receipt({ policy_canonical: undefined, policy_id: undefined, policy_version: undefined }),
-  );
+  const { policy_canonical: _pc, policy_id: _pid, policy_version: _pv, ...missingBase } = v3Receipt();
+  const missing = classifySchedulingReadback(missingBase);
   assert.equal(missing.queued, false);
   assert.notEqual(missing.state, "QUEUED");
   assert.equal(missing.reason_group, "POLICY_FAIL_CLOSED");
