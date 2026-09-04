@@ -1,0 +1,253 @@
+{
+  "schema": "confenge-control-snapshot-contract-dag/1",
+  "campaign_id": 16,
+  "observed_at": "2026-09-04T23:38:42Z",
+  "status": "TEST_ONLY",
+  "ratification_owner": 97,
+  "invariants": {
+    "outbound_eligible": false,
+    "auto_send": false,
+    "fail_closed_on_missing_or_divergent_version_or_hash": true,
+    "no_second_schema_authority": true,
+    "no_runtime_fallback": true
+  },
+  "nucleos": [
+    {
+      "id": "expert_evidence_assistance",
+      "label": "Per\u00edcias e Assist\u00eancia T\u00e9cnica"
+    },
+    {
+      "id": "property_valuation",
+      "label": "Avalia\u00e7\u00f5es de Im\u00f3veis"
+    },
+    {
+      "id": "building_engineering_documentation",
+      "label": "Engenharia de Edifica\u00e7\u00f5es e Documenta\u00e7\u00e3o"
+    },
+    {
+      "id": "occupational_safety",
+      "label": "Seguran\u00e7a do Trabalho"
+    },
+    {
+      "id": "public_works_b2g",
+      "label": "Obras P\u00fablicas e B2G"
+    }
+  ],
+  "contracts": [
+    {
+      "id": "CONFENGE_CORPORATE_TAXONOMY",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "web-cfg#578/campaign-02",
+      "consumers": [
+        "web-cfg",
+        "Governance",
+        "warmbly",
+        "meetcfg"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Draft taxonomy for the 2026-09-04 wave; not a second schema authority.",
+      "content_hash": "a8266bc18482436ebde7840651e77d763b457845e879cc8bfbdabf8a8b3aa2b4"
+    },
+    {
+      "id": "CONFENGE_OFFER_CATALOG",
+      "version": "2.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "web-cfg#583/campaign-03",
+      "consumers": [
+        "web-cfg",
+        "Governance"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Draft multi-vertical catalog pin; does not replace Governance catalog.v1 production authority.",
+      "content_hash": "10ac1507533b5ce99640a7e08e69eb246f27ea52cb8cb0d90796a1d2cf5a778b"
+    },
+    {
+      "id": "CONFENGE_WEB_INTAKE",
+      "version": "2.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "web-cfg#580/campaign-08",
+      "consumers": [
+        "Governance",
+        "warmbly"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Public capture contract draft. Producer publishes; consumers pin version/hash.",
+      "content_hash": "4d5008a2d419798ef13178bb538e725c23057246611ee03bb7a57e07947ad642"
+    },
+    {
+      "id": "NET_NEW_INBOUND_HANDRAISER",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "Governance#65/campaign-06",
+      "consumers": [
+        "warmbly",
+        "web-cfg",
+        "meetcfg"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Wave coordination id. Shipped production policy on origin/main remains NET_NEW_INBOUND_HANDRAISER-v1; this draft id is not a runtime fallback.",
+      "content_hash": "3f2c20c5225054acb269a03b03e8ddf07331b4dd9a22da7389728f98b3d79e12"
+    },
+    {
+      "id": "CONFENGE_HANDRAISER_STATE",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "warmbly#47-closed/campaign-07",
+      "consumers": [
+        "meetcfg",
+        "Governance"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Inbound commercial state. Warmbly#47 is closed; residual live proof sits on Warmbly#260.",
+      "content_hash": "ca9877e36ac20d17873c8f06aafce93b3b126606a471160061fc695dc6eb5190"
+    },
+    {
+      "id": "MEETCFG_HANDRAISER_CONTEXT",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "meetcfg#1/campaign-14",
+      "consumers": [
+        "meetcfg"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Consumer-only context envelope. Meetcfg must not become a second commercial authority.",
+      "content_hash": "f4b2accdd5ec7b88facb0c170f6b08e9ba0c8baa079004a809a23ec86e56d738"
+    },
+    {
+      "id": "private_project_technical_readiness_v1",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "campaign-09",
+      "consumers": [
+        "extra-cli",
+        "Governance"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Private asset contract id. Campaign 16 must not create a product issue for canary 09.",
+      "content_hash": "cd0fc3156f6ccb05f569101e17cd900c5bcfdf8f9d23cc8799ddf461f7759b45"
+    },
+    {
+      "id": "private_project_technical_readiness_assessment",
+      "version": "1.0.0-draft.20260904",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "campaign-09",
+      "consumers": [
+        "extra-cli"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Candidate private offer id. Not a public money page; #588 must not divert this priority.",
+      "content_hash": "44cb9334e019dee0db597b528a2b5358b9fad1532236c0d5d1823f6a72911276"
+    },
+    {
+      "id": "CONFENGE_WEB",
+      "version": "lane",
+      "authority": "TEST_ONLY_WAVE_COORDINATION",
+      "production_authority": false,
+      "runtime_fallback_forbidden": true,
+      "producer": "web-cfg",
+      "consumers": [
+        "Governance",
+        "warmbly"
+      ],
+      "fail_closed_on_missing_version": true,
+      "fail_closed_on_missing_hash": true,
+      "fail_closed_on_divergent_hash": true,
+      "notes": "Source/lane for public intake. outbound_eligible=false; auto_send=false.",
+      "content_hash": "b0c0e6137ba6679263594a63effd97c0f65080ad1d243b1391aafd8c44bcb65f"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CONFENGE_CORPORATE_TAXONOMY",
+      "to": "CONFENGE_OFFER_CATALOG",
+      "relation": "classifies"
+    },
+    {
+      "from": "CONFENGE_OFFER_CATALOG",
+      "to": "CONFENGE_WEB_INTAKE",
+      "relation": "offer_id_on_capture"
+    },
+    {
+      "from": "CONFENGE_WEB_INTAKE",
+      "to": "NET_NEW_INBOUND_HANDRAISER",
+      "relation": "admission_input"
+    },
+    {
+      "from": "NET_NEW_INBOUND_HANDRAISER",
+      "to": "CONFENGE_HANDRAISER_STATE",
+      "relation": "accepted_or_rejected"
+    },
+    {
+      "from": "CONFENGE_HANDRAISER_STATE",
+      "to": "MEETCFG_HANDRAISER_CONTEXT",
+      "relation": "accepted_context_only"
+    },
+    {
+      "from": "CONFENGE_WEB",
+      "to": "CONFENGE_WEB_INTAKE",
+      "relation": "source_lane"
+    },
+    {
+      "from": "private_project_technical_readiness_v1",
+      "to": "private_project_technical_readiness_assessment",
+      "relation": "private_asset_to_offer"
+    },
+    {
+      "from": "extra-cli#530",
+      "to": "warmbly#260",
+      "relation": "official_envelope_consumer",
+      "state": "PARTIAL"
+    },
+    {
+      "from": "extra-cli#543",
+      "to": "Governance#1",
+      "relation": "confront_not_supersede",
+      "state": "PARTIAL"
+    },
+    {
+      "from": "web-cfg#586",
+      "to": "web-cfg#536",
+      "relation": "absorbed_subset_not_lcp_hold",
+      "state": "HOLD"
+    }
+  ],
+  "do_not": [
+    "Copy any contract schema into a second authority.",
+    "Use a draft.20260904 id as production runtime fallback.",
+    "Treat missing or divergent version/hash as pass.",
+    "Authorize SMTP from Warmbly#43 or #155."
+  ]
+}

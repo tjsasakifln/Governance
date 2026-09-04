@@ -1,0 +1,270 @@
+{
+  "schema": "confenge-control-snapshot-file-locks/1",
+  "campaign_id": 16,
+  "observed_at": "2026-09-04T23:38:42Z",
+  "photograph": "initial",
+  "refresh_owner": 97,
+  "this_campaign_write_set": [
+    "docs/campaigns/2026-09-04-multivertical/control-snapshot/**",
+    "tests/test_control_snapshot_campaign_20260904.py",
+    "docs/integration/campaign-20260904/16/**"
+  ],
+  "do_not_touch": [
+    "commercial/**",
+    "schemas/**",
+    "control-center/**",
+    "delivery/**",
+    ".github/**",
+    "package.json",
+    "lockfiles",
+    "Makefile",
+    "README.md",
+    "docs/README.md",
+    "docs/ops/**"
+  ],
+  "locks": [
+    {
+      "campaign_id": "01",
+      "owner": "PRs/depend\u00eancias",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        ".github/**",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "web-cfg PRs #522 #523 #524 #535 #536 #544 #548 #549"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Campaign 01 owns the eight open PRs and dependency bumps. Campaign 16 must not comment or close those PRs."
+    },
+    {
+      "campaign_id": "02",
+      "owner": "arquitetura/taxonomia",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "docs/strategy/**",
+        "ADR-STRAT-002",
+        "MARKET-CAPTURE-OS",
+        "web-cfg#578",
+        "web-cfg#577"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Taxonomy/architecture owner. Draft CONFENGE_CORPORATE_TAXONOMY/1.0.0-draft.20260904."
+    },
+    {
+      "campaign_id": "03",
+      "owner": "ofertas",
+      "repositories": [
+        "web-cfg",
+        "Governance"
+      ],
+      "paths": [
+        "web-cfg#583",
+        "web-cfg#587",
+        "web-cfg#588",
+        "catalog/offer pages"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Offer catalog owner. #588 must not divert campaign 09 private priority."
+    },
+    {
+      "campaign_id": "04",
+      "owner": "credenciais",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#581",
+        "web-cfg#243",
+        "especialista/credentials pages"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Professional credentials; do not invent proof."
+    },
+    {
+      "campaign_id": "05",
+      "owner": "conflitos",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#585",
+        "ethics/conflict gates"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Ethical conflict gate generalization."
+    },
+    {
+      "campaign_id": "06",
+      "owner": "policy Governance",
+      "repositories": [
+        "Governance"
+      ],
+      "paths": [
+        "commercial/inbound/**",
+        "schemas/net-new-inbound-handraiser*.json",
+        "tests/test_net_new_inbound_handraiser.py",
+        "Governance#65"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Admission policy owner. Campaign 16 must not implement policy/schema."
+    },
+    {
+      "campaign_id": "07",
+      "owner": "consumer Warmbly",
+      "repositories": [
+        "warmbly"
+      ],
+      "paths": [
+        "warmbly#260",
+        "INTEL_WATCH inbox/dedup/watch",
+        "warmbly#47 closed residual"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Official envelope consumer. Canary is not official extra-cli envelope."
+    },
+    {
+      "campaign_id": "08",
+      "owner": "captura",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#580",
+        "public forms/intake",
+        "CONFENGE_WEB_INTAKE"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Public capture. No sensitive upload on first contact."
+    },
+    {
+      "campaign_id": "09",
+      "owner": "can\u00e1rio privado",
+      "repositories": [
+        "extra-cli",
+        "Governance"
+      ],
+      "paths": [
+        "private_project_technical_readiness_v1",
+        "private_project_technical_readiness_assessment"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Private canary. Do not create a product issue from campaign 16."
+    },
+    {
+      "campaign_id": "10",
+      "owner": "shell/global CSS",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "styles.css",
+        "home shell",
+        "web-cfg#582"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Home/navigation/global CSS. Campaign 16 does not touch UI."
+    },
+    {
+      "campaign_id": "11",
+      "owner": "hub local",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#579",
+        "Grande Florian\u00f3polis hub pages"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Local acquisition hub; no doorway pages."
+    },
+    {
+      "campaign_id": "12",
+      "owner": "proof QA",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#531",
+        "proof/method pages"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Proof QA is LATER; do not invent case studies."
+    },
+    {
+      "campaign_id": "13",
+      "owner": "mensura\u00e7\u00e3o",
+      "repositories": [
+        "web-cfg"
+      ],
+      "paths": [
+        "web-cfg#529",
+        "analytics without PII"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Measurement waits INDEX_READY URLs and real traffic."
+    },
+    {
+      "campaign_id": "14",
+      "owner": "Meetcfg",
+      "repositories": [
+        "meetcfg"
+      ],
+      "paths": [
+        "meetcfg#1",
+        "MEETCFG_HANDRAISER_CONTEXT"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Consumer of accepted context only."
+    },
+    {
+      "campaign_id": "15",
+      "owner": "pr\u00e9-mortem",
+      "repositories": [
+        "Governance"
+      ],
+      "paths": [
+        "docs/campaigns/2026-09-04-multivertical/premortem/**"
+      ],
+      "exclusive_write": true,
+      "shared_edit_forbidden": true,
+      "integration_owner": 97,
+      "notes": "Premortem owner. Distinct from control-snapshot."
+    }
+  ],
+  "shared_registry_owner": 97,
+  "final_audit_owner": 98,
+  "promotion_owner": 99
+}
