@@ -118,6 +118,22 @@ test("timeout, invalid and stale readback stay unconfirmed on the same key", () 
   assert.equal(replayKeepsIdempotencyKey(timeout, invalid), true);
 });
 
+test("omitted or null blockers is not QUEUED; empty blockers array may confirm", () => {
+  const { blockers: _blockers, ...omitted } = v3Receipt();
+  const omittedRow = classifySchedulingReadback(omitted);
+  assert.equal(omittedRow.queued, false);
+  assert.notEqual(omittedRow.state, "QUEUED");
+
+  const nullRow = classifySchedulingReadback(v3Receipt({ blockers: null }));
+  assert.equal(nullRow.queued, false);
+  assert.notEqual(nullRow.state, "QUEUED");
+
+  const empty = classifySchedulingReadback(v3Receipt({ blockers: [] }));
+  assert.equal(empty.state, "QUEUED");
+  assert.equal(empty.queued, true);
+  assert.equal(empty.provider_mutation, 0);
+});
+
 test("stale freshness on an otherwise complete receipt does not confirm QUEUED", () => {
   const stale = classifySchedulingReadback(v3Receipt({ freshness: "stale" }));
   assert.equal(stale.state, "APPROVAL_PENDING_READBACK");

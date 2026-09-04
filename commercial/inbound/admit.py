@@ -320,26 +320,26 @@ def evaluate_net_new_inbound_handraiser(
     claimed_id = _nonempty_str(payload.get("policy_id"))
     claimed_version = _nonempty_str(payload.get("policy_version"))
     claimed_name = _nonempty_str(payload.get("canonical_name"))
-    if claimed_id is None and claimed_version is None and claimed_name is None:
+    if claimed_version is None:
         unknown("POLICY_VERSION_MISSING")
+    elif claimed_version in accepted_versions:
+        pass
+    elif claimed_version in OLD_POLICY_VERSIONS or (
+        claimed_version.startswith("v") and claimed_version != CANONICAL_POLICY_VERSION
+    ):
+        reject("POLICY_VERSION_NOT_ADMITTED")
     else:
-        if claimed_id is not None and claimed_id not in accepted_ids:
-            if claimed_id in {"CFG-FIRST-TOUCH-ROUTING", "ACQUISITION_PRESSURE"}:
-                reject("POLICY_VERSION_NOT_ADMITTED")
-            else:
-                unknown("POLICY_ID_UNKNOWN")
-        if claimed_name is not None and claimed_name not in accepted_versions:
-            if claimed_name.startswith("NET_NEW_INBOUND_HANDRAISER-") or claimed_name in OLD_POLICY_VERSIONS:
-                reject("POLICY_VERSION_NOT_ADMITTED")
-            else:
-                unknown("POLICY_VERSION_UNKNOWN")
-        if claimed_version is not None:
-            if claimed_version in accepted_versions:
-                pass
-            elif claimed_version in OLD_POLICY_VERSIONS or claimed_version.startswith("v") and claimed_version != CANONICAL_POLICY_VERSION:
-                reject("POLICY_VERSION_NOT_ADMITTED")
-            else:
-                unknown("POLICY_VERSION_UNKNOWN")
+        unknown("POLICY_VERSION_UNKNOWN")
+    if claimed_id is not None and claimed_id not in accepted_ids:
+        if claimed_id in {"CFG-FIRST-TOUCH-ROUTING", "ACQUISITION_PRESSURE"}:
+            reject("POLICY_VERSION_NOT_ADMITTED")
+        else:
+            unknown("POLICY_ID_UNKNOWN")
+    if claimed_name is not None and claimed_name not in accepted_versions:
+        if claimed_name.startswith("NET_NEW_INBOUND_HANDRAISER-") or claimed_name in OLD_POLICY_VERSIONS:
+            reject("POLICY_VERSION_NOT_ADMITTED")
+        else:
+            unknown("POLICY_VERSION_UNKNOWN")
 
     origin_s, origin_invalid = _safe_token(origin)
     lane_s, lane_invalid = _safe_token(lane)
