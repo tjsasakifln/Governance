@@ -92,10 +92,10 @@ test("performance budget owns exact mobile targets and critical routes", () => {
   assert.equal(budget.budgets.initial_request_count, 16);
   assert.equal(budget.budgets.css_raw_bytes, 30000);
   assert.equal(budget.budgets.css_gzip_bytes, 6700);
-  assert.equal(budget.budgets.bundle_gzip_bytes, 130300);
-  assert.equal(budget.budgets.javascript_gzip_bytes, 123600);
-  assert.equal(budget.budget_change.previous_bundle_gzip_bytes, 130000);
-  assert.match(budget.budget_change.reason, /outbound runway/);
+  assert.equal(budget.budgets.bundle_gzip_bytes, 130900);
+  assert.equal(budget.budgets.javascript_gzip_bytes, 124200);
+  assert.equal(budget.budget_change.previous_bundle_gzip_bytes, 130300);
+  assert.match(budget.budget_change.reason, /QUEUED confirmation now requires CFG-FIRST-TOUCH-ROUTING-v3/);
   assert.deepEqual(budget.routes.map((route: { id: string }) => route.id), ["hoje", "rascunhos", "coortes"]);
   const probe = readFileSync(join(app, "scripts/performance-probe.mjs"), "utf8");
   assert.match(probe, /performance_event_timing/);
