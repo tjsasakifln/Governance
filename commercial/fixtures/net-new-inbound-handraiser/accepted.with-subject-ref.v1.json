@@ -1,0 +1,33 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.v1",
+  "origin": "CONFENGE_WEB",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "HUMAN_REVIEW",
+  "idempotency_key": "nihr:web:accepted-subject-ref-001",
+  "correlation_id": "corr_accepted_subject_ref_001",
+  "receipt_id": "rcpt_accepted_subject_ref_001",
+  "subject_ref": "subj:web:handraiser:001",
+  "account_ref": null,
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_subject_001",
+    "identity_match_method": "EXPLICIT_SUBJECT_REF"
+  },
+  "consent_evidence": {
+    "captured": true,
+    "basis": "EXPLICIT_HUMAN_REVIEW_REQUEST",
+    "evidence_ref": "ev_consent_subject_001"
+  },
+  "source": {
+    "system": "web-cfg",
+    "issue_ref": "tjsasakifln/web-cfg#61"
+  },
+  "freshness": {
+    "as_of": "2026-09-03T11:30:00Z",
+    "max_age_seconds": 86400
+  },
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1"
+}

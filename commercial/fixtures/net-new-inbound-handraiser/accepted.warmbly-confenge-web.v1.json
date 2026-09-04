@@ -1,0 +1,33 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.v1",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "v1",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+  "origin": "confenge_web",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "REQUEST_DEEP_DIVE",
+  "idempotency_key": "inbound_only:confenge_web:REQUEST_DEEP_DIVE:fixture-contact",
+  "correlation_id": "corr_warmbly_web_001",
+  "receipt_id": "rcpt_warmbly_web_001",
+  "subject_ref": "company:subj-web-001",
+  "account_ref": null,
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_warmbly_web_001",
+    "identity_match_method": "EXPLICIT_SUBJECT_REF"
+  },
+  "consent_evidence": {
+    "captured": true,
+    "basis": "EXPLICIT_HUMAN_REVIEW_REQUEST",
+    "evidence_ref": "ev_consent_warmbly_web_001"
+  },
+  "source": {
+    "system": "web-cfg",
+    "issue_ref": "tjsasakifln/web-cfg#61"
+  },
+  "freshness": {
+    "as_of": "2026-09-03T11:00:00Z",
+    "max_age_seconds": 86400
+  }
+}

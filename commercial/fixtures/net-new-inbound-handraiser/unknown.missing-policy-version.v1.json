@@ -1,0 +1,30 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.v1",
+  "origin": "CONFENGE_WEB",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "DEEP_DIVE",
+  "idempotency_key": "nihr:web:missing-policy-001",
+  "correlation_id": "corr_missing_policy_001",
+  "receipt_id": "rcpt_missing_policy_001",
+  "subject_ref": null,
+  "account_ref": null,
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_missing_policy_001",
+    "identity_match_method": "EXPLICIT_CONTACT"
+  },
+  "consent_evidence": {
+    "captured": true,
+    "basis": "EXPLICIT_FORM_SUBMIT",
+    "evidence_ref": "ev_consent_missing_policy_001"
+  },
+  "source": {
+    "system": "web-cfg",
+    "issue_ref": "tjsasakifln/web-cfg#61"
+  },
+  "freshness": {
+    "as_of": "2026-09-03T11:00:00Z",
+    "max_age_seconds": 86400
+  }
+}

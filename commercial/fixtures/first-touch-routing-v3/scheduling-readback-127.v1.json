@@ -1,0 +1,17 @@
+{
+  "schema_version": "scheduling-readback-127.v1",
+  "policy_canonical": "CFG-FIRST-TOUCH-ROUTING-v3",
+  "issue": "tjsasakifln/Governance#127",
+  "warmbly_issue": "tjsasakifln/warmbly#155",
+  "incident_gate": "tjsasakifln/extra-cli#468",
+  "incident_gate_state": "OPEN",
+  "isolated_rehearsal": "PASS",
+  "live_authorized_readback": false,
+  "provider_mutation": 0,
+  "queued_is_not_smtp": true,
+  "dispatch_paused": true,
+  "current_transport_verdict": "NO_GO_SMTP",
+  "verdict": "PARTIAL_INCIDENT_GATE",
+  "closeable": false,
+  "reason": "extra-cli#468 remains an open P0 incident containment that freezes mutation on the real CONFENGE population; isolated QUEUED rehearsal is not a live authorized readback."
+}

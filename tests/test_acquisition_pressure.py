@@ -498,4 +498,4 @@ def test_ci_workflow_runs_this_module():
     assert "tests/test_acquisition_pressure.py" in pytest_line
     for name in ORIGIN_MAIN_PYTEST:
         assert name in pytest_line
-    assert "tests/test_net_new_inbound_handraiser.py" not in pytest_line
+    assert "tests/test_net_new_inbound_handraiser.py" in pytest_line
