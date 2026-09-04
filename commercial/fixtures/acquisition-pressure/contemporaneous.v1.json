@@ -1,0 +1,31 @@
+{
+  "schema_version": "acquisition-pressure-observation.v1",
+  "observed_at": "2026-09-03T12:00:00Z",
+  "lane": "NET_NEW_INBOUND",
+  "window": {
+    "start": "2026-08-27T12:00:00Z",
+    "end": "2026-09-03T12:00:00Z"
+  },
+  "previous_decision": null,
+  "sources": {
+    "web_cfg": {
+      "present": false,
+      "payload_ref": null,
+      "snapshot_ref": null,
+      "note": "No named windowed reached/asset_visit/useful_action readback; HTTP 200 probes are not funnel evidence"
+    },
+    "warmbly": {
+      "present": true,
+      "payload_ref": "control-center/connectors/warmbly/fixtures/commercial-runtime.json",
+      "snapshot_ref": null,
+      "note": "Warmbly collect payload present; commercial-snapshot funnel keys are not bound to the canonical eight stages"
+    },
+    "delivery": {
+      "present": false,
+      "payload_ref": null,
+      "snapshot_ref": null,
+      "note": "Governance#123 remains TRIGGERED; no real staffed-capacity snapshot published"
+    }
+  },
+  "stage_observations": []
+}

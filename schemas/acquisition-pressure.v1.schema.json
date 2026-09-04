@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tjsasakifln/Governance/schemas/acquisition-pressure.v1.schema.json",
+  "title": "CONFENGE ACQUISITION_PRESSURE authority v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "canonical_name",
+    "status",
+    "effective_at",
+    "authority",
+    "boundary",
+    "lanes",
+    "canonical_stages",
+    "default_window_seconds",
+    "freshness_max_age_seconds",
+    "stage_bindings",
+    "unbound_vocabularies",
+    "forbidden_funnel_proxies",
+    "anti_noise",
+    "shift",
+    "evaluation",
+    "next_actions",
+    "idempotency",
+    "invariants",
+    "safety",
+    "rollback"
+  ],
+  "properties": {
+    "schema_version": { "const": "acquisition-pressure.v1" },
+    "policy_id": { "const": "ACQUISITION_PRESSURE" },
+    "policy_version": { "const": "v1" },
+    "canonical_name": { "const": "ACQUISITION_PRESSURE-v1" },
+    "status": { "const": "ACTIVE" },
+    "effective_at": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "boundary": { "$ref": "#/$defs/boundary" },
+    "lanes": { "const": ["NET_NEW_INBOUND"] },
+    "canonical_stages": {
+      "const": [
+        "reached",
+        "asset_visit",
+        "useful_action",
+        "monitor",
+        "handraiser",
+        "QCO",
+        "proposal",
+        "won"
+      ]
+    },
+    "default_window_seconds": { "type": "integer", "minimum": 1 },
+    "freshness_max_age_seconds": { "type": "integer", "minimum": 1 },
+    "stage_bindings": { "$ref": "#/$defs/stage_bindings" },
+    "unbound_vocabularies": { "$ref": "#/$defs/string_array" },
+    "forbidden_funnel_proxies": { "$ref": "#/$defs/string_array" },
+    "anti_noise": { "$ref": "#/$defs/anti_noise" },
+    "shift": { "$ref": "#/$defs/shift" },
+    "evaluation": { "$ref": "#/$defs/evaluation" },
+    "next_actions": { "$ref": "#/$defs/next_actions" },
+    "idempotency": { "$ref": "#/$defs/idempotency" },
+    "invariants": { "$ref": "#/$defs/invariants" },
+    "safety": { "$ref": "#/$defs/safety" },
+    "rollback": { "$ref": "#/$defs/rollback" }
+  },
+  "$defs": {
+    "string_array": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decided_by_role",
+        "decision_reference",
+        "capacity_reference",
+        "intake_reference",
+        "decision_source",
+        "human_actor_impersonation_allowed"
+      ],
+      "properties": {
+        "decided_by_role": { "const": "FOUNDER" },
+        "decision_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/164" },
+        "capacity_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/123" },
+        "intake_reference": { "const": "https://github.com/tjsasakifln/Governance/issues/65" },
+        "decision_source": { "const": "VERSIONED_GOVERNANCE_POLICY" },
+        "human_actor_impersonation_allowed": { "const": false }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "governance_owns",
+        "governance_must_not",
+        "web_cfg_owns",
+        "warmbly_owns",
+        "delivery_owns",
+        "intake_frozen",
+        "capacity_issue_state",
+        "new_data_plane",
+        "causal_inference"
+      ],
+      "properties": {
+        "governance_owns": { "$ref": "#/$defs/string_array" },
+        "governance_must_not": { "$ref": "#/$defs/string_array" },
+        "web_cfg_owns": { "const": ["reached", "asset_visit", "useful_action"] },
+        "warmbly_owns": { "const": ["monitor", "handraiser", "QCO", "proposal", "won"] },
+        "delivery_owns": { "const": ["staffed_capacity_via_123"] },
+        "intake_frozen": { "const": "NET_NEW_INBOUND_HANDRAISER-v1" },
+        "capacity_issue_state": { "const": "TRIGGERED" },
+        "new_data_plane": { "const": false },
+        "causal_inference": { "const": false }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner_repo", "owner_issues", "expected_readback", "binding", "not_bound"],
+      "properties": {
+        "owner_repo": { "type": "string", "minLength": 1 },
+        "owner_issues": { "$ref": "#/$defs/string_array" },
+        "expected_readback": { "type": "string", "minLength": 1 },
+        "binding": { "const": "EXPLICIT_CANONICAL_STAGE_ONLY" },
+        "not_bound": { "$ref": "#/$defs/string_array" }
+      }
+    },
+    "stage_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reached",
+        "asset_visit",
+        "useful_action",
+        "monitor",
+        "handraiser",
+        "QCO",
+        "proposal",
+        "won"
+      ],
+      "properties": {
+        "reached": { "$ref": "#/$defs/binding" },
+        "asset_visit": { "$ref": "#/$defs/binding" },
+        "useful_action": { "$ref": "#/$defs/binding" },
+        "monitor": { "$ref": "#/$defs/binding" },
+        "handraiser": { "$ref": "#/$defs/binding" },
+        "QCO": { "$ref": "#/$defs/binding" },
+        "proposal": { "$ref": "#/$defs/binding" },
+        "won": { "$ref": "#/$defs/binding" }
+      }
+    },
+    "anti_noise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "min_abs_delta",
+        "zero_is_always_material",
+        "tie_break",
+        "unknown_never_competes",
+        "retain_previous_unless_material",
+        "documentation"
+      ],
+      "properties": {
+        "rule_id": { "const": "ABS_DELTA_GE_2_OR_ZERO_BREAK" },
+        "min_abs_delta": { "const": 2 },
+        "zero_is_always_material": { "const": true },
+        "tie_break": { "const": "EARLIER_STAGE" },
+        "unknown_never_competes": { "const": true },
+        "retain_previous_unless_material": { "const": true },
+        "documentation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "shift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "yes_requires",
+        "capacity_unknown_while_123_unmeasured",
+        "synthetic_capacity_is_unknown",
+        "policy_ceiling_is_not_capacity",
+        "unknown_never_becomes_yes"
+      ],
+      "properties": {
+        "yes_requires": { "$ref": "#/$defs/string_array" },
+        "capacity_unknown_while_123_unmeasured": { "const": true },
+        "synthetic_capacity_is_unknown": { "const": true },
+        "policy_ceiling_is_not_capacity": { "const": true },
+        "unknown_never_becomes_yes": { "const": true }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "absence_is_unknown_not_zero",
+        "observed_zero_stays_zero",
+        "fail_closed",
+        "replay_semantics",
+        "mutation_mode",
+        "causal_inference",
+        "zero_throughput_does_not_wait_for_conversion_window"
+      ],
+      "properties": {
+        "mode": { "const": "MATERIALIZE_THEN_ONE_DECISION" },
+        "absence_is_unknown_not_zero": { "const": true },
+        "observed_zero_stays_zero": { "const": true },
+        "fail_closed": { "const": true },
+        "replay_semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "mutation_mode": { "const": "MODEL_ONLY" },
+        "causal_inference": { "const": false },
+        "zero_throughput_does_not_wait_for_conversion_window": { "const": true }
+      }
+    },
+    "next_actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "UNKNOWN",
+        "reached",
+        "asset_visit",
+        "useful_action",
+        "monitor",
+        "handraiser",
+        "QCO",
+        "proposal",
+        "won"
+      ],
+      "properties": {
+        "UNKNOWN": { "type": "string", "minLength": 1 },
+        "reached": { "type": "string", "minLength": 1 },
+        "asset_visit": { "type": "string", "minLength": 1 },
+        "useful_action": { "type": "string", "minLength": 1 },
+        "monitor": { "type": "string", "minLength": 1 },
+        "handraiser": { "type": "string", "minLength": 1 },
+        "QCO": { "type": "string", "minLength": 1 },
+        "proposal": { "type": "string", "minLength": 1 },
+        "won": { "type": "string", "minLength": 1 }
+      }
+    },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key_required",
+        "semantics",
+        "same_origin_same_window",
+        "store_mode",
+        "production_ledger_authorized"
+      ],
+      "properties": {
+        "key_required": { "const": true },
+        "semantics": { "const": "EXACTLY_ONCE_LOGICAL" },
+        "same_origin_same_window": { "const": "REPLAY_ORIGINAL_RECORD" },
+        "store_mode": { "const": "MODEL_ONLY" },
+        "production_ledger_authorized": { "const": false }
+      }
+    },
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "new_data_plane",
+        "dashboard",
+        "causal_inference",
+        "page_pr_commit_as_funnel_success",
+        "absence_equals_zero",
+        "intake_schema_mutable",
+        "activate_123_without_trigger",
+        "pii_in_decision",
+        "shift_yes_with_capacity_unknown"
+      ],
+      "properties": {
+        "new_data_plane": { "const": false },
+        "dashboard": { "const": false },
+        "causal_inference": { "const": false },
+        "page_pr_commit_as_funnel_success": { "const": false },
+        "absence_equals_zero": { "const": false },
+        "intake_schema_mutable": { "const": false },
+        "activate_123_without_trigger": { "const": false },
+        "pii_in_decision": { "const": false },
+        "shift_yes_with_capacity_unknown": { "const": false }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paid_media", "smtp", "checkout", "crm_copy", "other_repo_edits"],
+      "properties": {
+        "paid_media": { "const": false },
+        "smtp": { "const": false },
+        "checkout": { "const": false },
+        "crm_copy": { "const": false },
+        "other_repo_edits": { "const": false }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["return_to", "preserve_evidence", "invent_funnel", "invent_dashboard"],
+      "properties": {
+        "return_to": { "const": "UNKNOWN" },
+        "preserve_evidence": { "const": true },
+        "invent_funnel": { "const": false },
+        "invent_dashboard": { "const": false }
+      }
+    }
+  }
+}

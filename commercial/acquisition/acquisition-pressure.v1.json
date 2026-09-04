@@ -1,0 +1,222 @@
+{
+  "schema_version": "acquisition-pressure.v1",
+  "policy_id": "ACQUISITION_PRESSURE",
+  "policy_version": "v1",
+  "canonical_name": "ACQUISITION_PRESSURE-v1",
+  "status": "ACTIVE",
+  "effective_at": "2026-09-03T00:00:00Z",
+  "authority": {
+    "decided_by_role": "FOUNDER",
+    "decision_reference": "https://github.com/tjsasakifln/Governance/issues/164",
+    "capacity_reference": "https://github.com/tjsasakifln/Governance/issues/123",
+    "intake_reference": "https://github.com/tjsasakifln/Governance/issues/65",
+    "decision_source": "VERSIONED_GOVERNANCE_POLICY",
+    "human_actor_impersonation_allowed": false
+  },
+  "boundary": {
+    "governance_owns": [
+      "versioned_policy",
+      "canonical_funnel",
+      "pure_cycle_evaluator",
+      "append_only_model_only_ledger",
+      "one_decision_per_cycle"
+    ],
+    "governance_must_not": [
+      "dashboard",
+      "crm",
+      "crawler",
+      "warehouse",
+      "analytics_sdk",
+      "paid_media",
+      "smtp",
+      "durable_data_plane",
+      "intake_schema_change",
+      "delivery_os_redesign"
+    ],
+    "web_cfg_owns": ["reached", "asset_visit", "useful_action"],
+    "warmbly_owns": ["monitor", "handraiser", "QCO", "proposal", "won"],
+    "delivery_owns": ["staffed_capacity_via_123"],
+    "intake_frozen": "NET_NEW_INBOUND_HANDRAISER-v1",
+    "capacity_issue_state": "TRIGGERED",
+    "new_data_plane": false,
+    "causal_inference": false
+  },
+  "lanes": ["NET_NEW_INBOUND"],
+  "canonical_stages": [
+    "reached",
+    "asset_visit",
+    "useful_action",
+    "monitor",
+    "handraiser",
+    "QCO",
+    "proposal",
+    "won"
+  ],
+  "default_window_seconds": 604800,
+  "freshness_max_age_seconds": 86400,
+  "stage_bindings": {
+    "reached": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "owner_issues": ["tjsasakifln/web-cfg#61", "tjsasakifln/web-cfg#563"],
+      "expected_readback": "windowed reached events named canonical stage reached",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["http_200_probe", "gsc_without_named_readback", "page_count", "pr_count", "commit_count"]
+    },
+    "asset_visit": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "owner_issues": ["tjsasakifln/web-cfg#61", "tjsasakifln/web-cfg#563"],
+      "expected_readback": "windowed asset_visit events named canonical stage asset_visit",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["http_200_probe", "page_count"]
+    },
+    "useful_action": {
+      "owner_repo": "tjsasakifln/web-cfg",
+      "owner_issues": ["tjsasakifln/web-cfg#61"],
+      "expected_readback": "windowed useful_action events named canonical stage useful_action",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["form_html_presence"]
+    },
+    "monitor": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "owner_issues": ["tjsasakifln/warmbly#47"],
+      "expected_readback": "windowed monitor-enter events named canonical stage monitor",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["reservoir_monitored", "working-overview_stock"]
+    },
+    "handraiser": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "owner_issues": ["tjsasakifln/warmbly#47", "tjsasakifln/Governance#65"],
+      "expected_readback": "windowed NET_NEW_INBOUND_HANDRAISER accepted count named canonical stage handraiser",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["confenge_inbound_stock", "novos_leads", "new_leads"]
+    },
+    "QCO": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "owner_issues": ["tjsasakifln/warmbly#47"],
+      "expected_readback": "windowed QCO events named canonical stage QCO",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["oportunidades", "opportunities", "qualified", "qualificados"]
+    },
+    "proposal": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "owner_issues": ["tjsasakifln/warmbly#47"],
+      "expected_readback": "windowed proposal events named canonical stage proposal",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["propostas", "proposals", "pipeline_stage_name"]
+    },
+    "won": {
+      "owner_repo": "tjsasakifln/warmbly",
+      "owner_issues": ["tjsasakifln/warmbly#47"],
+      "expected_readback": "windowed won events named canonical stage won",
+      "binding": "EXPLICIT_CANONICAL_STAGE_ONLY",
+      "not_bound": ["clientes", "clients", "deals_summary.won_count_unwindowed"]
+    }
+  },
+  "unbound_vocabularies": [
+    "novos_leads",
+    "qualificados",
+    "oportunidades",
+    "propostas",
+    "clientes",
+    "new_leads",
+    "qualified",
+    "opportunities",
+    "proposals",
+    "clients",
+    "search_visibility",
+    "click_session",
+    "cta",
+    "inbound_event",
+    "lead",
+    "qualified_lead",
+    "opportunity",
+    "commercial_proposal",
+    "client_revenue"
+  ],
+  "forbidden_funnel_proxies": [
+    "page",
+    "pages",
+    "page_count",
+    "pr",
+    "prs",
+    "pr_count",
+    "pull_request",
+    "pull_requests",
+    "commit",
+    "commits",
+    "commit_count"
+  ],
+  "anti_noise": {
+    "rule_id": "ABS_DELTA_GE_2_OR_ZERO_BREAK",
+    "min_abs_delta": 2,
+    "zero_is_always_material": true,
+    "tie_break": "EARLIER_STAGE",
+    "unknown_never_competes": true,
+    "retain_previous_unless_material": true,
+    "documentation": "A candidate replaces the current bottleneck only if both are OBSERVED and either the candidate count is 0 while the current is not, or current count minus candidate count is >= min_abs_delta. A +/-1 oscillation does not replace. UNKNOWN never competes as 0. Ties keep the earlier canonical stage. Previous bottleneck is retained when the new candidate is not materially lower."
+  },
+  "shift": {
+    "yes_requires": [
+      "qualified_demand_observed",
+      "available_capacity_observed",
+      "qualified_demand_gt_available_capacity",
+      "capacity_evidence_class_real"
+    ],
+    "capacity_unknown_while_123_unmeasured": true,
+    "synthetic_capacity_is_unknown": true,
+    "policy_ceiling_is_not_capacity": true,
+    "unknown_never_becomes_yes": true
+  },
+  "evaluation": {
+    "mode": "MATERIALIZE_THEN_ONE_DECISION",
+    "absence_is_unknown_not_zero": true,
+    "observed_zero_stays_zero": true,
+    "fail_closed": true,
+    "replay_semantics": "EXACTLY_ONCE_LOGICAL",
+    "mutation_mode": "MODEL_ONLY",
+    "causal_inference": false,
+    "zero_throughput_does_not_wait_for_conversion_window": true
+  },
+  "next_actions": {
+    "UNKNOWN": "INSUFFICIENT_EVIDENCE: publish the missing {missing_event} owned by {owner}; do not invent zeros, dashboards, or a new data plane.",
+    "reached": "Publish a windowed reached event readback for lane NET_NEW_INBOUND from web-cfg (#61/#563); do not treat HTTP 200 or page/PR/commit as reach.",
+    "asset_visit": "Publish a windowed asset_visit event readback for lane NET_NEW_INBOUND from web-cfg; do not proxy with page views invented locally.",
+    "useful_action": "Publish a windowed useful_action event readback for lane NET_NEW_INBOUND from web-cfg; do not build a new analytics SDK.",
+    "monitor": "Publish a windowed monitor-enter count named canonical stage monitor from Warmbly; do not treat reservoir_monitored stock as flow.",
+    "handraiser": "Produce or publish windowed NET_NEW_INBOUND_HANDRAISER accepted count via the frozen #65 contract consumed by Warmbly #47; do not change intake schema.",
+    "QCO": "Publish a windowed QCO count named canonical stage QCO from Warmbly; do not map oportunidades/qualified silently.",
+    "proposal": "Publish a windowed proposal count named canonical stage proposal from Warmbly; do not map pipeline column names silently.",
+    "won": "Publish a windowed won count named canonical stage won from Warmbly; do not treat clients or unwindowed won_count as the canonical stage."
+  },
+  "idempotency": {
+    "key_required": true,
+    "semantics": "EXACTLY_ONCE_LOGICAL",
+    "same_origin_same_window": "REPLAY_ORIGINAL_RECORD",
+    "store_mode": "MODEL_ONLY",
+    "production_ledger_authorized": false
+  },
+  "invariants": {
+    "new_data_plane": false,
+    "dashboard": false,
+    "causal_inference": false,
+    "page_pr_commit_as_funnel_success": false,
+    "absence_equals_zero": false,
+    "intake_schema_mutable": false,
+    "activate_123_without_trigger": false,
+    "pii_in_decision": false,
+    "shift_yes_with_capacity_unknown": false
+  },
+  "safety": {
+    "paid_media": false,
+    "smtp": false,
+    "checkout": false,
+    "crm_copy": false,
+    "other_repo_edits": false
+  },
+  "rollback": {
+    "return_to": "UNKNOWN",
+    "preserve_evidence": true,
+    "invent_funnel": false,
+    "invent_dashboard": false
+  }
+}
