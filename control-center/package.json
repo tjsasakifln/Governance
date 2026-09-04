@@ -33,6 +33,9 @@
     "deploy",
     "qa"
   ],
+  "overrides": {
+    "fast-uri": "3.1.7"
+  },
   "scripts": {
     "install": "node scripts/install-workspace.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
