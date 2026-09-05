@@ -665,8 +665,20 @@ def test_draft_conflict_unknown_never_becomes_clear():
 
 
 def test_draft_sensitive_content_never_enters_public_envelope():
+    # D4: the fixture is named "rejected" and must be rejected as committed, with
+    # no in-test mutation propping it up. It stays wire-legal on purpose: the
+    # request schema types protected_ref as a free string, so only the evaluator
+    # can tell a pointer from the protected content itself.
     request = load_fixture("rejected.sensitive-content.draft-20260904.json")
     schema_validate(request, load_json(DRAFT_REQUEST_SCHEMA))
+    as_committed = admit(request)
+    _assert_draft_closed_and_safe(as_committed, request)
+    assert as_committed["decision"] == "REJECTED_WITH_REASON"
+    assert "SENSITIVE_CONTENT_FORBIDDEN" in as_committed["reason_codes"]
+    assert as_committed["sensitive_data"]["protected_ref"] is None
+    assert request["sensitive_data"]["protected_ref"] not in json.dumps(as_committed)
+
+    # Second, explicit case: a forbidden content key is rejected too.
     poisoned = deepcopy(request)
     poisoned["sensitive_data"]["content"] = "sensitive-secret privilege notes"
     decision = admit(poisoned)
@@ -1017,3 +1029,310 @@ def test_draft_warmbly_and_meetcfg_pins_fail_closed_on_missing_or_divergent():
     assert mutated_decision["decision"] == "UNKNOWN"
     assert mutated_decision["decision"] != "ACCEPTED"
     _assert_no_commercial_action(mutated_decision)
+
+
+# ---------------------------------------------------------------------------
+# Adversarial-review regressions (#171 phase A). Each test below pins one of six
+# defects that let a fail-closed policy reach ACCEPTED. None of them may be
+# relaxed without a matching authority change.
+# ---------------------------------------------------------------------------
+
+DRAFT_CLEAN_FIXTURE = "accepted.public_works_b2g.draft-20260904.json"
+
+
+def _poison_sensitive_content(request):
+    request["sensitive_data"]["content"] = "sensitive-secret privilege notes"
+
+
+def _poison_unminimized_location(request):
+    request["site_location"]["street"] = "Rua das Flores 100"
+
+
+def _poison_ambiguous_intent(request):
+    request["intent_kinds"] = ["DEEP_DIVE", "HUMAN_REVIEW"]
+
+
+def _poison_schema_version(request):
+    request["schema_version"] = "net-new-inbound-handraiser-request.9.9.9-forged"
+
+
+@pytest.mark.parametrize(
+    "poison,expected_decision,expected_code",
+    [
+        (_poison_sensitive_content, "REJECTED_WITH_REASON", "SENSITIVE_CONTENT_FORBIDDEN"),
+        (_poison_unminimized_location, "REJECTED_WITH_REASON", "LOCATION_NOT_MINIMIZED"),
+        (_poison_ambiguous_intent, "UNKNOWN", "INTENT_KIND_AMBIGUOUS"),
+        (_poison_schema_version, "UNKNOWN", "REQUEST_INVALID"),
+    ],
+)
+def test_d1_replay_never_launders_a_poisoned_payload(poison, expected_decision, expected_code):
+    """D1: a repeated idempotency key with different material is evaluated fresh.
+
+    The material hash used to authorise REPLAY_ORIGINAL_DECISION must cover every
+    field a hard gate reads. A projection that dropped sensitive_data.content,
+    site_location.street, intent_kinds or schema_version let a second request
+    inherit the first request's clean ACCEPTED.
+    """
+    store = ModelOnlyHandraiserStore()
+    clean = load_fixture(DRAFT_CLEAN_FIXTURE)
+    first = admit(clean, store=store)
+    _assert_draft_closed_and_safe(first, clean)
+    assert first["decision"] == "ACCEPTED"
+    assert first["replayed"] is False
+
+    poisoned = deepcopy(clean)
+    poison(poisoned)
+    assert poisoned["idempotency_key"] == clean["idempotency_key"]
+
+    second = admit(poisoned, store=store)
+    _assert_draft_closed_and_safe(second, poisoned)
+    assert second["replayed"] is False, "poisoned payload was replayed as the clean decision"
+    assert second["metrics"]["replayed"] is False
+    assert second["decision"] != "ACCEPTED"
+    assert second["decision"] == expected_decision
+    assert expected_code in second["reason_codes"]
+    assert "IDEMPOTENCY_PAYLOAD_CONFLICT" in second["reason_codes"]
+    assert second["consumer_authorization"]["create_inbound_only_identity"] is False
+    assert second["consumer_authorization"]["surface_on_commercial_queue"] is False
+    # The clean admission stays the only logical admission on that key.
+    assert store.accepted_logical_count() == 1
+    assert len(store) == 1
+
+
+def test_d1_identical_material_still_replays_exactly_once():
+    """D1 must not weaken EXACTLY_ONCE_LOGICAL for a genuinely identical replay."""
+    store = ModelOnlyHandraiserStore()
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    first = admit(request, store=store)
+    replay = admit(deepcopy(request), store=store)
+    assert first["decision"] == "ACCEPTED"
+    assert replay["decision"] == "ACCEPTED"
+    assert replay["replayed"] is True
+    assert replay["logical_admission_id"] == first["logical_admission_id"]
+    assert store.accepted_logical_count() == 1
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "decision_role",
+        "urgency",
+        "why_now_class",
+        "desired_decision_or_deliverable",
+        "document_availability_class",
+    ],
+)
+def test_d2_omitted_required_input_is_unknown(field: str):
+    """D2: inputs.required + absence_or_ambiguity=UNKNOWN. Omission must fail closed."""
+    assert field in draft_policy()["inputs"]["required"]
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    assert admit(request)["decision"] == "ACCEPTED"
+
+    request.pop(field)
+    decision = admit(request)
+    _assert_draft_closed_and_safe(decision, request)
+    assert decision["decision"] == "UNKNOWN"
+    assert "REQUEST_INVALID" in decision["reason_codes"]
+    assert decision[field] is None
+    assert decision["qualification_state"] == "NONE"
+    assert decision["inbound_only"] is False
+    assert decision["identity_authorization"] == "NONE"
+    assert decision["consumer_authorization"]["create_inbound_only_identity"] is False
+
+
+def test_d3_consumer_pin_fails_closed_when_authority_cannot_be_loaded(monkeypatch, tmp_path):
+    """D3: the pin path must close like the request path on a broken authority."""
+    pin = load_fixture("pin.warmbly.matching.draft-20260904.json")
+    assert evaluate_consumer_pin(pin)["decision"] == "ACCEPTED"
+
+    missing = tmp_path / "absent-authority.json"
+    monkeypatch.setattr("commercial.inbound.admit.DRAFT_AUTHORITY_PATH", missing)
+    absent = evaluate_consumer_pin(pin)
+    assert absent["decision"] == "UNKNOWN"
+    assert "AUTHORITY_UNAVAILABLE" in absent["reason_codes"]
+    _assert_no_commercial_action(absent)
+
+    broken = tmp_path / "broken-authority.json"
+    broken.write_text("{ this is not json", encoding="utf-8")
+    monkeypatch.setattr("commercial.inbound.admit.DRAFT_AUTHORITY_PATH", broken)
+    corrupt = evaluate_consumer_pin(pin)
+    assert corrupt["decision"] == "UNKNOWN"
+    assert "AUTHORITY_UNAVAILABLE" in corrupt["reason_codes"]
+    _assert_no_commercial_action(corrupt)
+
+    monkeypatch.setattr("commercial.inbound.admit.DRAFT_CONSUMER_MATRIX_PATH", missing)
+    monkeypatch.setattr("commercial.inbound.admit.DRAFT_AUTHORITY_PATH", DRAFT_AUTHORITY_PATH)
+    no_matrix = evaluate_consumer_pin(pin)
+    assert no_matrix["decision"] == "UNKNOWN"
+    assert "AUTHORITY_UNAVAILABLE" in no_matrix["reason_codes"]
+    _assert_no_commercial_action(no_matrix)
+
+
+@pytest.mark.parametrize(
+    "bogus_authority",
+    [
+        {"totally": "bogus"},
+        {"canonical_name": ""},
+        {"canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1"},
+        {"canonical_name": "SOMETHING_ELSE/9.9.9"},
+        [],
+        "not-a-mapping",
+    ],
+)
+def test_d3_incomplete_authority_argument_cannot_ratify_a_pin(bogus_authority):
+    """D3: a passed-in authority that is not the live draft must never ACCEPT.
+
+    Falling back to DRAFT_CANONICAL_NAME while hashing the caller's document
+    produced a self-inconsistent ratification: bogus authority, fallback name,
+    ACCEPTED.
+    """
+    pin = load_fixture("pin.warmbly.matching.draft-20260904.json")
+    decision = evaluate_consumer_pin(pin, authority=bogus_authority)
+    assert decision["decision"] == "UNKNOWN"
+    assert decision["decision"] != "ACCEPTED"
+    assert "AUTHORITY_UNAVAILABLE" in decision["reason_codes"]
+    assert "ADMISSION_GATES_SATISFIED" not in decision["reason_codes"]
+    _assert_no_commercial_action(decision)
+
+
+def test_d3_bogus_matrix_argument_cannot_ratify_a_pin():
+    pin = load_fixture("pin.warmbly.matching.draft-20260904.json")
+    decision = evaluate_consumer_pin(pin, matrix="not-a-mapping")
+    assert decision["decision"] == "UNKNOWN"
+    assert "AUTHORITY_UNAVAILABLE" in decision["reason_codes"]
+    _assert_no_commercial_action(decision)
+
+
+# Assembled from parts on purpose: a literal CPF in this file would trip
+# scan_tree_for_secrets() in scripts/validate_commercial_authority.py, which
+# scans tests/*.py for the \d{3}.\d{3}.\d{3}-\d{2} pattern.
+ADVERSARIAL_CITY = (
+    "Rua das Flores 100 apto 2 - Joao Silva CPF "
+    + ".".join(("123", "456", "789"))
+    + "-00 tel 48999998888"
+)
+
+
+def test_d5_free_text_pii_in_city_is_not_echoed_and_is_not_accepted():
+    """D5: LOCATION_FORBIDDEN_FIELDS screens keys; the values need screening too.
+
+    The adversarial value is 73 characters, so it passes the request schema's
+    `city` maxLength of 80. Only the evaluator can stop it, and invariants
+    .pii_in_decision is false.
+    """
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    request["site_location"] = {"city": ADVERSARIAL_CITY, "uf": "SC"}
+    schema_validate(request, load_json(DRAFT_REQUEST_SCHEMA))
+
+    decision = admit(request)
+    _assert_draft_closed_and_safe(decision, request)
+    assert decision["decision"] == "REJECTED_WITH_REASON"
+    assert "LOCATION_NOT_MINIMIZED" in decision["reason_codes"]
+    assert decision["site_location"] is None
+    blob = json.dumps(decision, ensure_ascii=False)
+    assert ADVERSARIAL_CITY not in blob
+    assert "Rua das Flores" not in blob
+    assert "Joao Silva" not in blob
+    assert "48999998888" not in blob
+    assert decision["consumer_authorization"]["create_inbound_only_identity"] is False
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        {"city": "Florianopolis 88010-000", "uf": "SC"},
+        {"city": "visitante@example.com", "uf": "SC"},
+        {"city": "Florianopolis, Rua X, 100", "uf": "SC"},
+        {"city": "F" * 81, "uf": "SC"},
+        {"city": "Florianopolis", "uf": "Santa Catarina"},
+        {"city": "Florianopolis", "uf": "SC", "ibge_municipality_code": "not-a-code"},
+    ],
+)
+def test_d5_location_values_that_are_not_city_state_are_rejected(location):
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    request["site_location"] = location
+    decision = admit(request)
+    assert decision["decision"] == "REJECTED_WITH_REASON"
+    assert "LOCATION_NOT_MINIMIZED" in decision["reason_codes"]
+    assert decision["site_location"] is None
+
+
+@pytest.mark.parametrize(
+    "city",
+    [
+        "Florianopolis",
+        "Embu-Guacu",
+        "Santa Barbara d'Oeste",
+        "Sao Jose dos Pinhais",
+        # Accented spellings are the real ones on a Brazilian web form. They pin
+        # the choice of a forbidden-character set over a letter-class regex:
+        # r"^[A-Za-z][A-Za-z'\- ]*$" would pass every ASCII case above and start
+        # rejecting legitimate inbound leads from these municipalities.
+        "Florianópolis",
+        "São José dos Pinhais",
+        "Embu-Guaçu",
+        "Brasília",
+        "Olho d'Água das Flores",
+    ],
+)
+def test_d5_real_municipality_names_still_pass(city: str):
+    """The D5 gate must not false-reject genuine Brazilian municipality names."""
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    request["site_location"] = {"city": city, "uf": "SC", "ibge_municipality_code": "4205407"}
+    decision = admit(request)
+    _assert_draft_closed_and_safe(decision, request)
+    assert decision["decision"] == "ACCEPTED"
+    assert decision["site_location"] == {
+        "city": city,
+        "uf": "SC",
+        "ibge_municipality_code": "4205407",
+    }
+
+
+def test_d6_store_is_truthy_even_when_empty():
+    """D6: `store or ModelOnlyHandraiserStore()` must not discard the first admission."""
+    empty = ModelOnlyHandraiserStore()
+    assert len(empty) == 0
+    assert bool(empty) is True
+    assert (empty or ModelOnlyHandraiserStore()) is empty
+
+    # The idiom now preserves the caller's store across two admissions.
+    store = ModelOnlyHandraiserStore()
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    admit(request, store=(store or ModelOnlyHandraiserStore()))
+    assert len(store) == 1
+    replay = admit(request, store=(store or ModelOnlyHandraiserStore()))
+    assert replay["replayed"] is True
+    assert store.accepted_logical_count() == 1
+
+
+@pytest.mark.parametrize(
+    "poison",
+    [
+        _poison_ambiguous_intent,
+        _poison_schema_version,
+    ],
+)
+def test_d1_v1_path_replay_is_also_material_complete(poison):
+    """D1 applies to the v1 path too: its projection omitted schema_version and
+    intent_kinds, so the same replay bypass existed on the shipped v1 policy."""
+    store = ModelOnlyHandraiserStore()
+    clean = load_fixture("accepted.missing-account.v1.json")
+    first = admit(clean, store=store)
+    assert first["decision"] == "ACCEPTED"
+    assert first["canonical_name"] == "NET_NEW_INBOUND_HANDRAISER-v1"
+    assert first["replayed"] is False
+
+    poisoned = deepcopy(clean)
+    poison(poisoned)
+    assert poisoned["idempotency_key"] == clean["idempotency_key"]
+
+    second = admit(poisoned, store=store)
+    # A forged schema_version must not reroute a v1 request onto the draft path.
+    assert second["canonical_name"] == "NET_NEW_INBOUND_HANDRAISER-v1"
+    assert second["replayed"] is False, "poisoned payload was replayed as the clean decision"
+    assert second["metrics"]["replayed"] is False
+    assert second["decision"] != "ACCEPTED"
+    assert "IDEMPOTENCY_PAYLOAD_CONFLICT" in second["reason_codes"]
+    assert second["consumer_authorization"]["create_inbound_only_identity"] is False
+    assert store.accepted_logical_count() == 1

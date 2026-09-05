@@ -48,6 +48,13 @@ LOCATION_FORBIDDEN_FIELDS = frozenset(
 SENSITIVE_CONTENT_KEYS = frozenset({"content", "raw", "text", "payload", "body", "message"})
 ISO_Z_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 OPAQUE_REF_RE = re.compile(r"^[A-Za-z0-9:._-]{1,128}$")
+# site_location.city/uf are the only free-form strings the policy lets through
+# unhashed, so they are validated by value and not only by key. A street, CEP,
+# CPF, phone number or e-mail stuffed into `city` is not a minimized location.
+CITY_MAX_LEN = 80
+CITY_FORBIDDEN_CHARS = frozenset("0123456789@,;:/\\#|<>[]{}()\"=+*&%$!?\t\r\n")
+UF_RE = re.compile(r"^[A-Z]{2}$")
+IBGE_RE = re.compile(r"^[0-9]{7}$")
 PII_KEYS = frozenset(
     {
         "email",
@@ -138,10 +145,37 @@ def evaluate_consumer_pin(
 ) -> dict[str, Any]:
     """Ratify a Warmbly/Meetcfg pin. Missing or divergent version/hash fail closed."""
 
-    authority = authority if isinstance(authority, Mapping) else load_draft_authority()
-    matrix = matrix if isinstance(matrix, Mapping) else load_draft_consumer_matrix()
-    live_name = _nonempty_str(authority.get("canonical_name")) or DRAFT_CANONICAL_NAME
-    live_hash = policy_hash(authority)
+    # Fail closed on a broken, missing, or incomplete authority, exactly like the
+    # request path (_evaluate_draft). A passed-in document that is not the live
+    # draft authority must never ratify a pin: falling back to
+    # DRAFT_CANONICAL_NAME while hashing the passed-in document would produce a
+    # self-inconsistent ACCEPTED.
+    authority_unavailable = False
+    if authority is None:
+        try:
+            authority = load_draft_authority()
+        except (OSError, ValueError):
+            authority = {}
+            authority_unavailable = True
+    if (
+        not isinstance(authority, Mapping)
+        or _nonempty_str(authority.get("canonical_name")) != DRAFT_CANONICAL_NAME
+    ):
+        authority = {}
+        authority_unavailable = True
+
+    if matrix is None:
+        try:
+            matrix = load_draft_consumer_matrix()
+        except (OSError, ValueError):
+            matrix = {}
+            authority_unavailable = True
+    if not isinstance(matrix, Mapping):
+        matrix = {}
+        authority_unavailable = True
+
+    live_name = DRAFT_CANONICAL_NAME
+    live_hash = None if authority_unavailable else policy_hash(authority)
     payload = pin if isinstance(pin, Mapping) else {}
     consumer_id = _nonempty_str(payload.get("consumer_id"))
     pin_name = _nonempty_str(payload.get("canonical_name"))
@@ -156,7 +190,10 @@ def evaluate_consumer_pin(
     reasons: list[str] = []
     decision_state = "ACCEPTED"
 
-    if not isinstance(pin, Mapping) or consumer_id is None or plane is None:
+    if authority_unavailable:
+        decision_state = "UNKNOWN"
+        reasons.append("AUTHORITY_UNAVAILABLE")
+    elif not isinstance(pin, Mapping) or consumer_id is None or plane is None:
         decision_state = "UNKNOWN"
         reasons.append("REQUEST_INVALID")
     elif consumer_id not in known_ids and consumer_id not in {plane, plane.lower()}:
@@ -232,6 +269,18 @@ def _opaque_ref(value: Any) -> str | None:
     if not OPAQUE_REF_RE.match(text) or "@" in text:
         return None
     return text
+
+
+def _is_city_name(value: str) -> bool:
+    """True only for something that looks like a municipality name.
+
+    Rejects digits and punctuation used by street addresses, CEPs, CPFs, phone
+    numbers and e-mails while still admitting real Brazilian municipalities
+    (``Embu-Guacu``, ``Santa Barbara d'Oeste``, ``Olho d'Agua das Flores``).
+    """
+    if not value or len(value) > CITY_MAX_LEN:
+        return False
+    return not any(char in CITY_FORBIDDEN_CHARS for char in value)
 
 
 def _safe_token(value: Any) -> tuple[str | None, bool]:
@@ -322,6 +371,13 @@ class ModelOnlyHandraiserStore:
     def __len__(self) -> int:
         return len(self._by_key)
 
+    def __bool__(self) -> bool:
+        # A store object is always truthy. Only `is None` may decide whether a
+        # caller constructs a default store: an empty store that reads as falsy
+        # makes `store or ModelOnlyHandraiserStore()` silently discard the first
+        # admission and break exactly-once logical replay.
+        return True
+
     def accepted_logical_count(self) -> int:
         return sum(
             1
@@ -333,45 +389,38 @@ class ModelOnlyHandraiserStore:
         return tuple(self._by_key.keys())
 
 
+def _material_hash(view: Any) -> str:
+    """Deterministic digest of a material view, safe on non-JSON payloads."""
+    try:
+        blob = canonical_json(view)
+    except (TypeError, ValueError):
+        try:
+            blob = json.dumps(
+                view, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=repr
+            )
+        except (TypeError, ValueError):
+            blob = repr(view)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
 def _material_view(request: Mapping[str, Any]) -> dict[str, Any]:
-    contact = request.get("contact_evidence") if isinstance(request.get("contact_evidence"), Mapping) else None
-    consent = request.get("consent_evidence") if isinstance(request.get("consent_evidence"), Mapping) else None
-    source = request.get("source") if isinstance(request.get("source"), Mapping) else None
-    freshness = request.get("freshness") if isinstance(request.get("freshness"), Mapping) else None
-    return {
-        "origin": request.get("origin"),
-        "acquisition_lane": request.get("acquisition_lane"),
-        "intent_kind": request.get("intent_kind"),
-        "idempotency_key": request.get("idempotency_key"),
-        "correlation_id": request.get("correlation_id"),
-        "receipt_id": request.get("receipt_id"),
-        "subject_ref": request.get("subject_ref"),
-        "account_ref": request.get("account_ref"),
-        "opt_out": request.get("opt_out"),
-        "contact_evidence": {
-            "present": None if contact is None else contact.get("present"),
-            "channel": None if contact is None else contact.get("channel"),
-            "evidence_ref": None if contact is None else contact.get("evidence_ref"),
-            "identity_match_method": None if contact is None else contact.get("identity_match_method"),
-        },
-        "consent_evidence": {
-            "captured": None if consent is None else consent.get("captured"),
-            "basis": None if consent is None else consent.get("basis"),
-            "evidence_ref": None if consent is None else consent.get("evidence_ref"),
-        },
-        "source": None
-        if source is None
-        else {"system": source.get("system"), "issue_ref": source.get("issue_ref")},
-        "freshness": None
-        if freshness is None
-        else {
-            "as_of": freshness.get("as_of"),
-            "max_age_seconds": freshness.get("max_age_seconds"),
-        },
-        "policy_id": request.get("policy_id"),
-        "policy_version": request.get("policy_version"),
-        "canonical_name": request.get("canonical_name"),
-    }
+    """Material identity of a request: the whole request, never a projection.
+
+    The material hash decides whether a repeated idempotency key replays the
+    original decision. Any projection risks omitting a field that a hard gate
+    inspects, and every omitted field is a replay bypass: a first clean
+    ACCEPTED followed by the same key carrying sensitive content, an
+    unminimized location, an ambiguous intent, or a different schema_version
+    would inherit the ACCEPTED instead of being evaluated fresh and rejected.
+
+    Hashing the entire request removes that class of bug by construction. It
+    only ever moves outcomes from REPLAY_ORIGINAL_DECISION toward fresh
+    evaluation or IDEMPOTENCY_PAYLOAD_CONFLICT, which is the fail-closed
+    direction.
+    """
+    if not isinstance(request, Mapping):
+        return {}
+    return dict(request)
 
 
 def _replay(stored: Mapping[str, Any]) -> dict[str, Any]:
@@ -604,7 +653,7 @@ def evaluate_net_new_inbound_handraiser(
                     unknown("FRESHNESS_STALE")
 
     material = _material_view(payload)
-    material_hash = hashlib.sha256(canonical_json(material).encode("utf-8")).hexdigest()
+    material_hash = _material_hash(material)
 
     if store is not None and key_s is not None:
         existing = store.get(key_s)
@@ -729,53 +778,8 @@ def evaluate_net_new_inbound_handraiser(
 
 
 def _material_view_draft(request: Mapping[str, Any]) -> dict[str, Any]:
-    material = _material_view(request)
-    landing = request.get("landing_asset") if isinstance(request.get("landing_asset"), Mapping) else None
-    location = request.get("site_location") if isinstance(request.get("site_location"), Mapping) else None
-    sensitive = request.get("sensitive_data") if isinstance(request.get("sensitive_data"), Mapping) else None
-    conflict = request.get("conflict_screening") if isinstance(request.get("conflict_screening"), Mapping) else None
-    material.update(
-        {
-            "intake_source": request.get("intake_source"),
-            "landing_asset": None
-            if landing is None
-            else {"id": landing.get("id"), "kind": landing.get("kind")},
-            "nucleus_id": request.get("nucleus_id"),
-            "offer_candidate_id": request.get("offer_candidate_id"),
-            "party_kind": request.get("party_kind"),
-            "decision_role": request.get("decision_role"),
-            "site_location": None
-            if location is None
-            else {
-                "city": location.get("city"),
-                "uf": location.get("uf"),
-                "ibge_municipality_code": location.get("ibge_municipality_code"),
-            },
-            "urgency": request.get("urgency"),
-            "why_now_class": request.get("why_now_class"),
-            "desired_decision_or_deliverable": request.get("desired_decision_or_deliverable"),
-            "document_availability_class": request.get("document_availability_class"),
-            "sensitive_data": None
-            if sensitive is None
-            else {
-                "present": sensitive.get("present"),
-                "class": sensitive.get("class"),
-                "protected_ref": sensitive.get("protected_ref"),
-            },
-            "conflict_screening": None
-            if conflict is None
-            else {
-                "status": conflict.get("status"),
-                "protected_ref": conflict.get("protected_ref"),
-                "claimed_clear": conflict.get("claimed_clear"),
-            },
-            "partner_required": request.get("partner_required"),
-            "capacity_review_required": request.get("capacity_review_required"),
-            "outbound_eligible": request.get("outbound_eligible"),
-            "auto_send": request.get("auto_send"),
-        }
-    )
-    return material
+    """Draft material identity. Same whole-request rule as the v1 path."""
+    return _material_view(request)
 
 
 def _derive_qualification(
@@ -1025,16 +1029,43 @@ def _evaluate_draft(
         unknown("PARTY_KIND_UNKNOWN")
         party_s = None
 
-    if role_s is not None and admitted_roles and role_s not in admitted_roles:
+    # inputs.required lists all five of these. Absence is ambiguity, and the
+    # policy's absence_or_ambiguity disposition is UNKNOWN, so an omitted field
+    # must fail closed instead of silently reaching ACCEPTED.
+    if role_raw in {None, ""} or role_s is None:
         unknown("REQUEST_INVALID")
-    if urgency_s is not None and admitted_urgency and urgency_s not in admitted_urgency:
+        role_s = None
+    elif admitted_roles and role_s not in admitted_roles:
         unknown("REQUEST_INVALID")
-    if why_s is not None and admitted_why and why_s not in admitted_why:
+        role_s = None
+
+    if urgency_raw in {None, ""} or urgency_s is None:
         unknown("REQUEST_INVALID")
-    if deliverable_s is not None and admitted_deliverable and deliverable_s not in admitted_deliverable:
+        urgency_s = None
+    elif admitted_urgency and urgency_s not in admitted_urgency:
         unknown("REQUEST_INVALID")
-    if docs_s is not None and admitted_docs and docs_s not in admitted_docs:
+        urgency_s = None
+
+    if why_raw in {None, ""} or why_s is None:
         unknown("REQUEST_INVALID")
+        why_s = None
+    elif admitted_why and why_s not in admitted_why:
+        unknown("REQUEST_INVALID")
+        why_s = None
+
+    if deliverable_raw in {None, ""} or deliverable_s is None:
+        unknown("REQUEST_INVALID")
+        deliverable_s = None
+    elif admitted_deliverable and deliverable_s not in admitted_deliverable:
+        unknown("REQUEST_INVALID")
+        deliverable_s = None
+
+    if docs_raw in {None, ""} or docs_s is None:
+        unknown("REQUEST_INVALID")
+        docs_s = None
+    elif admitted_docs and docs_s not in admitted_docs:
+        unknown("REQUEST_INVALID")
+        docs_s = None
 
     landing_out: dict[str, str] | None = None
     if not isinstance(landing, Mapping):
@@ -1055,11 +1086,20 @@ def _evaluate_draft(
     else:
         if any(str(key).lower() in LOCATION_FORBIDDEN_FIELDS for key in location):
             reject("LOCATION_NOT_MINIMIZED")
+        if any(str(key).lower() in PII_KEYS for key in location):
+            reject("LOCATION_NOT_MINIMIZED")
         city = _nonempty_str(location.get("city"))
         uf = _nonempty_str(location.get("uf"))
         ibge = _nonempty_str(location.get("ibge_municipality_code"))
         if city is None or uf is None:
             unknown("REQUEST_INVALID")
+        elif not _is_city_name(city) or UF_RE.match(uf) is None:
+            # Key-only screening is not enough: a street address, CPF or phone
+            # number stuffed into the `city` value is still an unminimized
+            # location and must never be echoed into the decision envelope.
+            reject("LOCATION_NOT_MINIMIZED")
+        elif ibge is not None and IBGE_RE.match(ibge) is None:
+            reject("LOCATION_NOT_MINIMIZED")
         else:
             location_out = {"city": city, "uf": uf}
             if ibge is not None:
@@ -1077,7 +1117,15 @@ def _evaluate_draft(
             reject("SENSITIVE_CONTENT_FORBIDDEN")
         sensitive_present = sensitive.get("present") is True
         sensitive_class = _nonempty_str(sensitive.get("class"))
-        sensitive_ref = _opaque_ref(sensitive.get("protected_ref")) if sensitive.get("protected_ref") not in {None, ""} else None
+        raw_sensitive_ref = sensitive.get("protected_ref")
+        if raw_sensitive_ref not in {None, ""}:
+            sensitive_ref = _opaque_ref(raw_sensitive_ref)
+            if sensitive_ref is None:
+                # A protected_ref that is not an opaque token carries the
+                # protected content itself, not a pointer to it. The wire schema
+                # cannot catch this (it types protected_ref as a free string),
+                # so the evaluator is the only gate.
+                reject("SENSITIVE_CONTENT_FORBIDDEN")
         if sensitive_class is None:
             unknown("SENSITIVE_CLASS_UNKNOWN")
         elif admitted_sensitive and sensitive_class not in admitted_sensitive:
@@ -1197,7 +1245,7 @@ def _evaluate_draft(
                     unknown("FRESHNESS_STALE")
 
     material = _material_view_draft(payload)
-    material_hash = hashlib.sha256(canonical_json(material).encode("utf-8")).hexdigest()
+    material_hash = _material_hash(material)
 
     if store is not None and key_s is not None:
         existing = store.get(key_s)

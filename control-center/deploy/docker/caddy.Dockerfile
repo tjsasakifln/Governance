@@ -22,6 +22,10 @@ COPY --from=caddy-build /caddy /usr/bin/caddy
 # Fail the build unless the reviewed fixed floor is available.
 RUN apk add --no-cache --upgrade 'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
 
+# CVE-2026-11352/11586/12064/8286/8458/8925/8927/9547 in curl/libcurl: fixed
+# in 8.22.0-r0. Fail the build unless the reviewed fixed floor is available.
+RUN apk add --no-cache --upgrade 'curl>=8.22.0-r0' 'libcurl>=8.22.0-r0'
+
 # BusyBox wget is already in this image; do not apk-add a healthcheck chain.
 # Default hook; compose also bind-mounts Caddyfile so operators can edit without rebuild.
 COPY Caddyfile /etc/caddy/Caddyfile

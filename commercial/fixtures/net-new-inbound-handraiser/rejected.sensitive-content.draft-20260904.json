@@ -32,7 +32,7 @@
   "sensitive_data": {
     "present": true,
     "class": "LEGAL_PRIVILEGE",
-    "protected_ref": "sens:ref:001"
+    "protected_ref": "parecer juridico privilegiado do cliente, nao um ponteiro"
   },
   "conflict_screening": {
     "status": "CLEAR",
