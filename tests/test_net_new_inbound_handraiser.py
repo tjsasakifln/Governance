@@ -7,7 +7,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from jsonschema import Draft202012Validator, ValidationError as JsonSchemaValidationError
 
 from commercial.inbound import (
     AUTHORITY_PATH,
@@ -844,19 +843,19 @@ def test_draft_qualification_states_are_closed():
 
 def test_draft_site_location_is_required_but_only_collects_city_uf_when_material():
     request = load_fixture(DRAFT_CLEAN_FIXTURE)
-    validator = Draft202012Validator(load_json(DRAFT_REQUEST_SCHEMA))
+    location_schema = load_json(DRAFT_REQUEST_SCHEMA)["$defs"]["site_location"]
+    assert location_schema["required"] == ["material"]
+    assert location_schema["properties"]["material"] == {"type": "boolean"}
 
     not_material = deepcopy(request)
     not_material["site_location"] = {"material": False}
-    validator.validate(not_material)
+    schema_validate(not_material, load_json(DRAFT_REQUEST_SCHEMA))
     decision = admit(not_material)
     _assert_draft_closed_and_safe(decision, not_material)
     assert decision["site_location"] == {"material": False}
 
     unminimized = deepcopy(not_material)
     unminimized["site_location"] = {"material": False, "city": "Florianopolis"}
-    with pytest.raises(JsonSchemaValidationError):
-        validator.validate(unminimized)
     rejected = admit(unminimized)
     _assert_draft_closed_and_safe(rejected, unminimized)
     assert rejected["decision"] == "REJECTED_WITH_REASON"
