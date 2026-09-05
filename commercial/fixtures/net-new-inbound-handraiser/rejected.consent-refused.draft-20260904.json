@@ -1,0 +1,64 @@
+{
+  "schema_version": "net-new-inbound-handraiser-request.1.0.0-draft.20260904",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "1.0.0-draft.20260904",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+  "origin": "CONFENGE_WEB",
+  "acquisition_lane": "NET_NEW_INBOUND",
+  "intent_kind": "HUMAN_REVIEW",
+  "idempotency_key": "nihr:web:draft-rejected-consent-001",
+  "correlation_id": "corr_draft_rejected_consent_001",
+  "receipt_id": "rcpt_draft_rejected_consent_001",
+  "subject_ref": null,
+  "account_ref": null,
+  "intake_source": "CONFENGE_WEB",
+  "landing_asset": {
+    "id": "private_project_technical_readiness_v1",
+    "kind": "OFFER"
+  },
+  "nucleus_id": "expert_evidence_assistance",
+  "offer_candidate_id": "private_project_technical_readiness_assessment",
+  "party_kind": "COMPANY",
+  "decision_role": "DECISION_MAKER",
+  "site_location": {
+    "city": "Florianopolis",
+    "uf": "SC",
+    "ibge_municipality_code": "4205407"
+  },
+  "urgency": "THIS_CYCLE",
+  "why_now_class": "AUDIT",
+  "desired_decision_or_deliverable": "ASSESSMENT",
+  "document_availability_class": "COMPLETE",
+  "sensitive_data": {
+    "present": false,
+    "class": "NONE",
+    "protected_ref": null
+  },
+  "conflict_screening": {
+    "status": "CLEAR",
+    "protected_ref": "conflict:ref:eea:001"
+  },
+  "contact_evidence": {
+    "present": true,
+    "channel": "EMAIL",
+    "evidence_ref": "ev_contact_draft_refused_001",
+    "identity_match_method": "EXPLICIT_CONTACT"
+  },
+  "consent_evidence": {
+    "captured": false,
+    "basis": "EXPLICIT_FORM_SUBMIT",
+    "evidence_ref": "ev_consent_draft_refused_001"
+  },
+  "source": {
+    "system": "web-cfg",
+    "issue_ref": "tjsasakifln/web-cfg#577"
+  },
+  "freshness": {
+    "as_of": "2026-09-03T11:00:00Z",
+    "max_age_seconds": 86400
+  },
+  "retention": {
+    "purpose": "INBOUND_ADMISSION",
+    "class": "COMMERCIAL_INTAKE"
+  }
+}

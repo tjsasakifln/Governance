@@ -1,0 +1,80 @@
+{
+  "schema_version": "net-new-inbound-handraiser-consumer-matrix.1.0.0-draft.20260904",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "1.0.0-draft.20260904",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+  "status": "ACTIVE",
+  "v1_remains_exact_match_authority": true,
+  "policy_hash": "sha256:984f442690f7c74f309173b31008518631170d63733b5cc04c32abaf88c67e28",
+  "exact_version_match_required": true,
+  "missing_old_unknown_fail_closed": true,
+  "do_not_copy_schema": true,
+  "consumers": [
+    {
+      "id": "Warmbly#47",
+      "role": "record_queue_outcome_owner",
+      "compatibility": "pin_version_and_hash",
+      "must_pin": ["canonical_name", "policy_hash"],
+      "may_not": ["outbound_eligible_default", "smtp", "followup", "auto_send", "parallel_crm", "copy_schema"]
+    },
+    {
+      "id": "Warmbly#117",
+      "role": "record_queue_outcome_owner",
+      "compatibility": "pin_version_and_hash",
+      "must_pin": ["canonical_name", "policy_hash"],
+      "may_not": ["outbound_eligible_default", "copy_schema"]
+    },
+    {
+      "id": "Warmbly#260",
+      "role": "record_queue_outcome_owner",
+      "compatibility": "pin_version_and_hash",
+      "must_pin": ["canonical_name", "policy_hash"],
+      "may_not": ["copy_schema"]
+    },
+    {
+      "id": "MeetCFG#1",
+      "role": "view_only_consumer",
+      "compatibility": "accepted_only",
+      "must_pin": ["canonical_name", "policy_hash"],
+      "may_not": ["create_lead", "create_session_from_rejected_or_unknown", "outbound_eligibility", "copy_schema"]
+    },
+    {
+      "id": "web-cfg#577",
+      "role": "intent_producer",
+      "origins": ["CONFENGE_WEB", "confenge_web"],
+      "compatibility": "pin_version_and_hash"
+    },
+    {
+      "id": "web-cfg#580",
+      "role": "intent_producer",
+      "origins": ["CONFENGE_WEB"],
+      "compatibility": "pin_version_and_hash"
+    },
+    {
+      "id": "web-cfg#585",
+      "role": "intent_producer",
+      "origins": ["CONFENGE_WEB"],
+      "compatibility": "pin_version_and_hash"
+    }
+  ],
+  "not_producers": [
+    {
+      "id": "extra-cli#543",
+      "reason": "PNCP live is async ingestion and telemetry. It is not commercial authority and not site inbound."
+    }
+  ],
+  "incompatible": [
+    "missing_policy_version",
+    "v0",
+    "v1_string_on_this_version",
+    "v2",
+    "v3",
+    "unknown_policy_id",
+    "intel_watch",
+    "intel_seed",
+    "CFG-FIRST-TOUCH-ROUTING",
+    "outbound_eligible_true",
+    "auto_send_true"
+  ],
+  "pin_command": "python -c \"from commercial.inbound import load_draft_authority, policy_hash; print(policy_hash(load_draft_authority()))\""
+}
