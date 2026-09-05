@@ -4,6 +4,10 @@ FROM postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95
 # Fail the build unless the reviewed fixed floor is available.
 RUN apk add --no-cache --upgrade 'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
 
+# CVE-2026-53612/53613/53614/76642/78408/78409/78410 in libuuid: fixed in
+# 2.42.3-r0. Fail the build unless the reviewed fixed floor is available.
+RUN apk add --no-cache --upgrade 'libuuid>=2.42.3-r0'
+
 # UTC internally. Presentation (America/Sao_Paulo) belongs to consumers, not this cluster.
 ENV TZ=UTC
 ENV PGTZ=UTC

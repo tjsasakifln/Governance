@@ -1,0 +1,418 @@
+{
+  "schema_version": "net-new-inbound-handraiser.1.0.0-draft.20260904",
+  "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+  "policy_version": "1.0.0-draft.20260904",
+  "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+  "status": "ACTIVE",
+  "effective_at": "2026-09-04T00:00:00Z",
+  "does_not_rewrite_v1": true,
+  "v1_remains_exact_match_authority": true,
+  "coordination_id": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+  "authority": {
+    "decided_by_role": "FOUNDER",
+    "decision_reference": "https://github.com/tjsasakifln/Governance/issues/65",
+    "runtime_reference": "https://github.com/tjsasakifln/warmbly/issues/47",
+    "decision_source": "VERSIONED_GOVERNANCE_POLICY",
+    "human_actor_impersonation_allowed": false,
+    "extra_cli_pncp_live_is_commercial_authority": false,
+    "live_intelligence_is_site_inbound": false
+  },
+  "activation": {
+    "exact_version_match_required": true,
+    "accepted_version_strings": [
+      "1.0.0-draft.20260904",
+      "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904"
+    ],
+    "accepted_policy_ids": ["NET_NEW_INBOUND_HANDRAISER"],
+    "v1_string_does_not_activate_this_version": true,
+    "missing_version_disposition": "FAIL_CLOSED",
+    "unknown_version_disposition": "FAIL_CLOSED",
+    "old_version_disposition": "FAIL_CLOSED"
+  },
+  "boundary": {
+    "admission_owner": "Governance",
+    "producer": "web-cfg",
+    "producer_origin": "CONFENGE_WEB",
+    "producer_issue": "tjsasakifln/web-cfg#577",
+    "producers_by_origin": {
+      "CONFENGE_WEB": "web-cfg",
+      "confenge_web": "web-cfg"
+    },
+    "producer_issues": {
+      "web-cfg": "tjsasakifln/web-cfg#577"
+    },
+    "record_queue_outcome_owner": "Warmbly",
+    "consumer": "Warmbly",
+    "consumer_issue": "tjsasakifln/warmbly#47",
+    "view_only_consumer": "Meetcfg",
+    "view_only_consumer_issue": "tjsasakifln/MeetCFG#1",
+    "policy_governance": "Governance/NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+    "meetcfg_receives": "accepted_commercial_context_only",
+    "not_producers_of_this_authority": [
+      "extra-cli",
+      "intel_watch",
+      "intel_seed",
+      "PNCP_LIVE",
+      "CFG-FIRST-TOUCH-ROUTING"
+    ],
+    "producer_may": [
+      "submit_intake_request",
+      "supply_origin_lane_intent",
+      "supply_idempotency_key",
+      "supply_contact_consent_evidence_refs",
+      "supply_receipt_correlation",
+      "supply_subject_or_account_ref_when_existing",
+      "supply_nucleus_and_offer_candidate",
+      "supply_minimized_location",
+      "supply_sensitive_class_without_content",
+      "supply_conflict_status_and_protected_ref"
+    ],
+    "producer_must_not": [
+      "create_crm_record",
+      "evaluate_outbound_eligibility",
+      "authorize_smtp",
+      "authorize_followup",
+      "authorize_auto_send",
+      "discard_for_missing_account",
+      "fuzzy_match_identity_by_name",
+      "inherit_first_touch",
+      "treat_live_intelligence_as_inbound",
+      "put_sensitive_content_in_public_envelope",
+      "coerce_conflict_unknown_to_clear"
+    ],
+    "consumer_may": [
+      "create_inbound_only_identity_on_accepted",
+      "retain_receipt_and_evidence",
+      "surface_accepted_intent_on_commercial_queue",
+      "return_readback"
+    ],
+    "consumer_must_not": [
+      "mark_outbound_eligible_from_this_authority",
+      "send_smtp",
+      "send_followup",
+      "auto_send",
+      "fuzzy_match_identity_by_name",
+      "discard_for_missing_account",
+      "emit_pii_to_metrics",
+      "copy_schema_as_second_authority"
+    ],
+    "governance_owns": [
+      "versioned_policy",
+      "closed_states",
+      "reason_codes",
+      "idempotency_semantics",
+      "readback_contract",
+      "rollback_contract",
+      "pure_admit_evaluator",
+      "qualification_states",
+      "nucleus_admission_set"
+    ],
+    "governance_must_not": [
+      "crm",
+      "commercial_queue",
+      "ui",
+      "smtp",
+      "web_form",
+      "durable_data_plane",
+      "warmbly_runtime",
+      "meetcfg_runtime"
+    ],
+    "parallel_crm_authorized": false,
+    "parallel_architecture_allowed": false
+  },
+  "inputs": {
+    "required": [
+      "origin",
+      "acquisition_lane",
+      "intent_kind",
+      "idempotency_key",
+      "contact_evidence",
+      "consent_evidence",
+      "receipt_id",
+      "correlation_id",
+      "intake_source",
+      "landing_asset",
+      "nucleus_id",
+      "offer_candidate_id",
+      "party_kind",
+      "decision_role",
+      "site_location",
+      "urgency",
+      "why_now_class",
+      "desired_decision_or_deliverable",
+      "document_availability_class",
+      "sensitive_data",
+      "conflict_screening"
+    ],
+    "optional_when_present": [
+      "subject_ref",
+      "account_ref",
+      "source",
+      "freshness",
+      "policy_id",
+      "policy_version",
+      "canonical_name",
+      "partner_required",
+      "capacity_review_required",
+      "retention"
+    ],
+    "admitted_origins": ["CONFENGE_WEB", "confenge_web"],
+    "admitted_intake_sources": ["CONFENGE_WEB"],
+    "admitted_acquisition_lanes": ["NET_NEW_INBOUND"],
+    "admitted_intent_kinds": [
+      "HUMAN_REVIEW",
+      "DEEP_DIVE",
+      "REQUEST_HUMAN_REVIEW",
+      "REQUEST_DEEP_DIVE"
+    ],
+    "intent_kind_aliases": {
+      "REQUEST_HUMAN_REVIEW": "HUMAN_REVIEW",
+      "REQUEST_DEEP_DIVE": "DEEP_DIVE"
+    },
+    "admitted_nuclei": [
+      "expert_evidence_assistance",
+      "property_valuation",
+      "building_engineering_documentation",
+      "occupational_safety",
+      "public_works_b2g"
+    ],
+    "admitted_offer_candidates": [
+      "private_project_technical_readiness_assessment"
+    ],
+    "admitted_party_kinds": ["PERSON", "COMPANY"],
+    "admitted_decision_roles": ["DECISION_MAKER", "INFLUENCER", "OPERATOR", "UNKNOWN"],
+    "admitted_urgency": ["IMMEDIATE", "THIS_CYCLE", "EXPLORATORY", "UNKNOWN"],
+    "admitted_why_now_classes": [
+      "DEADLINE",
+      "INCIDENT",
+      "AUDIT",
+      "PROCUREMENT",
+      "CAPACITY",
+      "UNKNOWN"
+    ],
+    "admitted_desired_deliverables": [
+      "ASSESSMENT",
+      "OPINION",
+      "DOCUMENT_SET",
+      "SITE_VISIT",
+      "UNKNOWN"
+    ],
+    "admitted_document_availability_classes": [
+      "COMPLETE",
+      "PARTIAL",
+      "GAP",
+      "UNKNOWN"
+    ],
+    "admitted_sensitive_classes": [
+      "NONE",
+      "LGPD_SPECIAL",
+      "LEGAL_PRIVILEGE",
+      "HEALTH",
+      "UNKNOWN"
+    ],
+    "admitted_conflict_statuses": ["CLEAR", "UNKNOWN", "HIT", "NOT_SCREENED"],
+    "forbidden_origins": ["intel_watch", "intel_seed", "PNCP_LIVE", "FIRST_TOUCH"],
+    "admitted_consent_bases": ["EXPLICIT_FORM_SUBMIT", "EXPLICIT_HUMAN_REVIEW_REQUEST"],
+    "admitted_identity_match_methods": ["EXPLICIT_CONTACT", "EXPLICIT_SUBJECT_REF"],
+    "forbidden_identity_match_methods": ["NAME", "DISPLAY_NAME", "FUZZY", "FUZZY_NAME", "FUZZY_IDENTITY"],
+    "location_allowed_fields": ["city", "uf", "ibge_municipality_code"],
+    "location_forbidden_fields": ["street", "address", "cep", "zip", "lat", "lon", "latitude", "longitude", "email"]
+  },
+  "qualification_states": [
+    "NEEDS_CONTEXT",
+    "POTENTIAL_FIT",
+    "CONFLICT_CHECK_REQUIRED",
+    "DOCUMENT_GAP",
+    "CAPACITY_REVIEW",
+    "PARTNER_REQUIRED",
+    "OUT_OF_SCOPE",
+    "QCO"
+  ],
+  "closed_states": ["ACCEPTED", "REJECTED_WITH_REASON", "UNKNOWN"],
+  "reason_codes": {
+    "accepted": ["ADMISSION_GATES_SATISFIED"],
+    "rejected": [
+      "ORIGIN_NOT_ADMITTED",
+      "ACQUISITION_LANE_NOT_ADMITTED",
+      "INTENT_KIND_NOT_ADMITTED",
+      "CONSENT_REFUSED",
+      "OPT_OUT_PRESENT",
+      "FUZZY_IDENTITY_FORBIDDEN",
+      "IDEMPOTENCY_PAYLOAD_CONFLICT",
+      "IDENTITY_CONFLICT",
+      "POLICY_VERSION_NOT_ADMITTED",
+      "INTAKE_PAUSED",
+      "NUCLEUS_NOT_ADMITTED",
+      "OFFER_CANDIDATE_NOT_ADMITTED",
+      "LIVE_INTELLIGENCE_NOT_INBOUND",
+      "FIRST_TOUCH_INHERITANCE_FORBIDDEN",
+      "OUTBOUND_INHERITANCE_FORBIDDEN",
+      "AUTO_SEND_FORBIDDEN",
+      "SENSITIVE_CONTENT_FORBIDDEN",
+      "CONFLICT_CLEAR_COERCION_FORBIDDEN",
+      "LOCATION_NOT_MINIMIZED"
+    ],
+    "unknown": [
+      "REQUEST_INVALID",
+      "AUTHORITY_UNAVAILABLE",
+      "ORIGIN_UNKNOWN",
+      "ACQUISITION_LANE_UNKNOWN",
+      "INTENT_KIND_UNKNOWN",
+      "INTENT_KIND_AMBIGUOUS",
+      "IDEMPOTENCY_KEY_MISSING",
+      "CONTACT_EVIDENCE_UNKNOWN",
+      "CONSENT_EVIDENCE_UNKNOWN",
+      "CONSENT_AMBIGUOUS",
+      "RECEIPT_UNKNOWN",
+      "CORRELATION_UNKNOWN",
+      "SOURCE_UNKNOWN",
+      "FRESHNESS_UNKNOWN",
+      "FRESHNESS_STALE",
+      "SUBJECT_REFERENCE_AMBIGUOUS",
+      "POLICY_VERSION_MISSING",
+      "POLICY_VERSION_UNKNOWN",
+      "POLICY_ID_UNKNOWN",
+      "NUCLEUS_UNKNOWN",
+      "OFFER_CANDIDATE_UNKNOWN",
+      "PARTY_KIND_UNKNOWN",
+      "LANDING_ASSET_UNKNOWN",
+      "SENSITIVE_CLASS_UNKNOWN",
+      "CONFLICT_STATUS_MISSING"
+    ],
+    "never_emitted": [
+      "ACCOUNT_MISSING",
+      "ACCOUNT_REQUIRED",
+      "ACCOUNT_NOT_FOUND",
+      "CONFLICT_UNKNOWN_AS_CLEAR"
+    ]
+  },
+  "evaluation": {
+    "mode": "ALL_REQUIRED_INPUTS_THEN_HARD_GATES",
+    "unknown_result": "UNKNOWN",
+    "absence_or_ambiguity": "UNKNOWN",
+    "fail_closed": true,
+    "replay_semantics": "EXACTLY_ONCE_LOGICAL",
+    "mutation_mode": "MODEL_ONLY",
+    "conflict_unknown_never_becomes_clear": true,
+    "http_2xx_is_not_acceptance": true,
+    "live_intelligence_is_not_inbound": true,
+    "first_touch_inheritance_forbidden": true,
+    "coordination_ids_are_not_runtime_fallbacks": true
+  },
+  "invariants": {
+    "account_required_for_acceptance": false,
+    "missing_account_is_discard_reason": false,
+    "accepted_may_create_inbound_only_identity": true,
+    "inbound_only_on_accepted": true,
+    "inbound_only_equals_outbound_eligible": false,
+    "outbound_eligible_default": false,
+    "auto_send": false,
+    "smtp_authorized": false,
+    "followup_authorized": false,
+    "provider_dispatch_authorized": false,
+    "fuzzy_identity_by_name": false,
+    "pii_in_metrics": false,
+    "pii_in_decision": false,
+    "parallel_crm_authorized": false,
+    "inbound_only_never_promotes_outbound": true,
+    "sensitive_content_in_public_envelope": false,
+    "conflict_unknown_never_becomes_clear": true,
+    "http_2xx_is_not_acceptance": true
+  },
+  "identity": {
+    "accepted_authorization": "INBOUND_ONLY",
+    "rejected_or_unknown_authorization": "NONE",
+    "fuzzy_name_match_allowed": false,
+    "account_ref_optional": true,
+    "subject_ref_optional": true
+  },
+  "idempotency": {
+    "key_required": true,
+    "semantics": "EXACTLY_ONCE_LOGICAL",
+    "same_key_same_material": "REPLAY_ORIGINAL_DECISION",
+    "same_key_different_material": "REJECTED_WITH_REASON",
+    "same_key_different_material_reason": "IDEMPOTENCY_PAYLOAD_CONFLICT",
+    "distinct_keys": "DISTINCT_LOGICAL_ADMISSIONS",
+    "store_mode": "MODEL_ONLY",
+    "production_ledger_authorized": false
+  },
+  "readback": {
+    "required": true,
+    "http_2xx_is_not_acceptance": true,
+    "required_fields": [
+      "schema_version",
+      "policy_id",
+      "policy_version",
+      "canonical_name",
+      "decision_id",
+      "logical_admission_id",
+      "decision",
+      "reason_codes",
+      "idempotency_key",
+      "correlation_id",
+      "receipt_id",
+      "replayed",
+      "origin",
+      "acquisition_lane",
+      "intent_kind",
+      "intake_source",
+      "nucleus_id",
+      "offer_candidate_id",
+      "qualification_state",
+      "inbound_only",
+      "outbound_eligible",
+      "auto_send",
+      "smtp_authorized",
+      "followup_authorized",
+      "account_required_for_acceptance",
+      "identity_authorization",
+      "evaluated_at"
+    ],
+    "pii_fields_forbidden": [
+      "email",
+      "phone",
+      "display_name",
+      "full_name",
+      "name",
+      "cpf",
+      "raw_message",
+      "message_body",
+      "ip_address",
+      "street",
+      "address",
+      "sensitive_content"
+    ]
+  },
+  "rollback": {
+    "pause_intake": true,
+    "retain_receipts": true,
+    "refuse_with_reason_code": true,
+    "refuse_reason_code": "INTAKE_PAUSED",
+    "delete_forbidden": true,
+    "outbound_promotion_forbidden": true,
+    "replay_of_existing_receipt_preserved": true,
+    "freeze_intake": true
+  },
+  "failure": {
+    "absence_decision": "UNKNOWN",
+    "ambiguity_decision": "UNKNOWN",
+    "concrete_reason_codes_required": true,
+    "fail_closed": true
+  },
+  "retention": {
+    "purpose": "INBOUND_ADMISSION",
+    "class": "COMMERCIAL_INTAKE"
+  },
+  "safety": {
+    "smtp_authorized": false,
+    "followup_authorized": false,
+    "auto_send": false,
+    "outbound_eligible_default": false,
+    "crm_parallel_authorized": false,
+    "durable_data_plane_authorized": false,
+    "contains_pii": false,
+    "e2e_claimed": false,
+    "pncp_live_commercial_authority": false,
+    "live_intelligence_as_inbound": false
+  }
+}
