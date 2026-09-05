@@ -794,6 +794,11 @@ def _derive_qualification(
     urgency: str | None,
     why_now: str | None,
 ) -> str:
+    # A visitor may begin with a real technical need without knowing the
+    # internal nucleus taxonomy. It is admitted for intake, but never treated
+    # as a fit or commercial action until a human supplies the missing context.
+    if nucleus_id == "other_technical_need":
+        return "NEEDS_CONTEXT"
     if nucleus_id is not None and nucleus_id not in admitted_nuclei:
         return "OUT_OF_SCOPE"
     if conflict_status in PROTECTED_NON_CLEAR_STATUSES:
@@ -1078,7 +1083,7 @@ def _evaluate_draft(
         else:
             landing_out = {"id": landing_id, "kind": landing_kind}
 
-    location_out: dict[str, str] | None = None
+    location_out: dict[str, str | bool] | None = None
     if location is None:
         unknown("REQUEST_INVALID")
     elif not isinstance(location, Mapping):
@@ -1088,10 +1093,18 @@ def _evaluate_draft(
             reject("LOCATION_NOT_MINIMIZED")
         if any(str(key).lower() in PII_KEYS for key in location):
             reject("LOCATION_NOT_MINIMIZED")
+        material = location.get("material")
         city = _nonempty_str(location.get("city"))
         uf = _nonempty_str(location.get("uf"))
         ibge = _nonempty_str(location.get("ibge_municipality_code"))
-        if city is None or uf is None:
+        if material not in {True, False}:
+            unknown("REQUEST_INVALID")
+        elif material is False:
+            if city is not None or uf is not None or ibge is not None:
+                reject("LOCATION_NOT_MINIMIZED")
+            else:
+                location_out = {"material": False}
+        elif city is None or uf is None:
             unknown("REQUEST_INVALID")
         elif not _is_city_name(city) or UF_RE.match(uf) is None:
             # Key-only screening is not enough: a street address, CPF or phone
@@ -1101,7 +1114,7 @@ def _evaluate_draft(
         elif ibge is not None and IBGE_RE.match(ibge) is None:
             reject("LOCATION_NOT_MINIMIZED")
         else:
-            location_out = {"city": city, "uf": uf}
+            location_out = {"material": True, "city": city, "uf": uf}
             if ibge is not None:
                 location_out["ibge_municipality_code"] = ibge
 

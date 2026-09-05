@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator, ValidationError as JsonSchemaValidationError
 
 from commercial.inbound import (
     AUTHORITY_PATH,
@@ -39,6 +40,7 @@ NUCLEI = (
     "occupational_safety",
     "public_works_b2g",
 )
+OTHER_TECHNICAL_NEED = "other_technical_need"
 QUALIFICATION_STATES = (
     "NEEDS_CONTEXT",
     "POTENTIAL_FIT",
@@ -596,7 +598,7 @@ def test_draft_authority_is_versioned_fail_closed_and_does_not_rewrite_v1():
     assert value["activation"]["v1_string_does_not_activate_this_version"] is True
     assert value["activation"]["missing_version_disposition"] == "FAIL_CLOSED"
     assert value["qualification_states"] == list(QUALIFICATION_STATES)
-    assert value["inputs"]["admitted_nuclei"] == list(NUCLEI)
+    assert value["inputs"]["admitted_nuclei"] == [*NUCLEI, OTHER_TECHNICAL_NEED]
     assert value["invariants"]["outbound_eligible_default"] is False
     assert value["invariants"]["auto_send"] is False
     assert value["invariants"]["conflict_unknown_never_becomes_clear"] is True
@@ -818,9 +820,46 @@ def test_draft_qualification_states_are_closed():
     assert "NUCLEUS_NOT_ADMITTED" in out_decision["reason_codes"]
     assert out_decision["qualification_state"] == "NONE"
 
+    other = deepcopy(request)
+    other["idempotency_key"] = "nihr:web:draft-other-technical-need-001"
+    other["receipt_id"] = "rcpt_draft_other_technical_need_001"
+    other["nucleus_id"] = OTHER_TECHNICAL_NEED
+    other["offer_candidate_id"] = "technical_triage_review"
+    other["landing_asset"] = {"id": "technical_triage_v1", "kind": "TRIAGE"}
+    other["site_location"] = {"material": False}
+    schema_validate(other, load_json(DRAFT_REQUEST_SCHEMA))
+    other_decision = admit(other)
+    _assert_draft_closed_and_safe(other_decision, other)
+    assert other_decision["decision"] == "ACCEPTED"
+    assert other_decision["nucleus_id"] == OTHER_TECHNICAL_NEED
+    assert other_decision["offer_candidate_id"] == "technical_triage_review"
+    assert other_decision["qualification_state"] == "NEEDS_CONTEXT"
+    assert other_decision["site_location"] == {"material": False}
+
     for row in (qco, gap_decision, partner_decision, capacity_decision, needs_decision, fit_decision):
         _assert_draft_closed_and_safe(row, request)
         assert row["qualification_state"] in QUALIFICATION_STATES
+
+
+def test_draft_site_location_is_required_but_only_collects_city_uf_when_material():
+    request = load_fixture(DRAFT_CLEAN_FIXTURE)
+    validator = Draft202012Validator(load_json(DRAFT_REQUEST_SCHEMA))
+
+    not_material = deepcopy(request)
+    not_material["site_location"] = {"material": False}
+    validator.validate(not_material)
+    decision = admit(not_material)
+    _assert_draft_closed_and_safe(decision, not_material)
+    assert decision["site_location"] == {"material": False}
+
+    unminimized = deepcopy(not_material)
+    unminimized["site_location"] = {"material": False, "city": "Florianopolis"}
+    with pytest.raises(JsonSchemaValidationError):
+        validator.validate(unminimized)
+    rejected = admit(unminimized)
+    _assert_draft_closed_and_safe(rejected, unminimized)
+    assert rejected["decision"] == "REJECTED_WITH_REASON"
+    assert "LOCATION_NOT_MINIMIZED" in rejected["reason_codes"]
 
 
 def test_draft_100_same_key_replays_collapse_to_one_logical_admission():
@@ -1221,7 +1260,7 @@ def test_d5_free_text_pii_in_city_is_not_echoed_and_is_not_accepted():
     .pii_in_decision is false.
     """
     request = load_fixture(DRAFT_CLEAN_FIXTURE)
-    request["site_location"] = {"city": ADVERSARIAL_CITY, "uf": "SC"}
+    request["site_location"] = {"material": True, "city": ADVERSARIAL_CITY, "uf": "SC"}
     schema_validate(request, load_json(DRAFT_REQUEST_SCHEMA))
 
     decision = admit(request)
@@ -1240,12 +1279,12 @@ def test_d5_free_text_pii_in_city_is_not_echoed_and_is_not_accepted():
 @pytest.mark.parametrize(
     "location",
     [
-        {"city": "Florianopolis 88010-000", "uf": "SC"},
-        {"city": "visitante@example.com", "uf": "SC"},
-        {"city": "Florianopolis, Rua X, 100", "uf": "SC"},
-        {"city": "F" * 81, "uf": "SC"},
-        {"city": "Florianopolis", "uf": "Santa Catarina"},
-        {"city": "Florianopolis", "uf": "SC", "ibge_municipality_code": "not-a-code"},
+        {"material": True, "city": "Florianopolis 88010-000", "uf": "SC"},
+        {"material": True, "city": "visitante@example.com", "uf": "SC"},
+        {"material": True, "city": "Florianopolis, Rua X, 100", "uf": "SC"},
+        {"material": True, "city": "F" * 81, "uf": "SC"},
+        {"material": True, "city": "Florianopolis", "uf": "Santa Catarina"},
+        {"material": True, "city": "Florianopolis", "uf": "SC", "ibge_municipality_code": "not-a-code"},
     ],
 )
 def test_d5_location_values_that_are_not_city_state_are_rejected(location):
@@ -1278,11 +1317,17 @@ def test_d5_location_values_that_are_not_city_state_are_rejected(location):
 def test_d5_real_municipality_names_still_pass(city: str):
     """The D5 gate must not false-reject genuine Brazilian municipality names."""
     request = load_fixture(DRAFT_CLEAN_FIXTURE)
-    request["site_location"] = {"city": city, "uf": "SC", "ibge_municipality_code": "4205407"}
+    request["site_location"] = {
+        "material": True,
+        "city": city,
+        "uf": "SC",
+        "ibge_municipality_code": "4205407",
+    }
     decision = admit(request)
     _assert_draft_closed_and_safe(decision, request)
     assert decision["decision"] == "ACCEPTED"
     assert decision["site_location"] == {
+        "material": True,
         "city": city,
         "uf": "SC",
         "ibge_municipality_code": "4205407",

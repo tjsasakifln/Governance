@@ -21,6 +21,7 @@
   "party_kind": "COMPANY",
   "decision_role": "DECISION_MAKER",
   "site_location": {
+    "material": true,
     "city": "Florianopolis",
     "uf": "SC",
     "ibge_municipality_code": "4205407"

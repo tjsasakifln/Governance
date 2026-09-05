@@ -174,10 +174,12 @@
       "property_valuation",
       "building_engineering_documentation",
       "occupational_safety",
-      "public_works_b2g"
+      "public_works_b2g",
+      "other_technical_need"
     ],
     "admitted_offer_candidates": [
-      "private_project_technical_readiness_assessment"
+      "private_project_technical_readiness_assessment",
+      "technical_triage_review"
     ],
     "admitted_party_kinds": ["PERSON", "COMPANY"],
     "admitted_decision_roles": ["DECISION_MAKER", "INFLUENCER", "OPERATOR", "UNKNOWN"],
@@ -215,7 +217,7 @@
     "admitted_consent_bases": ["EXPLICIT_FORM_SUBMIT", "EXPLICIT_HUMAN_REVIEW_REQUEST"],
     "admitted_identity_match_methods": ["EXPLICIT_CONTACT", "EXPLICIT_SUBJECT_REF"],
     "forbidden_identity_match_methods": ["NAME", "DISPLAY_NAME", "FUZZY", "FUZZY_NAME", "FUZZY_IDENTITY"],
-    "location_allowed_fields": ["city", "uf", "ibge_municipality_code"],
+    "location_allowed_fields": ["material", "city", "uf", "ibge_municipality_code"],
     "location_forbidden_fields": ["street", "address", "cep", "zip", "lat", "lon", "latitude", "longitude", "email"]
   },
   "qualification_states": [
