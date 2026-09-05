@@ -1165,6 +1165,11 @@ def _evaluate_draft(
             reject("CONFLICT_CLEAR_COERCION_FORBIDDEN")
             if conflict_status == "CLEAR":
                 conflict_status = _canonical_conflict_status(_nonempty_str(conflict.get("status")))
+        # A concrete conflict is not a context gap. HIT also represents the
+        # legacy DECLINE value after canonicalization, so both are safely
+        # disqualified while UNKNOWN and NOT_SCREENED remain reviewable.
+        if conflict_status == "HIT":
+            reject("CONFLICT_HIT")
         if conflict.get("protected_ref") not in {None, ""}:
             conflict_ref = _opaque_ref(conflict.get("protected_ref"))
             if conflict_ref is None:

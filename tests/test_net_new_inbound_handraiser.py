@@ -599,6 +599,7 @@ def test_draft_authority_is_versioned_fail_closed_and_does_not_rewrite_v1():
     assert value["activation"]["missing_version_disposition"] == "FAIL_CLOSED"
     assert value["qualification_states"] == list(QUALIFICATION_STATES)
     assert value["inputs"]["admitted_nuclei"] == [*NUCLEI, OTHER_TECHNICAL_NEED]
+    assert "CONFLICT_HIT" in value["reason_codes"]["rejected"]
     assert value["invariants"]["outbound_eligible_default"] is False
     assert value["invariants"]["auto_send"] is False
     assert value["invariants"]["conflict_unknown_never_becomes_clear"] is True
@@ -935,15 +936,16 @@ def test_draft_consumer_pin_matches_live_hash_and_does_not_copy_schema():
         assert row["content_hash"] == computed
 
 
-def test_draft_conflict_hit_and_decline_are_not_coerced_to_clear():
+def test_draft_conflict_hit_and_decline_are_safely_rejected():
     request = load_fixture("accepted.conflict-hit.draft-20260904.json")
     schema_validate(request, load_json(DRAFT_REQUEST_SCHEMA))
     decision = admit(request)
     _assert_draft_closed_and_safe(decision, request)
-    assert decision["decision"] == "ACCEPTED"
+    assert decision["decision"] == "REJECTED_WITH_REASON"
+    assert "CONFLICT_HIT" in decision["reason_codes"]
     assert decision["conflict_screening"]["status"] == "HIT"
     assert decision["conflict_screening"]["status"] != "CLEAR"
-    assert decision["qualification_state"] == "CONFLICT_CHECK_REQUIRED"
+    assert decision["qualification_state"] == "NONE"
     assert decision["conflict_screening"]["protected_ref"] == "conflict:ref:hit:001"
     assert "content" not in (decision.get("conflict_screening") or {})
     assert decision["outbound_eligible"] is False
@@ -955,10 +957,11 @@ def test_draft_conflict_hit_and_decline_are_not_coerced_to_clear():
     decline["conflict_screening"]["status"] = "DECLINE"
     decline_decision = admit(decline)
     _assert_draft_closed_and_safe(decline_decision, decline)
-    assert decline_decision["decision"] == "ACCEPTED"
+    assert decline_decision["decision"] == "REJECTED_WITH_REASON"
+    assert "CONFLICT_HIT" in decline_decision["reason_codes"]
     assert decline_decision["conflict_screening"]["status"] == "HIT"
     assert decline_decision["conflict_screening"]["status"] != "CLEAR"
-    assert decline_decision["qualification_state"] == "CONFLICT_CHECK_REQUIRED"
+    assert decline_decision["qualification_state"] == "NONE"
     assert decline_decision["outbound_eligible"] is False
     assert decline_decision["auto_send"] is False
 
@@ -973,6 +976,20 @@ def test_draft_conflict_hit_and_decline_are_not_coerced_to_clear():
         assert coerced_decision["conflict_screening"]["status"] in {"HIT", "UNKNOWN", "NOT_SCREENED"}
         assert coerced_decision["outbound_eligible"] is False
         assert coerced_decision["auto_send"] is False
+
+
+def test_draft_not_screened_conflict_remains_reviewable_without_accepting_a_hit():
+    request = load_fixture("accepted.conflict-hit.draft-20260904.json")
+    request["idempotency_key"] = "nihr:web:draft-not-screened-conflict-001"
+    request["receipt_id"] = "rcpt_draft_not_screened_conflict_001"
+    request["conflict_screening"]["status"] = "NOT_SCREENED"
+
+    decision = admit(request)
+    _assert_draft_closed_and_safe(decision, request)
+    assert decision["decision"] == "ACCEPTED"
+    assert decision["conflict_screening"]["status"] == "NOT_SCREENED"
+    assert decision["qualification_state"] == "CONFLICT_CHECK_REQUIRED"
+    assert "CONFLICT_HIT" not in decision["reason_codes"]
 
 
 def _assert_no_commercial_action(decision):

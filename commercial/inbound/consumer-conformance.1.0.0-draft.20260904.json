@@ -10,7 +10,7 @@
     "CONFENGE_HANDRAISER_STATE/1.0.0-draft.20260904",
     "MEETCFG_HANDRAISER_CONTEXT/1.0.0-draft.20260904"
   ],
-  "policy_hash": "sha256:1c353c4e7fe2ed0fa0e2a6640b5cb8285ba64e4554817228ed2db93c8dc6c06b",
+  "policy_hash": "sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7",
   "examples": {
     "ACCEPTED": "commercial/fixtures/net-new-inbound-handraiser/accepted.missing-account.draft-20260904.json",
     "REJECTED_WITH_REASON": "commercial/fixtures/net-new-inbound-handraiser/rejected.consent-refused.draft-20260904.json",
@@ -27,9 +27,9 @@
       "class": "ACCEPTED",
       "content_hash": "sha256:7b9b2ea686c897f831ba7edf56f29131607d6dc43f65d2645f8d90d46b26c4b2"
     },
-    "accepted.conflict-hit": {
+    "rejected.conflict-hit": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.conflict-hit.draft-20260904.json",
-      "class": "ACCEPTED",
+      "class": "REJECTED_WITH_REASON",
       "content_hash": "sha256:fb82d1ce7c6c6c260917b37cba084df8487bdab06e9419f69449ab985e0e6907"
     },
     "accepted.expert_evidence_assistance": {
