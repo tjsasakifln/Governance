@@ -10,7 +10,7 @@
     "CONFENGE_HANDRAISER_STATE/1.0.0-draft.20260904",
     "MEETCFG_HANDRAISER_CONTEXT/1.0.0-draft.20260904"
   ],
-  "policy_hash": "sha256:984f442690f7c74f309173b31008518631170d63733b5cc04c32abaf88c67e28",
+  "policy_hash": "sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7",
   "examples": {
     "ACCEPTED": "commercial/fixtures/net-new-inbound-handraiser/accepted.missing-account.draft-20260904.json",
     "REJECTED_WITH_REASON": "commercial/fixtures/net-new-inbound-handraiser/rejected.consent-refused.draft-20260904.json",
@@ -20,72 +20,72 @@
     "accepted.missing-account": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.missing-account.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:e972bf8cc921e6c5fa4d5840ebad8136c4aa6d2bbe7cca8795dc24cd096a9ddc"
+      "content_hash": "sha256:c636eb7ecfd126bf847b31a8102a66ccffe8074e577d8ea482e903b4c6500b73"
     },
     "accepted.conflict-unknown": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.conflict-unknown.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:d59492e87b179bf3f42b764816c1154aa4f7e58a0290125dc84dbdaae479866b"
+      "content_hash": "sha256:7b9b2ea686c897f831ba7edf56f29131607d6dc43f65d2645f8d90d46b26c4b2"
     },
-    "accepted.conflict-hit": {
+    "rejected.conflict-hit": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.conflict-hit.draft-20260904.json",
-      "class": "ACCEPTED",
-      "content_hash": "sha256:7ab9060846879be6fdbc04be322da1edb6328e672e7c998e0aa2715c9886d49d"
+      "class": "REJECTED_WITH_REASON",
+      "content_hash": "sha256:fb82d1ce7c6c6c260917b37cba084df8487bdab06e9419f69449ab985e0e6907"
     },
     "accepted.expert_evidence_assistance": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.expert_evidence_assistance.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:31e2cde01a531504cc0b14ca6170d4bd682ad29403d6b901af72e14fbbff30fc"
+      "content_hash": "sha256:7a19135c656b2dcb3c138f54e4a43346751aa8d839ef60ac37b7ec7b29620cce"
     },
     "accepted.property_valuation": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.property_valuation.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:e9b6e412fcdec39e91349c7e4f5921d3750641d4359e697e57b471a88b202340"
+      "content_hash": "sha256:5fb11607051bad1eac841e7f17f7831ff065cacd1feb197aaf19a2a16569ff69"
     },
     "accepted.building_engineering_documentation": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.building_engineering_documentation.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:9fe27549382008f907cde312d0f8943aa8be436db4583b8b1e0cbae0bb5411df"
+      "content_hash": "sha256:110e6d80c66e0f1bba648e2148d5c2ead67ac083b26de38b9f01d52167d4cfef"
     },
     "accepted.occupational_safety": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.occupational_safety.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:eb32a7516f9f6e931dc32e9567f805d196b520299b951dbd904609f350d55863"
+      "content_hash": "sha256:468c3665d6acbf661f1328cf6b9e8123f9a9ada15dd6c9a29b3fd2cf01084986"
     },
     "accepted.public_works_b2g": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/accepted.public_works_b2g.draft-20260904.json",
       "class": "ACCEPTED",
-      "content_hash": "sha256:0f2c83a30138c00b805b7d78d217f8ccce350f87f6dcd36b3af35929233b83eb"
+      "content_hash": "sha256:60322550d1ac2a40a94e0242534df10af302f9410ee7c332f09293d767a267c7"
     },
     "rejected.consent-refused": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/rejected.consent-refused.draft-20260904.json",
       "class": "REJECTED_WITH_REASON",
-      "content_hash": "sha256:6b1090fb63dab69df311ae8b55a0d4a91259e74b864b40feb32c7da6730da3d7"
+      "content_hash": "sha256:b33fd80ca72b8e057491d5b9f2b5061408c60e761ff0d690b16eac6c339177e2"
     },
     "rejected.live-intelligence": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/rejected.live-intelligence.draft-20260904.json",
       "class": "REJECTED_WITH_REASON",
-      "content_hash": "sha256:53b2f2bf220f2bfa6b7b97ffcfdf6ace90a22971ec0a71deb94999bd9fb264a5"
+      "content_hash": "sha256:2a1758df618ba613ad40f0f42d5c71805831c6a657379a9ed55d90aca383c3fa"
     },
     "rejected.first-touch-inheritance": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/rejected.first-touch-inheritance.draft-20260904.json",
       "class": "REJECTED_WITH_REASON",
-      "content_hash": "sha256:9e924e5acb9e93134eeab1c94cda73b265ce7559345cd40c51c088edfcdc8021"
+      "content_hash": "sha256:ad500b63b929cc43cbe42150d380f6017837b5a2ce8a39b2c9b96c9421f4b342"
     },
     "rejected.outbound-eligible": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/rejected.outbound-eligible.draft-20260904.json",
       "class": "REJECTED_WITH_REASON",
-      "content_hash": "sha256:152367813d6620eb7bd9a1863719a0fbfb6dd67f607d6d4d936a9739b8b1e8b6"
+      "content_hash": "sha256:9417ba7656372b57ba016f6fa2913c455815cd9853a4acbe1692c97083440954"
     },
     "unknown.unknown-version": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/unknown.unknown-version.draft-20260904.json",
       "class": "UNKNOWN",
-      "content_hash": "sha256:1b955bfbe19e32f3dcd4109143916510ed7b836df7592fc0cffebde028935135"
+      "content_hash": "sha256:da5f674be177d8f61a7943324857887f81bda2d960ce571a629eafdab41dccc0"
     },
     "unknown.missing-nucleus": {
       "path": "commercial/fixtures/net-new-inbound-handraiser/unknown.missing-nucleus.draft-20260904.json",
       "class": "UNKNOWN",
-      "content_hash": "sha256:82fdcbe8240d9901e33af8264709bc3472181c7bb01fea6e31f651f020023e71"
+      "content_hash": "sha256:0adaee98d0b3b3ec615201a5a473eefdc8fc60010480c46832381c2980860f39"
     }
   }
 }

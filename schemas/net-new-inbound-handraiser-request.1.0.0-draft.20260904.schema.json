@@ -120,12 +120,31 @@
     "site_location": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["city", "uf"],
+      "required": ["material"],
       "properties": {
+        "material": { "type": "boolean" },
         "city": { "type": "string", "minLength": 1, "maxLength": 80 },
         "uf": { "type": "string", "pattern": "^[A-Z]{2}$" },
         "ibge_municipality_code": { "type": "string", "pattern": "^[0-9]{7}$" }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "material": { "const": true } }, "required": ["material"] },
+          "then": { "required": ["city", "uf"] }
+        },
+        {
+          "if": { "properties": { "material": { "const": false } }, "required": ["material"] },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["city"] },
+                { "required": ["uf"] },
+                { "required": ["ibge_municipality_code"] }
+              ]
+            }
+          }
+        }
+      ]
     },
     "sensitive_data": {
       "type": "object",
