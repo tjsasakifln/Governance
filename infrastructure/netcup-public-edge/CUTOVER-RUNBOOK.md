@@ -51,10 +51,15 @@ for f in ops.confenge.com.br.conf auth.ops.confenge.com.br.conf \
   sha256sum "control-center/deploy/nginx/conf.d/$f" "/etc/nginx/sites-enabled/$f"
 done | tee "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
 # The host file that declares the cc_auth_login zone is not named by the repo;
-# locate it and hash it next to the tracked fragment.
-sha256sum control-center/deploy/nginx/fragments/00-rate-limit-zones.conf \
-  $(grep -rl 'zone=cc_auth_login:' /etc/nginx) \
-  | tee -a "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
+# locate it and hash it next to the tracked fragment. An empty match is a
+# finding in itself: record it instead of hashing the tracked file alone.
+zone_host="$(grep -rl 'zone=cc_auth_login:' /etc/nginx || true)"
+if [ -z "$zone_host" ]; then
+  echo "cc_auth_login zone not found under /etc/nginx" | tee -a "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
+else
+  sha256sum control-center/deploy/nginx/fragments/00-rate-limit-zones.conf "$zone_host" \
+    | tee -a "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
+fi
 ```
 
 Gate: NGINX owns host 80/443; Caddy is only `127.0.0.1:18080/18443`; the web

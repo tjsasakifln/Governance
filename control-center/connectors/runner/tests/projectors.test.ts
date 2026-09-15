@@ -2098,6 +2098,29 @@ test("commercial projector keeps absent Warmbly counts absent: no fabricated zer
   assert.equal(commercial.payload.counts, undefined);
 });
 
+test("commercial projector keeps inbound-derived fields absent when /v1/confenge/inbound answered 200 without a list body", () => {
+  for (const body of [null, { raw: "<html>502" }, { error: "internal" }, { data: null }]) {
+    const payload = loadFixture("commercial-runtime.json");
+    (payload as Record<string, unknown>).confenge_inbound = body;
+    const snapshot = collectFromWarmblyPayload(payload, { now: new Date(now) });
+    assert.equal("inbound_now" in snapshot.counts, false, JSON.stringify(body));
+    const [commercial] = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: JSON.parse(JSON.stringify(snapshot)) as Record<string, unknown>,
+    });
+    assert.ok(commercial);
+    const funnel = (commercial.payload.funnel ?? {}) as Record<string, unknown>;
+    assert.equal("new_leads" in funnel, false, JSON.stringify(body));
+    const ops = commercial.payload.operations as { overview: Record<string, unknown> };
+    assert.equal("inbound_requiring_attention" in ops.overview, false, JSON.stringify(body));
+    assert.notEqual(ops.overview.inbound_requiring_attention, 0);
+  }
+});
+
 test("commercial projector: an absent inbound surface next to zero open deals is not an empty funnel; an empty inbound list is", () => {
   const project = (payload: Record<string, unknown>) => {
     const [commercial] = projectCollector({
