@@ -11,9 +11,12 @@ canonical_name = NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904
 policy_hash    = python -c "from commercial.inbound import load_draft_authority, policy_hash; print(policy_hash(load_draft_authority()))"
 ```
 
-`NET_NEW_INBOUND_HANDRAISER-v1` remains an exact-match authority for existing
-Warmbly pins. A v1 string does not activate this version. Missing, old or
-unknown version fail closed.
+`NET_NEW_INBOUND_HANDRAISER-v1` remains an exact-match authority for
+v1-shaped requests only. It is not a pin target: `evaluate_consumer_pin`
+closes a pin naming `NET_NEW_INBOUND_HANDRAISER-v1` as `REJECTED_WITH_REASON`
+/ `POLICY_VERSION_NOT_ADMITTED`. A v1 string does not activate this version.
+Missing, old or unknown version fail closed. The per-file pin inventory is
+`commercial/inbound/pin-registry.v1.json`.
 
 ## Owner planes
 

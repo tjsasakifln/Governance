@@ -113,19 +113,40 @@ A stale acquisition source is presented to the founder as an acquisition-plan
 condition ("Atualização de mercado atrasada; novos leads podem não estar
 refletidos."), never as "Outbound bloqueado."
 
-## Inbound admission — NET_NEW_INBOUND_HANDRAISER-v1
+## Inbound admission — NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904
 
-Governance owns the versioned admission policy
-(`commercial/inbound/net-new-inbound-handraiser.v1.json`). Missing, old or
-unknown policy versions fail closed. web-cfg produces `CONFENGE_WEB` /
-`confenge_web` intent; extra-cli produces `intel_watch` / `intel_seed` intent.
-Warmbly is the only record/queue/outcome owner. MeetCFG is view-only.
+Governance owns the versioned admission policy. The contemporary pin target
+for `CONFENGE_WEB` net-new hand-raisers is
+`commercial/inbound/net-new-inbound-handraiser.1.0.0-draft.20260904.json`:
+
+```
+canonical_name        = NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904
+policy_hash           = sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7
+governance_source_sha = 0074722ce66f16af06dd4799ee88064ea8a12fc1
+```
+
+Missing, old or unknown policy versions fail closed. web-cfg produces
+`CONFENGE_WEB` / `confenge_web` intent; extra-cli produces `intel_watch` /
+`intel_seed` intent. Warmbly is the only record/queue/outcome owner. MeetCFG is
+view-only.
 
 Accepted net-new is inbound-only. It is never outbound-eligible by default and
 never authorizes SMTP or follow-up. Absence of a prior account is not a silent
 discard. Replay is `EXACTLY_ONCE_LOGICAL`. Metrics are PII-free.
 
-Pin: `python -c "from commercial.inbound import policy_hash; print(policy_hash())"`.
+Pin command (hash the draft authority, not the v1 default of `policy_hash()`):
+
+```
+python -c "from commercial.inbound import load_draft_authority, policy_hash; print(policy_hash(load_draft_authority()))"
+```
+
+Consumers ratify their pin with `commercial.inbound.evaluate_consumer_pin`.
+A pin naming `NET_NEW_INBOUND_HANDRAISER-v1` is rejected by the evaluator as
+`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`, constants at
+lines 33-38, pin branch at line 205): v1 stays an exact-match authority for
+v1-shaped requests only and is **not admitted for pin**. The per-file inventory
+(policy id, version, canonical name, computed hash, pin status, consumers) is
+`commercial/inbound/pin-registry.v1.json`.
 
 ## Schema contracts
 

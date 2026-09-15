@@ -186,12 +186,47 @@ verdict. Present it as:
 
 Never as "Outbound bloqueado."
 
-## Inbound admission — NET_NEW_INBOUND_HANDRAISER-v1
+## Inbound admission — NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904
 
-`NET_NEW_INBOUND_HANDRAISER-v1` is the only active net-new inbound admission
-policy. Governance owns admission. Producers are origin-scoped: web-cfg for
-`CONFENGE_WEB` / `confenge_web`, extra-cli for `intel_watch` / `intel_seed`.
+Governance owns net-new inbound admission. Producers are origin-scoped: web-cfg
+for `CONFENGE_WEB` / `confenge_web`, extra-cli for `intel_watch` / `intel_seed`.
 Warmbly owns record, unique queue and outcome. MeetCFG is view-only.
+
+### Pin target (contemporary authority)
+
+The only pin target for `CONFENGE_WEB` net-new hand-raisers is:
+
+```
+policy_id             = NET_NEW_INBOUND_HANDRAISER
+canonical_name        = NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904
+policy_hash           = sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7
+governance_source_sha = 0074722ce66f16af06dd4799ee88064ea8a12fc1
+policy_file           = commercial/inbound/net-new-inbound-handraiser.1.0.0-draft.20260904.json
+```
+
+Reproduce the hash from the Governance checkout instead of copying it:
+
+```
+python -c "from commercial.inbound import load_draft_authority, policy_hash; print(policy_hash(load_draft_authority()))"
+```
+
+`policy_hash()` with no argument hashes the **v1** file (`load_authority()`),
+not the pin target. A consumer pin must be ratified by
+`commercial.inbound.evaluate_consumer_pin`, which compares both the canonical
+name and the hash against the live draft authority. The machine-readable
+inventory of every policy file, its computed hash and its pin status is
+`commercial/inbound/pin-registry.v1.json`.
+
+### `NET_NEW_INBOUND_HANDRAISER-v1` is not admitted for pin
+
+A consumer pin whose `canonical_name` is `NET_NEW_INBOUND_HANDRAISER-v1` (or
+`v0`, `v2`, `v3`) is closed by the evaluator as `REJECTED_WITH_REASON` with
+`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`, constants at
+lines 33-38 and the pin branch at line 205). A pin naming any other version, or
+the right name with a divergent hash, is `UNKNOWN` / `POLICY_VERSION_UNKNOWN`.
+`NET_NEW_INBOUND_HANDRAISER-v1` remains an exact-match authority only for
+v1-shaped **requests** evaluated by `evaluate_net_new_inbound_handraiser`; it
+does not activate the contemporary version and it is not a pin target.
 
 Missing, old, unknown or incompatible policy/version fail closed. Accepted
 missing-account is inbound-only, never outbound-eligible, never SMTP, never
