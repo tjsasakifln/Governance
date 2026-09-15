@@ -221,8 +221,10 @@ inventory of every policy file, its computed hash and its pin status is
 
 A consumer pin whose `canonical_name` is `NET_NEW_INBOUND_HANDRAISER-v1` (or
 `v0`, `v2`, `v3`) is closed by the evaluator as `REJECTED_WITH_REASON` with
-`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`, constants at
-lines 33-38 and the pin branch at line 205). A pin naming any other version, or
+`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`: the constants
+`CANONICAL_POLICY_NAME`, `OLD_POLICY_VERSIONS` and `OLD_CANONICAL_NAMES`, and
+the rejecting branch of `evaluate_consumer_pin`; either `OLD_CANONICAL_NAMES`
+or `CANONICAL_POLICY_NAME` alone rejects v1). A pin naming any other version, or
 the right name with a divergent hash, is `UNKNOWN` / `POLICY_VERSION_UNKNOWN`.
 `NET_NEW_INBOUND_HANDRAISER-v1` remains an exact-match authority only for
 v1-shaped **requests** evaluated by `evaluate_net_new_inbound_handraiser`; it

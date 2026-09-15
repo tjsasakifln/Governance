@@ -142,8 +142,10 @@ python -c "from commercial.inbound import load_draft_authority, policy_hash; pri
 
 Consumers ratify their pin with `commercial.inbound.evaluate_consumer_pin`.
 A pin naming `NET_NEW_INBOUND_HANDRAISER-v1` is rejected by the evaluator as
-`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`, constants at
-lines 33-38, pin branch at line 205): v1 stays an exact-match authority for
+`POLICY_VERSION_NOT_ADMITTED` (`commercial/inbound/admit.py`: the constants
+`CANONICAL_POLICY_NAME`, `OLD_POLICY_VERSIONS` and `OLD_CANONICAL_NAMES`, and
+the rejecting branch of `evaluate_consumer_pin`; either `OLD_CANONICAL_NAMES`
+or `CANONICAL_POLICY_NAME` alone rejects v1): v1 stays an exact-match authority for
 v1-shaped requests only and is **not admitted for pin**. The per-file inventory
 (policy id, version, canonical name, computed hash, pin status, consumers) is
 `commercial/inbound/pin-registry.v1.json`.
