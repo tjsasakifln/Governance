@@ -1104,12 +1104,13 @@ export function pilotSteps(input: WarmblySurfaceInput): StepView[] {
     detail,
   });
   if (!readable && rows.length === 0) {
+    const unread = "O gate não pôde ser lido neste carregamento.";
     return [
-      unknownStep("fonte", "Fonte", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("cohort", "Cohort", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("validacao", "Validação", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("revisao", "Revisão", "O gate não pôde ser lido neste carregamento."),
-      unknownStep("agendamento", "Agendamento", "O gate não pôde ser lido neste carregamento."),
+      unknownStep("fonte", "Fonte", unread),
+      unknownStep("cohort", "Cohort", unread),
+      unknownStep("validacao", "Validação", unread),
+      unknownStep("revisao", "Revisão", unread),
+      unknownStep("agendamento", "Agendamento", unread),
     ];
   }
   const hasCohort = cohort !== undefined && Object.keys(cohort).length > 0;

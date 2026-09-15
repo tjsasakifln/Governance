@@ -83,6 +83,8 @@ function conciseText(value: string, maxCharacters: number): string {
     : `${characters.slice(0, maxCharacters - 1).join("")}…`;
 }
 
+const OBSERVED_AT_UNKNOWN = "Horário da leitura inválido ou não informado";
+
 const freshnessRank: Readonly<Record<FreshnessStatus, number>> = {
   FRESH: 0,
   STALE: 1,
@@ -361,7 +363,7 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
       observedAt,
       observedAtLabel: observedAt
         ? `Leitura gerada em ${formatLocal(observedAt)}`
-        : "Horário da leitura inválido ou não informado",
+        : OBSERVED_AT_UNKNOWN,
     };
   }
 
@@ -389,7 +391,7 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
       observedAt,
       observedAtLabel: observedAt
         ? `Leitura gerada em ${formatLocal(observedAt)}`
-        : "Horário da leitura inválido ou não informado",
+        : OBSERVED_AT_UNKNOWN,
     };
   }
 
@@ -403,7 +405,7 @@ export function buildOrientationSummary(input: OrientationInput): OrientationSum
     observedAt,
     observedAtLabel: observedAt
       ? `Leitura gerada em ${formatLocal(observedAt)}`
-      : "Horário da leitura inválido ou não informado",
+      : OBSERVED_AT_UNKNOWN,
   };
 }
 

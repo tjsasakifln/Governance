@@ -337,12 +337,8 @@ function composeClients(input: HojeComposeInput): HojeSection {
  * reading either: the compressed note must say the surface was not observed
  * instead of claiming the slice "veio limpa".
  */
-const COMMERCIAL_UNOBSERVED_COUNTS: ReadonlyArray<[key: "inbound_unread_count", label: string]> = [
-  ["inbound_unread_count", "inbound não observado"],
-];
-
 function commercialUnobserved(snap: CommercialSnapshot): string[] {
-  return COMMERCIAL_UNOBSERVED_COUNTS.filter(([key]) => typeof snap[key] !== "number").map(([, label]) => label);
+  return typeof snap.inbound_unread_count === "number" ? [] : ["inbound não observado"];
 }
 
 function commercialInException(snap: CommercialSnapshot): boolean {

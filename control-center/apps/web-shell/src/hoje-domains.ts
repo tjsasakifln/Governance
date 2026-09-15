@@ -72,6 +72,8 @@ const ABSENCE_SENTENCES: Record<AbsenceReason, string> = {
   upstream_error: "Erro de coleta: a origem respondeu com erro e nada foi lido.",
 };
 
+const UNRECOGNISED_ABSENCE = "Faltam dados por motivo não reconhecido.";
+
 export interface DomainPending {
   label: string;
   count: number;
@@ -457,7 +459,7 @@ function warmblyCard(
   } else if (commercial.presence === "absent") {
     const absence = commercial.absence_reason ?? "no_data";
     state = absence === "upstream_error" ? "erro_coleta" : "desconhecido";
-    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? "Faltam dados por motivo não reconhecido.";
+    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? UNRECOGNISED_ABSENCE;
   } else if (commercial.freshness_status === "ERROR") {
     state = "erro_coleta";
     reason = "Erro de coleta Warmbly: estado não confiável.";
@@ -569,7 +571,7 @@ function standardCard(seed: CardSeed, slot: DomainSlot | null, alerts: AlertCoun
   } else if (slot.presence === "absent") {
     const absence = slot.absence_reason ?? "no_data";
     state = absence === "upstream_error" ? "erro_coleta" : "desconhecido";
-    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? "Faltam dados por motivo não reconhecido.";
+    reason = ownMapValue(ABSENCE_SENTENCES, absence) ?? UNRECOGNISED_ABSENCE;
   } else if (slot.freshness_status === "ERROR") {
     state = "erro_coleta";
     reason = "Erro de coleta: a última tentativa de leitura falhou. Os números abaixo não valem.";
@@ -775,7 +777,7 @@ export function absenceNoteFor(envelopeRaw: unknown, domain: string): string | n
     return "Faltam dados: este domínio não veio no envelope operacional.";
   }
   if (slot.presence === "absent") {
-    return ownMapValue(ABSENCE_SENTENCES, slot.absence_reason ?? "no_data") ?? "Faltam dados por motivo não reconhecido.";
+    return ownMapValue(ABSENCE_SENTENCES, slot.absence_reason ?? "no_data") ?? UNRECOGNISED_ABSENCE;
   }
   if (slot.freshness_status === "ERROR") {
     return "Erro de coleta: a última leitura deste domínio falhou.";
