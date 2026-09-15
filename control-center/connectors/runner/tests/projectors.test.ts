@@ -2093,11 +2093,9 @@ test("commercial projector keeps absent Warmbly counts absent: no fabricated zer
   assert.notEqual(ops.overview.inbound_requiring_attention, 0);
   // Absence of the inbound surface is not evidence of an empty funnel.
   assert.equal(commercial.payload.empty, false);
-  const counts = commercial.payload.counts as Record<string, unknown> | undefined;
-  if (counts) {
-    assert.notEqual(counts.inbound_now, 0);
-    assert.notEqual(counts.inbox_unread, 0);
-  }
+  // The projected body carries no raw `counts`; the funnel/overview above are
+  // the only places a fabricated zero could surface.
+  assert.equal(commercial.payload.counts, undefined);
 });
 
 test("commercial projector distinguishes auto_send observed-off from not-observed", () => {
