@@ -121,6 +121,11 @@ interface OutcomeRule {
   recovery: string;
 }
 
+/** A refusal whose title carries the shared "Recusada: " verdict prefix. */
+function refused(title: string, recovery: string): OutcomeRule {
+  return { kind: "refused", title: `Recusada: ${title}`, recovery };
+}
+
 /**
  * Keyed by the channel's own refusal code, because the HTTP status cannot
  * separate the cases that matter most. `circuit_open`, `transport_error` and
@@ -138,64 +143,50 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery:
       "Nada saiu do navegador e nada foi aplicado no Warmbly. Preencha o motivo — e o id do alerta, quando for reconhecimento — e envie de novo.",
   },
-  missing_actor: {
-    kind: "refused",
-    title: "Recusada: sessão não identificada",
-    recovery:
-      "O Authelia não entregou a identidade do operador nesta requisição. Reautentique e repita. A recusa já está na trilha de auditoria.",
-  },
-  unknown_action: {
-    kind: "refused",
-    title: "Recusada: ação desconhecida",
-    recovery:
-      "Este canal expõe exatamente pausar, retomar e reconhecer. Se um controle desta tela pediu outra coisa, é defeito: registre e não repita.",
-  },
-  forbidden_path: {
-    kind: "refused",
-    title: "Recusada: caminho fora do allowlist de escrita",
-    recovery:
-      "O conector não classifica esse caminho como escrita permitida e não o seguiu. Nada foi aplicado. Isto é configuração do conector, não do operador.",
-  },
-  confirmation_not_applicable: {
-    kind: "refused",
-    title: "Recusada: esta ação não usa confirmação",
-    recovery: "Pausar e reconhecer são de um passo. Envie sem token de confirmação.",
-  },
-  invalid_reason: {
-    kind: "refused",
-    title: "Recusada: motivo de auditoria inválido",
-    recovery:
-      "O motivo é o único registro de por que a chave foi mexida. Escreva uma frase e envie de novo. Nada foi aplicado.",
-  },
-  invalid_target: {
-    kind: "refused",
-    title: "Recusada: alvo inválido",
-    recovery: "Informe o id do alerta a reconhecer e envie de novo. Nada foi aplicado.",
-  },
+  missing_actor: refused(
+    "sessão não identificada",
+    "O Authelia não entregou a identidade do operador nesta requisição. Reautentique e repita. A recusa já está na trilha de auditoria.",
+  ),
+  unknown_action: refused(
+    "ação desconhecida",
+    "Este canal expõe exatamente pausar, retomar e reconhecer. Se um controle desta tela pediu outra coisa, é defeito: registre e não repita.",
+  ),
+  forbidden_path: refused(
+    "caminho fora do allowlist de escrita",
+    "O conector não classifica esse caminho como escrita permitida e não o seguiu. Nada foi aplicado. Isto é configuração do conector, não do operador.",
+  ),
+  confirmation_not_applicable: refused(
+    "esta ação não usa confirmação",
+    "Pausar e reconhecer são de um passo. Envie sem token de confirmação.",
+  ),
+  invalid_reason: refused(
+    "motivo de auditoria inválido",
+    "O motivo é o único registro de por que a chave foi mexida. Escreva uma frase e envie de novo. Nada foi aplicado.",
+  ),
+  invalid_target: refused(
+    "alvo inválido",
+    "Informe o id do alerta a reconhecer e envie de novo. Nada foi aplicado.",
+  ),
   confirmation_required: {
     kind: "refused",
     title: "Confirmação exigida: a retomada não foi executada",
     recovery:
       "Retomar é de dois passos. Envie o primeiro passo, leia o resumo de impacto e confirme em seguida.",
   },
-  confirmation_invalid: {
-    kind: "refused",
-    title: "Recusada: confirmação inválida ou vencida",
-    recovery:
-      "O token já foi gasto ou expirou, e ele é de uso único e ligado a quem o pediu. Refaça os dois passos. O outbound continua como estava.",
-  },
+  confirmation_invalid: refused(
+    "confirmação inválida ou vencida",
+    "O token já foi gasto ou expirou, e ele é de uso único e ligado a quem o pediu. Refaça os dois passos. O outbound continua como estava.",
+  ),
   confirmation_stale: {
     kind: "refused",
     title: "Confirmação descartada: a leitura mudou",
     recovery:
       "A retomada não foi executada. Releia o estado, a fila e o teto exibidos acima e peça uma nova confirmação.",
   },
-  circuit_open: {
-    kind: "refused",
-    title: "Recusada: circuito do conector aberto — a ação não foi tentada",
-    recovery:
-      `Com o circuito aberto o canal recusa as três ações, pausar inclusive. Para parar o outbound agora use o fallback fora de banda ${OUT_OF_BAND_PAUSE_FALLBACK} na VPS e registre o que foi feito.`,
-  },
+  circuit_open: refused(
+    "circuito do conector aberto — a ação não foi tentada",
+    `Com o circuito aberto o canal recusa as três ações, pausar inclusive. Para parar o outbound agora use o fallback fora de banda ${OUT_OF_BAND_PAUSE_FALLBACK} na VPS e registre o que foi feito.`,
+  ),
   transport_error: {
     kind: "refused",
     title: "Falhou no transporte: a requisição nunca foi escrita",
@@ -214,18 +205,14 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery:
       `O navegador não obteve resposta e não é possível saber se a ação chegou a ser aplicada. Recarregue, leia o estado do disparo e a trilha antes de repetir. Se o outbound precisa parar agora, use ${OUT_OF_BAND_PAUSE_FALLBACK}.`,
   },
-  operator_channel_not_configured: {
-    kind: "refused",
-    title: "Recusada: canal de operador desligado nesta instalação",
-    recovery:
-      `Este Control Center não tem o canal do Warmbly ligado, então nenhuma das três ações funciona por aqui e nada foi aplicado. Use ${OUT_OF_BAND_PAUSE_FALLBACK} na VPS se o outbound precisa parar, e ligue o canal antes de operar por esta tela.`,
-  },
-  unsupported_media_type: {
-    kind: "refused",
-    title: "Recusada: a requisição não foi enviada como JSON",
-    recovery:
-      "O serviço exige content-type application/json justamente para que um formulário de outra origem não consiga disparar estas ações. Nada foi aplicado; isto é defeito desta tela, não do operador.",
-  },
+  operator_channel_not_configured: refused(
+    "canal de operador desligado nesta instalação",
+    `Este Control Center não tem o canal do Warmbly ligado, então nenhuma das três ações funciona por aqui e nada foi aplicado. Use ${OUT_OF_BAND_PAUSE_FALLBACK} na VPS se o outbound precisa parar, e ligue o canal antes de operar por esta tela.`,
+  ),
+  unsupported_media_type: refused(
+    "a requisição não foi enviada como JSON",
+    "O serviço exige content-type application/json justamente para que um formulário de outra origem não consiga disparar estas ações. Nada foi aplicado; isto é defeito desta tela, não do operador.",
+  ),
   upstream_error: {
     kind: "failed",
     title: "Falhou no Warmbly: a ação foi enviada e recusada lá",
@@ -244,30 +231,22 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery:
       "Nada saiu do navegador e nada foi gravado no Warmbly. Complete os campos indicados no formulário e envie de novo.",
   },
-  approval_acknowledgement_required: {
-    kind: "refused",
-    title: "Recusada: APPROVE chegou sem a ciência obrigatória",
-    recovery:
-      "O clique em “Aprovar e enfileirar” é a ciência sobre destinatário, mensagem exata, policy e evidência, e deve carregar acknowledged=true. Recarregue a tela; se persistir, é defeito do Control Center. HOLD e REJECT não carregam essa ciência.",
-  },
-  insufficient_human_gate_role: {
-    kind: "refused",
-    title: "Recusada: sua sessão não tem a autoridade necessária",
-    recovery:
-      "Aprovar e enfileirar exige operators; reprocessar aprovações antigas exige admins. Nada foi aplicado. Peça a inclusão no grupo no Authelia e reautentique antes de repetir.",
-  },
-  idempotency_key_required: {
-    kind: "refused",
-    title: "Recusada: escrita sem chave de idempotência",
-    recovery:
-      "Toda escrita do gate viaja com uma chave que impede duplicar a intenção. Nada foi aplicado; isto é defeito desta tela, não do operador.",
-  },
-  human_gate_route_not_allowed: {
-    kind: "refused",
-    title: "Recusada: rota fora do allowlist fixo do gate",
-    recovery:
-      "O proxy do gate só encaminha um conjunto fixo de rotas e esta não está nele. Nada foi aplicado; isto é configuração do canal, não do operador.",
-  },
+  approval_acknowledgement_required: refused(
+    "APPROVE chegou sem a ciência obrigatória",
+    "O clique em “Aprovar e enfileirar” é a ciência sobre destinatário, mensagem exata, policy e evidência, e deve carregar acknowledged=true. Recarregue a tela; se persistir, é defeito do Control Center. HOLD e REJECT não carregam essa ciência.",
+  ),
+  insufficient_human_gate_role: refused(
+    "sua sessão não tem a autoridade necessária",
+    "Aprovar e enfileirar exige operators; reprocessar aprovações antigas exige admins. Nada foi aplicado. Peça a inclusão no grupo no Authelia e reautentique antes de repetir.",
+  ),
+  idempotency_key_required: refused(
+    "escrita sem chave de idempotência",
+    "Toda escrita do gate viaja com uma chave que impede duplicar a intenção. Nada foi aplicado; isto é defeito desta tela, não do operador.",
+  ),
+  human_gate_route_not_allowed: refused(
+    "rota fora do allowlist fixo do gate",
+    "O proxy do gate só encaminha um conjunto fixo de rotas e esta não está nele. Nada foi aplicado; isto é configuração do canal, não do operador.",
+  ),
   human_gate_transport_unknown: {
     kind: "unknown",
     title: "Sem resposta: a escrita pode ter sido aplicada",
@@ -280,66 +259,48 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
     recovery: "Recarregue a página. Nada foi gravado.",
   },
   /* Ajuste (nova versão de conteúdo). */
-  frozen_hash_mismatch: {
-    kind: "refused",
-    title: "Recusada: o conteúdo congelado mudou desde a sua leitura",
-    recovery:
-      "Você editou sobre uma versão que já não é a atual, então o ajuste não foi aplicado. Recarregue esta revisão, releia a mensagem congelada e refaça a edição sobre o texto novo.",
-  },
-  confirmation_mismatch: {
-    kind: "refused",
-    title: "Recusada: a confirmação não corresponde à versão",
-    recovery:
-      "Digite exatamente a versão exibida nesta revisão (por exemplo v1) e confirme de novo. Nada foi alterado.",
-  },
-  version_superseded: {
-    kind: "refused",
-    title: "Recusada: esta versão já foi substituída por outra mais nova",
-    recovery:
-      "Alguém criou uma versão posterior enquanto você editava. Abra a versão mais recente na lista de Cohorts e refaça o ajuste lá. Nada foi alterado aqui.",
-  },
-  authority_active: {
-    kind: "refused",
-    title: "Recusada: há autoridade bounded ativa para esta cohort",
-    recovery:
-      "Esta versão ainda carrega uma autoridade histórica ativa. O endpoint antigo de GO/NO-GO não existe mais: trate a revogação operacional no Warmbly antes de ajustar. Nada foi alterado.",
-  },
-  immutable_field: {
-    kind: "refused",
-    title: "Recusada: o pedido tocou um campo imutável",
-    recovery:
-      "Só assunto e corpo podem ser ajustados; destinatário, evidência, origem, policy e classe de rota são congelados. Nada foi alterado; isto é defeito desta tela, não do operador.",
-  },
-  copy_qa_failed: {
-    kind: "refused",
-    title: "Recusada: o texto proposto reprovou no QA de copy",
-    recovery:
-      "O Warmbly aplica as mesmas regras de copy da composição original. Leia os motivos no detalhe técnico, corrija o assunto ou o corpo e proponha de novo. Nada foi alterado.",
-  },
-  candidate_not_found: {
-    kind: "refused",
-    title: "Recusada: candidato não encontrado nesta versão",
-    recovery:
-      "O candidato não existe mais nesta versão da cohort. Recarregue a revisão antes de agir de novo.",
-  },
+  frozen_hash_mismatch: refused(
+    "o conteúdo congelado mudou desde a sua leitura",
+    "Você editou sobre uma versão que já não é a atual, então o ajuste não foi aplicado. Recarregue esta revisão, releia a mensagem congelada e refaça a edição sobre o texto novo.",
+  ),
+  confirmation_mismatch: refused(
+    "a confirmação não corresponde à versão",
+    "Digite exatamente a versão exibida nesta revisão (por exemplo v1) e confirme de novo. Nada foi alterado.",
+  ),
+  version_superseded: refused(
+    "esta versão já foi substituída por outra mais nova",
+    "Alguém criou uma versão posterior enquanto você editava. Abra a versão mais recente na lista de Cohorts e refaça o ajuste lá. Nada foi alterado aqui.",
+  ),
+  authority_active: refused(
+    "há autoridade bounded ativa para esta cohort",
+    "Esta versão ainda carrega uma autoridade histórica ativa. O endpoint antigo de GO/NO-GO não existe mais: trate a revogação operacional no Warmbly antes de ajustar. Nada foi alterado.",
+  ),
+  immutable_field: refused(
+    "o pedido tocou um campo imutável",
+    "Só assunto e corpo podem ser ajustados; destinatário, evidência, origem, policy e classe de rota são congelados. Nada foi alterado; isto é defeito desta tela, não do operador.",
+  ),
+  copy_qa_failed: refused(
+    "o texto proposto reprovou no QA de copy",
+    "O Warmbly aplica as mesmas regras de copy da composição original. Leia os motivos no detalhe técnico, corrija o assunto ou o corpo e proponha de novo. Nada foi alterado.",
+  ),
+  candidate_not_found: refused(
+    "candidato não encontrado nesta versão",
+    "O candidato não existe mais nesta versão da cohort. Recarregue a revisão antes de agir de novo.",
+  ),
   /* ---------------------------------------------------------------- *
    * Aprovação que resolve a verificação do destinatário no caminho.
    * Os dois códigos abaixo nascem no cliente, e existem porque "a
    * verificação falhou" e "a aprovação foi recusada" mandam o operador
    * para lugares diferentes.
    * ---------------------------------------------------------------- */
-  approval_validation_unavailable: {
-    kind: "refused",
-    title: "Recusada: a verificação do destinatário não completou",
-    recovery:
-      "O APPROVE não chegou a ser enviado e nada foi decidido neste candidato. Leia o motivo da verificação no detalhe técnico; se for indisponibilidade do verificador, tente aprovar de novo em seguida. Se persistir, registre HOLD com o motivo.",
-  },
-  approval_validation_not_valid: {
-    kind: "refused",
-    title: "Recusada: o destinatário foi verificado agora e não voltou VALID",
-    recovery:
-      "A verificação foi feita nesta ação e o APPROVE não foi enviado, então nada foi decidido. O Warmbly recusa aprovação fora de uma validação VALID: registre HOLD ou REJECT, ou corrija a origem do contato e recomponha.",
-  },
+  approval_validation_unavailable: refused(
+    "a verificação do destinatário não completou",
+    "O APPROVE não chegou a ser enviado e nada foi decidido neste candidato. Leia o motivo da verificação no detalhe técnico; se for indisponibilidade do verificador, tente aprovar de novo em seguida. Se persistir, registre HOLD com o motivo.",
+  ),
+  approval_validation_not_valid: refused(
+    "o destinatário foi verificado agora e não voltou VALID",
+    "A verificação foi feita nesta ação e o APPROVE não foi enviado, então nada foi decidido. O Warmbly recusa aprovação fora de uma validação VALID: registre HOLD ou REJECT, ou corrija a origem do contato e recomponha.",
+  ),
   adjust_route_unavailable: {
     kind: "refused",
     title: "Ajuste ainda não disponível nesta instalação",
@@ -350,48 +311,34 @@ const OUTCOME_BY_CODE: Record<string, OutcomeRule> = {
 
 /** Fallback when the channel answers a status this build does not have a code for. */
 const OUTCOME_BY_STATUS: Record<number, OutcomeRule> = {
-  400: { kind: "refused", title: "Recusada: pedido inválido", recovery: "Corrija os campos e envie de novo. Nada foi aplicado." },
-  401: {
-    kind: "refused",
-    title: "Recusada: sessão não identificada",
-    recovery: "Reautentique no Authelia e repita.",
-  },
-  403: {
-    kind: "refused",
-    title: "Recusada: ação não permitida",
-    recovery: "Nada foi aplicado. Não repita sem entender a recusa registrada na trilha.",
-  },
-  405: {
-    kind: "refused",
-    title: "Recusada: método não permitido",
-    recovery: "As rotas de operador são POST; a trilha é somente leitura. Isto é defeito desta tela, não do operador.",
-  },
-  404: {
-    kind: "refused",
-    title: "Recusada: canal de operador não montado",
-    recovery:
-      `O Control Center desta instalação não tem o canal ligado, então nenhuma das três ações funciona aqui. Use ${OUT_OF_BAND_PAUSE_FALLBACK} para parar o outbound e habilite o canal antes de operar por esta tela.`,
-  },
-  415: {
-    kind: "refused",
-    title: "Recusada: formato de requisição não aceito",
-    recovery: "Nada foi aplicado. Isto é defeito desta tela, não do operador.",
-  },
-  428: {
-    kind: "refused",
-    title: "Recusada: confirmação exigida",
-    recovery: "Refaça os dois passos da retomada.",
-  },
+  400: refused("pedido inválido", "Corrija os campos e envie de novo. Nada foi aplicado."),
+  401: refused("sessão não identificada", "Reautentique no Authelia e repita."),
+  403: refused(
+    "ação não permitida",
+    "Nada foi aplicado. Não repita sem entender a recusa registrada na trilha.",
+  ),
+  405: refused(
+    "método não permitido",
+    "As rotas de operador são POST; a trilha é somente leitura. Isto é defeito desta tela, não do operador.",
+  ),
+  404: refused(
+    "canal de operador não montado",
+    `O Control Center desta instalação não tem o canal ligado, então nenhuma das três ações funciona aqui. Use ${OUT_OF_BAND_PAUSE_FALLBACK} para parar o outbound e habilite o canal antes de operar por esta tela.`,
+  ),
+  415: refused(
+    "formato de requisição não aceito",
+    "Nada foi aplicado. Isto é defeito desta tela, não do operador.",
+  ),
+  428: refused("confirmação exigida", "Refaça os dois passos da retomada."),
   502: {
     kind: "failed",
     title: "Falhou no Warmbly",
     recovery: "O Warmbly respondeu com erro. Confira o estado do disparo antes de repetir.",
   },
-  503: {
-    kind: "refused",
-    title: "Recusada: canal indisponível",
-    recovery: `Confira o estado do disparo. Para parar o outbound agora use ${OUT_OF_BAND_PAUSE_FALLBACK}.`,
-  },
+  503: refused(
+    "canal indisponível",
+    `Confira o estado do disparo. Para parar o outbound agora use ${OUT_OF_BAND_PAUSE_FALLBACK}.`,
+  ),
 };
 
 const OUTCOME_BY_CHANNEL_OUTCOME: Record<string, OutcomeRule> = {
