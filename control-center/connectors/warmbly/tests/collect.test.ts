@@ -193,6 +193,68 @@ describe("collectFromWarmblyPayload (shipped normalize)", () => {
   });
 });
 
+describe("collectFromWarmblyPayload counts: absence is never 0", () => {
+  it("emits the four surface-backed counts when their surfaces answered", () => {
+    const snapshot = collectFromWarmblyPayload(loadFixture("commercial-runtime.json"), { now: NOW });
+    assert.equal(snapshot.counts.inbox_unread, 3);
+    assert.equal(snapshot.counts.inbox_awaiting_reply, 1);
+    assert.equal(snapshot.counts.campaigns_active, 1);
+    assert.equal(typeof snapshot.counts.inbound_now, "number");
+    assert.ok((snapshot.counts.inbound_now as number) > 0);
+  });
+
+  it("omits inbox_unread / inbox_awaiting_reply when the unibox surface is missing from the payload", () => {
+    const payload = loadFixture("commercial-runtime.json");
+    payload.unibox_overview = undefined;
+    const snapshot = collectFromWarmblyPayload(payload, { now: NOW });
+    const unibox = snapshot.observations.find((o) => o.http_path === "/v1/unibox/overview");
+    assert.ok(unibox);
+    assert.equal(unibox.provenance.freshness_status, "UNKNOWN");
+    assert.equal("inbox_unread" in snapshot.counts, false);
+    assert.equal("inbox_awaiting_reply" in snapshot.counts, false);
+    assert.notEqual(snapshot.counts.inbox_unread, 0);
+    assert.notEqual(snapshot.counts.inbox_awaiting_reply, 0);
+    assert.equal(JSON.parse(JSON.stringify(snapshot)).counts.inbox_unread, undefined);
+  });
+
+  it("omits inbound_now when /v1/confenge/inbound errored, keeps 0 when it answered an empty list", () => {
+    const errored = loadFixture("commercial-runtime.json");
+    errored.confenge_inbound = undefined;
+    errored.unavailable = [
+      ...(errored.unavailable ?? []),
+      {
+        method: "GET",
+        path: "/v1/confenge/inbound",
+        status: 500,
+        reason: "Warmbly returned 500 for GET /v1/confenge/inbound",
+      },
+    ];
+    const missing = collectFromWarmblyPayload(errored, { now: NOW });
+    assert.equal("inbound_now" in missing.counts, false);
+    assert.notEqual(missing.counts.inbound_now, 0);
+
+    const empty = loadFixture("commercial-runtime.json");
+    empty.confenge_inbound = [];
+    const answered = collectFromWarmblyPayload(empty, { now: NOW });
+    assert.equal(answered.counts.inbound_now, 0);
+  });
+
+  it("omits campaigns_active only when neither campaigns surface answered", () => {
+    const payload = loadFixture("commercial-runtime.json");
+    payload.campaigns_overview = undefined;
+    payload.campaigns = undefined;
+    const neither = collectFromWarmblyPayload(payload, { now: NOW });
+    assert.equal("campaigns_active" in neither.counts, false);
+    assert.notEqual(neither.counts.campaigns_active, 0);
+
+    const listOnly = loadFixture("commercial-runtime.json");
+    listOnly.campaigns_overview = undefined;
+    listOnly.campaigns = [];
+    const answeredEmpty = collectFromWarmblyPayload(listOnly, { now: NOW });
+    assert.equal(answeredEmpty.counts.campaigns_active, 0);
+  });
+});
+
 describe("collect() against a local Warmbly-shaped stub", () => {
   it("returns the same non-empty attention slice on two runs", async () => {
     const payload = loadFixture("commercial-runtime.json");
