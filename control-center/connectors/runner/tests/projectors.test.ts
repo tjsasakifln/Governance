@@ -2098,6 +2098,52 @@ test("commercial projector keeps absent Warmbly counts absent: no fabricated zer
   assert.equal(commercial.payload.counts, undefined);
 });
 
+test("commercial projector: an absent inbound surface next to zero open deals is not an empty funnel; an empty inbound list is", () => {
+  const project = (payload: Record<string, unknown>) => {
+    const [commercial] = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: JSON.parse(JSON.stringify(payload)) as Record<string, unknown>,
+    });
+    assert.ok(commercial);
+    return commercial.payload;
+  };
+
+  // deals answered an empty list: deals_open === 0 and the surface is FRESH.
+  // The inbound surface did not answer: inbound_now must stay absent, and the
+  // funnel must not be declared empty on the strength of a count nobody read.
+  const absent = loadFixture("commercial-runtime.json");
+  absent.deals = [];
+  absent.confenge_inbound = undefined;
+  absent.unavailable = [
+    ...(absent.unavailable ?? []),
+    { method: "GET", path: "/v1/confenge/inbound", status: 500, reason: "Warmbly returned 500" },
+  ];
+  const absentSnapshot = collectFromWarmblyPayload(absent, { now: new Date(now) });
+  assert.equal(absentSnapshot.counts.deals_open, 0);
+  assert.equal("inbound_now" in absentSnapshot.counts, false);
+  const absentBody = project(absentSnapshot as unknown as Record<string, unknown>);
+  assert.equal(absentBody.availability, "FRESH");
+  assert.deepEqual(absentBody.funnel, { opportunities: 0 });
+  assert.equal(absentBody.empty, false);
+
+  // Same payload, but the inbound surface answered an empty list: both counts
+  // are real zeros and the funnel is empty.
+  const zero = loadFixture("commercial-runtime.json");
+  zero.deals = [];
+  zero.confenge_inbound = [];
+  const zeroSnapshot = collectFromWarmblyPayload(zero, { now: new Date(now) });
+  assert.equal(zeroSnapshot.counts.deals_open, 0);
+  assert.equal(zeroSnapshot.counts.inbound_now, 0);
+  const zeroBody = project(zeroSnapshot as unknown as Record<string, unknown>);
+  assert.equal(zeroBody.availability, "FRESH");
+  assert.deepEqual(zeroBody.funnel, { new_leads: 0, opportunities: 0 });
+  assert.equal(zeroBody.empty, true);
+});
+
 test("commercial projector distinguishes auto_send observed-off from not-observed", () => {
   const project = (status: Record<string, unknown> | undefined) => {
     const [commercial] = projectCollector({
