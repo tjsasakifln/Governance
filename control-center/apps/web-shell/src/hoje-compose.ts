@@ -331,6 +331,20 @@ function composeClients(input: HojeComposeInput): HojeSection {
   );
 }
 
+/**
+ * Surface-backed counts the Warmbly mapper omits (never 0) when their surface
+ * did not answer. An absent count is not an exception, but it is not a clean
+ * reading either: the compressed note must say the surface was not observed
+ * instead of claiming the slice "veio limpa".
+ */
+const COMMERCIAL_UNOBSERVED_COUNTS: ReadonlyArray<[key: "inbound_unread_count", label: string]> = [
+  ["inbound_unread_count", "inbound não observado"],
+];
+
+function commercialUnobserved(snap: CommercialSnapshot): string[] {
+  return COMMERCIAL_UNOBSERVED_COUNTS.filter(([key]) => typeof snap[key] !== "number").map(([, label]) => label);
+}
+
 function commercialInException(snap: CommercialSnapshot): boolean {
   return (
     (snap.at_risk_client_count ?? 0) > 0 ||
@@ -359,12 +373,12 @@ function composeCommercial(input: HojeComposeInput): HojeSection {
       ? `pipeline ${snap.pipeline_open_count} aberto`
       : "funil ausente";
   if (!commercialInException(snap)) {
-    return section(
-      "commercial",
-      [],
-      true,
-      `${funnel} — ${emptyNote(input, ["commercial"], "sem exceção comercial nesta coleta; a leitura chegou e veio limpa")}`,
-    );
+    const unobserved = commercialUnobserved(snap);
+    const noOccurrences =
+      unobserved.length === 0
+        ? "sem exceção comercial nesta coleta; a leitura chegou e veio limpa"
+        : `sem exceção comercial observada nesta coleta; leitura parcial: ${unobserved.join(", ")} (ausência não é zero)`;
+    return section("commercial", [], true, `${funnel} — ${emptyNote(input, ["commercial"], noOccurrences)}`);
   }
   const rows: HojeRow[] = [];
   if ((snap.inbound_unread_count ?? 0) > 0) {
