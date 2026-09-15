@@ -93,13 +93,13 @@
     {
       "path": "commercial/CONSUMER-HANDOFF.md",
       "schema_version": "consumer-handoff.v1",
-      "content_hash": "sha256:b1fc96a147a2ec3705e6aa124e6f19cc76d62fa7ab958cce457c5c24a7e42e38",
+      "content_hash": "sha256:14c2bbd0129eae19be9eac749af407f74239db893d3f99d773fadc0523d78546",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {
       "path": "commercial/CONSUMER-CONTRACT.md",
       "schema_version": "consumer-contract.v1",
-      "content_hash": "sha256:6c91a092599dd01b7d327149974adbe4b5d47b26f91699fb921809074c192527",
+      "content_hash": "sha256:b758cca96d1c65c6ecb6640c8fc08a1b543e53a2e413fd2288df5105f40c584d",
       "effective_at": "2026-08-17T00:00:00Z"
     },
     {

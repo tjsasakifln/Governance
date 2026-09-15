@@ -27,6 +27,8 @@ export const MOCK_OPERATOR: ActorRef = {
 };
 
 const GENERATED_AT = "2026-08-20T18:00:00Z";
+const OBSERVED_AT = "2026-08-20T16:00:00Z";
+const CONTEXT_AGENT_ID = "agent:cc-context";
 
 function provenance(
   system: string,
@@ -244,11 +246,11 @@ export const PRIORITY_FIXTURES: PriorityRecommendation[] = [
       "governance",
       "manual",
       "docs/ops",
-      "2026-08-20T16:00:00Z",
+      OBSERVED_AT,
       "FRESH",
       0.6,
     ),
-    generated_at: "2026-08-20T16:00:00Z",
+    generated_at: OBSERVED_AT,
     horizon: "this_week",
   },
 ];
@@ -540,12 +542,12 @@ export const HEALTH_FIXTURES: ServiceHealth[] = [
       "collector",
       "health-probe",
       "health/web-cfg",
-      "2026-08-20T16:00:00Z",
+      OBSERVED_AT,
       "STALE",
       0.55,
       { freshness_window_seconds: 60 },
     ),
-    checked_at: "2026-08-20T16:00:00Z",
+    checked_at: OBSERVED_AT,
     latency_ms: 820,
     service_id: "web-cfg",
     role: "Painel de configuração web (edge)",
@@ -739,13 +741,13 @@ export const DIRECTIVE_FIXTURES: Directive[] = [
     effective_from: "2026-08-20T17:12:00Z",
     expires_at: "2026-08-21T17:12:00Z",
     supersedes: null,
-    created_by: { kind: "agent", id: "agent:cc-context", display_name: "Agente de contexto" },
+    created_by: { kind: "agent", id: CONTEXT_AGENT_ID, display_name: "Agente de contexto" },
     created_at: "2026-08-20T17:15:00Z",
     updated_at: "2026-08-20T17:15:00Z",
     audit: [
       {
         at: "2026-08-20T17:15:00Z",
-        actor: { kind: "agent", id: "agent:cc-context" },
+        actor: { kind: "agent", id: CONTEXT_AGENT_ID },
         action: "created",
         to_status: "active",
       },
@@ -757,7 +759,7 @@ export const AGENT_ACTIVITY_FIXTURES: AgentActivity[] = [
   {
     schema_version: "control-center.agent-activity.v1",
     id: "cc:agent-activity:01K3CC-LEDGER-RUNNING",
-    agent_id: "agent:cc-context",
+    agent_id: CONTEXT_AGENT_ID,
     provider: "grok",
     scope: "finance",
     repo: "tjsasakifln/Governance",
@@ -772,7 +774,7 @@ export const AGENT_ACTIVITY_FIXTURES: AgentActivity[] = [
       "collector",
       "report",
       "agent-activity/running",
-      "2026-08-20T16:00:00Z",
+      OBSERVED_AT,
       "STALE",
       0.5,
     ),
@@ -783,7 +785,7 @@ export const AGENT_ACTIVITY_FIXTURES: AgentActivity[] = [
   {
     schema_version: "control-center.agent-activity.v1",
     id: "cc:agent-activity:01K3CC-LEDGER-PARTIAL",
-    agent_id: "agent:cc-context",
+    agent_id: CONTEXT_AGENT_ID,
     provider: "grok",
     scope: "finance",
     status: "partial",
@@ -806,7 +808,7 @@ export const AGENT_ACTIVITY_FIXTURES: AgentActivity[] = [
   {
     schema_version: "control-center.agent-activity.v1",
     id: "cc:agent-activity:01K3CC-LEDGER-UNKNOWN",
-    agent_id: "agent:cc-context",
+    agent_id: CONTEXT_AGENT_ID,
     scope: "company",
     status: "not-a-status",
     presentation_status: "UNKNOWN",
@@ -829,7 +831,7 @@ export const AGENT_SESSION_FIXTURES: AgentSession[] = [
   {
     schema_version: "control-center.agent-session.v1",
     id: "cc:agent-session:01K3CC-CTX-FINANCE",
-    agent_id: "agent:cc-context",
+    agent_id: CONTEXT_AGENT_ID,
     requested_scopes: ["finance", "client:acme-industria"],
     granted_scopes: ["finance", "client:acme-industria"],
     purpose:
@@ -837,7 +839,7 @@ export const AGENT_SESSION_FIXTURES: AgentSession[] = [
     started_at: "2026-08-20T17:50:00Z",
     ended_at: null,
     status: "open",
-    created_by: { kind: "agent", id: "agent:cc-context" },
+    created_by: { kind: "agent", id: CONTEXT_AGENT_ID },
     include_directives: true,
     include_snapshots: true,
     include_attention: true,
@@ -845,7 +847,7 @@ export const AGENT_SESSION_FIXTURES: AgentSession[] = [
   {
     schema_version: "control-center.agent-session.v1",
     id: "cc:agent-session:01K3CC-CTX-DENIED-COMPANY",
-    agent_id: "agent:cc-context",
+    agent_id: CONTEXT_AGENT_ID,
     requested_scopes: ["company"],
     granted_scopes: [],
     purpose: "Pedido de dump company-wide. Negado: agentes consultam por escopo.",

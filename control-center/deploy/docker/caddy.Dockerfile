@@ -9,13 +9,14 @@ RUN apk add --no-cache git \
  && cd /src \
  && git checkout --detach "$CADDY_SOURCE_COMMIT" \
  && test "$(git rev-parse HEAD)" = "$CADDY_SOURCE_COMMIT" \
- && go get golang.org/x/crypto@v0.55.0 google.golang.org/grpc@v1.83.1 \
+ && go get golang.org/x/crypto@v0.55.0 google.golang.org/grpc@v1.83.2 \
  && go mod tidy \
  && CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /caddy ./cmd/caddy
 
 FROM caddy:2.11-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 
 # CVE-2026-56854 and CVE-2026-84304 are fixed in the rebuilt official source.
+# CVE-2026-84445 in google.golang.org/grpc is fixed by the v1.83.2 module above.
 COPY --from=caddy-build /caddy /usr/bin/caddy
 
 # The pinned upstream image predates the Alpine fix for CVE-2026-14456.

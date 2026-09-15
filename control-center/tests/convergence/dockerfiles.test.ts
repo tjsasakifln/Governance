@@ -306,6 +306,32 @@ test("Alpine runtime images fail closed below the CVE-2026-14456 fixed floor", (
   }
 });
 
+test("Debian Node runtime stages fail closed below the libpcre2 CVE-2026-86145/89161 fixed floor", () => {
+  for (const rel of [
+    "services/context/Dockerfile",
+    "services/mcp/Dockerfile",
+    "connectors/runner/Dockerfile",
+    "apps/web-shell/Dockerfile",
+    "deploy/docker/ops.Dockerfile",
+    "deploy/docker/stub.Dockerfile",
+  ]) {
+    const runtime = lastStage(read(rel));
+    assert.match(runtime, /apt-get install -y --no-install-recommends --only-upgrade libpcre2-8-0/, rel);
+    assert.match(
+      runtime,
+      /dpkg --compare-versions "\$\(dpkg-query -W -f='\$\{Version\}' libpcre2-8-0\)" ge 10\.42-1\+deb12u1/,
+      rel,
+    );
+    assert.match(runtime, /rm -rf \/var\/lib\/apt\/lists\/\*/, rel);
+    // The upgrade must land before the privilege drop; apt cannot run as `node`.
+    const upgradeAt = runtime.indexOf("--only-upgrade libpcre2-8-0");
+    const userAt = runtime.search(/^USER /m);
+    assert.ok(upgradeAt !== -1 && userAt !== -1 && upgradeAt < userAt, `${rel} must upgrade before USER`);
+    // Only the shipped stage is scanned; a builder-only upgrade would not fix the image.
+    assert.doesNotMatch(builderStages(read(rel)), /libpcre2-8-0/, rel);
+  }
+});
+
 test("CVE exception records require owner, expiry, evidence, reachability, mitigation; expired fail", () => {
   const shipped = parseExceptionFile(JSON.parse(read("supply-chain/cve-exceptions.json")));
   assert.equal(shipped.schema_version, "control-center.cve-exceptions.v1");

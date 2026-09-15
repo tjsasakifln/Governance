@@ -23,6 +23,8 @@ const HUMAN_GATE_OVERRIDE = join(OVERLAY, "docker-compose.warmbly-human-gate.ove
 const NGINX_ROOT = join(PACK_ROOT, "nginx");
 const OPS_VHOST = join(NGINX_ROOT, "conf.d", "ops.confenge.com.br.conf");
 const AUTH_VHOST = join(NGINX_ROOT, "conf.d", "auth.ops.confenge.com.br.conf");
+const OPS_HTTP_VHOST = join(NGINX_ROOT, "conf.d", "ops.confenge.com.br-http.conf");
+const AUTH_HTTP_VHOST = join(NGINX_ROOT, "conf.d", "auth.ops.confenge.com.br-http.conf");
 const RATE_ZONES = join(NGINX_ROOT, "fragments", "00-rate-limit-zones.conf");
 const NGINX_FIXTURE = join(NGINX_ROOT, "fixtures", "nginx.conf");
 const PRODUCTION_CADDY = join(PACK_ROOT, "..", "security", "production", "Caddyfile");
@@ -42,6 +44,62 @@ after(() => {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+type NginxBlock = { name: string; body: string; children: NginxBlock[] };
+
+/**
+ * Structural check for nginx config files: `nginx -t` is not available on
+ * every runner, so verify what a parser would reject first — every `{` has a
+ * matching `}`, every simple directive ends with `;`, and no line carries
+ * more than one statement. Comments and blank lines are ignored.
+ */
+function assertNginxStructure(text: string, label: string): void {
+  let depth = 0;
+  text.split("\n").forEach((rawLine, index) => {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    if (line.length === 0) return;
+    const where = `${label}:${index + 1}`;
+    if (line === "}") {
+      depth -= 1;
+      assert.ok(depth >= 0, `${where}: unbalanced closing brace`);
+      return;
+    }
+    if (line.endsWith("{")) {
+      assert.doesNotMatch(line, /;/, `${where}: directive and block on one line`);
+      depth += 1;
+      return;
+    }
+    assert.ok(line.endsWith(";"), `${where}: directive missing terminating ';'`);
+    assert.equal(line.indexOf(";"), line.length - 1, `${where}: more than one directive on a line`);
+    assert.doesNotMatch(line, /[{}]/, `${where}: stray brace`);
+  });
+  assert.equal(depth, 0, `${label}: unbalanced braces`);
+}
+
+/** Parses the block tree of an nginx file (names and raw bodies) for assertions. */
+function nginxBlocks(text: string): NginxBlock[] {
+  assertNginxStructure(text, "nginx");
+  const root: NginxBlock = { name: "", body: "", children: [] };
+  const stack: NginxBlock[] = [root];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    if (line.length === 0) continue;
+    const current = stack[stack.length - 1];
+    assert.ok(current);
+    if (line === "}") {
+      stack.pop();
+      continue;
+    }
+    if (line.endsWith("{")) {
+      const block: NginxBlock = { name: line.slice(0, -1).trim(), body: "", children: [] };
+      current.children.push(block);
+      stack.push(block);
+      continue;
+    }
+    current.body += `${line}\n`;
+  }
+  return root.children;
 }
 
 function serviceNetworks(service: Record<string, unknown>): string[] {
@@ -241,7 +299,80 @@ test("nginx ops/auth templates TLS-proxy loopback Caddy, strip Remote-*, rate-li
   assert.match(zones, /zone=cc_ops_edge/);
   assert.match(zones, /zone=cc_auth_login/);
   const nginxFiles = readdirSync(join(NGINX_ROOT, "conf.d"));
-  assert.deepEqual(nginxFiles.sort(), ["auth.ops.confenge.com.br.conf", "ops.confenge.com.br.conf"]);
+  assert.deepEqual(nginxFiles.sort(), [
+    "auth.ops.confenge.com.br-http.conf",
+    "auth.ops.confenge.com.br.conf",
+    "ops.confenge.com.br-http.conf",
+    "ops.confenge.com.br.conf",
+  ]);
+});
+
+// Reads the versioned template only. Host equivalence (sha256 of the tracked
+// files against /etc/nginx/sites-enabled) is recorded by the cutover operator
+// per infrastructure/netcup-public-edge/CUTOVER-RUNBOOK.md §1, not asserted here.
+test("versioned auth vhost rate-limits only Authelia first/second-factor submissions", () => {
+  const auth = readFileSync(AUTH_VHOST, "utf8");
+  const blocks = nginxBlocks(auth);
+  const server = blocks.find((b) => b.name === "server");
+  assert.ok(server);
+  const locations = server.children.filter((b) => b.name.startsWith("location"));
+  assert.deepEqual(
+    locations.map((b) => b.name),
+    ["location ~ ^/api/(?:firstfactor|secondfactor)(?:/|$)", "location /"],
+  );
+  const [factor, root] = locations;
+  assert.ok(factor && root);
+  assert.match(factor.body, /limit_req zone=cc_auth_login burst=8 nodelay;/);
+  assert.doesNotMatch(root.body, /limit_req/);
+  for (const block of [factor, root]) {
+    assert.match(block.body, /proxy_pass http:\/\/127\.0\.0\.1:18080;/);
+    assert.match(block.body, /proxy_set_header Remote-User "";/);
+    assert.match(block.body, /proxy_set_header Remote-Groups "";/);
+    assert.match(block.body, /proxy_set_header Remote-Name "";/);
+    assert.match(block.body, /proxy_set_header Remote-Email "";/);
+  }
+  const zones = readFileSync(RATE_ZONES, "utf8");
+  assert.match(zones, /limit_req_zone \$binary_remote_addr zone=cc_auth_login:10m rate=\d+r\/m;/);
+});
+
+test("nginx port-80 vhosts serve ACME only and 301 everything else to https", () => {
+  for (const [path, host] of [
+    [OPS_HTTP_VHOST, "ops.confenge.com.br"],
+    [AUTH_HTTP_VHOST, "auth.ops.confenge.com.br"],
+  ] as const) {
+    const body = readFileSync(path, "utf8");
+    const uncommented = body
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    assert.match(body, /listen 80;/);
+    assert.match(body, /listen \[::\]:80;/);
+    assert.match(body, new RegExp(`server_name ${host.replace(/\./g, "\\.")};`));
+    assert.match(body, /server_tokens off;/);
+    assert.match(body, /location \^~ \/\.well-known\/acme-challenge\/ \{/);
+    assert.match(body, /root \/var\/www\/acme;/);
+    assert.match(body, /return 301 https:\/\/\$host\$request_uri;/);
+    assert.doesNotMatch(uncommented, /ssl|proxy_pass|listen 443|real_ip|Remote-/);
+    assert.doesNotMatch(uncommented, /warmbly|api\.confenge\.com\.br/i);
+    const blocks = nginxBlocks(body);
+    assert.equal(blocks.length, 1);
+    assert.equal(blocks[0]?.name, "server");
+    assert.deepEqual(
+      blocks[0]?.children.map((b) => b.name),
+      ["location ^~ /.well-known/acme-challenge/", "location /"],
+    );
+  }
+});
+
+test("every versioned nginx file is structurally well-formed and the fixture includes all of them", () => {
+  const fixture = readFileSync(NGINX_FIXTURE, "utf8");
+  for (const path of [OPS_VHOST, AUTH_VHOST, OPS_HTTP_VHOST, AUTH_HTTP_VHOST, RATE_ZONES, NGINX_FIXTURE]) {
+    assertNginxStructure(readFileSync(path, "utf8"), path);
+  }
+  for (const name of readdirSync(join(NGINX_ROOT, "conf.d"))) {
+    assert.match(fixture, new RegExp(`include /etc/nginx/conf\\.d/${name.replace(/\./g, "\\.")};`), name);
+  }
+  assert.match(fixture, /include \/etc\/nginx\/fragments\/00-rate-limit-zones\.conf;/);
 });
 
 test("nginx -t accepts the shipped ops/auth templates in a fixture container", () => {
@@ -277,6 +408,11 @@ test("nginx -t accepts the shipped ops/auth templates in a fixture container", (
   assert.equal(openssl.status, 0, openssl.stderr);
   writeFileSync(join(authLive, "privkey.pem"), readFileSync(join(opsLive, "privkey.pem")));
   writeFileSync(join(authLive, "fullchain.pem"), readFileSync(join(opsLive, "fullchain.pem")));
+  // A bind mount of a missing source makes docker create a root-owned
+  // directory at that path inside the checkout. Fail here, before docker runs.
+  for (const mounted of [NGINX_FIXTURE, RATE_ZONES, OPS_VHOST, AUTH_VHOST, OPS_HTTP_VHOST, AUTH_HTTP_VHOST]) {
+    assert.ok(existsSync(mounted), `versioned nginx file missing before bind mount: ${mounted}`);
+  }
   const result = spawnSync(
     "docker",
     [
@@ -290,6 +426,10 @@ test("nginx -t accepts the shipped ops/auth templates in a fixture container", (
       `${OPS_VHOST}:/etc/nginx/conf.d/ops.confenge.com.br.conf:ro`,
       "-v",
       `${AUTH_VHOST}:/etc/nginx/conf.d/auth.ops.confenge.com.br.conf:ro`,
+      "-v",
+      `${OPS_HTTP_VHOST}:/etc/nginx/conf.d/ops.confenge.com.br-http.conf:ro`,
+      "-v",
+      `${AUTH_HTTP_VHOST}:/etc/nginx/conf.d/auth.ops.confenge.com.br-http.conf:ro`,
       "-v",
       `${opsLive}:/etc/letsencrypt/live/ops.confenge.com.br:ro`,
       "-v",

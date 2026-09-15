@@ -13,6 +13,7 @@ import {
   LEADS_LIST_CONTRACT,
 } from "../contracts/required-upstream.ts";
 import {
+  listOrUndefined,
   unwrapData,
   unwrapList,
   type EndpointFailure,
@@ -194,21 +195,21 @@ export function collectFromWarmblyPayload(
     "/v1/contacts/search",
     "POST",
   );
-  mark(
+  const campaignsFresh = mark(
     "campaigns",
     payload.campaigns !== undefined,
     fail("GET", "/v1/campaigns"),
     "/v1/campaigns",
     "GET",
   );
-  mark(
+  const campaignsOverviewFresh = mark(
     "campaigns_overview",
     payload.campaigns_overview !== undefined,
     fail("GET", "/v1/campaigns-overview"),
     "/v1/campaigns-overview",
     "GET",
   );
-  mark(
+  const uniboxFresh = mark(
     "unibox_overview",
     payload.unibox_overview !== undefined,
     fail("GET", "/v1/unibox/overview"),
@@ -238,7 +239,7 @@ export function collectFromWarmblyPayload(
     "/v1/confenge/today",
     "GET",
   );
-  mark(
+  const inboundFresh = mark(
     "confenge_inbound",
     payload.confenge_inbound !== undefined,
     fail("GET", "/v1/confenge/inbound"),
@@ -302,10 +303,15 @@ export function collectFromWarmblyPayload(
   const deals = unwrapList(payload.deals);
   const tasks = mergeTasks(payload);
   const contacts = unwrapList(payload.contacts);
-  const campaigns = unwrapList(payload.campaigns);
+  const campaignsList = listOrUndefined(payload.campaigns);
+  const campaigns = campaignsList ?? [];
   const pipelines = unwrapList(payload.pipelines);
   const confengeAttention = unwrapList(payload.confenge_attention);
-  const inbound = unwrapList(payload.confenge_inbound);
+  // Kept as "list or undefined": an inbound/campaigns surface that answered 200
+  // with a body that is not a list (null, `{raw}`, `{error}`, `{data: null}`)
+  // is FRESH as a fetch but supplies no count.
+  const inboundList = listOrUndefined(payload.confenge_inbound);
+  const inbound = inboundList ?? [];
   const today = unwrapData(payload.confenge_today);
   const unibox = payload.unibox_overview;
 
@@ -414,6 +420,32 @@ export function collectFromWarmblyPayload(
 
   const intelExceptions = unknownList(payload.confenge_intel_exceptions);
 
+  // Absence is never 0. A count is emitted only when the surface that supplies
+  // it answered (FRESH) with a usable body: an integer for the scalar surfaces,
+  // a list for the list-derived counts. An UNKNOWN/ERROR surface, or a 200
+  // whose body is not a list, leaves the key out so the projector, the context
+  // service and the cockpit render "ausente" instead of a fabricated zero.
+  // 0 survives only when the surface answered with an empty list.
+  const campaignsActive: number | undefined =
+    campaignsOverviewFresh === "FRESH" && Number.isInteger(payload.campaigns_overview?.active)
+      ? (payload.campaigns_overview?.active as number)
+      : campaignsFresh === "FRESH" && campaignsList !== undefined
+        ? campaignsList.filter((c) => (c.status ?? "").toLowerCase() === "active").length
+        : undefined;
+  const inboxUnread: number | undefined =
+    uniboxFresh === "FRESH" && Number.isInteger(unibox?.unread) ? (unibox?.unread as number) : undefined;
+  const inboxAwaitingReply: number | undefined =
+    uniboxFresh === "FRESH" && Number.isInteger(unibox?.awaiting_reply)
+      ? (unibox?.awaiting_reply as number)
+      : undefined;
+  const inboundNow: number | undefined =
+    inboundFresh === "FRESH" && inboundList !== undefined
+      ? inboundList.filter((l) => {
+          const s = (l.status ?? "new").toLowerCase();
+          return s !== "done" && s !== "handled" && s !== "closed";
+        }).length
+      : undefined;
+
   const snapshot: CommercialSnapshot = {
     schema: COMMERCIAL_SNAPSHOT_SCHEMA,
     source: SNAPSHOT_SOURCE,
@@ -431,15 +463,10 @@ export function collectFromWarmblyPayload(
       deals_stalled: stalled,
       tasks_open: openTasks,
       tasks_overdue: overdue,
-      campaigns_active:
-        payload.campaigns_overview?.active ??
-        campaigns.filter((c) => (c.status ?? "").toLowerCase() === "active").length,
-      inbox_unread: unibox?.unread ?? 0,
-      inbox_awaiting_reply: unibox?.awaiting_reply ?? 0,
-      inbound_now: inbound.filter((l) => {
-        const s = (l.status ?? "new").toLowerCase();
-        return s !== "done" && s !== "handled" && s !== "closed";
-      }).length,
+      ...(campaignsActive !== undefined ? { campaigns_active: campaignsActive } : {}),
+      ...(inboxUnread !== undefined ? { inbox_unread: inboxUnread } : {}),
+      ...(inboxAwaitingReply !== undefined ? { inbox_awaiting_reply: inboxAwaitingReply } : {}),
+      ...(inboundNow !== undefined ? { inbound_now: inboundNow } : {}),
       confenge_attention: confengeAttention.length,
       attention: allAttention.length,
     },

@@ -1431,6 +1431,26 @@ function reviewDraftInspector(
             </article>`;
 }
 
+/**
+ * `operations.auto_send` is `{ enabled: true }` only when Warmbly reported it
+ * on; `{ enabled: false, observed: true }` when Warmbly reported it off; and
+ * `{ enabled: false, observed: false }` when the status surface did not answer.
+ * The last case is not "desligado": absence of the reading is never presented
+ * as a known-off switch.
+ */
+function autoSendState(auto: Record<string, unknown>): "observed_on" | "observed_off" | "not_observed" {
+  if (auto.enabled === true) return "observed_on";
+  if (auto.observed === true && auto.enabled === false) return "observed_off";
+  return "not_observed";
+}
+
+function autoSendLabel(auto: Record<string, unknown>): string {
+  const state = autoSendState(auto);
+  if (state === "observed_on") return "observado ligado — o Control Center não liga envio";
+  if (state === "observed_off") return "desligado";
+  return "não observado";
+}
+
 function commercialOps(
   snapshot: CommercialSnapshot,
   surface: string | null,
@@ -1605,7 +1625,7 @@ function commercialOps(
       <h2 id="comercial-ops-title">Operação agora</h2>
       <dl class="facts">
         ${fact("Disponibilidade da origem", escapeHtml(availabilityLabel(String(availability))), ` data-availability="${escapeHtml(String(availability))}"`)}
-        ${fact("Envio automático", auto.enabled === true ? "observado ligado — o Control Center não liga envio" : "desligado")}
+        ${fact("Envio automático", autoSendLabel(auto), ` data-auto-send="${escapeHtml(autoSendState(auto))}"`)}
         ${fact("Exceções", escapeHtml(String(overview.exceptions ?? "—")))}
         ${fact("Trabalho em atraso", escapeHtml(String(overview.overdue_work ?? "—")))}
         ${fact("Mensagens recebidas a tratar", escapeHtml(String(overview.inbound_requiring_attention ?? "—")))}

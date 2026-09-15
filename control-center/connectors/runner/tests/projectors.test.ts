@@ -2062,3 +2062,127 @@ test("the surviving latency carries the check that measured it", () => {
   // Not "http" — that was the base row's check, for a number it did not measure.
   assert.equal(merged.latency_check, "reachability");
 });
+
+test("commercial projector keeps absent Warmbly counts absent: no fabricated zero for a missing surface", () => {
+  const payload = loadFixture("commercial-runtime.json");
+  payload.unibox_overview = undefined;
+  payload.confenge_inbound = undefined;
+  payload.unavailable = [
+    ...(payload.unavailable ?? []),
+    { method: "GET", path: "/v1/confenge/inbound", status: 500, reason: "Warmbly returned 500" },
+  ];
+  const snapshot = collectFromWarmblyPayload(payload, { now: new Date(now) });
+  assert.equal("inbound_now" in snapshot.counts, false);
+  assert.equal("inbox_unread" in snapshot.counts, false);
+  // The runner persists JSON; a JSON round-trip must not resurrect the keys as 0.
+  const roundTripped = JSON.parse(JSON.stringify(snapshot)) as Record<string, unknown>;
+  const [commercial] = projectCollector({
+    collector: "warmbly",
+    freshness_status: "FRESH",
+    observed_at: now,
+    source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+    confidence: 0.8,
+    payload: roundTripped,
+  });
+  assert.ok(commercial);
+  const funnel = (commercial.payload.funnel ?? {}) as Record<string, unknown>;
+  assert.equal("new_leads" in funnel, false);
+  assert.notEqual(funnel.new_leads, 0);
+  const ops = commercial.payload.operations as { overview: Record<string, unknown> };
+  assert.equal("inbound_requiring_attention" in ops.overview, false);
+  assert.notEqual(ops.overview.inbound_requiring_attention, 0);
+  // Absence of the inbound surface is not evidence of an empty funnel.
+  assert.equal(commercial.payload.empty, false);
+  // The projected body carries no raw `counts`; the funnel/overview above are
+  // the only places a fabricated zero could surface.
+  assert.equal(commercial.payload.counts, undefined);
+});
+
+test("commercial projector keeps inbound-derived fields absent when /v1/confenge/inbound answered 200 without a list body", () => {
+  for (const body of [null, { raw: "<html>502" }, { error: "internal" }, { data: null }]) {
+    const payload = loadFixture("commercial-runtime.json");
+    (payload as Record<string, unknown>).confenge_inbound = body;
+    const snapshot = collectFromWarmblyPayload(payload, { now: new Date(now) });
+    assert.equal("inbound_now" in snapshot.counts, false, JSON.stringify(body));
+    const [commercial] = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: JSON.parse(JSON.stringify(snapshot)) as Record<string, unknown>,
+    });
+    assert.ok(commercial);
+    const funnel = (commercial.payload.funnel ?? {}) as Record<string, unknown>;
+    assert.equal("new_leads" in funnel, false, JSON.stringify(body));
+    const ops = commercial.payload.operations as { overview: Record<string, unknown> };
+    assert.equal("inbound_requiring_attention" in ops.overview, false, JSON.stringify(body));
+    assert.notEqual(ops.overview.inbound_requiring_attention, 0);
+  }
+});
+
+test("commercial projector: an absent inbound surface next to zero open deals is not an empty funnel; an empty inbound list is", () => {
+  const project = (payload: Record<string, unknown>) => {
+    const [commercial] = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: JSON.parse(JSON.stringify(payload)) as Record<string, unknown>,
+    });
+    assert.ok(commercial);
+    return commercial.payload;
+  };
+
+  // deals answered an empty list: deals_open === 0 and the surface is FRESH.
+  // The inbound surface did not answer: inbound_now must stay absent, and the
+  // funnel must not be declared empty on the strength of a count nobody read.
+  const absent = loadFixture("commercial-runtime.json");
+  absent.deals = [];
+  absent.confenge_inbound = undefined;
+  absent.unavailable = [
+    ...(absent.unavailable ?? []),
+    { method: "GET", path: "/v1/confenge/inbound", status: 500, reason: "Warmbly returned 500" },
+  ];
+  const absentSnapshot = collectFromWarmblyPayload(absent, { now: new Date(now) });
+  assert.equal(absentSnapshot.counts.deals_open, 0);
+  assert.equal("inbound_now" in absentSnapshot.counts, false);
+  const absentBody = project(absentSnapshot as unknown as Record<string, unknown>);
+  assert.equal(absentBody.availability, "FRESH");
+  assert.deepEqual(absentBody.funnel, { opportunities: 0 });
+  assert.equal(absentBody.empty, false);
+
+  // Same payload, but the inbound surface answered an empty list: both counts
+  // are real zeros and the funnel is empty.
+  const zero = loadFixture("commercial-runtime.json");
+  zero.deals = [];
+  zero.confenge_inbound = [];
+  const zeroSnapshot = collectFromWarmblyPayload(zero, { now: new Date(now) });
+  assert.equal(zeroSnapshot.counts.deals_open, 0);
+  assert.equal(zeroSnapshot.counts.inbound_now, 0);
+  const zeroBody = project(zeroSnapshot as unknown as Record<string, unknown>);
+  assert.equal(zeroBody.availability, "FRESH");
+  assert.deepEqual(zeroBody.funnel, { new_leads: 0, opportunities: 0 });
+  assert.equal(zeroBody.empty, true);
+});
+
+test("commercial projector distinguishes auto_send observed-off from not-observed", () => {
+  const project = (status: Record<string, unknown> | undefined) => {
+    const [commercial] = projectCollector({
+      collector: "warmbly",
+      freshness_status: "FRESH",
+      observed_at: now,
+      source: { system: "warmbly", kind: "collector-runner", locator: "warmbly" },
+      confidence: 0.8,
+      payload: { counts: { deals_open: 1, inbound_now: 0 }, ...(status ? { confenge_status: status } : {}) },
+    });
+    assert.ok(commercial);
+    return (commercial.payload.operations as { auto_send: Record<string, unknown> }).auto_send;
+  };
+  assert.deepEqual(project(undefined), { enabled: false, source: "warmbly.confenge.status", observed: false });
+  assert.deepEqual(project({ kill_switch: true }), { enabled: false, source: "warmbly.confenge.status", observed: false });
+  assert.deepEqual(project({ auto_send_enabled: false }), { enabled: false, source: "warmbly.confenge.status", observed: true });
+  const on = project({ auto_send_enabled: true });
+  assert.equal(on.enabled, true);
+});

@@ -479,14 +479,25 @@ export type WarmblyPayload = {
   unavailable?: EndpointFailure[];
 };
 
-export function unwrapList<T>(value: T[] | WarmblyList<T> | undefined): T[] {
-  if (!value) {
-    return [];
+/**
+ * The list a surface answered with, or `undefined` when the body is not a
+ * list: absent, `null`, a non-JSON `{raw}` body, `{error}`, `{data: null}`.
+ * Callers that derive a count from the list must gate on this so an unusable
+ * 200 body never becomes a fabricated 0.
+ */
+export function listOrUndefined<T>(value: T[] | WarmblyList<T> | undefined): T[] | undefined {
+  if (value === null || value === undefined) {
+    return undefined;
   }
   if (Array.isArray(value)) {
     return value;
   }
-  return Array.isArray(value.data) ? value.data : [];
+  const data = (value as { data?: unknown }).data;
+  return Array.isArray(data) ? (data as T[]) : undefined;
+}
+
+export function unwrapList<T>(value: T[] | WarmblyList<T> | undefined): T[] {
+  return listOrUndefined(value) ?? [];
 }
 
 export function unwrapData<T>(value: T | { data: T } | undefined): T | undefined {

@@ -165,6 +165,18 @@ export interface MountableRoot {
   }>;
 }
 
+type QueryableRoot = MountableRoot & Required<Pick<MountableRoot, "querySelectorAll">>;
+
+/** A root that cannot be queried (a string-only sink in tests) binds nothing. */
+function canQuery(root: MountableRoot): root is QueryableRoot {
+  return typeof root.querySelectorAll === "function";
+}
+
+/** The named control's value, or "" when the form does not carry that control. */
+function fieldValue(form: { querySelector(selector: string): { value: string } | null }, name: string): string {
+  return form.querySelector(`[name="${name}"]`)?.value ?? "";
+}
+
 function isPromise<T>(value: T | Promise<T>): value is Promise<T> {
   return typeof (value as Promise<T>).then === "function";
 }
@@ -284,7 +296,7 @@ export function stripQueueFocus(hash: string): string {
  * copy by hand; this only removes the two keystrokes.
  */
 function bindCopyControls(root: MountableRoot): void {
-  if (typeof root.querySelectorAll !== "function") return;
+  if (!canQuery(root)) return;
   const forms = root.querySelectorAll("[data-copy-form]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -295,7 +307,7 @@ function bindCopyControls(root: MountableRoot): void {
     if (!form.getAttribute("data-copy-form")) continue;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const payload = form.querySelector('[name="copy_payload"]')?.value ?? "";
+      const payload = fieldValue(form, "copy_payload");
       if (!payload) return;
       const clipboard = globalThis.navigator?.clipboard;
       if (clipboard && typeof clipboard.writeText === "function") {
@@ -349,7 +361,7 @@ export function consumeQueueFocus(
   painted: boolean,
   replaceLocation: ReplaceLocation = defaultReplaceLocation,
 ): boolean {
-  if (!painted || typeof root.querySelectorAll !== "function") return false;
+  if (!painted || !canQuery(root)) return false;
   const params = new URLSearchParams(queryOf(hash));
   const token = params.get(QUEUE_FOCUS_PARAM);
   if (!token) {
@@ -420,7 +432,7 @@ let restoreFocusId: string | null = null;
  * it keeps working after a repaint drops every handler on the page.
  */
 function bindListFilters(root: MountableRoot, hash: string, navigate: Navigate): void {
-  if (typeof root.querySelectorAll !== "function") return;
+  if (!canQuery(root)) return;
   const forms = root.querySelectorAll("[data-list-filters]");
   let bound = 0;
   for (let i = 0; i < forms.length; i += 1) {
@@ -485,7 +497,7 @@ export function bindReviewActions(
   navigate?: Navigate,
   currentHash?: string,
 ): void {
-  if (!adapter.reviewDraftAction || typeof root.querySelectorAll !== "function") return;
+  if (!adapter.reviewDraftAction || !canQuery(root)) return;
   const forms = root.querySelectorAll("[data-review-form]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -497,11 +509,11 @@ export function bindReviewActions(
       if (inFlight) return;
       const id = form.getAttribute("data-review-form") ?? "";
       const action = form.querySelector('[name="action"]')?.value as "SAVE_ADJUSTMENT" | "APPROVE" | "REJECT" | undefined;
-      const expected = form.querySelector('[name="expected_content_hash"]')?.value ?? "";
-      const nextReviewId = form.querySelector('[name="next_review_id"]')?.value ?? "";
+      const expected = fieldValue(form, "expected_content_hash");
+      const nextReviewId = fieldValue(form, "next_review_id");
       if (!id || !action || !expected) return;
-      const subject = form.querySelector('[name="subject"]')?.value ?? "";
-      const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
+      const subject = fieldValue(form, "subject");
+      const bodyText = fieldValue(form, "body_text");
       const originalSubject = form.querySelector('[name="original_subject"]')?.value ?? subject;
       const originalBodyText = form.querySelector('[name="original_body_text"]')?.value ?? bodyText;
       const draftKey = form.getAttribute("data-draft-key") ?? "";
@@ -521,7 +533,7 @@ export function bindReviewActions(
       rememberInteractionDraft(draftKey, {
         subject,
         body_text: bodyText,
-        reason: form.querySelector('[name="reason"]')?.value ?? "",
+        reason: fieldValue(form, "reason"),
       });
       form.setAttribute?.("aria-busy", "true");
       const controls = form.querySelectorAll?.("button,input,select,textarea") ?? [];
@@ -540,7 +552,7 @@ export function bindReviewActions(
         action,
         expected_content_hash: expected,
         ...(action === "SAVE_ADJUSTMENT" ? { subject, body_text: bodyText } : {}),
-        reason: form.querySelector('[name="reason"]')?.value ?? "",
+        reason: fieldValue(form, "reason"),
         // The primary CTA names the exact recipient. Per the review contract,
         // clicking it is the acknowledgement; requiring another checkbox or
         // select would reintroduce the friction this inspector removes.
@@ -628,7 +640,7 @@ export function bindExplicitSubmitKey(form: {
  * repaint caused by another form before this form has been submitted.
  */
 export function bindInteractionDraftCapture(root: MountableRoot): void {
-  if (typeof root.querySelectorAll !== "function") return;
+  if (!canQuery(root)) return;
   const forms = root.querySelectorAll("[data-draft-key]");
   for (let index = 0; index < forms.length; index += 1) {
     const form = forms[index];
@@ -674,7 +686,7 @@ export function bindOperatorActions(
   navigate?: Navigate,
   currentHash = "#/hoje",
 ): void {
-  if (!adapter.operatorAction || typeof root.querySelectorAll !== "function") return;
+  if (!adapter.operatorAction || !canQuery(root)) return;
   const forms = root.querySelectorAll("[data-operator-form]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -686,9 +698,9 @@ export function bindOperatorActions(
       if (inFlight) return;
       const actionType = form.getAttribute("data-operator-form");
       if (!actionType) return;
-      const targetCanonical = form.querySelector('[name="target_canonical_id"]')?.value ?? "";
-      const targetSource = form.querySelector('[name="target_source_id"]')?.value ?? "";
-      const note = form.querySelector('[name="note"]')?.value ?? "";
+      const targetCanonical = fieldValue(form, "target_canonical_id");
+      const targetSource = fieldValue(form, "target_source_id");
+      const note = fieldValue(form, "note");
       const draftKey = form.getAttribute("data-draft-key") ?? "";
       inFlight = true;
       rememberInteractionDraft(draftKey, { note });
@@ -750,7 +762,7 @@ export function bindWarmblyDispatch(
   onDone: () => void,
   observationFingerprint: string,
 ): void {
-  if (!adapter.warmblyDispatch || typeof root.querySelectorAll !== "function") return;
+  if (!adapter.warmblyDispatch || !canQuery(root)) return;
   const forms = root.querySelectorAll("[data-warmbly-dispatch]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -765,14 +777,14 @@ export function bindWarmblyDispatch(
       inFlight = true;
       const draftKey = form.getAttribute("data-draft-key") ?? "";
       rememberInteractionDraft(draftKey, {
-        reason: form.querySelector('[name="reason"]')?.value ?? "",
+        reason: fieldValue(form, "reason"),
       });
       markInteractionPending(form, "Confirmando no servidor…");
       void (async () => {
         try {
-          const reason = form.querySelector('[name="reason"]')?.value ?? "";
+          const reason = fieldValue(form, "reason");
           const normalizedReason = reason.trim();
-          const targetId = form.querySelector('[name="target_id"]')?.value ?? "";
+          const targetId = fieldValue(form, "target_id");
 
           let action: "pause" | "resume_confirm" | "resume" | "acknowledge" = requested;
           let confirmationToken: string | undefined;
@@ -864,7 +876,7 @@ function bindWarmblyHumanGate(
   onDone: () => void,
   navigate: Navigate,
 ): void {
-  if (!adapter.warmblyGate || typeof root.querySelectorAll !== "function") return;
+  if (!adapter.warmblyGate || !canQuery(root)) return;
   const forms = root.querySelectorAll("[data-human-gate]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -900,12 +912,12 @@ function bindWarmblyHumanGate(
       const confirmation = raw === "adjust"
         ? `v${form.getAttribute("data-cohort-version") ?? ""}`
         : "";
-      const reason = form.querySelector('[name="reason"]')?.value ?? "";
+      const reason = fieldValue(form, "reason");
       const draftKey = form.getAttribute("data-draft-key") ?? "";
 
       if (raw === "adjust") {
-        const subject = form.querySelector('[name="subject"]')?.value ?? "";
-        const bodyText = form.querySelector('[name="body_text"]')?.value ?? "";
+        const subject = fieldValue(form, "subject");
+        const bodyText = fieldValue(form, "body_text");
         if (form.getAttribute("data-adjust-step") !== "confirm") {
           // Step one is local and writes nothing: it parks the draft so the
           // next paint can show the operator the diff they are about to commit.
@@ -965,8 +977,8 @@ function bindWarmblyHumanGate(
           : {}),
         ...(raw === "adjust"
           ? {
-              subject: form.querySelector('[name="subject"]')?.value ?? "",
-              body_text: form.querySelector('[name="body_text"]')?.value ?? "",
+              subject: fieldValue(form, "subject"),
+              body_text: fieldValue(form, "body_text"),
               expected_frozen_hash: form.getAttribute("data-frozen-hash") ?? "",
             }
           : {}),
@@ -1270,7 +1282,7 @@ export function requestQueueAdvance(): void {
  */
 export function advanceReviewQueue(root: MountableRoot, painted: boolean): boolean {
   if (!queueAdvancePending) return false;
-  if (typeof root.querySelectorAll !== "function") return false;
+  if (!canQuery(root)) return false;
   const buttons = root.querySelectorAll("[data-approve-submit]");
   let next: (typeof buttons)[number] | undefined;
   for (let index = 0; index < buttons.length; index += 1) {
@@ -1620,7 +1632,7 @@ async function gateReadback(
  * repaint that reading a candidate causes.
  */
 function bindMessageToggle(root: MountableRoot, hash: string, navigate: Navigate): void {
-  if (typeof root.querySelectorAll !== "function") return;
+  if (!canQuery(root)) return;
   const buttons = root.querySelectorAll("[data-toggle-messages]");
   for (let i = 0; i < buttons.length; i += 1) {
     const button = buttons[i];
@@ -1638,7 +1650,7 @@ function bindMessageToggle(root: MountableRoot, hash: string, navigate: Navigate
 }
 
 function bindWarmblyGateFilters(root: MountableRoot, hash: string, navigate: Navigate): void {
-  if (typeof root.querySelectorAll !== "function") return;
+  if (!canQuery(root)) return;
   const forms = root.querySelectorAll("[data-human-gate-filters]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -1687,7 +1699,7 @@ export function bindWriteShortcuts(
   adapter: ControlCenterReadAdapter,
   onDone: () => void,
 ): void {
-  if (!adapter.writeShortcut || typeof root.querySelectorAll !== "function") return;
+  if (!adapter.writeShortcut || !canQuery(root)) return;
   const forms = root.querySelectorAll("[data-shortcut-form]");
   for (let i = 0; i < forms.length; i += 1) {
     const form = forms[i];
@@ -1698,8 +1710,8 @@ export function bindWriteShortcuts(
       if (inFlight) return;
       const kind = form.getAttribute("data-shortcut-form") as WriteShortcutKind | null;
       if (!kind) return;
-      const title = form.querySelector('[name="title"]')?.value ?? "";
-      const body = form.querySelector('[name="body"]')?.value ?? "";
+      const title = fieldValue(form, "title");
+      const body = fieldValue(form, "body");
       const draftKey = form.getAttribute("data-draft-key") ?? "";
       inFlight = true;
       rememberInteractionDraft(draftKey, { title, body });

@@ -1,0 +1,147 @@
+{
+  "schema_version": "net-new-inbound-handraiser-pin-registry.v1",
+  "governance_source_sha": "0074722ce66f16af06dd4799ee88064ea8a12fc1",
+  "hash_function": "commercial.inbound.policy_hash (sha256 of canonical JSON: sort_keys, separators (',', ':'), ensure_ascii=False)",
+  "pin_command": "python -c \"from commercial.inbound import load_draft_authority, policy_hash; print(policy_hash(load_draft_authority()))\"",
+  "status_semantics": {
+    "PIN_TARGET": "The one policy per policy_id that consumers must pin (canonical_name + policy_hash). Ratified by evaluate_consumer_pin.",
+    "NOT_ADMITTED_FOR_PIN": "A pin naming this policy is closed as REJECTED_WITH_REASON / POLICY_VERSION_NOT_ADMITTED by evaluate_consumer_pin.",
+    "ACTIVE": "Supporting document (consumer matrix, conformance index, authority table) that is live but is not itself a pin target."
+  },
+  "invariants": [
+    "exactly one PIN_TARGET per policy_id",
+    "policy_hash of every entry equals commercial.inbound.policy_hash(json.load(path))",
+    "every *.json under commercial/inbound except this registry is listed",
+    "the registry does not list itself and is not hashed by itself"
+  ],
+  "entries": [
+    {
+      "path": "commercial/inbound/net-new-inbound-handraiser.1.0.0-draft.20260904.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "1.0.0-draft.20260904",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+      "policy_hash": "sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7",
+      "status": "PIN_TARGET",
+      "role": "admission_policy",
+      "loader": "commercial.inbound.load_draft_authority",
+      "pin_evaluator": "commercial.inbound.evaluate_consumer_pin",
+      "consumers": [
+        "Warmbly#47",
+        "Warmbly#117",
+        "Warmbly#260",
+        "MeetCFG#1",
+        "web-cfg#577",
+        "web-cfg#580",
+        "web-cfg#585"
+      ],
+      "note": "Only pin target for CONFENGE_WEB net-new hand-raisers. Pin canonical_name + policy_hash; a divergent hash is POLICY_VERSION_UNKNOWN."
+    },
+    {
+      "path": "commercial/inbound/net-new-inbound-handraiser.v1.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "v1",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+      "policy_hash": "sha256:5f8c03b6a11af3527b202d08c74de1d59d420f181807f094e62b337f055ec4ac",
+      "status": "NOT_ADMITTED_FOR_PIN",
+      "role": "admission_policy",
+      "loader": "commercial.inbound.load_authority",
+      "pin_evaluator": "commercial.inbound.evaluate_consumer_pin",
+      "consumers": [
+        "Warmbly#47",
+        "MeetCFG#1",
+        "web-cfg#61",
+        "extra-cli#530"
+      ],
+      "note": "Exact-match authority for v1-shaped requests only (evaluate_net_new_inbound_handraiser). A consumer pin naming NET_NEW_INBOUND_HANDRAISER-v1 is REJECTED_WITH_REASON / POLICY_VERSION_NOT_ADMITTED (admit.py OLD_CANONICAL_NAMES, CANONICAL_POLICY_NAME)."
+    },
+    {
+      "path": "commercial/inbound/consumer-matrix.1.0.0-draft.20260904.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "1.0.0-draft.20260904",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+      "policy_hash": "sha256:8c2385d13afbfcdb9f16c3b6f93bf31f22c5f5e1354a7d46fdee0d0b4c9471ee",
+      "status": "ACTIVE",
+      "role": "consumer_matrix",
+      "loader": "commercial.inbound.load_draft_consumer_matrix",
+      "pins": {
+        "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+        "policy_hash": "sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7"
+      },
+      "consumers": [
+        "Warmbly#47",
+        "Warmbly#117",
+        "Warmbly#260",
+        "MeetCFG#1",
+        "web-cfg#577",
+        "web-cfg#580",
+        "web-cfg#585"
+      ],
+      "note": "Known consumer ids for evaluate_consumer_pin. Supporting document; not itself a pin target."
+    },
+    {
+      "path": "commercial/inbound/consumer-matrix.v1.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "v1",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+      "policy_hash": "sha256:f57493003f339d613f240b24595659365e85753f7c509b0676ef1fc95d6eba35",
+      "status": "ACTIVE",
+      "role": "consumer_matrix",
+      "loader": null,
+      "pins": {
+        "canonical_name": "NET_NEW_INBOUND_HANDRAISER-v1",
+        "policy_hash": "sha256:5f8c03b6a11af3527b202d08c74de1d59d420f181807f094e62b337f055ec4ac"
+      },
+      "consumers": [
+        "Warmbly#47",
+        "MeetCFG#1",
+        "web-cfg#61",
+        "extra-cli#530"
+      ],
+      "note": "Historical v1 consumer matrix. Its pinned policy is NOT_ADMITTED_FOR_PIN; kept for v1-shaped request evaluation only."
+    },
+    {
+      "path": "commercial/inbound/consumer-conformance.1.0.0-draft.20260904.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "1.0.0-draft.20260904",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+      "policy_hash": "sha256:4004fe538e3c301015f39cd600475fbfb172204372082b5776c88ea6bef85c96",
+      "status": "ACTIVE",
+      "role": "consumer_conformance",
+      "loader": null,
+      "pins": {
+        "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+        "policy_hash": "sha256:405ac86064a90641b843352d21cd21703744115de9592558e100671d92276df7"
+      },
+      "consumers": [
+        "Warmbly#47",
+        "Warmbly#117",
+        "Warmbly#260",
+        "MeetCFG#1",
+        "web-cfg#577",
+        "web-cfg#580",
+        "web-cfg#585"
+      ],
+      "note": "Fixture/example index for consumer conformance against the pin target."
+    },
+    {
+      "path": "commercial/inbound/authority-table.1.0.0-draft.20260904.json",
+      "policy_id": "NET_NEW_INBOUND_HANDRAISER",
+      "policy_version": "1.0.0-draft.20260904",
+      "canonical_name": "NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904",
+      "policy_hash": "sha256:83377bd7da0c3166363de376e9254ea922fbeddcf19fa39d7084843b734c8239",
+      "status": "ACTIVE",
+      "role": "authority_table",
+      "loader": null,
+      "consumers": [
+        "Warmbly#47",
+        "Warmbly#117",
+        "Warmbly#260",
+        "MeetCFG#1",
+        "web-cfg#577",
+        "web-cfg#580",
+        "web-cfg#585"
+      ],
+      "note": "Owner planes and invariants for the pin target."
+    }
+  ]
+}

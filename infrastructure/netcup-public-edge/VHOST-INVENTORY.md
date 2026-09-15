@@ -13,7 +13,16 @@ Inventory date: 2026-08-26. Sources read before implementation:
 | `api.confenge.com.br` | existing host vhost; template intentionally not owned by Governance | host NGINX 80/443 | Warmbly inbound/application plane | never reads, writes, enables or restores it |
 | `ops.confenge.com.br` | `control-center/deploy/nginx/conf.d/ops.confenge.com.br.conf` | host NGINX 443 | `127.0.0.1:18080` Caddy | protected, byte-unchanged |
 | `auth.ops.confenge.com.br` | `control-center/deploy/nginx/conf.d/auth.ops.confenge.com.br.conf` | host NGINX 443 | `127.0.0.1:18080` Caddy/Authelia | protected, byte-unchanged |
+| `ops.confenge.com.br` (port 80) | `control-center/deploy/nginx/conf.d/ops.confenge.com.br-http.conf` | host NGINX 80 | ACME challenge from `/var/www/acme`; everything else 301 to https | protected, byte-unchanged |
+| `auth.ops.confenge.com.br` (port 80) | `control-center/deploy/nginx/conf.d/auth.ops.confenge.com.br-http.conf` | host NGINX 80 | ACME challenge from `/var/www/acme`; everything else 301 to https | protected, byte-unchanged |
 | MCP | private Control Center contract | no public hostname/listener | private network/loopback + bearer | never published |
+
+The four tracked ops/auth templates are hand-installed on the host
+(`control-center/security/docs/production-edge/DNS-ACME-HANDOFF.md`); the
+repository tests parse the versioned files, they do not read the host. Host
+equivalence is evidence the cutover operator records (`sha256sum` of the four
+`sites-enabled` files and of the rate-limit zone fragment against the tracked
+files, see `CUTOVER-RUNBOOK.md` §1), never something a test claims.
 
 Caddy's only host publications are `127.0.0.1:18080` and optional
 `127.0.0.1:18443`. It does not own public ACME and must never bind host 80/443.

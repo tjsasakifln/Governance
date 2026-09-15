@@ -684,6 +684,8 @@ function operationsFromWarmbly(
   const outboundOutcomes = asRecord(nested.outbound_outcomes);
   const mailboxHealth = asRecord(nested.mailbox_health);
 
+  const overdueWork = integerOrUndefined(asRecord(payload.counts)?.tasks_overdue);
+  const inboundRequiringAttention = integerOrUndefined(asRecord(payload.counts)?.inbound_now);
   const operations = {
     schema_version: "control-center.commercial-operations.v1",
     projector_version: PROJECTOR_VERSION,
@@ -708,8 +710,14 @@ function operationsFromWarmbly(
       activity_shown: activity.length,
       exceptions: exceptionsTotal,
       exceptions_shown: exceptions.length,
-      overdue_work: integerOrUndefined(asRecord(payload.counts)?.tasks_overdue),
-      inbound_requiring_attention: integerOrUndefined(asRecord(payload.counts)?.inbound_now),
+      // Absence is never 0. The mapper omits `counts.inbound_now` /
+      // `counts.tasks_overdue` when the supplying surface did not answer; the
+      // key is left out here too (not stamped `undefined`, not coalesced to 0)
+      // so the read model and the cockpit render "ausente" / "—".
+      ...(overdueWork !== undefined ? { overdue_work: overdueWork } : {}),
+      ...(inboundRequiringAttention !== undefined
+        ? { inbound_requiring_attention: inboundRequiringAttention }
+        : {}),
       opportunities_requiring_action: pipeline.filter((row) => row.status === "open").length,
     },
     cohorts,

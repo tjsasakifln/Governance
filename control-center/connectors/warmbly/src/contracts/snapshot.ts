@@ -89,10 +89,20 @@ export type CommercialCounts = {
   deals_stalled: number;
   tasks_open: number;
   tasks_overdue: number;
-  campaigns_active: number;
-  inbox_unread: number;
-  inbox_awaiting_reply: number;
-  inbound_now: number;
+  /**
+   * Surface-backed counts are omitted (not zero) when the surface that supplies
+   * them was UNKNOWN or ERROR on this payload, or answered 200 with a body the
+   * count cannot be read from (a non-integer for the scalar surfaces
+   * `/v1/campaigns-overview` and `/v1/unibox/overview`; a non-list body —
+   * null, `{raw}`, `{error}`, `{data: null}` — for the list-derived
+   * `/v1/campaigns` and `/v1/confenge/inbound`). Absence is never presented as
+   * 0: the key is left out so the read model and the cockpit render "ausente".
+   * 0 means the surface answered with an empty list (or an integer 0).
+   */
+  campaigns_active?: number;
+  inbox_unread?: number;
+  inbox_awaiting_reply?: number;
+  inbound_now?: number;
   confenge_attention: number;
   attention: number;
 };

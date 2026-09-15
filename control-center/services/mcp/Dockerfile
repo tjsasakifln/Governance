@@ -21,7 +21,14 @@ RUN node scripts/strip-runtime-tree.mjs /src \
   && test -z "$(find /src -name '*.map' -not -path '*/node_modules/*' | head -1)"
 
 FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436
-RUN rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+# The pinned upstream image predates the Debian fix for CVE-2026-86145 and
+# CVE-2026-89161 in libpcre2-8-0 (10.42-1+deb12u1). Upgrade only that package
+# and fail the build unless the reviewed fixed floor is installed.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends --only-upgrade libpcre2-8-0 \
+  && rm -rf /var/lib/apt/lists/* \
+  && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ge 10.42-1+deb12u1 \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack
 WORKDIR /app
 COPY --from=builder --chown=node:node /src/package.json /src/package-lock.json /src/.npmrc ./
