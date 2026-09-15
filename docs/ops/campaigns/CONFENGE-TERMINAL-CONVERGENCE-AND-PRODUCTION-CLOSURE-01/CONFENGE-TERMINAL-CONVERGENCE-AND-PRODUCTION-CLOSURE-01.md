@@ -4,7 +4,7 @@ Data: 2026-09-15 (America/Sao_Paulo). Coordenador único: sessão Claude Code (u
 
 ## 1. Executive verdict
 
-CONFENGE_TECHNICAL_CONVERGENCE=PROVEN (residuais comerciais explicitamente gated, ver §23). Os quatro planos rodam em produção exatamente o `origin/main` contemporâneo de cada repositório, provado por readback independente. O probe de produção é somente leitura por contrato, por teste e por rastreio de rede contra a produção real. Uma pessoa válida sem contexto comercial completo é persistida com `NEEDS_CONTEXT` (provado em produção com um canário sintético persist-only). O Control Center e a autoridade Governance descrevem o que está publicado hoje. Três itens dependem de decisão humana e estão levados ao gate exato (checkpoint #468 para os dois ciclos, ratificação FINAL do pin do intake adaptativo, credenciais para o cutover do adaptador Asaas). SMTP continua NO_GO, dispatch pausado, `SMTP_DELTA=0` em todas as operações desta campanha.
+CONFENGE_TECHNICAL_CONVERGENCE=PROVEN (residuais comerciais explicitamente gated, ver §23). Os quatro planos rodam em produção exatamente o HEAD contemporâneo de cada repositório no momento do readback, provado por leitura independente. O probe de produção é somente leitura por contrato, por teste e por rastreio de rede contra a produção real. Uma pessoa válida sem contexto comercial completo é persistida com `NEEDS_CONTEXT` (provado em produção com um canário sintético persist-only). O Control Center e a autoridade Governance descrevem o que está publicado hoje. Três itens dependem de decisão humana e estão levados ao gate exato (checkpoint #468 para os dois ciclos, ratificação FINAL do pin do intake adaptativo, credenciais para o cutover do adaptador Asaas). SMTP continua NO_GO, dispatch pausado, `SMTP_DELTA=0` em todas as operações desta campanha.
 
 ## 2. Before state (Fase 0, 2026-09-15 ~10:00 -03)
 
@@ -89,7 +89,7 @@ Ver 9–10. Drift que permanece (gate G3): adaptador Asaas versionado (adapter.p
 Cadeia de autoridade: Governance `NET_NEW_INBOUND_HANDRAISER/1.0.0-draft.20260904` hash sha256:405ac860… source_sha 0074722c (registro pin-registry.v1.json, único PIN_TARGET) ⇄ Warmbly const pins (mesmo hash/SHA; readback público responde `policy_version 1.0.0-draft.20260904`) ⇄ web-cfg WITHHELD (pin null) — MATCH onde há pin; web-cfg fail-closed por design até G2. CC em 694e6915 com absence≠0 e auto_send "não observado". `ACQUISITION_PRESSURE.reached`: ABSENT (sem produtor em web-cfg; GSC BLOCKED_EXTERNAL #413) — mantido UNKNOWN, nunca 0.
 
 ## 19. Open external residuals
-G1 checkpoint #468; G2 pin FINAL; G3 Asaas cutover (token/secret); `ACQUISITION_PRESSURE.reached` (web-cfg #61/#563, depende de GSC #413); INTEL_WATCH producer (`deliver_pending_events`) sem scheduler/CLI e sem prova e2e — `CONFENGE_OPPORTUNITY_EVENT/1.0` aceito pelo inbound health, inbox=1; nucleus_id null nos leads não adaptativos; deals/tasks/contacts 200-não-lista → 0 no CC (CONTRACT_DRIFT follow-up); warmbly `DELEGATED_FIRST_TOUCH_AUTORUN` acumulando APPROVED/QUEUED com transporte pausado (PARTIAL 35.378 / APPLIED 13.761) — decisão antes de qualquer resume; canário MV-09 ACCEPTED persistido no store comercial sem decisão de retenção; timer de backup do warmbly inexistente (backup manual hoje); warmbly TestPG* não executam no CI; `netcup_inbound_harness` modo persist-only não prova transporte; ops health não autenticado em /.netlify/functions/ops; HEAD /robots.txt content-length ≠ GET (borda).
+G1 checkpoint #468; G2 pin FINAL; G3 Asaas cutover (token/secret); `ACQUISITION_PRESSURE.reached` (web-cfg #61/#563, depende de GSC #413); INTEL_WATCH producer (`deliver_pending_events`) sem scheduler/CLI e sem prova e2e — `CONFENGE_OPPORTUNITY_EVENT/1.0` aceito pelo inbound health, inbox=1; nucleus_id null nos leads não adaptativos; deals/tasks/contacts 200-não-lista → 0 no CC (CONTRACT_DRIFT follow-up); warmbly `DELEGATED_FIRST_TOUCH_AUTORUN` acumulando APPROVED/QUEUED com transporte pausado (PARTIAL 35.378 / APPLIED 13.761) — decisão antes de qualquer resume; canário MV-09 ACCEPTED persistido no store comercial sem decisão de retenção; timer de backup do warmbly inexistente (backup manual hoje); warmbly TestPG* não executam no CI; `netcup_inbound_harness` modo persist-only não prova transporte; ops health não autenticado em /.netlify/functions/ops; HEAD /robots.txt content-length ≠ GET (borda); `https://confenge.com.br/ready` responde 200 com JSON de readiness do runtime web (18100) na superfície pública — não é o Control Center (cujo ops-host responde 404), registrado como fato, sem ação implicada.
 
 ## 20. Closed/superseded issues and PRs
 web-cfg fechadas: #682 e #636 (superseded por #689), #639, #632, #631, #630, #629, #628, #627, #614, #609 (superseded), #593 (not planned); comentadas STILL_REQUIRED #637, #635; BLOCKED_EXTERNAL #633, #600. extra-cli fechadas: #555–#564 (superseded por #572); comentadas #572, #568, #569, #557, #531. warmbly: #271 e #272 mergeadas; #267/#269 BLOCKED_EXTERNAL. Governance: #168/#169 fechadas (not planned); #173 mergeada.
@@ -98,7 +98,7 @@ web-cfg fechadas: #682 e #636 (superseded por #689), #639, #632, #631, #630, #62
 - web: `deploy/netcup/run_bundle_control.py --operation rollback --rollback-target f40e2125e46d1bce2361352cffce4a4205d425e8` (symlink rollback aponta para f40e2125e; 1ddc5c1e permanece em /opt/confenge-web/releases).
 - extra: `pin_release.py b894d7ddf445d81411d8d46701734d2630b27878 --preserve-timer-state` a partir de /opt/extra-consultoria-releases/b894d7dd (release mantida); backup dos drop-ins em /root/campaign-tc01/*.service.d.
 - warmbly: `release-deploy.sh fafa8bda803c5245368dc4261fe8eb223c5c4dba` (imagens mantidas); backup 20260915T193712Z; `pause.sh` continua engajado.
-- CC: `deploy-release.sh` recusa rollback por SHA; usar o receipt de rollback-point (imagens 5fdda4f1 mantidas) conforme PRODUCTION-RUNBOOK §Rollback.
+- CC: `deploy-release.sh` recusa rollback por SHA; usar o receipt de rollback-point (imagens 694e6915 e 5fdda4f1 mantidas; rollback-point-20260915T222308Z) conforme PRODUCTION-RUNBOOK §Rollback.
 
 ## 22. Production acceptance matrix (final)
 | Plano | Main SHA | Deployed SHA (readback independente) | Match | Prova |
@@ -106,7 +106,7 @@ web-cfg fechadas: #682 e #636 (superseded por #689), #639, #632, #631, #630, #62
 | web-cfg | dce15f9e6 | dce15f9e6 (`/.well-known/build-info.json` + `runtime-info.json` + origem loopback + host symlink) | TRUE | bundle 517fb59b… atestado SLSA; home byte-idêntica borda/origem; edge Lighthouse MEASURED_PASS (attempt 2); arquivos de controle 404; guard persist-only provado ao vivo |
 | extra-cli | 98b9e331 | 98b9e331 (drop-ins `90-immutable-release.conf` + `pin_release.py --verify-only`) | TRUE | mutex A ACTIVE / B,C exit 75; binding PASS; commercial plane PASS coupling ZERO; targeting truth PASS |
 | warmbly | 55ed2883 | 55ed2883 (`verify-release`, imagens ghcr por SHA) | TRUE | schema 145; sends 94→94; paused=t; readback assinado 200 na borda; restore smoke PASS |
-| Governance / Control Center | 694e6915 | 694e6915 (`CC_RELEASE_SHA`, RELEASE VERIFICATION PASSED) | TRUE | /ready e /mcp públicos 404; authority manifest hash 61648c48…; pin-registry único PIN_TARGET |
+| Governance / Control Center | 2936c55 | 2936c55 (`deploy-release.sh` GO:CONTROL_CENTER_RELEASE_CONVERGED, RELEASE VERIFICATION PASSED, imagens `:2936c555…`) | TRUE | /ready e /mcp públicos 404; authority manifest hash 61648c48…; pin-registry único PIN_TARGET |
 
 Estados sem PASS inventado: `ACQUISITION_PRESSURE.reached`=UNKNOWN (ABSENT, não 0); INTEL_WATCH e2e=NOT_PROVEN; lane adaptativa=WITHHELD (503 honesto); ciclos C1/C2=NOT_RUN_HUMAN_GATE; Asaas versionado=NEVER_ACTIVATED (legado vivo).
 
@@ -121,8 +121,8 @@ EXTRA_SHA_MATCH=TRUE
 WARMBLY_MAIN_SHA=55ed2883
 WARMBLY_DEPLOYED_SHA=55ed2883
 WARMBLY_SHA_MATCH=TRUE
-GOVERNANCE_MAIN_SHA=694e6915
-CONTROL_CENTER_SHA=694e6915
+GOVERNANCE_MAIN_SHA=2936c55
+CONTROL_CENTER_SHA=2936c55
 CONTROL_CENTER_SHA_MATCH=TRUE
 GOVERNANCE_AUTHORITY=MATCH
 WEB=CURRENT_AND_VERIFIED
@@ -144,7 +144,7 @@ COMMERCIAL_EVIDENCE=NOT_YET_OBSERVED
 REAL_QCO_OBSERVED=NOT_YET_OBSERVED
 REAL_PROPOSAL_OBSERVED=NOT_OBSERVED
 REAL_REVENUE_OBSERVED=NOT_OBSERVED
-REPORT_COMMIT_NOTE=este arquivo entra em Governance por PR docs-only (sem alterar authority manifest, policy ou runtime); o merge move Governance main e o Control Center é reimplantado no SHA do merge, com readback publicado como comentário na PR.
+REPORT_COMMIT_NOTE=este relatório entrou em Governance pela PR #174 (merge 2936c55, docs-only) e o Control Center foi reimplantado e verificado em 2936c55 (readback no comentário da PR). Os SHAs acima registram o HEAD no qual o CC foi verificado, não o SHA da edição final deste arquivo; esta correção de valores é docs-only e NÃO dispara nova reimplantação do CC — um HEAD de Governance um commit docs-only à frente do CC não é drift de autoridade (authority manifest inalterado).
 FOUNDER_ACTION_REQUIRED=
   G1 (extra-cli #468): autorizar no issue a execução do Ciclo 1 sobre o release 98b9e331 (comentário de checkpoint publicado 2026-09-15).
   G2 (Governance): ratificar `NET_NEW_INBOUND_HANDRAISER` como FINAL (sair de draft.20260904) e fornecer os env pins ao runtime Netcup — só então a lane adaptativa sai de WITHHELD.
