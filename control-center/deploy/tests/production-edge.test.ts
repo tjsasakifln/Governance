@@ -307,7 +307,10 @@ test("nginx ops/auth templates TLS-proxy loopback Caddy, strip Remote-*, rate-li
   ]);
 });
 
-test("auth vhost rate-limits only Authelia first/second-factor submissions, as effective on the host", () => {
+// Reads the versioned template only. Host equivalence (sha256 of the tracked
+// files against /etc/nginx/sites-enabled) is recorded by the cutover operator
+// per infrastructure/netcup-public-edge/CUTOVER-RUNBOOK.md §1, not asserted here.
+test("versioned auth vhost rate-limits only Authelia first/second-factor submissions", () => {
   const auth = readFileSync(AUTH_VHOST, "utf8");
   const blocks = nginxBlocks(auth);
   const server = blocks.find((b) => b.name === "server");
@@ -405,6 +408,11 @@ test("nginx -t accepts the shipped ops/auth templates in a fixture container", (
   assert.equal(openssl.status, 0, openssl.stderr);
   writeFileSync(join(authLive, "privkey.pem"), readFileSync(join(opsLive, "privkey.pem")));
   writeFileSync(join(authLive, "fullchain.pem"), readFileSync(join(opsLive, "fullchain.pem")));
+  // A bind mount of a missing source makes docker create a root-owned
+  // directory at that path inside the checkout. Fail here, before docker runs.
+  for (const mounted of [NGINX_FIXTURE, RATE_ZONES, OPS_VHOST, AUTH_VHOST, OPS_HTTP_VHOST, AUTH_HTTP_VHOST]) {
+    assert.ok(existsSync(mounted), `versioned nginx file missing before bind mount: ${mounted}`);
+  }
   const result = spawnSync(
     "docker",
     [

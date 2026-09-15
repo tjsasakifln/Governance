@@ -40,7 +40,21 @@ ss -lntp >"$EVIDENCE_DIR/listeners-before.txt"
 sha256sum \
   control-center/deploy/nginx/conf.d/ops.confenge.com.br.conf \
   control-center/deploy/nginx/conf.d/auth.ops.confenge.com.br.conf \
+  control-center/deploy/nginx/conf.d/ops.confenge.com.br-http.conf \
+  control-center/deploy/nginx/conf.d/auth.ops.confenge.com.br-http.conf \
+  control-center/deploy/nginx/fragments/00-rate-limit-zones.conf \
   >"$EVIDENCE_DIR/tracked-protected-vhosts.sha256"
+# Host equivalence of the tracked templates (the repo tests only parse the
+# versioned files). Record the pairs; a mismatch is a finding, not a gate here.
+for f in ops.confenge.com.br.conf auth.ops.confenge.com.br.conf \
+         ops.confenge.com.br-http.conf auth.ops.confenge.com.br-http.conf; do
+  sha256sum "control-center/deploy/nginx/conf.d/$f" "/etc/nginx/sites-enabled/$f"
+done | tee "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
+# The host file that declares the cc_auth_login zone is not named by the repo;
+# locate it and hash it next to the tracked fragment.
+sha256sum control-center/deploy/nginx/fragments/00-rate-limit-zones.conf \
+  $(grep -rl 'zone=cc_auth_login:' /etc/nginx) \
+  | tee -a "$EVIDENCE_DIR/host-vs-tracked-vhosts.sha256"
 ```
 
 Gate: NGINX owns host 80/443; Caddy is only `127.0.0.1:18080/18443`; the web
