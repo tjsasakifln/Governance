@@ -239,6 +239,42 @@ describe("collectFromWarmblyPayload counts: absence is never 0", () => {
     assert.equal(answered.counts.inbound_now, 0);
   });
 
+  it("omits inbound_now when /v1/confenge/inbound answered 200 without a list body, keeps 0 for an empty list", () => {
+    // http/client.ts hands the collector json=null for an empty body and
+    // {raw} for a non-JSON body; an {error} object or {data: null} are the
+    // other 200-shaped bodies a count must not be read from.
+    for (const body of [null, { raw: "<html>502" }, { error: "internal" }, { data: null }]) {
+      const payload = loadFixture("commercial-runtime.json");
+      (payload as Record<string, unknown>).confenge_inbound = body;
+      const snapshot = collectFromWarmblyPayload(payload, { now: NOW });
+      assert.equal("inbound_now" in snapshot.counts, false, JSON.stringify(body));
+      assert.notEqual(snapshot.counts.inbound_now, 0, JSON.stringify(body));
+      assert.equal(JSON.parse(JSON.stringify(snapshot)).counts.inbound_now, undefined);
+    }
+    for (const body of [[], { data: [] }]) {
+      const payload = loadFixture("commercial-runtime.json");
+      (payload as Record<string, unknown>).confenge_inbound = body;
+      assert.equal(collectFromWarmblyPayload(payload, { now: NOW }).counts.inbound_now, 0);
+    }
+  });
+
+  it("omits campaigns_active when /v1/campaigns answered 200 without a list body and the overview is absent", () => {
+    for (const body of [null, { raw: "<html>502" }, { error: "internal" }, { data: null }]) {
+      const payload = loadFixture("commercial-runtime.json");
+      payload.campaigns_overview = undefined;
+      (payload as Record<string, unknown>).campaigns = body;
+      const snapshot = collectFromWarmblyPayload(payload, { now: NOW });
+      assert.equal("campaigns_active" in snapshot.counts, false, JSON.stringify(body));
+      assert.notEqual(snapshot.counts.campaigns_active, 0, JSON.stringify(body));
+    }
+    for (const body of [[], { data: [] }]) {
+      const payload = loadFixture("commercial-runtime.json");
+      payload.campaigns_overview = undefined;
+      (payload as Record<string, unknown>).campaigns = body;
+      assert.equal(collectFromWarmblyPayload(payload, { now: NOW }).counts.campaigns_active, 0);
+    }
+  });
+
   it("omits campaigns_active only when neither campaigns surface answered", () => {
     const payload = loadFixture("commercial-runtime.json");
     payload.campaigns_overview = undefined;

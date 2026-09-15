@@ -13,6 +13,7 @@ import {
   LEADS_LIST_CONTRACT,
 } from "../contracts/required-upstream.ts";
 import {
+  listOrUndefined,
   unwrapData,
   unwrapList,
   type EndpointFailure,
@@ -302,10 +303,15 @@ export function collectFromWarmblyPayload(
   const deals = unwrapList(payload.deals);
   const tasks = mergeTasks(payload);
   const contacts = unwrapList(payload.contacts);
-  const campaigns = unwrapList(payload.campaigns);
+  const campaignsList = listOrUndefined(payload.campaigns);
+  const campaigns = campaignsList ?? [];
   const pipelines = unwrapList(payload.pipelines);
   const confengeAttention = unwrapList(payload.confenge_attention);
-  const inbound = unwrapList(payload.confenge_inbound);
+  // Kept as "list or undefined": an inbound/campaigns surface that answered 200
+  // with a body that is not a list (null, `{raw}`, `{error}`, `{data: null}`)
+  // is FRESH as a fetch but supplies no count.
+  const inboundList = listOrUndefined(payload.confenge_inbound);
+  const inbound = inboundList ?? [];
   const today = unwrapData(payload.confenge_today);
   const unibox = payload.unibox_overview;
 
@@ -415,14 +421,16 @@ export function collectFromWarmblyPayload(
   const intelExceptions = unknownList(payload.confenge_intel_exceptions);
 
   // Absence is never 0. A count is emitted only when the surface that supplies
-  // it answered (FRESH); an UNKNOWN/ERROR surface leaves the key out so the
-  // projector, the context service and the cockpit render "ausente" instead
-  // of a fabricated zero. 0 survives only when the surface answered empty.
+  // it answered (FRESH) with a usable body: an integer for the scalar surfaces,
+  // a list for the list-derived counts. An UNKNOWN/ERROR surface, or a 200
+  // whose body is not a list, leaves the key out so the projector, the context
+  // service and the cockpit render "ausente" instead of a fabricated zero.
+  // 0 survives only when the surface answered with an empty list.
   const campaignsActive: number | undefined =
     campaignsOverviewFresh === "FRESH" && Number.isInteger(payload.campaigns_overview?.active)
       ? (payload.campaigns_overview?.active as number)
-      : campaignsFresh === "FRESH"
-        ? campaigns.filter((c) => (c.status ?? "").toLowerCase() === "active").length
+      : campaignsFresh === "FRESH" && campaignsList !== undefined
+        ? campaignsList.filter((c) => (c.status ?? "").toLowerCase() === "active").length
         : undefined;
   const inboxUnread: number | undefined =
     uniboxFresh === "FRESH" && Number.isInteger(unibox?.unread) ? (unibox?.unread as number) : undefined;
@@ -431,8 +439,8 @@ export function collectFromWarmblyPayload(
       ? (unibox?.awaiting_reply as number)
       : undefined;
   const inboundNow: number | undefined =
-    inboundFresh === "FRESH"
-      ? inbound.filter((l) => {
+    inboundFresh === "FRESH" && inboundList !== undefined
+      ? inboundList.filter((l) => {
           const s = (l.status ?? "new").toLowerCase();
           return s !== "done" && s !== "handled" && s !== "closed";
         }).length
