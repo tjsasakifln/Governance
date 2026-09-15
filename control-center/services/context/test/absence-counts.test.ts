@@ -36,6 +36,32 @@ function commercialRow(payload: Record<string, unknown>): OperationalSnapshotRow
   };
 }
 
+/**
+ * A row persisted by an older runner whose projector still wrote raw `counts`
+ * and no `funnel`. The context service derives the funnel from those counts on
+ * the read side; the derived keys must follow the same absence rule.
+ */
+function legacyCountsRow(counts: Record<string, unknown>): OperationalSnapshotRow {
+  return {
+    id: "cc:operational-snapshot:legacy-counts",
+    scope: "commercial",
+    snapshot_kind: "commercial",
+    generated_at: OBSERVED_AT,
+    source: { system: "warmbly", kind: "crm-read-model", locator: "commercial/pipeline" },
+    observed_at: OBSERVED_AT,
+    freshness_status: "FRESH",
+    confidence: 0.9,
+    payload: JSON.parse(
+      JSON.stringify({
+        schema_version: "control-center.commercial-snapshot.v1",
+        availability: "FRESH",
+        configured: true,
+        counts,
+      }),
+    ) as Record<string, unknown>,
+  };
+}
+
 async function commercialSnapshot(row: OperationalSnapshotRow): Promise<Record<string, unknown>> {
   const operational = createOperationalService({
     port: createFixtureOperationalPort({ operational_snapshots: [row] }),
@@ -92,4 +118,20 @@ test("context keeps a real zero when the Warmbly surface answered an empty list"
   assert.equal(snapshot.inbound_unread_count, 0);
   const overview = ((snapshot.operations as Record<string, unknown>).overview ?? {}) as Record<string, unknown>;
   assert.equal(overview.inbound_requiring_attention, 0);
+});
+
+test("context derives the funnel from legacy raw counts without fabricating new_leads from an absent inbound_now", async () => {
+  const withInbound = await commercialSnapshot(legacyCountsRow({ deals_open: 2, inbound_now: 3, inbox_unread: 1 }));
+  assert.deepEqual(withInbound.funnel, { new_leads: 3, opportunities: 2 });
+  assert.equal(withInbound.inbound_unread_count, 1);
+
+  const withoutInbound = await commercialSnapshot(legacyCountsRow({ deals_open: 2 }));
+  assert.deepEqual(withoutInbound.funnel, { opportunities: 2 });
+  const funnel = withoutInbound.funnel as Record<string, unknown>;
+  assert.equal("new_leads" in funnel, false);
+  assert.notEqual(funnel.new_leads, 0);
+  assert.equal(withoutInbound.inbound_unread_count, undefined);
+
+  const noCounts = await commercialSnapshot(legacyCountsRow({}));
+  assert.equal(noCounts.funnel, undefined);
 });
